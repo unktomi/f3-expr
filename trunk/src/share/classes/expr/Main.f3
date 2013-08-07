@@ -1,0 +1,281 @@
+package expr;
+import f3.jogl.awt.JoglStage;
+import f3.jogl.awt.JoglStage.*;
+import f3.math.*;
+import f3.math.LinearMath.*;
+import f3.util.Bits;
+import f3.media.scene.*;
+import f3.media.input.*;
+import f3.media.svg.SVG;
+import java.lang.Math;
+import expr.choices.SliderField;
+
+function readTextFile from (url is String) to (String, Integer)
+{
+    const u = new java.net.URL(url);
+    const reader = new java.io.BufferedReader(new java.io.InputStreamReader(u.openStream()));
+    var line is Object;
+    var buf = new java.lang.StringBuffer;
+    var lineCount = 0;
+    while ((line = reader.readLine()) <> null) {
+	buf.append(line);
+	buf.append("\n");
+	lineCount++;
+    }
+    return (buf.toString(), lineCount);
+
+}
+
+public function run from (args is String[]) to ()
+{
+    var currentCamera is Camera;
+    var TheWebBrowserFactory is AbstractWebBrowserFactory;
+    try {
+	const clazz = 
+	    java.lang.Class.forName("f3.media.web.awesomium.AwesomiumWebBrowserFactory") as java.lang.Class of AbstractWebBrowserFactory;
+	TheWebBrowserFactory = clazz.newInstance();
+	    
+    } catch (e is java.lang.Exception) {
+	println("NOTE: couldn't load awesomium web browser factory");
+    }
+
+    println("args={args}");
+
+    var playerUrl is String;
+    readonly var model is Ma.Model = 
+	bind if (not playerUrl.endsWith(".ma")) then null else Ma.Model {
+		effectLoader: the CGEffectLoader;
+		imageLoader: the ImageLoader;
+		url: playerUrl;
+	    };
+
+    var clipIndex is Integer;
+
+    const getClips = function from (libs is TimeGroup[]) to TimeNode[] {
+	foreach (lib in libs) lib.content;
+    }
+
+    readonly var allClips = bind getClips(model.getClipLibraries());
+    readonly var clips is TimeNode[] = bind [model.getTemporalRoot(), allClips];
+
+    readonly var currentClip is TimeNode = bind clips[clipIndex];
+
+    const mainTimeLayer = TimeLayer {
+	content: bind currentClip;
+	playCount: -1;
+    }
+
+    const player = Timeline {
+	content: mainTimeLayer;
+    }
+
+    const camera = PerspectiveCamera {
+        id: "free";
+	ty: 3.0;
+	tz: 13;
+	near: 1;
+	far: 100;
+	content: PointLight {}
+    }
+
+    const viewer = DefaultExaminerViewer {
+	camera: camera;
+    }
+
+    const browser = if TheWebBrowserFactory == null then null else WebBrowser {
+	//factory: TheWebBrowserFactory;
+	//effectLoader: CGEffectLoader_INSTANCE;
+	//pathFactory: ThePath2DFactory;
+    }
+
+    var currentModel is Node = HTML {
+    	content: "<html style='overflow:hidden;border:none;'><body><h1>Welcome to F3</h1></body></html>";
+	height: 100;
+	width: 300;
+	//factory: TheWebBrowserFactory;
+	//effectLoader: CGEffectLoader_INSTANCE;
+	//pathFactory: ThePath2DFactory;
+    }
+
+    readonly var svgModel = bind if (not playerUrl.endsWith(".svg")) then null else SVG {
+		url: playerUrl;
+		factory: ThePath2DFactory
+	    };
+
+    readonly var imageModel = bind if (playerUrl.endsWith(".jpg") or 
+			      playerUrl.endsWith(".png") or
+			      playerUrl.endsWith(".tiff") or
+			      playerUrl.endsWith(".tif") or 
+			      playerUrl.endsWith(".tga")) 
+	Image { 
+	    url: playerUrl;
+	} else null;
+
+    readonly var textModel = bind if (playerUrl.endsWith(".txt")) then 
+	Text.Area {
+	    //pathFactory: ThePath2DFactory;
+	    //layoutEngine: TheLayoutEngine;
+	    override var height = bind font.height() * 24;
+	} else null;
+
+    function doDrop from (url is String) to () 
+    {
+	stage.title = url;
+	playerUrl = url;
+	if (url.endsWith(".ma")) {
+	    viewer.focusCamera(currentModel = model.getSpatialRoot());
+	} else if (url.endsWith(".svg")) {
+	    viewer.focusCamera(currentModel = svgModel.root)
+	} else if (url.endsWith(".png") or url.endsWith(".jpg") or url.endsWith(".tif") or url.endsWith(".tiff") or url.endsWith(".tga")) {
+	    viewer.focusCamera(currentModel = imageModel)
+	} else if (url.endsWith(".txt")) {
+	    textModel.setText(readTextFile(url).first);
+	    viewer.focusCamera(currentModel = TransformNode {
+		    tx: 150;
+		    ty: 150;
+		    content: textModel;
+		});
+	} else {
+	    if (browser <> null) {
+		browser.url = url;
+		currentModel = browser;
+		viewer.focusCamera(currentModel = browser);
+	    }
+	}
+	currentTransform.tx = 0;
+	currentTransform.ty = 0;
+	currentTransform.tz = 0;
+	currentTransform.rx = 0;
+	currentTransform.ry = 0;
+	currentTransform.rz = 0;
+	currentTransform.sx = 1;
+	currentTransform.sy = 1;
+	currentTransform.sz = 1;
+	currentTransform.px = 0;
+	currentTransform.py = 0;
+	currentTransform.pz = 0;
+	trax.setClips(clips);
+    }
+    var trax is expr.timeline.Trax;
+    const currentTransform = TransformNode {
+	content: bind currentModel;
+    }
+    currentCamera = camera;
+    const mainScene = Scene {
+	background: Color.GRAY;
+	override var camera = bind currentCamera on invalidate {
+	    println("scene camera invalidated {currentCamera}");
+	}
+	content: bind currentTransform;
+    }
+
+    var toolMenu = expr.toolmenu.ToolMenu {
+	transform: bind translate(stage.width /2, 
+				  stage.height - 10);
+	height: 20;
+	width: bind stage.width;
+	pause: &player.paused;
+	onRewind: player.setPlayhead.apply(0s);
+    };
+
+    var stage is JoglStage = JoglStage {
+	height: 800, width: 1020;
+	title: new java.io.File(args[0]).getName();
+	content: [mainScene,
+		  Scene {
+                      background: null;
+                      camera: camera;
+		      override var content = expr.manipulator.Manipulator 
+		      {
+                          viewer: viewer;
+			  target: bind currentTransform;
+			  scene: this;
+		      }
+                  },
+		  Scene {
+                    background: null;
+                    camera: Camera2D {}; 
+		    content: 
+		    [if (true) null else VBox {
+		        transform: translate(100, 30);
+                        content:
+		            foreach (i in [1..3]) SliderField {
+		            }
+                    },
+		    InternalWindow {
+		    	height: 150, width: 820;
+			cx: 520, cy: 100;	   
+			content: trax = expr.timeline.Trax {
+		           target: player;
+			   targetNode: mainTimeLayer;
+			}
+		    },
+		    toolMenu]
+                  }]
+    }
+
+    operation setCamera from (i is Integer) to ()
+    {
+	if (i == 0) {
+	    currentCamera = camera;
+	} else if (i == 9) {
+	    currentCamera = Camera2D {};
+	} else {
+	    const cam = model.getCameras()[i-1];
+	    if (cam <> null) {
+		currentCamera = cam;
+	    }
+	}
+	println("camera={camera.tx}, {camera.ty}, {camera.tz}");
+    }
+
+    const setClip = function from (i is Integer) to ()
+    {
+	clipIndex = Math.min(clips.size()-1, i);
+	println("clip={clips[clipIndex]}");
+    }
+
+    stage.addMouseInputHandler(viewer);
+    stage.addKeyboardInputHandler(KeyboardInputHandler {
+	    override function onKeyDown from (event is KeyboardEvent) to () 
+	    {
+		if (event.propagate) {
+		    if (event.keyCode == Keys.F) {
+			viewer.focusCamera(currentModel);
+		    } else if (event.keyCode >= Keys._0 and event.keyCode <= Keys._9) {
+			const index = event.keyCode - Keys._0;
+			if (event.metaKey) {
+			    setClip(index);
+			} else {
+			    setCamera(index);
+			}
+		    } else if (event.keyCode == Keys.G) {
+			java.lang.System.gc();
+			//showMemory = not showMemory;
+		    }
+		}
+	    }
+	});
+    stage.addDnDInputHandler(DnDInputHandler {
+	    override function onDrop from (event is DropEvent) to () 
+	    {
+		const url = event.url;
+		event.accept();
+		try {
+		    const checkProtocol = new java.net.URL(url);
+		    doDrop(url);
+		} catch (exception is java.lang.Exception) {
+		    exception.printStackTrace();
+		}
+	    }
+	});
+
+    stage.invoke(function {
+	    viewer.focusCamera(currentModel);
+	});
+
+}
+
+
+
+

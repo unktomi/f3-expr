@@ -1,0 +1,30 @@
+package expr.prog;
+
+public class VisualProgram {
+}
+
+class AbstractData {
+}
+
+class Data is AbstractData {
+    var alternatives is Codata;
+}
+
+class Codata {
+    var components is Data;
+}
+
+class Num is AbstractData {
+}
+
+class Bool is AbstractData {
+}
+
+class FunctionAbstraction {
+}
+
+class FunctionApplication {
+}
+
+class Variable {
+}

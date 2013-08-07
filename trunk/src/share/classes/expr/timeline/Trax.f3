@@ -1,0 +1,374 @@
+package expr.timeline;
+import expr.*;
+import f3.media.scene.*;
+import f3.media.scene.Shape2D.*;
+import f3.media.input.*;
+import f3.util.*;
+import f3.util.Observer.*;
+import f3.math.*;
+import f3.math.LinearMath.*;
+import java.lang.Math;
+
+class TimeNodeView is AbstractNode 
+{
+    public var trax is Trax;
+    public var target is TimeNode;
+    public var playX is Number = bind trax.durationToX(target.playTime);
+    public var content is Node[] = bind getContent(target);
+    public var expanded = false;
+
+    function getWidth from (i is Interval) to Number 
+    {
+	const w = Math.max(trax.durationToX(i.duration()), 100);
+	return w;
+    }
+
+    bound function getFill from (target is TimeNode) to Paint {
+	return ColorPaint(Color.color(.2, .2, .2));
+    }
+
+    bound function getContent from (target is TimeNode) to Node[]
+    {
+	if (target is TimeGroup) then foreach (n in (target as TimeGroup).content) trax.makeTimeNodeView(this, n) else [];
+    }
+
+    var w = bind getWidth(target.bounds);
+    override var transform = bind translate(playX + w / 2.0, trax.height / 2 - 20);
+    override var internalContent = Group {
+	content:
+	VBox {
+            var dx is Number;
+	    content: bind
+	    [if (target.id == "") then null else
+             Group is MouseInputHandler {
+		     override function onMouseDown from (event is MouseEvent) to ()
+		     {
+			 dx = trax.durationToX(target.playTime);
+			 println("MOUSE DOWN");
+		     }
+		     override function onMouseDrag from (event is MouseEvent) to ()
+		     {
+			 dx += (event.picked.dragPoint1 - event.picked.dragPoint0).x;
+			 target.playTime = trax.frameTo(trax.xToDuration(dx));
+			 trax.updatePlayhead();
+			 println("dx={dx}, target {target.id}.playTime={target.playTime}");
+			 println("X={playX}");
+			 println("translation={internalContent.transform.getTranslation()}");
+			 println("scene.translation={internalContent.toSceneTransform.getTranslation()}");
+		     }
+		content: 
+		[Rectangle
+		 {
+		     height: bind trax.getViewHeight();
+		     width: bind w;
+		     fillPaint: bind getFill(target);
+		 },
+		 Text.Label {
+		     transform: translate(0, 2);
+		     height: bind trax.getViewHeight();
+		     width: bind w;
+		     background: getFill(target);
+		     foreground: ColorPaint(Color.color(.9, .9, .9, 1));
+		     text: bind target.id;
+		     font: bind timeNodeViewFont;
+		 }];
+	      },
+              Group { 
+                   content: bind if (expanded) then content else [] 
+	      }]
+	 }
+    }
+}
+
+public class Playhead is AbstractNode {
+
+    public var x is Number;
+    public var height is Number = 500;
+    public var trax is Trax;
+
+    const self = this;
+    override var transform = bind translate(x, 0, 0.5);
+
+    const playhead_top = Image { 
+	url: "{__DIR__}playhead_top.png" 
+	override var transform = bind translate(0, self.height/2 - 5);
+    };
+
+    const playhead_middle = Image { 
+	url: "{__DIR__}playhead_middle.png";
+	override var transform = bind scale(1, self.height/8)
+    };
+
+    const playhead_bottom = Image { 
+	url: "{__DIR__}playhead_bottom.png" 
+	override var transform = bind translate(0, -self.height / 2);
+    };
+
+    const playhead_marker is Image = Image { 
+	override var transform = bind translate(0, self.height/2 -5);
+	url: "{__DIR__}playhead_marker.png";
+    };
+
+    override var internalContent = Group {
+	content: bind
+	[playhead_middle, playhead_bottom, playhead_top, playhead_marker];
+    } 
+
+
+    override function update {
+	//println("marker={playhead_marker.bounds} height={height} x={x}");
+	if (disp1 == null) createHandlers();
+    }
+
+    var tx = 0.0;
+
+    const onDown = DefaultObserver of MouseEvent {
+	override function onNext from (event is MouseEvent) to ()
+	{
+	    tx = trax.frameToX(trax.currentFrame-trax.scrollOffset);
+	}
+    }
+    const onDrag = DefaultObserver of MouseEvent {
+
+	override function onNext from (event is MouseEvent) to ()
+	{
+	    tx += (event.picked.dragPoint1 - event.picked.dragPoint0).x;
+	    //println("drag {tx}");
+	    trax.movePlayheadTo(tx);
+	}
+    };
+	
+    const onPlayhead = DefaultObserver of Duration {
+	override function onNext from (event is Duration) to () {
+	    const d = if (not target.paused and targetNode.contentBounds.duration() > 0s) event.rem(targetNode.contentBounds.duration()) else event;
+	    currentFrame = Math.round((d.toMillis() / 1000) * frameRate) as Integer;
+	    //println("currentFrame {event} => {currentFrame}");
+	    playhead.x = frameToX(currentFrame-scrollOffset);
+	}
+    }
+
+    var disp1 is Disposable;
+    var disp2 is Disposable;
+    var disp3 is Disposable;
+    function createHandlers {
+	disp1 = observeMouseDown().subscribe(onDown);
+	disp2 = observeMouseDrag().subscribe(onDrag);
+	disp3 = target.observePlayhead().subscribe(onPlayhead);
+    }
+}
+
+public class Trax is ResizableNode {
+
+    public var target is Timeline;
+    public var targetNode is TimeLayer;
+    var clips is TimeNode[];
+    public function setClips from (clips is TimeNode[]) to ()
+    {
+        this.clips = clips;
+    }
+
+    var timeNodeViews is Node[] = bind getTimeNodes(clips);
+    
+    bound function getTimeNodes from (content is TimeNode[]) to Node[] 
+    {
+	foreach (t in content) makeTimeNodeView(null, t)
+    }
+
+    var frameRate is Integer = 24;
+
+    const lineMesh = LineMesh {};
+    const backgroundColor is Color = Color.color(0.95, 0.95, 0.95);
+    const backgroundPaint is Paint = ColorPaint(backgroundColor);
+
+    function autoScrollLeft {
+    }
+
+    function autoScrollRight {
+    }
+
+    public var currentFrame is Integer on replace {
+	if (true or not target.paused) {
+	    if (currentFrame < scrollOffset) {
+		scrollOffset = currentFrame;
+	    } else if (currentFrame > scrollOffset + visibleFrameCount) {
+		scrollOffset = currentFrame - visibleFrameCount / 2;
+	    }
+	} else {
+	    if (currentFrame < scrollOffset) {
+		autoScrollLeft();
+	    } else if (currentFrame > scrollOffset + visibleFrameCount) {
+		autoScrollRight();
+	    }
+	}
+    }
+    
+    const PIXELS_PER_FRAME = 10;
+    
+    var visibleFrameCount is Integer = bind Math.round((width-10) / PIXELS_PER_FRAME) as Integer;
+    
+    function frameTo from (d is Duration) to Duration {
+	const seconds = d / 1s;
+	const frames = Math.round(seconds * frameRate);
+	return (1s / frameRate) * frames;
+    }
+
+    function xToDuration from (x is Number) to Duration
+    {
+	1s * x / (10 * frameRate);
+    }
+
+    function xToFrame from (x is Number) to Integer
+    {
+	Math.round(x / 10) as Integer;
+    }
+
+    function durationToX from (d0 is Duration) to Number
+    {
+	durationToX(d0, false);
+    }
+
+    function durationToX from (d0 is Duration, loop is Boolean) to Number
+    {
+	const d = if (loop and targetNode.contentBounds.duration() > 0s) d0.rem(targetNode.contentBounds.duration()) else d0;
+	const pixels = d / 1s * pixelsPerSecond();
+	return pixels;
+    }
+    
+    function pixelsPerSecond to Number {  
+	pixelsPerFrame() * frameRate;
+    }
+
+    function pixelsPerFrame to Integer { 10 }
+
+    function frameToX from (frame is Integer) to Number {
+	frame * pixelsPerFrame();
+    }
+
+    function getViewHeight to Number {
+	10
+    }
+
+    function updatePlayhead {
+	target.setPlayhead(target.playhead);
+    }
+
+    function movePlayheadTo from (x is Number) to ()
+    {
+	const d = xToDuration(x+frameToX(scrollOffset));
+	target.setPlayhead(d);
+    }
+
+    function getSelf to Trax { this }
+
+    const playhead is Playhead = Playhead {
+	id: "playhead";
+	trax: this;
+	override var height = bind getSelf().height;
+    }
+    var scrollOffset is Integer;
+    var visibleDuration is Duration;
+    var labels is Node[] = bind drawLabels(width, height, scrollOffset);
+    var font = bind layoutEngine.createFont("font-size:7;font-style:LucidaSans");
+    var timeNodeViewFont = bind layoutEngine.createFont("font-size:9;font-style:LucidaSans");
+
+    function makeTimeNodeView from (parent is TimeNodeView, t is TimeNode) to TimeNodeView {
+	println("Make time node view {parent}: {t}");
+	TimeNodeView {
+	    trax: this;
+	    target: t;
+	    expanded: t.id == "";
+	}
+    }
+
+    function drawLabels from (w is Number, h is Number, offset is Integer) to Node[] 
+    {
+	//println("draw labels {offset}");
+	const x = -w / 2 + 10;
+	const y = h / 2 - 15;
+	var off = offset - 10;
+	foreach (i in [0..<w step 100]) {
+	    off += 10;
+	    Text.Label {
+		height: 10;
+		width: 30;
+		background: this.backgroundPaint;
+		transform: translate(x+i+12, y+10);
+		font: font;
+		text: "{off}"
+	    }
+	}
+    }
+
+    function drawLines from (w is Number, h is Number) to AbstractMesh {
+	println("TIMELINE={target}");
+	const x0 = -w / 2 + 10;
+	const y0 = h / 2 - 15;
+	var x = x0;
+	var y = y0;
+	var mid is Boolean = false;
+	lineMesh.reset();
+	lineMesh.moveTo(x, y);
+	for (i in [0..<w step 10]) {
+	    var n = if (mid) then 3 else 5;
+	    mid = not mid;
+	    lineMesh.moveTo(x+i, y);
+	    lineMesh.lineTo(x+i, y+n);
+	}
+	for (i in [0..<h step 10]) {
+	    lineMesh.moveTo(x, y);
+	    lineMesh.lineTo(x + width-10, y);
+	    y -= 10;
+	}
+	const mesh = lineMesh.getMesh();
+	mesh.updateBounds();
+	println("draw lines: {mesh.bounds} {mesh.vertices.getVertexCount()}");
+	return mesh;
+    }
+    
+    override var internalContent = Group {
+	content: 
+	[Rectangle is MouseInputHandler {
+		id: "background"
+		override var height = bind getSelf().height;
+		override var width = bind getSelf().width;
+		fillPaint: bind ColorPaint(backgroundColor);
+		override function onMouseDown from (event is MouseEvent) to ()
+		{
+		    println("event={event}");
+		    println("event.sceneLoc={event.sceneLocation}");
+		    if (event.location.y >= height / 2 -15) {
+			movePlayheadTo(event.location.x+width/2-10);
+		    }
+		    dx = 0;
+		    startOff = scrollOffset;
+		}
+		var dx = 0.0;
+		var startOff = 0;
+		override function onMouseDrag from (event is MouseEvent) to ()
+		{
+		    if (event.location.y < height / 2 -15) {
+			dx += (event.picked.dragPoint1 - event.picked.dragPoint0).x;
+			const off = scrollOffset;
+			scrollOffset = -xToFrame(dx) + startOff;
+			const delta = scrollOffset - off;
+			target.setPlayhead(target.playhead);
+		    }
+		}
+	 },
+	 Group { content: bind labels },
+         MeshNode {
+	     id: "lines"
+	     pickable: false;
+	     override var mesh = bind getSelf().drawLines(getSelf().width, getSelf().height);
+	     shader: effectLoader.loadPaintShader(ColorPaint(Color.color(.75, .75, .75)));
+	 },
+	 TransformNode { 
+	     override var tx = bind -getSelf().width/2+10-frameToX(scrollOffset);
+	     content:
+	     [Group {
+		 content: bind timeNodeViews;
+	     },
+	     Group { content: bind playhead }]
+	 }]
+    }
+}

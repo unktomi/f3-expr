@@ -1,0 +1,33 @@
+package expr;
+import f3.util.*;
+import f3.media.scene.*;
+import f3.media.scene.Shape2D.*;
+import f3.media.input.*;
+
+public class Button is ResizableNode {
+    public var baseURL is String;
+    var active = bind Image { url: "{baseURL}_active.png" };
+    var inactive = bind Image { url: "{baseURL}_inactive.png" };
+    var hover = bind Image { url: "{baseURL}_hover.png" };
+    var pressed is Boolean;
+    override var internalContent = Group {
+	content: bind 
+	[Rectangle { height: bind height, width: bind width, fillPaint: ColorPaint(Color.color(.3, .3, .3, 0)) },
+	if (pressed and containsPointer) then active else if containsPointer then hover else inactive];
+    }
+    const down = observeMouseDown().subscribe(function from (event is MouseEvent) to () {
+	    println("pressed");
+	    pressed = true
+	});
+    const up = observeMouseUp().subscribe(function from (event is MouseEvent) to () {
+	    println("released");
+	    pressed = false;
+	    if (containsPointer) {
+		onPress();
+		subject.onNext(());
+	    }
+	});
+    const subject = Subject of (()) {};
+    public function observePress to Observable of () { subject }
+    public var onPress is function from () to ();
+}
