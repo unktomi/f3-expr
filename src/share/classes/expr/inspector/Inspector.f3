@@ -1,0 +1,80 @@
+package expr.inspector;
+import f3.media.scene.*;
+import expr.choices.*;
+import f3.lang.*;
+
+abstract class Inspected of a 
+{
+    public const pointer is Ref of a;
+    public var label is String;
+    public function getAsString from (t is Number) to String
+    {
+	"{get(t)}"
+    }
+    public function get from (t is Number) to a;
+    public function set from (t is Number) to () 
+    { 
+	pointer.set(get(t)); 
+    }
+}
+
+class InspectedNumber is Inspected of Number 
+{
+    public const low is Number;
+    public const hi is Number;
+    override function get from (t is Number) to Number 
+    { 
+	low + (hi - low)*t;
+    }
+}
+
+class InspectedChoice of a is Inspected of a 
+{
+    public const choices is (..a)[];
+    public const labels is String[] = foreach (choice in choices) "{choice}";
+
+    function getIndex from (t is Number) to Integer 
+    {
+	(t * choices.size()) as Integer
+    }
+
+    override function getAsString from (t is Number) to String
+    {
+	labels[getIndex(t)];
+    }
+
+    override function get from (t is Number) to a
+    { 
+	choices[getIndex(t)];
+    }
+}
+
+class InspectedBoolean is Inspected of Boolean
+{
+    override public function getAsString from (t is Number) to String
+    {
+	if (get(t)) then "Yes" else "No"
+    }
+
+    override public function get from (t is Number) to Boolean
+    {
+	t == 0.0
+    }
+}
+
+
+public class Inspector is AbstractNode {
+    public var inspecting is (Inspected of ?)[];
+    public var width is Number;
+    public var height is Number;
+    override var internalContent = VBox {
+	content: bind foreach (i in inspecting) {
+	    TransformNode {
+		tx: bind -width / 2
+		content: Text.Label {
+		    text: i.label
+		}
+	    }
+	}
+    }
+}

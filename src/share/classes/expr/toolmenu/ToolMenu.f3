@@ -1,0 +1,77 @@
+package expr.toolmenu;
+import expr.*;
+import f3.media.scene.*;
+import f3.media.input.*;
+import f3.media.scene.Shape2D.*;
+import f3.util.*;
+import f3.util.Observer.*;
+import f3.lang.*;
+import f3.math.LinearMath.*;
+
+public class ToolMenu is ResizableNode {
+
+    public var pause is Ref of Boolean;
+
+    function togglePause 
+    {
+	pause.set(not pause.get());
+    }
+
+    public var onRewind is function from () to ();
+
+    const play is Button = Button {
+        height: 18, width: 28;
+	baseURL: "{__DIR__}play"
+	onPress: togglePause
+    };
+
+    const rewind is Button = Button {
+        height: 18, width: 28;
+	baseURL: "{__DIR__}rewind"
+	onPress: bind onRewind;
+    };
+
+    const record is Button = Button {
+        height: 18, width: 28;
+	baseURL: "{__DIR__}record"
+    };
+
+    const loop is Button = Button {
+        height: 18, width: 28;
+	baseURL: "{__DIR__}loop"
+    };
+
+    const sound = Button {
+        height: 18, width: 28;
+	baseURL: "{__DIR__}sound"
+    };
+
+    function layout from (buttons is Button[]) to Node[] {
+	foreach (b in buttons) {
+	    TransformNode {
+		tx: bind b.width * indexof b + 1;
+		content: bind b;
+	    }
+	}
+    }
+    
+    var buttons = bind [record, rewind, play, loop, sound];
+
+    const box = Group {
+	content: bind layout(buttons);
+    };
+
+    override var internalContent = Group {
+	content: bind
+	[Rectangle {
+	    width: bind width;
+	    height: bind height;
+	    fillPaint: ColorPaint(Color.color(.3, .3, .3));
+	    pickable: false;
+	},
+        TransformNode {
+	    tx: bind width / 2 - (28 * buttons.size() + buttons.size()-1);
+	    content: bind box;
+	}]
+    }
+}

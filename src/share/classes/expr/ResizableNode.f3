@@ -1,0 +1,12 @@
+package expr;
+import f3.media.scene.*;
+
+public abstract class ResizableNode is AbstractNode {
+    public var width is Number;
+    public var height is Number;
+    public function resize from (w is Number, h is Number) to ()
+    {
+	width = w;
+	height = h;
+    }
+}

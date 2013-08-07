@@ -1,0 +1,95 @@
+package expr;
+import f3.media.scene.*;
+import f3.media.scene.Shape2D.*;
+import f3.media.input.*;
+import f3.math.*;
+import f3.math.LinearMath.*;
+import f3.util.*;
+import f3.util.Observer.*;
+
+public class InternalWindow is ResizableNode {
+
+    public var cx is Number;
+    public var cy is Number;
+
+    override function resize from (w is Number, h is Number) to ()
+    {
+	super.resize(w, h);
+	content.resize(w-2, h-32);
+    }
+
+    override var transform = bind translate(cx, cy);
+    const self = this;
+
+    const titleBar is Node = Rectangle {
+	override var transform = bind translate(0, self.height / 2 - 5);
+	height: 10;
+	override var width = bind self.width;
+	fillPaint: ColorPaint(Color.color(.18, .18, .18));
+    };
+
+    const buttonBar is Node = Rectangle {
+	override var transform = bind translate(0, self.height / 2 - 6 - 10);
+	height: 12;
+	override var width = bind self.width;
+	fillPaint: ColorPaint(Color.color(.3, .3, .3));
+    };
+
+    const resizeCorner is Node = Rectangle {
+	override var transform = bind translate(self.width/2 -6, -self.height/2 + 6);
+	height: 12;
+	width: 12
+	fillPaint: ColorPaint(Color.color(.65, .65, .65));
+    };
+
+    const leftSide is Node = Rectangle {
+	override var transform = bind translate(-self.width/2, 0);
+	override var height = bind self.height;
+	width: 1;
+	fillPaint: ColorPaint(Color.color(.18, .18, .18));
+    }
+
+    const rightSide is Node = Rectangle {
+	override var transform = bind translate(self.width/2, 0);
+	override var height = bind self.height;
+	width: 1;
+	fillPaint: ColorPaint(Color.color(.18, .18, .18));
+    }
+
+    public var content is ResizableNode;
+
+    override var internalContent = Group {
+	content: bind [titleBar, buttonBar, TransformNode { ty: -5, content: bind content}, resizeCorner, leftSide, rightSide];
+    } 
+       
+    postinit {
+	createHandlers();
+    }
+
+    var mover is Disposable;
+    var resizer is Disposable;
+
+    function createHandlers {
+        const onMove = DefaultObserver of MouseEvent {
+	      override function onNext from (event is MouseEvent) to ()
+	      {     	       		
+		  const v = event.picked.dragPoint1 - event.picked.dragPoint0;
+		  cx += v.x;
+		  cy += v.y;
+	      }
+	}
+        const onResize = DefaultObserver of MouseEvent {
+	      override function onNext from (event is MouseEvent) to ()
+	      {     	       		
+		  const v = event.picked.dragPoint1 - event.picked.dragPoint0;
+		  width += v.x;
+		  height -= v.y;
+		  resize(width, height);
+		  cx += v.x/2;
+		  cy += v.y/2;
+	      }
+	}
+	mover = titleBar.observeMouseDrag().subscribe(onMove);
+    	resizer= resizeCorner.observeMouseDrag().subscribe(onResize);
+    }
+}
