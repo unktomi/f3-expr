@@ -1,0 +1,23 @@
+package expr.undo;
+
+package var undoables = new java.util.WeakHashMap of (UndoList, ());
+
+public function getUndoables to UndoList[] 
+{
+    foreach (x in undoables.keySet()) x;
+}
+
+public function undo 
+{
+    for (t in getUndoables()) t.undo();
+}
+
+public function redo 
+{
+    for (t in getUndoables()) t.redo();
+}
+
+public function commit 
+{
+    for (t in getUndoables()) t.commit();
+}

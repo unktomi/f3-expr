@@ -9,6 +9,7 @@ import f3.media.input.*;
 import f3.media.svg.SVG;
 import java.lang.Math;
 import expr.choices.SliderField;
+import expr.undo.*;
 
 function readTextFile from (url is String) to (String, Integer)
 {
@@ -155,6 +156,7 @@ public function run from (args is String[]) to ()
 	currentTransform.py = 0;
 	currentTransform.pz = 0;
 	trax.setClips(clips);
+	MasterUndoable.commit();
     }
     var trax is expr.timeline.Trax;
     const currentTransform = TransformNode {
@@ -177,6 +179,8 @@ public function run from (args is String[]) to ()
 	pause: &player.paused;
 	onRewind: player.setPlayhead.apply(0s);
     };
+    
+    var manip is expr.manipulator.Manipulator;
 
     var stage is JoglStage = JoglStage {
 	height: 800, width: 1020;
@@ -185,7 +189,7 @@ public function run from (args is String[]) to ()
 		  Scene {
                       background: null;
                       camera: camera;
-		      override var content = expr.manipulator.Manipulator 
+		      override var content = manip = expr.manipulator.Manipulator 
 		      {
                           viewer: viewer;
 			  target: bind currentTransform;
@@ -214,7 +218,7 @@ public function run from (args is String[]) to ()
                   }]
     }
 
-    operation setCamera from (i is Integer) to ()
+    function setCamera from (i is Integer) to ()
     {
 	if (i == 0) {
 	    currentCamera = camera;
@@ -237,10 +241,27 @@ public function run from (args is String[]) to ()
 
     stage.addMouseInputHandler(viewer);
     stage.addKeyboardInputHandler(KeyboardInputHandler {
+
+	    override function onKeyInput from (event is KeyboardEvent) to () 
+	    {
+		if (event.keyChar == "-" or event.keyChar == "_") {
+		    manip.shrink();
+		} else if (event.keyChar == "+" or event.keyChar == "=") {
+		    manip.expand();
+		}
+	    }
+		
 	    override function onKeyDown from (event is KeyboardEvent) to () 
 	    {
 		if (event.propagate) {
-		    if (event.keyCode == Keys.F) {
+		    println("event={event}");
+		    if (event.keyCode == Keys.Z and event.metaKey) {
+			if (event.shiftKey) {
+			    MasterUndoable.redo();
+			} else {
+			    MasterUndoable.undo();
+			}
+		    } else if (event.keyCode == Keys.F) {
 			viewer.focusCamera(currentModel);
 		    } else if (event.keyCode >= Keys._0 and event.keyCode <= Keys._9) {
 			const index = event.keyCode - Keys._0;

@@ -5423,6 +5423,7 @@ createNode mesh -n "mScaleAll" -p "ScaleAll";
 	setAttr ".cd" -type "dataPolyComponent" Index_Data Edge 0 ;
 	setAttr ".cvd" -type "dataPolyComponent" Index_Data Vertex 0 ;
 createNode transform -n "RotateWheel";
+	setAttr ".v" no;
 	setAttr ".rp" -type "double3" -0.0023315951901853108 -1.3622607178014161e-08 1.5660401337175105e-08 ;
 	setAttr ".sp" -type "double3" -0.0023315951901853108 -1.3622607178014161e-08 1.5660401337175105e-08 ;
 createNode mesh -n "mRotateWheel" -p "RotateWheel";
