@@ -6,21 +6,62 @@ import f3.util.Observer.DefaultObserver;
 import f3.math.*;
 import f3.math.LinearMath.*;
 import java.lang.Math;
+import expr.undo.*;
 
 public class Manipulator is AbstractNode 
 {
     const assetUrl = "{__DIR__}/manipulator_full_v1.ma";
     const model = Ma.Model { url: assetUrl };
 
-    public var target is TransformNode;
+    const undoList = UndoList {
+    }
+
+    public var target is TransformNode on replace old {
+
+	undoList.removeTarget(&old.tx);
+	undoList.removeTarget(&old.ty);
+	undoList.removeTarget(&old.tz);
+
+	undoList.removeTarget(&old.rx);
+	undoList.removeTarget(&old.ry);
+	undoList.removeTarget(&old.rz);
+
+	undoList.removeTarget(&old.sx);
+	undoList.removeTarget(&old.sy);
+	undoList.removeTarget(&old.sz);
+
+	undoList.addTarget(&target.tx);
+	undoList.addTarget(&target.ty);
+	undoList.addTarget(&target.tz);
+
+	undoList.addTarget(&target.rx);
+	undoList.addTarget(&target.ry);
+	undoList.addTarget(&target.rz);
+
+	undoList.addTarget(&target.sx);
+	undoList.addTarget(&target.sy);
+	undoList.addTarget(&target.sz);
+    }
 
     public var viewer is ExaminerViewer; 
     
     public var scene is Scene;
 
+    public var viewSize is Number = 1.0 on replace { println("viewSize={viewSize}") }
+
+    public function expand 
+    {
+	viewSize *= 1.1;
+    }
+
+    public function shrink 
+    {
+	viewSize /= 1.1;
+    }
+
     public readonly var viewScale = bind {
-	var s = 0.2 * viewer.centerDistance / 10;
-	if (s <> 0) s else 1.0;
+	var s = viewer.centerDistance / 100;
+	if (s <> 0) then s*viewSize else 1.0;
     }
 
     const modelGroup is Group = Group {
@@ -31,8 +72,64 @@ public class Manipulator is AbstractNode
     }
 
     override var internalContent = Group {
-	override var transform = bind target.toSceneTransform;
+	override var transform = bind target.getScalePivotInScene();
         content: bind modelGroup;
+    };
+
+    function doScale from (event is MouseEvent, axis is Vec3) to ()
+    {
+	const m = event.picked.node.toSceneTransform;
+	const scenePt = m.getTranslation();
+	const off = (Point3.<<0>>+axis);
+	const p0 = scene.camera.toScreen(scenePt);
+	const p1 = scene.camera.toScreen(m * off);
+	const p2 = new Point3(event.screenx - event.screenDrag.x, 
+			      event.screeny + event.screenDrag.y,
+			      0);
+	const p3 = new Point3(event.screenx, event.screeny, 0);
+	println("p1={p1}, p2={p2}, p3={p3}");
+	const v0 = p1 - p0;
+	const v1 = p2 - p0;
+	const v2 = p3 - p0;
+	println("dot1={v1.dot(v0)}, dot2={v2.dot(v0)}");
+	const proj_s = Math.abs(v1.dot(v0) / v0.length());
+	const proj_t = Math.abs(v2.dot(v0) / v0.length());
+	println("proj_s={proj_s}, proj_t={proj_t}");
+	const v = axis  * (proj_t / proj_s);
+	println("v={v}");
+	applyScale(v);
+    }
+    
+    function applyScale from (v is Tuple3) to () 
+    {
+	if (v.x <> 0) target.sx *= v.x;
+	if (v.y <> 0) target.sy *= v.y;
+	if (v.z <> 0) target.sz *= v.z;
+    }
+
+    var lastMoveAllPoint is Point3[];
+    function doTranslateAll from (event is MouseEvent) to ()
+    {
+	const pt = target.toSceneTransform.getTranslation();
+	const ray = scene.camera.getPickRay(event.screenx, event.screeny);
+	const plane = Plane {
+	    point: pt;
+	    normal: ray.direction;
+	}
+	const hit = plane.intersectRay(ray);
+	if (hit == null) {
+	    return;
+	}
+	if (lastMoveAllPoint == []) {
+	    lastMoveAllPoint = [hit.point];
+	    return;
+	}
+	const toLocal = target.parent.toSceneTransform.inverse();
+	const p1 = toLocal * hit.point;
+	const p2 = toLocal * lastMoveAllPoint[0];
+	const d = p1 - p2;
+	lastMoveAllPoint = [hit.point];
+	applyTranslate(d);
     }
 
     function doTranslate 
@@ -75,19 +172,24 @@ public class Manipulator is AbstractNode
 		return;
 	    }
 	}
+	applyTranslate(d);
+    }
+
+    function applyTranslate from (d is Tuple3) to ()
+    {
 	target.tx += d.x;
 	target.ty += d.y;
 	target.tz += d.z;
     }
 
-    var lastMouse is Ray3;
+    var lastMouse is Ray3[];
 
     public var rotateOrder = Quat.EULER_ZYX;
     
     function doRotate from (event is MouseEvent, axis is Vec3) to ()
     {
 	println("DO ROTATE {event} {axis} {event.picked.node}");
-	const worldTransform = target.getPivot();
+	const worldTransform = target.getScalePivotInScene();
 	const translation = worldTransform.getTranslation();
 	const worldAxis = worldTransform * axis;
 	const planeNormal = worldAxis;
@@ -95,29 +197,48 @@ public class Manipulator is AbstractNode
 	    normal: planeNormal;
 	    point: translation;
 	}
-	const y = event.screenx;
-	scene.updateCamera();
 	const endRay = scene.camera.getPickRay(event.screenx, event.screeny);
-	const startRay = if (lastMouse == null) lastMouse = endRay else lastMouse;
+	if (lastMouse == []) {
+	    lastMouse = [endRay];
+	    return;
+	}
+	const startRay = lastMouse[0];
 	const hitStart = plane.intersectRay(startRay);
 	const hitEnd = plane.intersectRay(endRay);
 	if (hitStart == null or hitEnd == null) {
 	    return;
 	}
 	const startPos = hitStart.point;
+	println("startPos={startPos}");
 	const endPos = hitEnd.point;
+	println("endPos={startPos}");
 	const originToStart = (startPos - translation).normalize();
+	println("originToStart={originToStart}");
 	const originToEnd = (endPos - translation).normalize();
+	println("originToEnd={originToEnd}");
 	const rotCrossStart = worldAxis.cross(originToStart).normalize();
 	const rotCrossEnd = worldAxis.cross(originToEnd).normalize();
 	const startCrossEnd = rotCrossStart.cross(rotCrossEnd).normalize();
-	const dot = originToStart.dot(originToEnd);
-	const angle = Math.toDegrees(Math.acos(dot) * Math.signum(worldAxis.dot(startCrossEnd)));
-	const worldRotation = Quat.Quat(angle, worldAxis);
-	const sceneToLocal = target.parent.toSceneTransform.inverse();
-	const localRotation = (sceneToLocal * worldRotation.toMat4()).getRotation().normalize();
-	var angles = localRotation.toAngles(rotateOrder);
-	lastMouse = endRay;
+	const dot = Math.min(Math.max(originToStart.dot(originToEnd), 0),  1);
+	println("dot={dot}");
+	const radians = Math.acos(dot);
+	println("radians={radians}");
+	const angle = Math.toDegrees(radians * Math.signum(worldAxis.dot(startCrossEnd)));
+	println("ANGLE={angle}");
+	if (angle == 0) {
+	    return;
+	}
+	lastMouse = [endRay];
+	if (java.lang.Float.isNaN(angle)) {
+	    println("Nan");
+	    println("startPos={startPos} endPos={endPos}");
+	    return;
+	}
+	const worldRotation = rotate(angle, worldAxis);
+	const sceneToLocal = target.parentToSceneTransform.inverse();
+	const localRotation = (sceneToLocal * worldRotation).getRotation();
+	var angles = localRotation.toAngles();
+
 	for (n in [angles.x, angles.y, angles.z]) {
 	    if (java.lang.Float.isNaN(n)) {
 		return;
@@ -129,6 +250,57 @@ public class Manipulator is AbstractNode
 	target.rx += angles.x;
 	target.ry += angles.y;
 	target.rz += angles.z;
+    }
+
+    const onMouseUp = DefaultObserver of MouseEvent {
+	override function onNext from (event is MouseEvent) to () 
+	{
+	    MasterUndoable.commit();
+	}
+    }
+
+    const onMouseDownTranslate = DefaultObserver of MouseEvent {
+	override function onNext from (event is MouseEvent) to () 
+	{
+	    lastMoveAllPoint = [];
+	    enterTranslate();
+	}
+    }
+
+    const onMouseDownRotate = DefaultObserver of MouseEvent {
+	override function onNext from (event is MouseEvent) to () 
+	{
+	    lastMouse = [];
+	    enterRotate();
+	}
+    }
+
+    const onMouseDownScale = DefaultObserver of MouseEvent {
+	override function onNext from (event is MouseEvent) to () 
+	{
+	    enterScale();
+	}
+    }
+
+    const onScaleX = DefaultObserver of MouseEvent {
+	override function onNext from (event is MouseEvent) to () 
+	{
+	    doScale(event, Vec3.X_AXIS);
+	}
+    }
+
+    const onScaleY = DefaultObserver of MouseEvent {
+	override function onNext from (event is MouseEvent) to () 
+	{
+	    doScale(event, Vec3.Y_AXIS);
+	}
+    }
+
+    const onScaleZ = DefaultObserver of MouseEvent {
+	override function onNext from (event is MouseEvent) to () 
+	{
+	    doScale(event, Vec3.Z_AXIS);
+	}
     }
 
     const onRotateX = DefaultObserver of MouseEvent {
@@ -149,6 +321,13 @@ public class Manipulator is AbstractNode
 	override function onNext from (event is MouseEvent) to () 
 	{
 	    doRotate(event, Vec3.Z_AXIS);
+	}
+    }
+
+    const onMoveAll = DefaultObserver of MouseEvent {
+	override function onNext from (event is MouseEvent) to () 
+	{
+	    doTranslateAll(event);
 	}
     }
 
@@ -183,33 +362,48 @@ public class Manipulator is AbstractNode
     var rotateGuideX is Node;
     var rotateGuideY is Node;
     var rotateGuideZ is Node;
+    var scaleX is Node;
+    var scaleY is Node;
+    var scaleZ is Node;
+    var scaleAll is Node;
+    var rotateAll is Node;
+    var moveAll is Node;
 
-    function createHandlers {
-	moveX = internalContent.lookup("mMoveX");
+    var allGadgets is Node[];
+
+    function createHandlers 
+    {
+	moveX = internalContent.lookup("MoveX");
 	moveX.blocksPointer = true;
 	moveX.observeMouseDrag().subscribe(onMoveX);
-	moveY = internalContent.lookup("mMoveY");
+	moveY = internalContent.lookup("MoveY");
 	moveY.blocksPointer = true;
 	moveY.observeMouseDrag().subscribe(onMoveY);
-	moveZ = internalContent.lookup("mMoveZ");
+	moveZ = internalContent.lookup("MoveZ");
 	moveZ.blocksPointer = true;
 	moveZ.observeMouseDrag().subscribe(onMoveZ);
+	moveAll = internalContent.lookup("MoveAll");
+	moveAll.observeMouseDrag().subscribe(onMoveAll);
 
-	rotateX = internalContent.lookup("mRotateX");
-	rotateY = internalContent.lookup("mRotateY");
-	rotateZ = internalContent.lookup("mRotateZ");
+	for (i in [moveX, moveY, moveZ, moveAll]) {
+	    i.observeMouseDown().subscribe(onMouseDownTranslate)
+	}
+
+	rotateX = internalContent.lookup("RotateX");
+	rotateY = internalContent.lookup("RotateY");
+	rotateZ = internalContent.lookup("RotateZ");
 	/*
 	rotateX.blocksPointer = true;
 	rotateY.blocksPointer = true;
 	rotateZ.blocksPointer = true;
-	*/
 	rotateX.observeMouseDrag().subscribe(onRotateX);
 	rotateY.observeMouseDrag().subscribe(onRotateY);
 	rotateZ.observeMouseDrag().subscribe(onRotateZ);
+	*/
 
-	rotateGuideX = internalContent.lookup("mGuideRotateX");
-	rotateGuideY = internalContent.lookup("mGuideRotateY");
-	rotateGuideZ = internalContent.lookup("mGuideRotateZ");
+	rotateGuideX = internalContent.lookup("GuideRotateX");
+	rotateGuideY = internalContent.lookup("GuideRotateY");
+	rotateGuideZ = internalContent.lookup("GuideRotateZ");
 	/*
 	rotateGuideX.blocksPointer = true;
 	rotateGuideY.blocksPointer = true;
@@ -218,11 +412,63 @@ public class Manipulator is AbstractNode
 	rotateGuideX.observeMouseDrag().subscribe(onRotateX);
 	rotateGuideY.observeMouseDrag().subscribe(onRotateY);
 	rotateGuideZ.observeMouseDrag().subscribe(onRotateZ);
+	rotateAll = internalContent.lookup("RotateAll");
+
+	for (i in [rotateX, rotateY, rotateZ, rotateAll, rotateGuideX, rotateGuideY, rotateGuideZ]) {
+	    i.observeMouseDown().subscribe(onMouseDownRotate)
+	}
+
+	scaleX = internalContent.lookup("ScaleX");
+	scaleY = internalContent.lookup("ScaleY");
+	scaleZ = internalContent.lookup("ScaleZ");
+	scaleAll = internalContent.lookup("ScaleAll");
+
+	scaleX.observeMouseDrag().subscribe(onScaleX);
+	scaleY.observeMouseDrag().subscribe(onScaleY);
+	scaleZ.observeMouseDrag().subscribe(onScaleZ);
+
+	for (i in [scaleX, scaleY, scaleZ, scaleAll]) {
+	    i.observeMouseDown().subscribe(onMouseDownScale)
+	}
+
+	for (n in [moveX, moveY, moveZ, moveAll, rotateGuideX, rotateGuideY, rotateGuideZ, scaleX, scaleY, scaleZ]) {
+	    n.observeMouseUp().subscribe(onMouseUp);
+	}
+	allGadgets = [/*moveX, moveY, moveZ, rotateX, rotateY, rotateZ, */rotateGuideX, rotateGuideY, rotateGuideZ, rotateAll, moveAll, /*scaleX, scaleY, scaleZ,*/ scaleAll];
+	enterTranslate();
     }
 
-    override function update {
+    override function update 
+    {
 	if (moveX == null) createHandlers();
     }   
+
+    function hideAll 
+    {
+	println("hiding: {allGadgets}");
+	for (i in allGadgets) i.visible = false;
+    }
+
+    function enterTranslate 
+    {
+	println("enter translate");
+	hideAll();
+	for (i in [moveX, moveY, moveZ, moveAll]) i.visible = true;
+    }
+
+    function enterRotate 
+    {
+	println("enter rotate");
+	hideAll();
+	for (i in [rotateX, rotateY, rotateZ, rotateGuideX, rotateGuideY, rotateGuideZ, rotateAll]) i.visible = true;
+    }
+
+    function enterScale 
+    {
+	println("enter scale");
+	hideAll();
+	for (i in [scaleX, scaleY, scaleZ, scaleAll]) i.visible = true;
+    }
 }
 
 

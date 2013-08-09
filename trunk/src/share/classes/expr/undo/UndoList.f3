@@ -1,0 +1,58 @@
+package expr.undo;
+import f3.lang.Ref;
+
+class UndoableList  
+{
+    var todo is (Undoable of ?)[];
+}
+
+
+public class UndoList 
+{
+    init {
+	MasterUndoable.undoables.put(this, ());
+    }
+
+    var now is Integer = -1;
+    var history is UndoableList[];
+
+    public function undo 
+    {
+    println("undo {targets}");
+	if (now > 0) for (u in history[--now].todo) {
+	    u.apply();
+	}
+    }
+
+    public function redo 
+    {
+    println("redo {targets}");
+	if (now < history.size()-1) for (u in history[++now].todo) {
+	    u.apply();
+	}
+    }
+
+    var targets is (Ref of ?)[];
+
+    public function addTarget of a from (ptr is Ref of a) to () 
+    {
+	delete ptr from targets;
+	insert ptr into targets;
+	insert Undoable.make(ptr) into history[now].todo;
+    }
+
+    public function removeTarget of a from (ptr is Ref of a) to () 
+    {
+	delete ptr from targets;
+    }
+
+    public function commit 
+    {
+    println("commit {targets}");
+	insert UndoableList {
+	    todo: foreach (t in targets) Undoable.make(t)
+	} into history;
+	now++;
+    }
+}
+

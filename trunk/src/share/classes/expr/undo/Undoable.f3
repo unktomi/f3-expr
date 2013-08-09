@@ -1,31 +1,22 @@
 package expr.undo;
 import f3.lang.Ref;
-/*
+
 public class Undoable of a 
 {
     public var target is Ref of a;
     public var value is a;
-}
-
-public class UndoableList  
-{
-    const todo is (Undoable of ?)[];
-}
-
-public class UndoList 
-{
-    var now is Integer;
-    var history is UndoableList[];
-    public function undo {
-	for (u in history[--now]) {
-	    u.target.set(u.value);
-	}
-    }
-    public function redo {
-	for (u in history[now]) {
-	    u.target.set(u.value);
-	}
+    public function apply
+    {
+	target.set(value);
     }
 }
 
-*/
+public function make of a from (ptr is Ref of a) to Undoable of a 
+{
+    Undoable of a {
+	target: ptr;
+	value: ptr.get();
+    }
+}
+
+

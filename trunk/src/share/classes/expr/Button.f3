@@ -28,6 +28,6 @@ public class Button is ResizableNode {
 	    }
 	});
     const subject = Subject of (()) {};
-    public function observePress to Observable of () { subject }
+    public function observePress to Observable of (()) { subject }
     public var onPress is function from () to ();
 }

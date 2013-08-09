@@ -8,6 +8,7 @@ import f3.util.Observer.*;
 import f3.math.*;
 import f3.math.LinearMath.*;
 import java.lang.Math;
+import expr.undo.*;
 
 class TimeNodeView is AbstractNode 
 {
@@ -17,13 +18,14 @@ class TimeNodeView is AbstractNode
     public var content is Node[] = bind getContent(target);
     public var expanded = false;
 
+
     function getWidth from (i is Interval) to Number 
     {
-	const w = Math.max(trax.durationToX(i.duration()), 100);
-	return w;
+       Math.max(trax.durationToX(i.duration()), 100);
     }
 
-    bound function getFill from (target is TimeNode) to Paint {
+    bound function getFill from (target is TimeNode) to Paint 
+    {
 	return ColorPaint(Color.color(.2, .2, .2));
     }
 
@@ -56,6 +58,10 @@ class TimeNodeView is AbstractNode
 			 println("translation={internalContent.transform.getTranslation()}");
 			 println("scene.translation={internalContent.toSceneTransform.getTranslation()}");
 		     }
+		     override function onMouseUp from (event is MouseEvent) to ()
+		     {
+			 MasterUndoable.commit();
+		     }
 		content: 
 		[Rectangle
 		 {
@@ -80,40 +86,37 @@ class TimeNodeView is AbstractNode
     }
 }
 
-public class Playhead is AbstractNode {
-
+public class Playhead is AbstractNode 
+{
     public var x is Number;
     public var height is Number = 500;
     public var trax is Trax;
 
-    const self = this;
     override var transform = bind translate(x, 0, 0.5);
 
     const playhead_top = Image { 
 	url: "{__DIR__}playhead_top.png" 
-	override var transform = bind translate(0, self.height/2 - 5);
+	transform: bind translate(0, height/2 - 5);
     };
 
     const playhead_middle = Image { 
 	url: "{__DIR__}playhead_middle.png";
-	override var transform = bind scale(1, self.height/8)
+	transform: bind scale(1, height/8)
     };
 
     const playhead_bottom = Image { 
 	url: "{__DIR__}playhead_bottom.png" 
-	override var transform = bind translate(0, -self.height / 2);
+	transform: bind translate(0, -height / 2);
     };
 
     const playhead_marker is Image = Image { 
-	override var transform = bind translate(0, self.height/2 -5);
 	url: "{__DIR__}playhead_marker.png";
+	transform: bind translate(0, height/2 -5);
     };
 
     override var internalContent = Group {
-	content: bind
-	[playhead_middle, playhead_bottom, playhead_top, playhead_marker];
+	content: bind [playhead_middle, playhead_bottom, playhead_top, playhead_marker];
     } 
-
 
     override function update {
 	//println("marker={playhead_marker.bounds} height={height} x={x}");
@@ -161,13 +164,24 @@ public class Trax is ResizableNode {
 
     public var target is Timeline;
     public var targetNode is TimeLayer;
-    var clips is TimeNode[];
+
+    const undoList = UndoList {}
+
+    var clips is TimeNode[] on replace inserted[i..j] = deleted {
+	for (x in deleted) {
+	    undoList.removeTarget(&x.playTime);
+	}
+	for (x in inserted[i..j]) {
+	    undoList.addTarget(&x.playTime);
+	}
+    }
+
     public function setClips from (clips is TimeNode[]) to ()
     {
         this.clips = clips;
     }
 
-    var timeNodeViews is Node[] = bind getTimeNodes(clips);
+    readonly var timeNodeViews is Node[] = bind getTimeNodes(clips);
     
     bound function getTimeNodes from (content is TimeNode[]) to Node[] 
     {
