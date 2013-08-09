@@ -251,11 +251,22 @@ public function run from (args is String[]) to ()
 		}
 	    }
 		
+	    override function onKeyUp from (event is KeyboardEvent) to () 
+	    {
+		if (event.propagate) {
+		    if (event.keyCode == Keys.D) {
+			manip.exitPivotMode();
+		    }
+		}
+	    }
+
 	    override function onKeyDown from (event is KeyboardEvent) to () 
 	    {
 		if (event.propagate) {
 		    println("event={event}");
-		    if (event.keyCode == Keys.Z and event.metaKey) {
+		    if (event.keyCode == Keys.D) {
+			manip.enterPivotMode();
+		    } else if (event.keyCode == Keys.Z and event.metaKey) {
 			if (event.shiftKey) {
 			    MasterUndoable.redo();
 			} else {
