@@ -13,8 +13,7 @@ public class Manipulator is AbstractNode
     const assetUrl = "{__DIR__}/manipulator_full_v1.ma";
     const model = Ma.Model { url: assetUrl };
 
-    const undoList = UndoList {
-    }
+    const undoList = UndoList {};
 
     public var target is TransformNode on replace old {
 
@@ -96,7 +95,7 @@ public class Manipulator is AbstractNode
     {
         const m = event.picked.node.toSceneTransform;
         const scenePt = m.getTranslation();
-        const off = (Point3.<<0>>+axis);
+        const off = Point3.<<0>> + axis;
         const p0 = scene.camera.toScreen(scenePt);
         const p1 = scene.camera.toScreen(m * off);
         const p2 = new Point3(event.screenx - event.screenDrag.x, 
@@ -186,8 +185,6 @@ public class Manipulator is AbstractNode
     }
 
     var lastMouse is Ray3[];
-
-    public var rotateOrder = Quat.EULER_ZYX;
     
     function doRotate from (event is MouseEvent, axis is Vec3) to ()
     {
@@ -388,23 +385,11 @@ public class Manipulator is AbstractNode
         rotateX = internalContent.lookup("RotateX");
         rotateY = internalContent.lookup("RotateY");
         rotateZ = internalContent.lookup("RotateZ");
-        /*
-        rotateX.blocksPointer = true;
-        rotateY.blocksPointer = true;
-        rotateZ.blocksPointer = true;
-        rotateX.observeMouseDrag().subscribe(onRotateX);
-        rotateY.observeMouseDrag().subscribe(onRotateY);
-        rotateZ.observeMouseDrag().subscribe(onRotateZ);
-        */
 
         rotateGuideX = internalContent.lookup("GuideRotateX");
         rotateGuideY = internalContent.lookup("GuideRotateY");
         rotateGuideZ = internalContent.lookup("GuideRotateZ");
-        /*
-        rotateGuideX.blocksPointer = true;
-        rotateGuideY.blocksPointer = true;
-        rotateGuideZ.blocksPointer = true;
-        */
+
         rotateGuideX.observeMouseDrag().subscribe(onRotateX);
         rotateGuideY.observeMouseDrag().subscribe(onRotateY);
         rotateGuideZ.observeMouseDrag().subscribe(onRotateZ);

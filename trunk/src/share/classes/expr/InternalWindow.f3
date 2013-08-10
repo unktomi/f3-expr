@@ -6,19 +6,27 @@ import f3.math.*;
 import f3.math.LinearMath.*;
 import f3.util.*;
 import f3.util.Observer.*;
+import java.lang.Math;
+
+class ContentHolder is Group, Scissored {
+}
 
 public class InternalWindow is ResizableNode {
 
     public var cx is Number;
     public var cy is Number;
 
-    override function resize from (w is Number, h is Number) to ()
+    var dirty = true;
+
+    override function resize from (w0 is Number, h0 is Number) to ()
     {
+	const w = Math.round(2*w0)/2;
+	const h = Math.round(2*h0)/2;
 	super.resize(w, h);
 	content.resize(w-2, h-32);
     }
 
-    override var transform = bind translate(cx, cy);
+    override var transform = bind translate(Math.round(cx), Math.round(cy));
     const self = this;
 
     const titleBar is Node = Rectangle {
@@ -58,9 +66,21 @@ public class InternalWindow is ResizableNode {
 
     public var content is ResizableNode;
 
+    const contentHolder = ContentHolder {
+	scissorBounds: bind Bounds.boundsFromRect(width, height);
+	content: bind content;
+    }
+
     override var internalContent = Group {
-	content: bind [titleBar, buttonBar, TransformNode { ty: -5, content: bind content}, resizeCorner, leftSide, rightSide];
+	content: bind [titleBar, buttonBar, TransformNode { ty: -5, content: bind contentHolder}, resizeCorner, leftSide, rightSide];
     } 
+    
+    function update {
+	if (dirty) {
+	    dirty = false;
+	    resize(width, height);
+	}
+    }
        
     postinit {
 	createHandlers();
@@ -90,6 +110,6 @@ public class InternalWindow is ResizableNode {
 	      }
 	}
 	mover = titleBar.observeMouseDrag().subscribe(onMove);
-    	resizer= resizeCorner.observeMouseDrag().subscribe(onResize);
+    	resizer = resizeCorner.observeMouseDrag().subscribe(onResize);
     }
 }
