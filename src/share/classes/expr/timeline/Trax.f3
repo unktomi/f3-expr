@@ -18,10 +18,11 @@ class TimeNodeView is AbstractNode
     public var content is Node[] = bind getContent(target);
     public var expanded = false;
 
-
-    function getWidth from (i is Interval) to Number 
+    function getWidth from (i0 is Interval, visible is Interval) to Number 
     {
-       Math.max(trax.durationToX(i.duration()), 100);
+	const start = i0.start;
+	const end = i0.end.min(visibleInterval.end);
+	trax.durationToX(end-start)
     }
 
     bound function getFill from (target is TimeNode) to Paint 
@@ -34,7 +35,7 @@ class TimeNodeView is AbstractNode
 	if (target is TimeGroup) then foreach (n in (target as TimeGroup).content) trax.makeTimeNodeView(this, n) else [];
     }
 
-    var w = bind getWidth(target.bounds);
+    var w = bind getWidth(target.bounds, trax.visibleInterval);
     override var transform = bind translate(playX + w / 2.0, trax.height / 2 - 20);
     override var internalContent = Group {
 	content:
@@ -43,6 +44,7 @@ class TimeNodeView is AbstractNode
 	    content: bind
 	    [if (target.id == "") then null else
              Group is MouseInputHandler {
+		 visible: bind w > 0;
 		     override function onMouseDown from (event is MouseEvent) to ()
 		     {
 			 dx = trax.durationToX(target.playTime);
@@ -68,12 +70,14 @@ class TimeNodeView is AbstractNode
 		     height: bind trax.getViewHeight();
 		     width: bind w;
 		     fillPaint: bind getFill(target);
+		     blocksPointer: true;
 		 },
 		 Text.Label {
-		     transform: translate(0, 2);
+		     blocksPointer: false;
+		     transform: bind translate(Math.max(-playX, 0), 2);
 		     height: bind trax.getViewHeight();
 		     width: bind w;
-		     background: getFill(target);
+		     background: ColorPaint(Color.color(.9, .9, .9, 0));
 		     foreground: ColorPaint(Color.color(.9, .9, .9, 1));
 		     text: bind target.id;
 		     font: bind timeNodeViewFont;
@@ -165,7 +169,11 @@ public class Trax is ResizableNode {
     public var target is Timeline;
     public var targetNode is TimeLayer;
 
-    const undoList = UndoList {}
+    const undoList = UndoList {};
+
+    readonly var visibleInterval = bind
+	new Interval(frameToDuration(scrollOffset), 
+		     frameToDuration(scrollOffset+visibleFrameCount));
 
     var clips is TimeNode[] on replace inserted[i..j] = deleted {
 	for (x in deleted) {
@@ -219,6 +227,10 @@ public class Trax is ResizableNode {
     const PIXELS_PER_FRAME = 10;
     
     var visibleFrameCount is Integer = bind Math.round((width-10) / PIXELS_PER_FRAME) as Integer;
+
+    function frameToDuration from (frames is Integer) to Duration {
+	(1s / frameRate) * frames
+    }
     
     function frameTo from (d is Duration) to Duration {
 	const seconds = d / 1s;
@@ -300,7 +312,7 @@ public class Trax is ResizableNode {
 	const x = -w / 2 + 10;
 	const y = h / 2 - 15;
 	var off = offset - 10;
-	foreach (i in [0..<w step 100]) {
+	foreach (i in [0..<w-20 step 100]) {
 	    off += 10;
 	    Text.Label {
 		height: 10;
@@ -369,7 +381,7 @@ public class Trax is ResizableNode {
 		    }
 		}
 	 },
-	 Group { content: bind labels },
+	 Group { pickable: false, content: bind labels },
          MeshNode {
 	     id: "lines"
 	     pickable: false;
