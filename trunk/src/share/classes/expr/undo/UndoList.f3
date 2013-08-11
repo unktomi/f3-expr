@@ -4,6 +4,9 @@ import f3.lang.Ref;
 class UndoableList  
 {
     var todo is (Undoable of ?)[];
+    override function toString to String {
+	"{foreach (u in todo) "{u.tag}: todo: {u.value}, target: {u.target.get()}\n"}"
+    }
 }
 
 
@@ -13,12 +16,19 @@ public class UndoList
 	MasterUndoable.undoables.put(this, ());
     }
 
+    public function dispose {
+	MasterUndoable.undoables.remove(this);
+	history = [];
+	targets = [];
+	tags = [];
+    }
+
     var now is Integer = -1;
     var history is UndoableList[];
 
     public function undo 
     {
-    println("undo {targets}");
+    println("undo {history[now-1]}");
 	if (now > 0) for (u in history[--now].todo) {
 	    u.apply();
 	}
@@ -26,33 +36,54 @@ public class UndoList
 
     public function redo 
     {
-    println("redo {targets}");
+    println("redo {history[now+1]}");
 	if (now < history.size()-1) for (u in history[++now].todo) {
 	    u.apply();
 	}
     }
 
     var targets is (Ref of ?)[];
+    var tags is String[];
 
-    public function addTarget of a from (ptr is Ref of a) to () 
+    public function addTarget of a from (tag is String, ptr is Ref of a) to () 
     {
-	delete ptr from targets;
+	removeTarget(ptr);
+	insert Undoable.make(tag, ptr) into history[now].todo;
+	insert tag into tags;
 	insert ptr into targets;
-	insert Undoable.make(ptr) into history[now].todo;
     }
 
     public function removeTarget of a from (ptr is Ref of a) to () 
     {
-	delete ptr from targets;
+	for (t in targets) {
+	    if (t == ptr) {
+		const i = indexof t;
+		delete targets[i];
+		delete tags[i];
+		break;
+	    }
+	}
     }
 
     public function commit 
     {
-    println("commit {targets}");
-	insert UndoableList {
-	    todo: foreach (t in targets) Undoable.make(t)
-	} into history;
+        delete history[now+1..];
+	var list = history[now];
+	var dirty = list == null;
+	for (x in list.todo) {
+	    if (x.isDirty()) {
+		dirty = true;
+		break;
+	    }
+	}
+	if (dirty) {
+	    list = UndoableList {
+		todo: foreach (t in targets) Undoable.make(tags[indexof t], t)
+	    }
+	}
+	insert list into history;
 	now++;
+	println("commit {history[now]}");
     }
 }
 

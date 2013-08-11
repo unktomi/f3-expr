@@ -1,0 +1,8 @@
+package expr;
+import f3.media.scene.*;
+
+public class ResourceNode is TransformNode {
+    public var url is String;
+    override var id = bind url;
+    public var temporal is ResourceTimeNode;
+}

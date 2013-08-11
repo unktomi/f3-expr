@@ -33,21 +33,21 @@ public class Manipulator is AbstractNode
         undoList.removeTarget(&old.py);
         undoList.removeTarget(&old.pz);
 
-        undoList.addTarget(&target.tx);
-        undoList.addTarget(&target.ty);
-        undoList.addTarget(&target.tz);
+        undoList.addTarget("tx", &target.tx);
+        undoList.addTarget("ty", &target.ty);
+        undoList.addTarget("tz", &target.tz);
 
-        undoList.addTarget(&target.rx);
-        undoList.addTarget(&target.ry);
-        undoList.addTarget(&target.rz);
+        undoList.addTarget("rx", &target.rx);
+        undoList.addTarget("ry", &target.ry);
+        undoList.addTarget("rz", &target.rz);
 
-        undoList.addTarget(&target.sx);
-        undoList.addTarget(&target.sy);
-        undoList.addTarget(&target.sz);
+        undoList.addTarget("sx", &target.sx);
+        undoList.addTarget("sy", &target.sy);
+        undoList.addTarget("sz", &target.sz);
 
-        undoList.addTarget(&target.px);
-        undoList.addTarget(&target.py);
-        undoList.addTarget(&target.pz);
+        undoList.addTarget("px", &target.px);
+        undoList.addTarget("py", &target.py);
+        undoList.addTarget("pz", &target.pz);
     }
 
     public var viewer is ExaminerViewer; 
@@ -81,7 +81,7 @@ public class Manipulator is AbstractNode
     readonly var r = bind rotate(target.rx, target.ry, target.rz);
 
     override var internalContent = Group {
-        transform: bind target.parentToSceneTransform * t * p * r;
+        transform: bind if (target == null) then Mat4.<<1>> else target.parentToSceneTransform * t * p * r;
         content: bind modelGroup;
     };
 

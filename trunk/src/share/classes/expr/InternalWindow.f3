@@ -13,6 +13,7 @@ class ContentHolder is Group, Scissored {
 
 public class InternalWindow is ResizableNode {
 
+    public var containerBounds is Bounds;
     public var cx is Number;
     public var cy is Number;
 
@@ -23,7 +24,7 @@ public class InternalWindow is ResizableNode {
 	const w = Math.round(2*w0)/2;
 	const h = Math.round(2*h0)/2;
 	super.resize(w, h);
-	content.resize(w-2, h-32);
+	content.resize(w-2, h-38);
     }
 
     override var transform = bind translate(Math.round(cx), Math.round(cy));
@@ -31,14 +32,21 @@ public class InternalWindow is ResizableNode {
 
     const titleBar is Node = Rectangle {
 	override var transform = bind translate(0, self.height / 2 - 5);
-	height: 10;
+	height: 12;
 	override var width = bind self.width;
-	fillPaint: ColorPaint(Color.color(.18, .18, .18));
+	fillPaint: ColorPaint(Color.color(.2, .2, .2));
     };
 
+    const line is Node = Rectangle {
+	transform: bind translate(0, self.height / 2 - 9.5);
+	height: 1.0;
+	width: bind self.width;
+	fillPaint: ColorPaint(Color.color(.44, .44, .44));
+    }
+
     const buttonBar is Node = Rectangle {
-	override var transform = bind translate(0, self.height / 2 - 6 - 10);
-	height: 12;
+	override var transform = bind translate(0, self.height / 2 - 9 - 10);
+	height: 18;
 	override var width = bind self.width;
 	fillPaint: ColorPaint(Color.color(.3, .3, .3));
     };
@@ -67,49 +75,64 @@ public class InternalWindow is ResizableNode {
     public var content is ResizableNode;
 
     const contentHolder = ContentHolder {
-	scissorBounds: bind Bounds.boundsFromRect(width, height);
+	scissorBounds: bind Bounds.boundsFromRect(content.width, content.height);
 	content: bind content;
     }
 
     override var internalContent = Group {
-	content: bind [titleBar, buttonBar, TransformNode { ty: -5, content: bind contentHolder}, resizeCorner, leftSide, rightSide];
+	content: bind [titleBar, buttonBar, line, TransformNode { ty: -8, content: bind contentHolder}, resizeCorner, leftSide, rightSide];
     } 
     
-    function update {
+    override function update {
 	if (dirty) {
 	    dirty = false;
 	    resize(width, height);
 	}
     }
        
+
+    var dx = 0.0;
+    var dy = 0.0;
+
+    const onDown = DefaultObserver of MouseEvent {
+	override function onNext from (event is MouseEvent) to ()
+	{
+	    dx = cx;
+	    dy = cy;
+	}
+    };
+
+    const onMove = DefaultObserver of MouseEvent {
+	override function onNext from (event is MouseEvent) to ()
+	{     	       		
+	    const v = event.picked.dragPoint1 - event.picked.dragPoint0;
+	    dx += v.x;
+	    dy += v.y;
+	    const p0 = toSceneTransform.getTranslation().xy() - new Tuple2(cx, cy);
+	    const p1 = p0 + new Vec2(dx, dy);
+	    const clamp = new Point2(Math.max(p1.x, width/2), 
+				     Math.min(p1.y, containerBounds.top()-height/2));
+	    println("p0={p0}, p1={p1}, clamp={clamp}");
+	    cx = dx + clamp.x - p1.x;
+	    cy = dy + clamp.y - p1.y;
+	    println("cx={cx} cy={cy}");
+	}
+    };
+    const onResize = DefaultObserver of MouseEvent {
+	override function onNext from (event is MouseEvent) to ()
+	{     	       		
+	    const v = event.picked.dragPoint1 - event.picked.dragPoint0;
+	    width += v.x;
+	    height -= v.y;
+	    resize(width, height);
+	    cx += v.x/2;
+	    cy += v.y/2;
+	}
+    };
+
     postinit {
-	createHandlers();
-    }
-
-    var mover is Disposable;
-    var resizer is Disposable;
-
-    function createHandlers {
-        const onMove = DefaultObserver of MouseEvent {
-	      override function onNext from (event is MouseEvent) to ()
-	      {     	       		
-		  const v = event.picked.dragPoint1 - event.picked.dragPoint0;
-		  cx += v.x;
-		  cy += v.y;
-	      }
-	}
-        const onResize = DefaultObserver of MouseEvent {
-	      override function onNext from (event is MouseEvent) to ()
-	      {     	       		
-		  const v = event.picked.dragPoint1 - event.picked.dragPoint0;
-		  width += v.x;
-		  height -= v.y;
-		  resize(width, height);
-		  cx += v.x/2;
-		  cy += v.y/2;
-	      }
-	}
-	mover = titleBar.observeMouseDrag().subscribe(onMove);
-    	resizer = resizeCorner.observeMouseDrag().subscribe(onResize);
+	titleBar.observeMouseDown().subscribe(onDown);
+	titleBar.observeMouseDrag().subscribe(onMove);
+    	resizeCorner.observeMouseDrag().subscribe(onResize);
     }
 }

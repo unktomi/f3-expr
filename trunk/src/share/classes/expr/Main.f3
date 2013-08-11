@@ -11,6 +11,27 @@ import java.lang.Math;
 import expr.choices.SliderField;
 import expr.undo.*;
 
+public class ResourceGroup is TransformNode {
+    public var url is String;
+    public var resources is ResourceNode[];
+    override var content = bind resources;
+    public var currentClip is TimeNode;
+    const undoList = UndoList {};
+    postinit {
+	undoList.addTarget("resourceNodes", &resources);
+    }
+}
+
+public class ResourceTimeGroup is TimeGroup {
+    public var url is String;
+    public var resources is ResourceTimeNode[];
+    override var content = bind resources;
+    const undoList = UndoList {};
+    postinit {
+	undoList.addTarget("resourceTimeNodes", &resources);
+    }
+}
+
 class ResizableStageNode is ResizableNode {
     const stage is StageNode = StageNode {
 	depthBits: 0
@@ -47,6 +68,14 @@ function readTextFile from (url is String) to (String, Integer)
 
 public function run from (args is String[]) to ()
 {
+
+    const currentResource is ResourceGroup = ResourceGroup {
+    }
+    const currentAnimResource is ResourceTimeGroup = ResourceTimeGroup {
+    }
+    const transformHierarchy = TransformHierarchy {
+	root: bind currentResource;
+    }
     var currentCamera is Camera;
     var TheWebBrowserFactory is AbstractWebBrowserFactory;
     try {
@@ -61,30 +90,14 @@ public function run from (args is String[]) to ()
     println("args={args}");
 
     var playerUrl is String;
-    readonly var model is Ma.Model = 
-	bind if (not playerUrl.endsWith(".ma")) then null else Ma.Model {
-		effectLoader: the CGEffectLoader;
-		imageLoader: the ImageLoader;
-		url: playerUrl;
-	    };
-
-    var clipIndex is Integer;
-
-    const getClips = function from (libs is TimeGroup[]) to TimeNode[] {
-	foreach (lib in libs) lib.content;
-    }
-
-    readonly var allClips = bind getClips(model.getClipLibraries());
-    readonly var clips is TimeNode[] = bind [model.getTemporalRoot(), allClips];
-
-    readonly var currentClip is TimeNode = bind clips[clipIndex];
 
     const mainTimeLayer = TimeLayer {
-	content: bind currentClip;
+	content: bind currentAnimResource;
 	playCount: -1;
     }
 
     const player = Timeline {
+	paused: true;
 	content: mainTimeLayer;
     }
 
@@ -107,86 +120,102 @@ public function run from (args is String[]) to ()
 	//pathFactory: ThePath2DFactory;
     }
 
-    var currentModel is Node = HTML {
-    	content: "<html style='overflow:hidden;border:none;'><body><h1>Welcome to F3</h1></body></html>";
-	height: 100;
-	width: 300;
-	//factory: TheWebBrowserFactory;
-	//effectLoader: CGEffectLoader_INSTANCE;
-	//pathFactory: ThePath2DFactory;
+    const disp = transformHierarchy.observeSelection().subscribe(function from (n is Node) to () {
+	});
+    
+    function addResource from (rn is ResourceNode) to ()
+    {
+	insert rn into currentResource.resources;
+	transformHierarchy.selectNode(rn);
+	viewer.focusCamera(rn);
     }
 
-    readonly var svgModel = bind if (not playerUrl.endsWith(".svg")) then null else SVG {
-		url: playerUrl;
-		factory: ThePath2DFactory
-	    };
+    function addTimeResource from (rn is ResourceTimeNode) to ()
+    {
+	insert rn into currentAnimResource.resources;
+	trax.setClips(currentAnimResource.resources);
+	trax.selectClip(rn);
+    }
 
-    readonly var imageModel = bind if (playerUrl.endsWith(".jpg") or 
-			      playerUrl.endsWith(".png") or
-			      playerUrl.endsWith(".tiff") or
-			      playerUrl.endsWith(".tif") or 
-			      playerUrl.endsWith(".tga")) 
-	Image { 
-	    url: playerUrl;
-	} else null;
-
-    readonly var textModel = bind if (playerUrl.endsWith(".txt")) then 
-	Text.Area {
-	    //pathFactory: ThePath2DFactory;
-	    //layoutEngine: TheLayoutEngine;
-	    override var height = bind font.height() * 24;
-	} else null;
 
     function doDrop from (url is String) to () 
     {
 	stage.title = url;
 	playerUrl = url;
 	if (url.endsWith(".ma")) {
-	    viewer.focusCamera(currentModel = model.getSpatialRoot());
-	} else if (url.endsWith(".svg")) {
-	    viewer.focusCamera(currentModel = svgModel.root)
-	} else if (url.endsWith(".png") or url.endsWith(".jpg") or url.endsWith(".tif") or url.endsWith(".tiff") or url.endsWith(".tga")) {
-	    viewer.focusCamera(currentModel = imageModel)
-	} else if (url.endsWith(".txt")) {
-	    textModel.setText(readTextFile(url).first);
-	    viewer.focusCamera(currentModel = TransformNode {
-		    tx: 150;
-		    ty: 150;
-		    content: textModel;
-		});
-	} else {
-	    if (browser <> null) {
-		browser.url = url;
-		currentModel = browser;
-		viewer.focusCamera(currentModel = browser);
+	    const model = Ma.Model {
+		url: url;
 	    }
+	    const rn = ResourceNode {
+		url: url;
+		content: bind model.getSpatialRoot();
+	    }
+	    addResource(rn);
+	    const rtn = ResourceTimeNode {
+		url: url;
+		content: bind model.getTemporalRoot();
+		spatial: rn;
+	    }
+	    rn.temporal = rtn;
+	    addTimeResource(rtn);
+	} else if (url.endsWith(".svg")) {
+	    const svg = SVG {
+		url: url;
+	    }
+	    const rn = ResourceNode {
+		url: url;
+		content: bind svg.root;
+	    }	
+	    addResource(rn);
+	} else if (url.endsWith(".png") or url.endsWith(".jpg") or url.endsWith(".tif") or url.endsWith(".tiff") or url.endsWith(".tga")) {
+	    const image= Image { 
+		url: url;
+	    }
+	    const rn = ResourceNode {
+		url: url;
+		content: image;
+	    }	
+	    addResource(rn);
+	} else {
+	    const browser = WebBrowser {
+		url: url
+	    }
+	    const rn = ResourceNode {
+		url: url;
+		content: browser;
+	    }
+	    addResource(rn);
 	}
-	currentTransform.tx = 0;
-	currentTransform.ty = 0;
-	currentTransform.tz = 0;
-	currentTransform.rx = 0;
-	currentTransform.ry = 0;
-	currentTransform.rz = 0;
-	currentTransform.sx = 1;
-	currentTransform.sy = 1;
-	currentTransform.sz = 1;
-	currentTransform.px = 0;
-	currentTransform.py = 0;
-	currentTransform.pz = 0;
-	trax.setClips(clips);
 	MasterUndoable.commit();
     }
+
     var trax is expr.timeline.Trax;
-    const currentTransform = TransformNode {
-	content: bind currentModel;
-    }
+    var currentTransform = bind transformHierarchy.selectedTransform;
     currentCamera = camera;
+
     const mainScene = Scene {
 	background: Color.GRAY;
 	override var camera = bind currentCamera on invalidate {
 	    println("scene camera invalidated {currentCamera}");
 	}
-	content: bind currentTransform;
+	content: bind transformHierarchy.root;
+	override function injectMouseDown from (event is MouseEvent) to ()
+	{
+	    super.injectMouseDown(event);
+	    for (i in underMouse) {
+		println("{i.node}");
+		if (i.node is MeshNode) {
+		    var p = i.node.parent;
+		    while (p <> null) {
+			if (p is ResourceNode) {
+			    transformHierarchy.selectNode(p);
+			    return;
+			}
+			p = p.parent;
+		    }
+		}
+	    }
+	}
     }
 
     var toolMenu = expr.toolmenu.ToolMenu {
@@ -201,6 +230,42 @@ public function run from (args is String[]) to ()
     var manip is expr.manipulator.Manipulator;
 
     var stage is JoglStage = JoglStage {
+        menubar: Menu.Bar {
+	    menus: 
+	    [Menu 
+             { 
+		 label: "File";
+		 items:
+		 [MenuItem {
+		     label: "Open";
+		 },
+		 MenuItem {
+		     label: "Save";
+		 },
+		 MenuItem {
+		     label: "Save As";
+		 },
+		 Menu.Separator {},
+		 MenuItem {
+		     label: "Quit";
+		 }]
+	     },
+	     Menu 
+             { 
+		 label: "Edit";
+		 items:
+		 [MenuItem {
+		     label: "Cut"
+		 },
+		 MenuItem {
+		     label: "Copy"
+		 },
+		 MenuItem {
+		     label: "Paste"
+		 }]
+	     }]
+	     
+	}
 	height: 800, width: 1020;
 	title: new java.io.File(args[0]).getName();
 	content: [mainScene,
@@ -209,6 +274,7 @@ public function run from (args is String[]) to ()
                       camera: camera;
 		      override var content = manip = expr.manipulator.Manipulator 
 		      {
+			  visible: bind currentTransform <> null;
                           viewer: viewer;
 			  target: bind currentTransform;
 			  scene: this;
@@ -217,8 +283,12 @@ public function run from (args is String[]) to ()
 		  Scene {
                     background: null;
                     camera: Camera2D {}; 
-		    content: 
+		    override var content =
 		    [InternalWindow {
+			    containerBounds: bind Bounds.boundsFromRect(0, 
+									0, 
+									width,
+									height-toolMenu.bounds.height())
 		    	height: 150, width: 820;
 			cx: 520, cy: 100;	   
 			      //imageLoader: null;
@@ -236,6 +306,7 @@ public function run from (args is String[]) to ()
 
     function setCamera from (i is Integer) to ()
     {
+	/*
 	if (i == 0) {
 	    currentCamera = camera;
 	} else if (i == 9) {
@@ -247,12 +318,23 @@ public function run from (args is String[]) to ()
 	    }
 	}
 	println("camera={camera.tx}, {camera.ty}, {camera.tz}");
+	*/
+    }
+
+    function deleteResource from (n is Node) to () {
+	if (n is ResourceNode) {
+	    const rn = n as ResourceNode;
+	    delete n as ResourceNode from currentResource.resources;
+	    if (rn.temporal <> null) {
+		delete rn.temporal from currentAnimResource.resources;
+		trax.setClips(currentAnimResource.resources);
+	    }
+	}
     }
 
     const setClip = function from (i is Integer) to ()
     {
-	clipIndex = Math.min(clips.size()-1, i);
-	println("clip={clips[clipIndex]}");
+	//currentResource.setClip(i);
     }
 
     stage.addMouseInputHandler(viewer);
@@ -280,7 +362,11 @@ public function run from (args is String[]) to ()
 	    {
 		if (event.propagate) {
 		    println("event={event}");
-		    if (event.keyCode == Keys.D) {
+		    if (event.keyCode == Keys.Delete or event.keyCode == Keys.Backspace) {
+			const toDelete = currentTransform;
+			transformHierarchy.deleteSelection();
+			deleteResource(toDelete);
+		    } else if (event.keyCode == Keys.D) {
 			manip.enterPivotMode();
 		    } else if (event.keyCode == Keys.Z and event.metaKey) {
 			if (event.shiftKey) {
@@ -289,7 +375,7 @@ public function run from (args is String[]) to ()
 			    MasterUndoable.undo();
 			}
 		    } else if (event.keyCode == Keys.F) {
-			viewer.focusCamera(currentModel);
+			viewer.focusCamera(currentTransform);
 		    } else if (event.keyCode >= Keys._0 and event.keyCode <= Keys._9) {
 			const index = event.keyCode - Keys._0;
 			if (event.metaKey) {
@@ -319,7 +405,7 @@ public function run from (args is String[]) to ()
 	});
 
     stage.invoke(function {
-	    viewer.focusCamera(currentModel);
+	    //viewer.focusCamera(currentTransform);
 	});
 
 }

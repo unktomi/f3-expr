@@ -12,6 +12,7 @@ import expr.undo.*;
 
 class TimeNodeView is AbstractNode 
 {
+    public var row is Integer;
     public var trax is Trax;
     public var target is TimeNode;
     public var playX is Number = bind trax.durationToX(target.playTime);
@@ -20,68 +21,76 @@ class TimeNodeView is AbstractNode
 
     function getWidth from (i0 is Interval, visible is Interval) to Number 
     {
-	const start = i0.start;
-	const end = i0.end.min(visibleInterval.end);
-	trax.durationToX(end-start)
+	trax.durationToX(i0.duration())
     }
 
     bound function getFill from (target is TimeNode) to Paint 
     {
-	return ColorPaint(Color.color(.2, .2, .2));
+	return ColorPaint(Color.color(.3, .3, .3));
     }
 
     bound function getContent from (target is TimeNode) to Node[]
     {
-	if (target is TimeGroup) then foreach (n in (target as TimeGroup).content) trax.makeTimeNodeView(this, n) else [];
+	[]
     }
 
     var w = bind getWidth(target.bounds, trax.visibleInterval);
-    override var transform = bind translate(playX + w / 2.0, trax.height / 2 - 20);
+    var h = bind trax.getViewHeight();
+    var fg = ColorPaint(Color.color(.7, .7, .7, 1));
+    var bg = bind getFill(target);
+    override var transform = bind translate(playX + w / 2.0, trax.height / 2 + 2 - 15 -(row+1)*trax.getViewHeight());
     override var internalContent = Group {
 	content:
-	VBox {
+	Group {
             var dx is Number;
 	    content: bind
-	    [if (target.id == "") then null else
+	    [
              Group is MouseInputHandler {
 		 visible: bind w > 0;
 		     override function onMouseDown from (event is MouseEvent) to ()
 		     {
 			 dx = trax.durationToX(target.playTime);
-			 println("MOUSE DOWN");
 		     }
 		     override function onMouseDrag from (event is MouseEvent) to ()
 		     {
 			 dx += (event.picked.dragPoint1 - event.picked.dragPoint0).x;
 			 target.playTime = trax.frameTo(trax.xToDuration(dx));
 			 trax.updatePlayhead();
-			 println("dx={dx}, target {target.id}.playTime={target.playTime}");
-			 println("X={playX}");
-			 println("translation={internalContent.transform.getTranslation()}");
-			 println("scene.translation={internalContent.toSceneTransform.getTranslation()}");
 		     }
 		     override function onMouseUp from (event is MouseEvent) to ()
 		     {
+			 println("commit playTime={target.playTime}, pickable={target.pickable}");
 			 MasterUndoable.commit();
 		     }
 		content: 
 		[Rectangle
 		 {
-		     height: bind trax.getViewHeight();
+		     height: bind h;
 		     width: bind w;
-		     fillPaint: bind getFill(target);
+		     fillPaint: bind bg;
 		     blocksPointer: true;
 		 },
 		 Text.Label {
 		     blocksPointer: false;
-		     transform: bind translate(Math.max(-playX, 0), 2);
-		     height: bind trax.getViewHeight();
+		     transform: translate(20, 0);
+		     height: bind h;
 		     width: bind w;
-		     background: ColorPaint(Color.color(.9, .9, .9, 0));
-		     foreground: ColorPaint(Color.color(.9, .9, .9, 1));
+		     background: null;
+		     foreground: fg;
 		     text: bind target.id;
 		     font: bind timeNodeViewFont;
-		 }];
+		 },
+		 Rectangle is MouseInputHandler {
+		     transform: bind translate(-w/2+5.0/2+2, 0);
+		     height: 9.0;
+		     width: 5.0;
+		     fillPaint: bind if target.pickable then fg else TransparentPaint;
+		     strokePaint: bind if not target.pickable then fg else TransparentPaint;
+		     override function onMouseDown from (event is MouseEvent) to ()
+		     {
+			 target.pickable = not target.pickable;
+		     }
+		 }]
 	      },
               Group { 
                    content: bind if (expanded) then content else [] 
@@ -122,19 +131,17 @@ public class Playhead is AbstractNode
 	content: bind [playhead_middle, playhead_bottom, playhead_top, playhead_marker];
     } 
 
-    override function update {
-	//println("marker={playhead_marker.bounds} height={height} x={x}");
-	if (disp1 == null) createHandlers();
-    }
-
     var tx = 0.0;
+    var dragging = false;
 
     const onDown = DefaultObserver of MouseEvent {
 	override function onNext from (event is MouseEvent) to ()
 	{
+	    dragging = true;
 	    tx = trax.frameToX(trax.currentFrame-trax.scrollOffset);
 	}
     }
+
     const onDrag = DefaultObserver of MouseEvent {
 
 	override function onNext from (event is MouseEvent) to ()
@@ -144,29 +151,37 @@ public class Playhead is AbstractNode
 	    trax.movePlayheadTo(tx);
 	}
     };
+
+    const onUp = DefaultObserver of MouseEvent {
+	override function onNext from (event is MouseEvent) to ()
+	{
+	    dragging = false;
+	}
+    };
 	
+    const down = observeMouseDown().subscribe(onDown);
+    const drag = observeMouseDrag().subscribe(onDrag);
+    const up = observeMouseUp().subscribe(onUp);
+}
+
+public class Trax is ResizableNode {
+
+    var timelineListener is Disposable;
+
     const onPlayhead = DefaultObserver of Duration {
 	override function onNext from (event is Duration) to () {
 	    const d = if (not target.paused and targetNode.contentBounds.duration() > 0s) event.rem(targetNode.contentBounds.duration()) else event;
 	    currentFrame = Math.round((d.toMillis() / 1000) * frameRate) as Integer;
 	    //println("currentFrame {event} => {currentFrame}");
-	    playhead.x = frameToX(currentFrame-scrollOffset);
+	    playhead.x = frameToX(currentFrame);
 	}
     }
 
-    var disp1 is Disposable;
-    var disp2 is Disposable;
-    var disp3 is Disposable;
-    function createHandlers {
-	disp1 = observeMouseDown().subscribe(onDown);
-	disp2 = observeMouseDrag().subscribe(onDrag);
-	disp3 = target.observePlayhead().subscribe(onPlayhead);
+    public var target is Timeline on replace {
+	timelineListener.dispose();
+	timelineListener = target.observePlayhead().subscribe(onPlayhead);
     }
-}
 
-public class Trax is ResizableNode {
-
-    public var target is Timeline;
     public var targetNode is TimeLayer;
 
     const undoList = UndoList {};
@@ -175,23 +190,26 @@ public class Trax is ResizableNode {
 	new Interval(frameToDuration(scrollOffset), 
 		     frameToDuration(scrollOffset+visibleFrameCount));
 
-    var clips is TimeNode[] on replace inserted[i..j] = deleted {
-	for (x in deleted) {
+    var clips is TimeNode[] on replace deleted[i..j] = inserted {
+	for (x in deleted[i..j]) {
 	    undoList.removeTarget(&x.playTime);
+	    undoList.removeTarget(&x.pickable);
 	}
-	for (x in inserted[i..j]) {
-	    undoList.addTarget(&x.playTime);
+	for (x in inserted) {
+	    undoList.addTarget("{x.id}.playtime", &x.playTime);
+	    undoList.addTarget("{x.id}.pickable", &x.pickable);
 	}
     }
 
     public function setClips from (clips is TimeNode[]) to ()
     {
         this.clips = clips;
+	for (t in timeNodeViews) t.row = indexof t;
     }
 
-    readonly var timeNodeViews is Node[] = bind getTimeNodes(clips);
+    readonly var timeNodeViews is TimeNodeView[] = bind getTimeNodes(clips);
     
-    bound function getTimeNodes from (content is TimeNode[]) to Node[] 
+    bound function getTimeNodes from (content is TimeNode[]) to TimeNodeView[] 
     {
 	foreach (t in content) makeTimeNodeView(null, t)
     }
@@ -199,8 +217,9 @@ public class Trax is ResizableNode {
     var frameRate is Integer = 24;
 
     const lineMesh = LineMesh {};
-    const backgroundColor is Color = Color.color(0.95, 0.95, 0.95);
+    const backgroundColor is Color = Color.color(0.90, 0.90, 0.90);
     const backgroundPaint is Paint = ColorPaint(backgroundColor);
+    const foregroundPaint is Paint = ColorPaint(Color.color(0.2, 0.2, 0.2));
 
     function autoScrollLeft {
     }
@@ -209,7 +228,7 @@ public class Trax is ResizableNode {
     }
 
     public var currentFrame is Integer on replace {
-	if (true or not target.paused) {
+	if (not playhead.dragging) {
 	    if (currentFrame < scrollOffset) {
 		scrollOffset = currentFrame;
 	    } else if (currentFrame > scrollOffset + visibleFrameCount) {
@@ -227,6 +246,11 @@ public class Trax is ResizableNode {
     const PIXELS_PER_FRAME = 10;
     
     var visibleFrameCount is Integer = bind Math.round((width-10) / PIXELS_PER_FRAME) as Integer;
+
+    function durationToFrame from (d is Duration) to Integer 
+    {
+	Math.round((d / 1s) * frameRate) as Integer;
+    }
 
     function frameToDuration from (frames is Integer) to Duration {
 	(1s / frameRate) * frames
@@ -271,7 +295,7 @@ public class Trax is ResizableNode {
     }
 
     function getViewHeight to Number {
-	10
+	15
     }
 
     function updatePlayhead {
@@ -280,8 +304,10 @@ public class Trax is ResizableNode {
 
     function movePlayheadTo from (x is Number) to ()
     {
-	const d = xToDuration(x+frameToX(scrollOffset));
+	const scrollX = frameToX(scrollOffset);
+	const d = xToDuration(x+scrollX);
 	target.setPlayhead(d);
+	println("move playhead to {x}, scrollX={scrollX} d={d} frame={durationToFrame(d)}");
     }
 
     function getSelf to Trax { this }
@@ -294,7 +320,7 @@ public class Trax is ResizableNode {
     var scrollOffset is Integer;
     var visibleDuration is Duration;
     var labels is Node[] = bind drawLabels(width, height, scrollOffset);
-    var font = bind layoutEngine.createFont("font-size:7;font-style:LucidaSans");
+    var font = bind layoutEngine.createFont("font-size:8;font-style:LucidaSans");
     var timeNodeViewFont = bind layoutEngine.createFont("font-size:9;font-style:LucidaSans");
 
     function makeTimeNodeView from (parent is TimeNodeView, t is TimeNode) to TimeNodeView {
@@ -309,46 +335,51 @@ public class Trax is ResizableNode {
     function drawLabels from (w is Number, h is Number, offset is Integer) to Node[] 
     {
 	//println("draw labels {offset}");
-	const x = -w / 2 + 10;
+	const x = -w / 2 + 15;
 	const y = h / 2 - 15;
 	var off = offset - 10;
-	foreach (i in [0..<w-20 step 100]) {
+	foreach (i in [0..<w step 100]) {
 	    off += 10;
 	    Text.Label {
 		height: 10;
 		width: 30;
 		background: this.backgroundPaint;
-		transform: translate(x+i+12, y+10);
+		foreground: this.foregroundPaint;
+		transform: translate(x+i+10, y+10);
 		font: font;
 		text: "{off}"
 	    }
 	}
     }
 
-    function drawLines from (w is Number, h is Number) to AbstractMesh {
+    function drawLines from (w is Number, h is Number, viewHeight is Number) to AbstractMesh {
 	println("TIMELINE={target}");
-	const x0 = -w / 2 + 10;
-	const y0 = h / 2 - 15;
+	const x0 = -w / 2 + 15;
+	const y0 = h / 2 - viewHeight-5;
 	var x = x0;
 	var y = y0;
 	var mid is Boolean = false;
 	lineMesh.reset();
 	lineMesh.moveTo(x, y);
-	for (i in [0..<w step 10]) {
+	for (i in [0..<w step pixelsPerFrame()]) {
 	    var n = if (mid) then 3 else 5;
 	    mid = not mid;
 	    lineMesh.moveTo(x+i, y);
 	    lineMesh.lineTo(x+i, y+n);
 	}
-	for (i in [0..<h step 10]) {
+	for (i in [0..<h step pixelsPerFrame()]) {
 	    lineMesh.moveTo(x, y);
-	    lineMesh.lineTo(x + width-10, y);
-	    y -= 10;
+	    lineMesh.lineTo(x + width-pixelsPerFrame(), y);
+	    y -= viewHeight;
 	}
 	const mesh = lineMesh.getMesh();
 	mesh.updateBounds();
 	println("draw lines: {mesh.bounds} {mesh.vertices.getVertexCount()}");
 	return mesh;
+    }
+
+    public function selectClip from (clip is TimeNode) to ()
+    {
     }
     
     override var internalContent = Group {
@@ -385,11 +416,11 @@ public class Trax is ResizableNode {
          MeshNode {
 	     id: "lines"
 	     pickable: false;
-	     override var mesh = bind getSelf().drawLines(getSelf().width, getSelf().height);
+	     override var mesh = bind getSelf().drawLines(getSelf().width, getSelf().height, getViewHeight());
 	     shader: effectLoader.loadPaintShader(ColorPaint(Color.color(.75, .75, .75)));
 	 },
 	 TransformNode { 
-	     override var tx = bind -getSelf().width/2+10-frameToX(scrollOffset);
+	     override var tx = bind -getSelf().width/2+15-frameToX(scrollOffset);
 	     content:
 	     [Group {
 		 content: bind timeNodeViews;
@@ -397,4 +428,5 @@ public class Trax is ResizableNode {
 	     Group { content: bind playhead }]
 	 }]
     }
+
 }
