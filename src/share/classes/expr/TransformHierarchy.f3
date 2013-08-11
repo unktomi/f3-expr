@@ -1,0 +1,77 @@
+package expr;
+import expr.undo.*;
+import f3.media.scene.*;
+import f3.util.*;
+
+public class TransformHierarchy 
+{
+    public var selectedNode is Node on replace {
+	var p = selectedNode;
+	while (p <> null and not (p is ResourceNode)) {
+	    p = p.parent;
+	}
+	selectedTransform = p as ResourceNode;
+	selection.onNext(selectedTransform);
+    };
+
+    const undoList = UndoList {};
+
+    postinit {
+	undoList.addTarget("selectedNode", &selectedNode);
+    }
+
+    public var selectedTransform is TransformNode;
+
+    public var root is Node;
+
+    public function selectNode from (n is Node) to ()
+    {
+	selectedNode = n;
+    }
+
+    public function deleteSelection {
+	var old = selectedTransform;
+	var prev is ResourceNode = null;
+	var next is ResourceNode = null;
+	var t is Node;
+	root.foldLeft((), 
+		      function from (_ is (), n is Node) to () {
+			  if (n == old) {
+			      if (prev == null) {
+				  prev = n as ResourceNode;
+			      } else t = prev;
+			  } else if (n is ResourceNode) {
+			      if (prev == t) {
+				  next = n as ResourceNode;
+			      }
+			      prev = n as ResourceNode;
+			  }
+		      });
+	if (t == null) {
+	    t = next;
+	}
+	selectNode(t);
+    }
+
+    public function move from (src is Node, target is Node) to ()
+    {
+	const srcParent = src.parent as Group;
+	delete src from srcParent.content;
+	var targetGroup is Group;
+	if (not (target is Group)) {
+	    const parent = target.parent as Group;
+	    const i = f3.util.Sequences.indexOf(parent.content, target);
+	    insert src after parent.content[i];
+	} else {
+	    const parent = target as Group;
+	    insert src into parent.content;
+	}
+    }
+
+    const selection = Subject of TransformNode {};
+
+    public function observeSelection to Observable of TransformNode {
+	selection;
+    }
+	
+}
