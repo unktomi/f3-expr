@@ -1,0 +1,15 @@
+package expr;
+import f3.media.scene.*;
+import expr.undo.*;
+
+public class ResourceGroup is TransformNode {
+    public var url is String;
+    public var resources is ResourceNode[];
+    override var content = bind resources;
+    public var currentClip is TimeNode;
+    const undoList = UndoList {};
+    postinit {
+	undoList.addTarget("resourceNodes", &resources);
+    }
+}
+

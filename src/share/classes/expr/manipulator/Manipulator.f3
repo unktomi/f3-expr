@@ -10,7 +10,7 @@ import expr.undo.*;
 
 public class Manipulator is AbstractNode 
 {
-    const assetUrl = "{__DIR__}/manipulator_full_v1.ma";
+    const assetUrl = "{__DIR__}manipulator_full_v1.ma";
     const model = Ma.Model { url: assetUrl };
 
     const undoList = UndoList {};

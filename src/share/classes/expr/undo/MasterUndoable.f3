@@ -7,6 +7,13 @@ public function getUndoables to UndoList[]
     foreach (x in undoables.keySet()) x;
 }
 
+public function canUndo to Boolean {
+    for (x in undoables.keySet()) {
+	if (x.canUndo()) return true;
+    }
+    return false;
+}
+
 public function undo 
 {
     for (t in getUndoables()) t.undo();
