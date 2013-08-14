@@ -87,7 +87,16 @@ public class UndoList
     }
 
     public function canUndo to Boolean {
-	now >= 0
+	now > 0
+    }
+
+    public function canRedo to Boolean {
+	now < history.size()-1;
+    }
+
+    public function reset from () to () {
+	history = [];
+	now = -1
     }
 }
 

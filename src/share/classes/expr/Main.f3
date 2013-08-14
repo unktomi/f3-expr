@@ -11,7 +11,6 @@ import java.lang.Math;
 import expr.choices.SliderField;
 import expr.undo.*;
 
-
 class ResizableStageNode is ResizableNode {
     const stage is StageNode = StageNode {
 	depthBits: 0
@@ -121,9 +120,8 @@ public function run from (args is String[]) to ()
 
     function doDrop from (url is String) to () 
     {
-	stage.title = url;
 	playerUrl = url;
-	if (url.endsWith(".expr") {
+	if (url.endsWith(".expr")) {
 
 	} else if (url.endsWith(".ma")) {
 	    const model = Ma.Model {
@@ -176,7 +174,16 @@ public function run from (args is String[]) to ()
     var currentTransform = bind transformHierarchy.selectedTransform;
     currentCamera = camera;
 
+    var canUndo is Boolean;
+    var canRedo is Boolean;
+    var savePoint is Integer;
+
     const mainScene = Scene {
+    	override function update { 
+	    super.update();
+	    canUndo = MasterUndoable.canUndo();
+	    canRedo = MasterUndoable.canRedo();
+	}
 	background: Color.GRAY;
 	override var camera = bind currentCamera on invalidate {
 	    println("scene camera invalidated {currentCamera}");
@@ -201,7 +208,7 @@ public function run from (args is String[]) to ()
 	}
     }
 
-    const toolMenu = expr.toolmenu.ToolMenu {
+    const toolMenu is expr.toolmenu.ToolMenu = expr.toolmenu.ToolMenu {
 	transform: bind translate(stage.width /2, 
 				  stage.height - 10);
 	height: 20;
@@ -213,6 +220,7 @@ public function run from (args is String[]) to ()
     var manip is expr.manipulator.Manipulator;
 
     function save {
+	savePoint = MasterUndoable.now;
 	Resources.save(currentResource.url,
 		       mainScene,
 		       currentResource,
@@ -220,8 +228,11 @@ public function run from (args is String[]) to ()
     }
     
     function close from () to () {
+	savePoint = 0;
 	currentResource.resources = [];
 	currentAnimResource.resources = [];
+	transformHierarchy.clearSelection();
+	MasterUndoable.reset();
     }
 
     function open from (url is String) to ()
@@ -230,9 +241,7 @@ public function run from (args is String[]) to ()
 	currentResource.url = url;
 	const sceneRes = Resources.open(currentResource.url);
 	for (i in sceneRes.spatialResources) {
-
 	    doDrop(i.url);
-
 	    currentTransform.tx = i.tx;
 	    currentTransform.ty = i.ty;
 	    currentTransform.tz = i.tz;
@@ -248,9 +257,11 @@ public function run from (args is String[]) to ()
 	    currentTransform.px = i.px;
 	    currentTransform.py = i.py;
 	    currentTransform.pz = i.pz;
-
 	}
 	trax.setClips(currentAnimResource.resources);
+	MasterUndoable.reset();
+	MasterUndoable.commit();
+	savePoint = MasterUndoable.now;
     }
 
     const fileSave = FileDialog.FileSave {
@@ -265,6 +276,7 @@ public function run from (args is String[]) to ()
     }
 
     var stage is JoglStage = JoglStage {
+        title: bind "{currentResource.url} {if (savePoint <> MasterUndoable.now) then " (Unsaved)" else ""}";
         menubar: Menu.Bar {
 	    menus: 
 	    [Menu 
@@ -296,7 +308,7 @@ public function run from (args is String[]) to ()
 		     label: "Save As";
 		     enabled: bind currentResource.url == ""
 		     action: function {
-			 fileSave.fileName = "untitled.expr";
+			 fileSave.fileName = currentResource.url;
 			 const result = fileSave.open();
 			 if (result <> null) {
 			     currentResource.url = "file:{result}";
@@ -324,18 +336,22 @@ public function run from (args is String[]) to ()
 		 }
                  Menu.Separator {},
 		 MenuItem {
-		     label: "Undo"
+		     label: "Undo";
+		     enabled: bind canUndo;
 		     shortcut: Menu.Shortcut { keyCode: Keys.Z }
+		     action: MasterUndoable.undo
 		 },
 		 MenuItem {
-		     label: "Redo"
+		     label: "Redo";
+		     enabled: bind canRedo;
 		     shortcut: Menu.Shortcut { keyCode: Keys.Z, shiftKey: true }
+		     action: MasterUndoable.redo
 		 }]
 	     }]
 	     
 	}
 	height: 800, width: 1020;
-	title: new java.io.File(args[0]).getName();
+
 	content: [mainScene,
 		  Scene {
                       background: null;
@@ -436,12 +452,12 @@ public function run from (args is String[]) to ()
 			deleteResource(toDelete);
 		    } else if (event.keyCode == Keys.D) {
 			manip.enterPivotMode();
-		    } else if (event.keyCode == Keys.Z and event.metaKey) {
+			/* } else if (event.keyCode == Keys.Z and event.metaKey) {
 			if (event.shiftKey) {
 			    MasterUndoable.redo();
 			} else {
 			    MasterUndoable.undo();
-			}
+			    }*/
 		    } else if (event.keyCode == Keys.F) {
 			viewer.focusCamera(currentTransform);
 		    } else if (event.keyCode >= Keys._0 and event.keyCode <= Keys._9) {
