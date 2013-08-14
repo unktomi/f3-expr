@@ -14,17 +14,37 @@ public function canUndo to Boolean {
     return false;
 }
 
+public var commits is Integer;
+public var now is Integer = -1;
+
+public function canRedo to Boolean {
+    for (x in undoables.keySet()) {
+	if (x.canRedo()) return true;
+    }
+    return false;
+}
+
+public function reset from () to () {
+    for (x in undoables.keySet()) x.reset();
+    commits = 0;
+    now = -1;
+}
+
 public function undo 
-{
+{   
+    if (now > 0) now--;
     for (t in getUndoables()) t.undo();
 }
 
 public function redo 
 {
+    if (now < commits-1) now++;
     for (t in getUndoables()) t.redo();
 }
 
 public function commit 
 {
+    commits++;
+    now++;
     for (t in getUndoables()) t.commit();
 }
