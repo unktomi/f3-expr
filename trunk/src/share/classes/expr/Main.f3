@@ -258,6 +258,13 @@ public function run from (args is String[]) to ()
 	    currentTransform.py = i.py;
 	    currentTransform.pz = i.pz;
 	}
+	for (i in sceneRes.temporalResources, j in currentAnimResource.resources) {
+	    if (i.url == j.url) {
+		j.playTime = i.playTime;
+		j.playRate = i.playRate;
+		j.playCount = i.playCount;
+	    }
+	}
 	trax.setClips(currentAnimResource.resources);
 	MasterUndoable.reset();
 	MasterUndoable.commit();
