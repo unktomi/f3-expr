@@ -85,5 +85,9 @@ public class UndoList
 	now++;
 	println("commit {history[now]}");
     }
+
+    public function canUndo to Boolean {
+	now >= 0
+    }
 }
 

@@ -72,11 +72,12 @@
 		<path path="lib/f3.svg.awt.jar"/>
 		<path path="lib/f3.awesomium.jogl.jar"/>
 		<path path="lib/f3.cg.jogl.awt.jar"/>
+		<path path="lib/json-simple-1.1.1.jar"/>
             </classpath>
     </f3c>
   </target>
   <target name="jar" depends="copy.resources,compile">
-    <jar compress="true" destfile="build/f3.cg.jogl.awt.jar">
+    <jar compress="true" destfile="build/expr.jar">
       <fileset dir="build/classes"/>
     </jar>
   </target>
@@ -87,7 +88,7 @@
         <path path="lib/gluegen-rt.jar"/>
         <path path="lib/jogl.cg.jar"/>
         <path path="lib/f3rt.jar"/>
-        <path path="build/f3.cg.jogl.awt.jar"/>
+        <path path="build/expr.jar"/>
 	<path path="lib/f3.svg.awt.jar"/>
 	<path path="lib/org.f3.media.web.awesomium.jar"/>
       </classpath>
@@ -96,4 +97,27 @@
       <arg value="f3.jogl.awt.JoglStage"/>
     </java>
   </target>
+<target name="app" depends="jar">
+  <delete dir="demo.app"/>
+  <!-- untar dest="." src="demo.app.in.tar"/--> <!-- untar can't handle symlinks -->
+  <exec executable="tar">
+    <arg value="xvf"/>
+    <arg value="demo.app.in.tar"/>
+ </exec>
+  <copy todir="demo.app/Contents/MacOS/dist">
+    <fileset dir="dist"/>
+  </copy>
+  <copy todir="demo.app/Contents/MacOS">
+    <fileset dir="lib" includes="*.jar"/>
+  </copy>
+  <copy todir="demo.app/Contents/MacOS">
+    <fileset dir="lib/macosxuniversal" includes="*.*"/>
+    <fileset dir="build" includes="*.jar"/>
+  </copy>
+  <copy file="run.sh" todir="demo.app/Contents/MacOS">
+  </copy>
+  <chmod dir="demo.app/Contents/Frameworks/" perm="+x" includes="**"/>
+  <chmod dir="demo.app/Contents/MacOS" perm="+x" includes="*.sh"/>
+  <chmod dir="demo.app/Contents/MacOS/dist/bin" perm="+x" includes="*"/>
+</target>
 </project>

@@ -1,0 +1,307 @@
+package expr;
+import org.json.simple.parser.*;
+import org.json.simple.JSONValue;
+import f3.reflect.*;
+
+const ctx = F3Local.getContext();
+
+const STRING_TYPE = ctx.findClass("java.lang.String");
+const BOXED_NUMBER_TYPE = ctx.findClass("java.lang.Float");
+const NUMBER_TYPE = ctx.makeClassRef(java.lang.Float.TYPE);
+const BOXED_INTEGER_TYPE = ctx.findClass("java.lang.Integer");
+const INTEGER_TYPE = ctx.makeClassRef(java.lang.Integer.TYPE);
+const BOXED_BOOLEAN_TYPE = ctx.findClass("java.lang.Boolean");
+const BOOLEAN_TYPE = ctx.makeClassRef(java.lang.Boolean.TYPE);
+const DURATION_TYPE = ctx.findClass("f3.lang.Duration");
+
+const classMap = new java.util.HashMap of (String, java.util.Map of (String, F3VarMember));
+
+function getClass from (name is String) to F3ClassType 
+{
+    if (name == "Integer") then INTEGER_TYPE 
+	else if (name == "Number") then NUMBER_TYPE 
+	    else if (name == "Boolean") then BOOLEAN_TYPE 
+		else if (name == "String") then STRING_TYPE 
+		    else { ctx.findClass(name) }
+}
+
+function getVar from (classType is F3ClassType, name is String) to F3VarMember 
+{
+    var varMap = classMap[classType.getName()];
+    if (varMap == null) {
+        const vars = classType.getVariables(true);
+	println("vars={vars}");
+        varMap = new java.util.HashMap of (String, F3VarMember);
+        for (varMember in vars) {
+	    varMap.put(varMember.getName(), varMember);
+        }
+        classMap.put(classType.getName(), varMap);
+    }
+    return varMap[name];
+}
+
+function getVars from (classType is F3ClassType) to F3VarMember[]
+{
+    var varMap = classMap[classType.getName()];
+    if (varMap == null) {
+        const vars = classType.getVariables(true);
+	println("vars={vars}");
+        varMap = new java.util.HashMap of (String, F3VarMember);
+        for (varMember in vars) {
+	    varMap.put(varMember.getName(), varMember);
+        }
+        classMap.put(classType.getName(), varMap);
+    }
+    foreach (k in varMap.values()) k
+}
+
+
+
+public class JSONWriter is ContentHandler {
+
+    public var writer is java.io.Writer;
+
+    override public function startJSON {
+    }
+
+    override public function endJSON {
+    }
+
+    override function startObject to Boolean 
+    {
+	writer.write("\{");
+	true
+    }
+
+    override function endObject to Boolean 
+    {
+	writer.write("\}");
+	true
+    }
+
+    override function startObjectEntry from (key is String) to Boolean 
+    {
+	JSONValue.writeJSONString(key, writer);
+	writer.write(":");
+	true
+    }
+
+    override function endObjectEntry from () to Boolean 
+    {
+	writer.write(",");
+	true
+    }
+
+    override function startArray to Boolean 
+    {
+	writer.write("[");
+	true;
+    }
+
+    override function endArray to Boolean 
+    {
+	writer.write("]");
+	true;
+    }
+
+    override function primitive from (value is Object) to Boolean
+    {
+	JSONValue.writeJSONString(value, writer);
+	true;
+    }
+}
+
+function makeSequenceValue(s is Object[], elementType is F3Type) to F3SequenceValue 
+{
+    const arr = foreach (x in s) if (x is F3Value) then x as F3Value else ctx.mirrorOf(x, elementType);
+    return ctx.makeSequenceValue(arr, arr.size(), elementType);
+}
+
+
+public class Handler is ContentHandler {
+
+    var valueStack = new java.util.Stack of Object;
+    const valueStacks = new java.util.Stack of java.util.Stack of Object;
+    const keys = new java.util.Stack of String;
+    override function startJSON {}
+    override function endJSON {}
+
+    public function getResult to Object 
+    {
+	println("stack={valueStack}");
+	(valueStack.pop() as F3Local.ObjectValue).asObject();
+    }
+
+    override function startObject to Boolean 
+    {
+	println("start object");
+	valueStack.push(new java.util.HashMap of (String, Object));
+	true
+    }
+
+    override function endObject to Boolean 
+    {
+	const top = valueStack.peek();
+	println("end object top={top}");
+	const currentObject = valueStack.pop() as java.util.Map of (String, Object);
+	const className = currentObject.get("class").toString();
+	const clazz = IO.getClass(className);
+	const inst = clazz.newInstance();
+	valueStack.push(inst);
+	for (ent in currentObject.entrySet()) {
+	    const key = ent.getKey();
+	    const value0 = ent.getValue();	    
+	    const variable = getVar(clazz, key);
+	    const f3type = variable.getType();
+	    const value = if (DURATION_TYPE.isAssignableFrom(f3type)) then Duration.valueOf((value0 as java.lang.Number).doubleValue()) else value0;
+	    const f3value =
+		if (f3type is F3SequenceType) then makeSequenceValue(value as Object[], (f3type as F3SequenceType).getComponentType())
+		else if (value is F3Value) 
+			then value as F3Value 
+			else ctx.mirrorOf(value, f3type); 
+	    variable.setValue(inst, f3value);
+	}
+	currentObject.clear();
+	true
+    }
+
+    override function startObjectEntry from (key is String) to Boolean 
+    {
+	println("start entry {key}");
+	keys.push(key);
+	true
+    }
+
+    override function endObjectEntry from () to Boolean 
+    {
+	const key = keys.pop();
+	println("end entry {key}");
+	const value = valueStack.pop();
+	var top = valueStack.peek();
+	println("end object entry top={top} value={value}");
+	if (top is Object[]) {
+	    var arr = valueStack.pop() as Object[];
+	    insert value into arr;
+	    valueStack.push(arr);
+	} else {
+	    const currentObject = top as java.util.Map of (String, Object);
+	    currentObject.put(key, value);
+	}
+	true
+    }
+
+    override function startArray to Boolean 
+    {
+	println("start array");
+	valueStacks.push(valueStack);
+	valueStack = new java.util.Stack of Object;
+	true
+    }
+
+    override function endArray to Boolean 
+    {
+	const arr0 = valueStack;
+	valueStack = valueStacks.pop();
+	var arr1 is Object[] = [];
+	for (x in arr0) { 
+	    insert x into arr1;
+	}
+	valueStack.push(arr1);
+	println("end array");
+	true;
+    }
+
+    override function primitive from (value is Object) to Boolean
+    {
+	println("primitive {value}");
+	valueStack.push(value);
+	true
+    }
+}
+
+public function writeObject from (writer is java.io.Writer, obj is Object) to ()
+{
+    writeObject(JSONWriter 
+		{
+		    writer: writer;
+		},
+		obj);
+}
+
+function writeObject from (writer is ContentHandler, obj is Object) to ()
+{
+    const v = ctx.mirrorOf(obj);
+    writer.startJSON();
+    writeValue(writer, v);
+    writer.endJSON();
+}
+
+function writeValue from (writer is ContentHandler, k is F3Value) to ()
+{
+    if (k is F3PrimitiveValue) {
+	writer.primitive((k as F3PrimitiveValue).asObject());
+    } else if (k is F3SequenceValue) {
+	writer.startArray();
+	const s = k as F3SequenceValue;
+	for (i in [0..<s.getItemCount()]) {
+	    const item = s.getItem(i);
+	    writeValue(writer, item);
+	}
+	writer.endArray();
+    } else {
+	const t = k.getType();
+	if (STRING_TYPE.isAssignableFrom(t)) {
+	    writer.primitive((k as F3Local.ObjectValue).asObject());
+	} else if (DURATION_TYPE.isAssignableFrom(t)) {
+	    const d = (k as F3Local.ObjectValue).asObject() as Duration;
+	    writer.primitive(d.toMillis());
+	} else {
+	    const vars = getVars(t as F3ClassType);
+	    writer.startObject();
+	    writer.startObjectEntry("class");
+	    writer.primitive(t.getName());
+	    writer.endObjectEntry();
+	    const o = k as F3ObjectValue;
+	    for (v in vars) {
+		const j = v.getValue(o);
+		if (not j.isNull()) {
+		    writer.startObjectEntry(v.getName());
+		    try {
+			writeValue(writer, j);
+		    } catch (all is java.lang.Throwable) {
+			//println("error");
+		    }
+		    writer.endObjectEntry();
+		}
+	    }
+	    writer.endObject();
+	}
+    }
+}
+
+public function readObject from (reader is java.io.Reader) to Object 
+{
+    const h = Handler {}
+    const parser = new JSONParser();
+    parser.parse(reader, h);
+    h.getResult();
+}
+
+public class Test {
+    public var x is Number;
+    public var y is String;
+    public var test is Test;
+    public var arr is Integer[];
+}
+
+function run {
+    const text = "\{\"x\": 2.0, \"y\": \"yes\", \"class\": \"IO.Test\", \"arr\": [1, 2]\}";
+    const h = Handler {}
+    const parser = new JSONParser();
+    parser.parse(text, h, true);
+    const t = h.getResult() as Test;
+    println("x={t.x}, y={t.y} arr={t.arr}");
+    const w = new java.io.StringWriter();
+    writeObject(w, t);
+    println("encoded=>{w}");
+}

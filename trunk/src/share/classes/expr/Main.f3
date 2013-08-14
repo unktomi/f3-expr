@@ -11,26 +11,6 @@ import java.lang.Math;
 import expr.choices.SliderField;
 import expr.undo.*;
 
-public class ResourceGroup is TransformNode {
-    public var url is String;
-    public var resources is ResourceNode[];
-    override var content = bind resources;
-    public var currentClip is TimeNode;
-    const undoList = UndoList {};
-    postinit {
-	undoList.addTarget("resourceNodes", &resources);
-    }
-}
-
-public class ResourceTimeGroup is TimeGroup {
-    public var url is String;
-    public var resources is ResourceTimeNode[];
-    override var content = bind resources;
-    const undoList = UndoList {};
-    postinit {
-	undoList.addTarget("resourceTimeNodes", &resources);
-    }
-}
 
 class ResizableStageNode is ResizableNode {
     const stage is StageNode = StageNode {
@@ -70,6 +50,7 @@ public function run from (args is String[]) to ()
 {
 
     const currentResource is ResourceGroup = ResourceGroup {
+    
     }
     const currentAnimResource is ResourceTimeGroup = ResourceTimeGroup {
     }
@@ -142,7 +123,9 @@ public function run from (args is String[]) to ()
     {
 	stage.title = url;
 	playerUrl = url;
-	if (url.endsWith(".ma")) {
+	if (url.endsWith(".expr") {
+
+	} else if (url.endsWith(".ma")) {
 	    const model = Ma.Model {
 		url: url;
 	    }
@@ -218,7 +201,7 @@ public function run from (args is String[]) to ()
 	}
     }
 
-    var toolMenu = expr.toolmenu.ToolMenu {
+    const toolMenu = expr.toolmenu.ToolMenu {
 	transform: bind translate(stage.width /2, 
 				  stage.height - 10);
 	height: 20;
@@ -229,39 +212,124 @@ public function run from (args is String[]) to ()
     
     var manip is expr.manipulator.Manipulator;
 
+    function save {
+	Resources.save(currentResource.url,
+		       mainScene,
+		       currentResource,
+		       currentAnimResource);
+    }
+    
+    function close from () to () {
+	currentResource.resources = [];
+	currentAnimResource.resources = [];
+    }
+
+    function open from (url is String) to ()
+    {
+	close();
+	currentResource.url = url;
+	const sceneRes = Resources.open(currentResource.url);
+	for (i in sceneRes.spatialResources) {
+
+	    doDrop(i.url);
+
+	    currentTransform.tx = i.tx;
+	    currentTransform.ty = i.ty;
+	    currentTransform.tz = i.tz;
+
+	    currentTransform.sx = i.sx;
+	    currentTransform.sy = i.sy;
+	    currentTransform.sz = i.sz;
+
+	    currentTransform.rx = i.rx;
+	    currentTransform.ry = i.ry;
+	    currentTransform.rz = i.rz;
+
+	    currentTransform.px = i.px;
+	    currentTransform.py = i.py;
+	    currentTransform.pz = i.pz;
+
+	}
+	trax.setClips(currentAnimResource.resources);
+    }
+
+    const fileSave = FileDialog.FileSave {
+    }
+
+    const fileOpen = FileDialog.FileOpen {
+	filterExtensions: [".expr"]
+    }
+
+    function fileDirty to Boolean {
+	MasterUndoable.canUndo();
+    }
+
     var stage is JoglStage = JoglStage {
         menubar: Menu.Bar {
 	    menus: 
 	    [Menu 
              { 
 		 label: "File";
+		 shortcut: Menu.Shortcut { keyCode: Keys.F }
 		 items:
 		 [MenuItem {
+		     shortcut: Menu.Shortcut { keyCode: Keys.O }
 		     label: "Open";
+		     action: function {
+			 const result = fileOpen.open();
+			 if (result <> null) {
+			     if (fileDirty()) {
+				 save();
+			     }
+			     open("file:{result}");
+			 }
+		     }
 		 },
 		 MenuItem {
+		     shortcut: Menu.Shortcut { keyCode: Keys.S }
 		     label: "Save";
+		     enabled: bind currentResource.url <> ""
+		     action: save;
 		 },
 		 MenuItem {
+		     shortcut: Menu.Shortcut { keyCode: Keys.A }
 		     label: "Save As";
-		 },
-		 Menu.Separator {},
-		 MenuItem {
-		     label: "Quit";
+		     enabled: bind currentResource.url == ""
+		     action: function {
+			 fileSave.fileName = "untitled.expr";
+			 const result = fileSave.open();
+			 if (result <> null) {
+			     currentResource.url = "file:{result}";
+			     save();
+			 }
+		     }
 		 }]
 	     },
 	     Menu 
              { 
-		 label: "Edit";
+		 shortcut: Menu.Shortcut { keyCode: Keys.E }
+		 label: "Edit"
 		 items:
 		 [MenuItem {
+		     shortcut: Menu.Shortcut { keyCode: Keys.X }
 		     label: "Cut"
 		 },
 		 MenuItem {
+		     shortcut: Menu.Shortcut { keyCode: Keys.C }
 		     label: "Copy"
 		 },
 		 MenuItem {
+		     shortcut: Menu.Shortcut { keyCode: Keys.V }
 		     label: "Paste"
+		 }
+                 Menu.Separator {},
+		 MenuItem {
+		     label: "Undo"
+		     shortcut: Menu.Shortcut { keyCode: Keys.Z }
+		 },
+		 MenuItem {
+		     label: "Redo"
+		     shortcut: Menu.Shortcut { keyCode: Keys.Z, shiftKey: true }
 		 }]
 	     }]
 	     

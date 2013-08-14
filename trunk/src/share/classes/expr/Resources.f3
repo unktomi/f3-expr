@@ -1,0 +1,128 @@
+package expr;
+import f3.media.scene.*;
+import f3.media.svg.SVG;
+import java.io.File;
+
+public class Resource {
+    public var id is String;
+    public var url is String;
+}
+
+public class ProjectResource is Resource {
+    public var scenes is SceneResource[];
+    public var allResources is Resource[];
+}
+
+public class SpatialResource is Resource {
+    public var tx is Number;
+    public var ty is Number;
+    public var tz is Number;
+
+    public var rx is Number;
+    public var ry is Number;
+    public var rz is Number;
+
+    public var sx is Number;
+    public var sy is Number;
+    public var sz is Number;
+
+    public var px is Number;
+    public var py is Number;
+    public var pz is Number;
+}
+
+public class TemporalResource is Resource {
+    public var playTime is Duration;
+    public var playRate is Number;
+    public var playCount is Number;
+}
+
+public class MaResource is SpatialResource {
+}
+
+public class MaClipLibrary is TemporalResource {
+}
+
+public class SVGResource is SpatialResource {
+}
+
+public class ImageResource is SpatialResource {
+}
+
+public class WebResource is SpatialResource {
+}
+
+function makeResource from (n is ResourceNode) to SpatialResource {
+    SpatialResource {
+	url: n.url;
+	tx: n.tx;
+	ty: n.ty;
+	tz: n.tz;
+
+	sx: n.sx;
+	sy: n.sy;
+	sz: n.sz;
+
+	rx: n.rx;
+	ry: n.ry;
+	rz: n.rz;
+
+	px: n.px;
+	py: n.py;
+	pz: n.pz;
+    }
+}
+
+function makeResource from (n is ResourceTimeNode) to TemporalResource {
+    TemporalResource {
+	url: n.url;
+	playTime: n.playTime;
+	playRate: n.playRate;
+	playCount: n.playCount;
+    }
+}
+
+public class SceneResource is Resource {
+    public var width is Number;
+    public var height is Number;
+    public var name is String;
+    public var spatialResources is SpatialResource[];
+    public var temporalResources is TemporalResource[];
+    public var logicResources is Resource[];
+}
+
+public function save 
+    from (url is String,
+	  scene is Scene,
+	  spatial is ResourceGroup,
+	  temporal is ResourceTimeGroup)
+    to ()
+{
+    if (url.startsWith("file:")) {
+	const file = new java.io.File(url.substring(5));
+	const sceneRes = SceneResource {
+	    width: scene.width;
+	    height: scene.height;
+	    name: scene.id;
+	    spatialResources:
+	    foreach (i in spatial.resources) {
+		makeResource(i)
+	    }
+	    temporalResources:
+	    foreach (i in temporal.resources) {
+		makeResource(i)
+	    }
+	}
+	const w = new java.io.BufferedWriter(new java.io.FileWriter(file));
+	IO.writeObject(w, sceneRes);
+	w.close();
+    }
+}
+
+public function open 
+    from (url is String)
+    to SceneResource
+{
+    const reader = new java.io.InputStreamReader(new java.io.BufferedInputStream(new java.net.URL(url).openStream()));
+    const result = IO.readObject(reader) as SceneResource;
+}
