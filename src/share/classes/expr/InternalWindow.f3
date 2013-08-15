@@ -24,7 +24,7 @@ public class InternalWindow is ResizableNode {
 	const w = Math.round(2*w0)/2;
 	const h = Math.round(2*h0)/2;
 	super.resize(w, h);
-	content.resize(w-2, h-38);
+	content.resize(w-2-12, h-38-3);
     }
 
     override var transform = bind translate(Math.round(cx), Math.round(cy));
@@ -75,6 +75,7 @@ public class InternalWindow is ResizableNode {
     public var content is ResizableNode;
 
     const contentHolder = ContentHolder {
+        transform: translate(-6, 1);
 	scissorBounds: bind Bounds.boundsFromRect(content.width, content.height);
 	content: bind content;
     }

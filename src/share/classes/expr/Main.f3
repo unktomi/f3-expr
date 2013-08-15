@@ -384,11 +384,19 @@ public function run from (args is String[]) to ()
 			cx: 520, cy: 100;	   
 			      //imageLoader: null;
 			      //content: ResizableStageNode {
-			    
-			    content: trax = expr.timeline.Trax {
+			    content: Tabview {
+				tabs: 
+				[Tabview.Tab {
+				    title: "Timeline"
+				    content: trax = expr.timeline.Trax {
 				      target: player;
 				      targetNode: mainTimeLayer;
-				  };
+				     }
+				 },
+				 Tabview.Tab {
+				     title: "Graph Editor"
+				 }]
+			    }
 			      // }
 		    },
 		    toolMenu]
