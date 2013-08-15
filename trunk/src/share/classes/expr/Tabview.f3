@@ -1,0 +1,115 @@
+package expr;
+import f3.media.scene.*;
+import f3.media.scene.Shape2D.*;
+import f3.math.LinearMath.*;
+import java.lang.Math;
+import f3.media.input.*;
+
+const BG = Color.color(.48, .48, .48);
+const FG = Color.color(.9, .9, .9);
+const TEXT_COLOR = Color.color(.2, .2, .2);
+
+const FG_PAINT is Paint = ColorPaint(FG);
+const BG_PAINT is Paint = ColorPaint(BG);
+const TEXT_PAINT is Paint = ColorPaint(TEXT_COLOR);
+
+const TAB_HEIGHT = 15;
+
+public class Tab {
+    public var title is String;
+    public var content is ResizableNode;
+    protected var index is Integer;
+}
+
+class TabImpl is TransformNode, MouseInputHandler {
+    public var tab is Tab;
+    public var tabview is Tabview;
+    override function onMouseDown from (e is MouseEvent) to ()
+    {
+	tabview.selectedIndex = tab.index;
+    }
+
+}
+
+public class Tabview is ResizableNode {
+
+    override function resize from (w is Number, h is Number) to ()
+    {
+	super.resize(w, h);
+	selectedTab.content.resize(contentWidth, contentHeight);
+    }
+    public var selectedIndex is Integer;
+    public var tabs is Tab[];
+    public readonly var selectedTab is Tab = bind tabs[selectedIndex];
+
+    var contentWidth is Number = bind width;
+    var contentHeight is Number = bind height - TAB_HEIGHT;
+
+    readonly var font = bind layoutEngine.createFont("font-size:11;font-style:LucidaSans");
+
+    var tabWidth is Number = bind Math.max(minTabWidth, width / Math.max(tabs.size(), 1));
+
+    var minTabWidth is Number;
+
+    var labels is Text.Label[] = bind foreach (t in tabs) Text.Label {
+	blocksPointer: false;
+	transform: translate(5, 0);
+	height: bind TAB_HEIGHT;
+	width: bind tabWidth;
+	background: null;
+	foreground: bind TEXT_PAINT;
+	text: bind t.title
+	font: bind font;
+    };
+
+    override function update {
+	super.update();
+	minTabWidth = width / Math.max(tabs.size(), 1);
+	var maxLabelWidth = 0.0;
+	var x = 0.0;
+	var visibleCount = 0;
+	for (tab in tabs) { tab.index = indexof tab }
+	for (label in labels) {
+	    const w = label.content.layout.getShape().getBounds().width() + 6;
+	    if (x < width) {
+		maxLabelWidth = Math.max(maxLabelWidth, w);
+	    }
+	    x += w;
+	}
+	minTabWidth = maxLabelWidth;
+    }
+
+    const tabLabels = Group {
+	content: bind foreach (t in tabs) {
+	    TabImpl {
+		tabview: this;
+		tab: t;
+		tx: bind tabWidth * t.index
+		content: 
+		[Rectangle {
+		    height: TAB_HEIGHT+1;
+		    width: bind tabWidth;
+		    fillPaint: bind if (t == selectedTab) then FG_PAINT else BG_PAINT;
+		    strokePaint: bind if (t == selectedTab) then FG_PAINT else TEXT_PAINT;
+			//	    stroke: Stroke { width: 0.5 }
+		},
+		Group { content: bind labels[t.index] }]
+	    }
+	}
+    };
+	
+    override var internalContent = TransformNode {
+	content:
+	[TransformNode {
+		//tx: bind -width / 2;
+	    tx: bind -tabWidth/2;
+	    ty: bind contentHeight / 2-1;
+            content: bind tabLabels;
+	},
+	TransformNode {
+	    ty: bind -TAB_HEIGHT/2-2;
+	    content: bind selectedTab.content
+	}];
+    }
+	
+}

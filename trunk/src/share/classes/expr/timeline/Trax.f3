@@ -109,12 +109,12 @@ public class Playhead is AbstractNode
 
     const playhead_top = Image { 
 	url: "{__DIR__}playhead_top.png" 
-	transform: bind translate(0, height/2 - 5);
+	transform: bind translate(0, height/2);
     };
 
     const playhead_middle = Image { 
 	url: "{__DIR__}playhead_middle.png";
-	transform: bind scale(1, height/8)
+	transform: bind scale(1, (height-15)/8)
     };
 
     const playhead_bottom = Image { 
@@ -336,7 +336,7 @@ public class Trax is ResizableNode {
     {
 	//println("draw labels {offset}");
 	const x = -w / 2 + 15;
-	const y = h / 2 - 15;
+	const y = h / 2 - 19;
 	var off = offset - 10;
 	foreach (i in [0..<w step 100]) {
 	    off += 10;
@@ -425,7 +425,7 @@ public class Trax is ResizableNode {
 	     [Group {
 		 content: bind timeNodeViews;
 	     },
-	     Group { content: bind playhead }]
+	     TransformNode { ty: -6, content: bind playhead }]
 	 }]
     }
 
