@@ -10,6 +10,8 @@ import f3.media.svg.SVG;
 import java.lang.Math;
 import expr.choices.SliderField;
 import expr.undo.*;
+import expr.inspector.*;
+import expr.inspector.Inspector.*;
 
 class ResizableStageNode is ResizableNode {
     const stage is StageNode = StageNode {
@@ -171,6 +173,7 @@ public function run from (args is String[]) to ()
     }
 
     var trax is expr.timeline.Trax;
+    var inspector is Inspector;
     var currentTransform = bind transformHierarchy.selectedTransform;
     currentCamera = camera;
 
@@ -376,6 +379,76 @@ public function run from (args is String[]) to ()
                     camera: Camera2D {}; 
 		    override var content =
 		    [InternalWindow {
+			containerBounds: bind Bounds.boundsFromRect(0, 
+									0, 
+									width,
+									height-toolMenu.bounds.height())
+		    	height: 260, width: 200;
+			cx: 160, cy: 800-210;	   
+			    content: Tabview {
+				tabs: 
+				[Tabview.Tab {
+				    title: "Inspector"
+				    content: inspector = Inspector {
+					inspecting: bind if currentTransform <> null then
+					[InspectedNumber {
+					    label: "translateX";
+					    pointer: bind &currentTransform.tx;
+					},
+					InspectedNumber {
+					    label: "translateY";
+					    pointer: bind &currentTransform.ty;
+						
+					},
+					InspectedNumber {
+					    label: "translateZ";
+					    pointer: bind &currentTransform.tz;
+					}
+					InspectedNumber {
+					    label: "rotateX";
+					    pointer: bind &currentTransform.rx;
+					},
+					InspectedNumber {
+					    label: "rotateY";
+					    pointer: bind &currentTransform.ry;
+						
+					},
+					InspectedNumber {
+					    label: "rotateZ";
+					    pointer: bind &currentTransform.rz;
+					}
+					InspectedNumber {
+					    label: "scaleX";
+					    pointer: bind &currentTransform.sx;
+					},
+					InspectedNumber {
+					    label: "scaleY";
+					    pointer: bind &currentTransform.sy;
+						
+					},
+					InspectedNumber {
+					    label: "scaleZ";
+					    pointer: bind &currentTransform.sz;
+					}
+					InspectedNumber {
+					    label: "pivotX";
+					    pointer: bind &currentTransform.px;
+					},
+					InspectedNumber {
+					    label: "pivotY";
+					    pointer: bind &currentTransform.py;
+						
+					},
+					InspectedNumber {
+					    label: "pivotZ";
+					    pointer: bind &currentTransform.pz;
+					}] else [];
+				    }
+				 }, Tabview.Tab {}]
+			    }
+			      // }
+		     }
+		     InternalWindow {
 			    containerBounds: bind Bounds.boundsFromRect(0, 
 									0, 
 									width,
