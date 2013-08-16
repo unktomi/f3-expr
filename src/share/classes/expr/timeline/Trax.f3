@@ -72,8 +72,8 @@ class TimeNodeView is AbstractNode
 		 },
 		 Text.Label {
 		     blocksPointer: false;
-		     transform: translate(20, 0);
-		     height: bind h;
+		     transform: bind translate(20, font.descent);
+		     //height: bind h;
 		     width: bind w;
 		     background: null;
 		     foreground: fg;
