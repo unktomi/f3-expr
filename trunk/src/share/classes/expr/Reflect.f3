@@ -1,0 +1,133 @@
+package expr;
+import f3.reflect.*;
+
+public const ctx = F3Local.getContext();
+
+public const STRING_TYPE = ctx.findClass("java.lang.String");
+public const BOXED_NUMBER_TYPE = ctx.findClass("java.lang.Float");
+public const NUMBER_TYPE = ctx.getNumberType();
+public const BOXED_INTEGER_TYPE = ctx.findClass("java.lang.Integer");
+public const INTEGER_TYPE = ctx.getIntegerType();
+public const BOXED_BOOLEAN_TYPE = ctx.findClass("java.lang.Boolean");
+public const BOOLEAN_TYPE = ctx.getBooleanType();
+public const DURATION_TYPE = ctx.findClass("f3.lang.Duration");
+public const UNIT_TYPE = ctx.getVoidType();
+public const BOXED_UNIT_TYPE = ctx.findClass("java.lang.Void");
+public const OBJECT_TYPE = ctx.findClass("java.lang.Object");
+public const OBSERVER_TYPE = ctx.findClass("f3.util.Observer");
+public const OBSERVABLE_TYPE = ctx.findClass("f3.util.Observable");
+public const SUBJECT_TYPE = ctx.findClass("f3.util.Subject");
+
+public const classMap = new java.util.HashMap of (String, java.util.Map of (String, F3VarMember));
+
+public function getTypeArguments from (c is F3Type) to F3Type[]
+{
+    if (c is F3Local.ClassType) {
+	const t = (c as F3Local.ClassType).getType();
+	if (t is java.lang.reflect.ParameterizedType) {
+	    const p = t as java.lang.reflect.ParameterizedType;
+	    const targs is java.lang.reflect.Type[] = p.getActualTypeArguments();
+	    return foreach (x in targs) getType(x);
+	}
+    }
+    return [];
+}
+
+public function getType from (t is java.lang.reflect.Type) to F3Type {
+    ctx.makeTypeRef(t);
+}
+
+public function getType from (name is String) to F3Type 
+{
+    if (name == "Integer") then INTEGER_TYPE 
+	else if (name == "Number") then NUMBER_TYPE 
+	    else if (name == "Boolean") then BOOLEAN_TYPE 
+		else if (name == "String") then STRING_TYPE 
+		    else { ctx.findClass(name) }
+}
+
+public function getVar from (classType is F3ClassType, name is String) to F3VarMember 
+{
+    var varMap = classMap[classType.getName()];
+    if (varMap == null) {
+        const vars = classType.getVariables(true);
+	println("vars={vars}");
+        varMap = new java.util.HashMap of (String, F3VarMember);
+        for (varMember in vars) {
+	    varMap.put(varMember.getName(), varMember);
+        }
+        classMap.put(classType.getName(), varMap);
+    }
+    return varMap[name];
+}
+
+public function getVars from (classType is F3ClassType) to F3VarMember[]
+{
+    var varMap = classMap[classType.getName()];
+    if (varMap == null) {
+        const vars = classType.getVariables(true);
+	println("vars={vars}");
+        varMap = new java.util.HashMap of (String, F3VarMember);
+        for (varMember in vars) {
+	    varMap.put(varMember.getName(), varMember);
+        }
+        classMap.put(classType.getName(), varMap);
+    }
+    foreach (k in varMap.values()) k
+}
+
+function run from (args is String[]) to () {
+    const clazz = ctx.findClass(args[0]);
+    const funs = clazz.getFunctions(true);
+    for (f in funs where not f.getName().contains("$") and 
+	     OBJECT_TYPE <> f.getDeclaringClass()
+	 ) { 
+	const ft = f.getType();
+	var rt = ft.getReturnType();
+	if (ft.minArgs() == 0) {
+	    if (SUBJECT_TYPE.isAssignableFrom(rt) or OBSERVABLE_TYPE.isAssignableFrom(rt) or OBSERVER_TYPE.isAssignableFrom(rt)) {
+		rt = getTypeArguments(rt)[0];
+	    } else {
+		continue;
+	    }	
+	    if (SUBJECT_TYPE.isAssignableFrom(rt)) {
+		println("Subject of ({getTypeArguments(rt)})");
+		continue;
+	    }	
+	    if (OBSERVABLE_TYPE.isAssignableFrom(rt)) {
+		println("Observable of ({getTypeArguments(rt)})");
+		continue;
+	    }	
+	    if (OBSERVER_TYPE.isAssignableFrom(rt)) {
+		println("Observer of ({getTypeArguments(rt)})");
+		continue;
+	    }	
+	}
+	if (UNIT_TYPE <> rt) {
+	    continue
+	}
+	if (ft.minArgs() == 0) {
+	    // observer of ()
+	    println("{f.getName()} => Observer of (())");
+	} else if (ft.minArgs() == 1) {
+	    // observer of ft.getArgumentType(0)
+	    println("{f.getName()} => Observer of ({ft.getArgumentType(0)})");
+	} else if (ft.minArgs() == 1) {
+	    // observer of (ft.getArgumentType(0), ft.getArgumentType(1))
+	}
+    }
+    const vars = clazz.getVariables(true);
+    for (v in vars where not v.getName().contains("$") and not v.isStatic()) {
+	if (not v.isPublicInit() and not v.isDef()) {
+	    var rt = v.getType();
+	    if (SUBJECT_TYPE.isAssignableFrom(rt) or OBSERVABLE_TYPE.isAssignableFrom(rt) or OBSERVER_TYPE.isAssignableFrom(rt)) {
+		rt = getTypeArguments(rt)[0];
+	    }	
+	    if (not v.isPublicRead()) {
+		println("{v.getName()} => Subject of ({rt})");
+	    } else if (v.isPublic()) {
+		println("{v.getName()} => Observable of ({rt})");
+	    }
+	}
+    }
+}
