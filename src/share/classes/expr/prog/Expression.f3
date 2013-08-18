@@ -1,0 +1,337 @@
+package expr.prog;
+import f3.math.*;
+import f3.math.LinearMath.*;
+import expr.*;
+import f3.reflect.*;
+import expr.Reflect.*;
+import f3.util.*;
+import f3.lang.*;
+import f3.media.input.*;
+import f3.media.scene.*;
+import f3.media.scene.Shape2D.*;
+
+var exprMap = new java.util.HashMap of (F3ClassType, Member[]);
+
+public function introspect from (clazz is F3ClassType) to Member[]
+{
+    if (exprMap.containsKey(clazz)) {
+	return exprMap.get(clazz);
+    }
+    var result is Member[];
+    const funs = clazz.getFunctions(true);
+    for (f in funs where not f.getName().contains("$") and 
+	     OBJECT_TYPE <> f.getDeclaringClass()
+	 ) { 
+	const ft = f.getType();
+	var rt = ft.getReturnType();
+	var toInsert is Member;
+	if (ft.minArgs() == 0) {
+	    if (SUBJECT_TYPE.isAssignableFrom(rt) or OBSERVABLE_TYPE.isAssignableFrom(rt) or OBSERVER_TYPE.isAssignableFrom(rt)) {
+		rt = getTypeArguments(rt)[0];
+	    } else {
+		continue;
+	    }	
+	    if (SUBJECT_TYPE.isAssignableFrom(rt)) {
+		toInsert = Member {
+		    m: f;
+		    t: rt
+		    isObservable: true, isObserver: true;
+		}
+		println("Subject of ({getTypeArguments(rt)})");
+	    }  else if (OBSERVABLE_TYPE.isAssignableFrom(rt)) {
+		toInsert = Member {
+		    m: f;
+		    t: rt
+		    isObservable: true;
+		}
+		println("Observable of ({getTypeArguments(rt)})");
+	    } else if (OBSERVER_TYPE.isAssignableFrom(rt)) {
+		toInsert = Member {
+		    m: f;
+		    t: rt
+		    isObserver: true;
+		}
+		println("Observer of ({getTypeArguments(rt)})");
+	    } else {
+		continue;
+	    }
+	} else {
+	    if (UNIT_TYPE <> rt) {
+		continue;
+	    }
+	    if (ft.minArgs() == 0) {
+		// observer of ()
+		rt = UNIT_TYPE;
+	    } else if (ft.minArgs() == 1) {
+		// observer of ft.getArgumentType(0)
+		//println("{f.getName()} => Observer of ({ft.getArgumentType(0)})");
+	    } else if (ft.minArgs() == 1) {
+		// observer of (ft.getArgumentType(0), ft.getArgumentType(1))
+		continue;
+	    }
+	    toInsert = Member {
+		m: f;
+		t: rt;
+		isObserver: true;
+	    }
+	}
+	if (toInsert <> null) {
+	    insert toInsert into result;
+	}
+    }
+    const vars = clazz.getVariables(true);
+    for (v in vars where not v.getName().contains("$") and not v.isStatic()) {
+	var toInsert is Member;
+	if (not v.isPublicInit() and not v.isDef()) {
+	    var rt = v.getType();
+	    if (SUBJECT_TYPE.isAssignableFrom(rt) or OBSERVABLE_TYPE.isAssignableFrom(rt) or OBSERVER_TYPE.isAssignableFrom(rt)) {
+		rt = getTypeArguments(rt)[0];
+	    }	
+	    if (not v.isPublicRead()) {
+		println("{v.getName()} => Subject of ({rt})");
+		toInsert = Member {
+		    m: v;
+		    t: rt
+		    isObserver: true;
+		    isObservable: true;
+		}
+	    } else if (v.isPublic()) {
+		println("{v.getName()} => Observable of ({rt})");
+		toInsert = Member {
+		    m: v;
+		    t: rt
+		    isObservable: true;
+		}
+	    }
+	}
+	if (toInsert <> null) {
+	    insert toInsert into result;
+	}
+    }
+    exprMap.put(clazz, result);
+    return result;
+}
+
+public class Member {
+    public const m is F3Member; 
+    public const t is F3Type;
+    public const name = m.getName();
+    public var isObservable is Boolean;
+    public var isObserver is Boolean;
+}
+
+
+public abstract class Expression {
+    public var name is String;
+    public const t is F3Type;
+}
+
+function argName from (ft is F3FunctionType, i is Integer) to String {
+    ft.getArgumentType(i).getName()
+}
+
+function resultName from (ft is F3FunctionType) to String {
+    ft.getReturnType().getName();
+}
+
+public class MemberExpression is Expression {
+    public const member is Member;
+    override var name = bind member.m.getName();
+    override const t = bind member.t;
+}
+
+public class Function is Expression {
+    public const fun is F3FunctionMember;
+    const ft = fun.getType();
+    override var t = bind ft;
+    public var inputs is Parameter[] =
+	bind foreach (i in [0..<ft.minArgs()]) {
+	Parameter {
+	    name: argName(ft, i);
+	    target: this;
+	    t: ft.getArgumentType(i)
+	}
+    }
+    public var output is Result = Result {
+	name: resultName(ft);
+	t: ft.getReturnType()
+    }
+}
+
+public class Parameter is Expression {
+    public var target is Function;
+    public var source is Expression;
+}
+
+public class Result is Expression {
+    public var source is Function;
+    public var target is Expression;
+}
+
+public class ObservableExpression is Expression {
+    public var observers is ObserverExpression[];
+}
+
+public class ObserverExpression is Expression {
+    public var observable is ObservableExpression;
+}
+
+public class Program {
+    public var start is ObservableExpression;
+}
+
+class DataArrow is MeshNode.Instance {
+}
+
+class ControlArrow is MeshNode.Instance {
+}
+
+class ExpressionView is AbstractNode {
+    public const canvas is Canvas;
+    public var expression is Expression;
+    public var pos is Point3;
+    var cellWidth is Number;
+    var cellHeight is Number;
+    var font is Text.Font;
+    const label is Text.Label = Text.Label {
+	text: bind expression.name;
+	height: bind cellHeight;
+	width: bind cellWidth;
+	font: bind font;
+    };
+    const d1 = label.observeMouseDown().subscribe(onDown);
+    const d2 = label.observeMouseUp().subscribe(onUp);
+    const d3 = label.observeMouseDrag().subscribe(onDrag);
+    function onDown from (e is MouseEvent) to () 
+    {
+    }
+    function onDrag from (e is MouseEvent) to () 
+    {
+	pos += e.picked.dragPoint1 - e.picked.dragPoint0;
+    }
+    function onUp from (e is MouseEvent) to () 
+    {
+    }
+}
+
+class FunctionView is AbstractNode {
+    public var fun is Function;
+    var inputs = bind foreach (p in fun.inputs) ParameterView {
+	parameter: p
+    };
+    var output = ResultView {
+	result: bind fun.output;
+    };
+    override var internalContent = Group {
+	content: 
+	[
+	 Group {
+	     content: bind inputs
+	 }
+	 Group {
+	     content: bind output;
+	 }]
+    }
+}
+
+class LinkView is ExpressionView {
+    public var target is ParameterView;
+    public var source is ResultView;
+}
+
+class LinkedView is ExpressionView {
+    var link is LinkView;
+}
+
+class ParameterView is LinkedView {
+    const parameter is Parameter;
+    override var internalContent = Group {
+	content: 
+	[label]
+
+    };
+
+    override function onDown from (e is MouseEvent) to () 
+    {
+    }
+    override function onDrag from (e is MouseEvent) to () 
+    {
+    }
+    override function onUp from (e is MouseEvent) to () 
+    {
+    }
+
+}
+
+class ResultView is LinkView {
+
+    public var result is Result;
+
+    override var internalContent = Group 
+    {
+	content: 
+	[Text.Label {
+		//text: bind toString(result.t)
+	}]
+    }
+
+    override function onDrag from (e is MouseEvent) to () 
+    {
+	//targetPos = e.location;
+	const source = canvas.pickInput(e, result.t);
+    }
+
+    override function onDown from (e is MouseEvent) to () 
+    {
+    }
+
+    override function onUp from (e is MouseEvent) to () 
+    {
+    }
+}
+
+public class Canvas is ResizableNode {
+
+    var portPaint is Paint;
+
+    const portArrow = Polygon {
+	points: [0, 0, 0, 10, 6, 5];
+	fillPaint: bind portPaint;
+    }
+
+    function pickOutput from (e is MouseEvent, t is F3Type) to ExpressionView 
+    {
+	for (p in e.scene.underMouse) {
+	    const n = p.node;
+	    if (n is ResultView) {
+		const rv = n as ResultView;
+		if (rv.result.t.isAssignableFrom(t)) {
+		    return rv;
+		}
+	    }
+	}
+	null;
+    }
+
+    function pickInput 
+	from (e is MouseEvent, 
+	      t is F3Type) 
+	to ExpressionView 
+    {
+	for (p in e.scene.underMouse) {
+	    const n = p.node;
+	    if (n is ParameterView) {
+		const pv = n as ParameterView;
+		if (t.isAssignableFrom(pv.parameter.t)) {
+		    return pv;
+		}
+	    }
+	}
+	null;
+    }
+}
+
+
+
+
+ 
