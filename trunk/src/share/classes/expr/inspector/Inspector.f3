@@ -1,4 +1,5 @@
 package expr.inspector;
+import f3.media.input.*;
 import f3.media.scene.*;
 import f3.media.scene.Shape2D.*;
 import expr.choices.*;
@@ -6,27 +7,37 @@ import f3.lang.*;
 import f3.util.*;
 import f3.util.Observables;
 import expr.*;
+import expr.Reflect.*;
+import f3.reflect.*;
+import org.f3.runtime.*;
+import expr.prog.Expression;
+import expr.prog.Expression.*;
 import f3.math.*;
 import f3.math.LinearMath.*;
+import java.lang.Math;
 
 public abstract class Inspected of a 
 {
-    public var pointer is ObservableRef of a;
     public var label is String;
+    public var observable is Observable of a;
+    protected var index is Integer;
+    public function get to a { null} 
+    public function set from (x is a) to () {}
+}
+
+public class InspectedRange of a is Inspected of a {
     public function getAsString from (t is Number) to String
     {
 	"{get(t)}";
     }
-    public function get from (t is Number) to a;
+    public function get from (t is Number) to a { null }
     public function set from (t is Number) to () 
     { 
-	pointer.set(get(t)); 
+	set(get(t)); 
     }
-    public var observable = bind Observables.observe(pointer);
-    protected var index is Integer;
 }
 
-public class InspectedNumber is Inspected of Number 
+public class InspectedNumber is InspectedRange of Number 
 {
     public const low is Number;
     public const hi is Number;
@@ -36,7 +47,7 @@ public class InspectedNumber is Inspected of Number
     }
 }
 
-public class InspectedChoice of a is Inspected of a 
+public class InspectedChoice of a is InspectedRange of a 
 {
     public const choices is (..a)[];
     public const labels is String[] = foreach (choice in choices) "{choice}";
@@ -57,7 +68,7 @@ public class InspectedChoice of a is Inspected of a
     }
 }
 
-public class InspectedBoolean is Inspected of Boolean
+public class InspectedBoolean is InspectedRange of Boolean
 {
     override public function getAsString from (t is Number) to String
     {
@@ -72,21 +83,21 @@ public class InspectedBoolean is Inspected of Boolean
 
 public class InspectedString is Inspected of String
 {
-    override public function getAsString from (t is Number) to String
-    {
-        pointer.get();
-    }
-
-    override public function get from (t is Number) to String
-    {
-        pointer.get();
-    }
 }
+
+public class InspectedObservable of a is Inspected of Observable of a
+{
+}
+
 
 const FG = Color.color(.2, .2, .2);
 const FG_PAINT = ColorPaint(FG);
+const SELECTED_FG = Color.color(.8, .8, .8);
+const SELECTED_FG_PAINT = ColorPaint(SELECTED_FG);
 const BG = Color.color(.8, .8, .8);
 const BG_PAINT = ColorPaint(BG);
+const SELECTED_BG = Color.color(.2, .2, .2);
+const SELECTED_BG_PAINT = ColorPaint(SELECTED_BG);
 const DARK_BG = Color.color(.5, .5, .5);
 const DARK_BG_PAINT = ColorPaint(DARK_BG);
 
@@ -99,7 +110,7 @@ class NumberField is SliderField {
 	t = n;
     }
     postinit {
-	t = i.pointer.get();
+	t = i.get();
 	println("I.observable = {i.observable}");
 	disp = i.observable.subscribe(onChange);
     }
@@ -112,14 +123,57 @@ class NumberField is SliderField {
     }
 }
 
-public class Inspector is ResizableNode {
+class BooleanField is SliderField {
+    public var i is InspectedBoolean;
+    var disp is Disposable;
+    function onChange from (n is Boolean) to () 
+    {
+	println("on change {n}");
+	t = if (n) then 1.0 else 0.0;
+    }
+    postinit {
+	onChange(i.get());
+	disp = i.observable.subscribe(onChange);
+    }
+    override var t on replace {
+	println("t={t}");
+    }
+    override function getText from (t is Number) to String
+    {
+	if (t == 0.0) then "No" else "Yes";
+    }
+}
+
+public class Inspector is ResizableNode, Focusable, KeyboardInputHandler {
     public var inspecting is (Inspected of ?)[];
+    public var selectedIndex is Integer;
+    var low is Integer;
+    var hi is Integer;
     public var cellHeight is Number = 15;
     public var fieldWidth is Number = 64;
     public var font is Text.Font = bind layoutEngine.createFont("font-size:12;font-style:LucidaSans");
     public var border is Number = 1;
+    override function onKeyDown from (e is KeyboardEvent) to ()
+    {
+	if (e.keyCode == Keys.Down) {
+	    selectedIndex = Math.min(inspecting.size()-1, selectedIndex+1);
+	} else if (e.keyCode == Keys.Up) {
+	    selectedIndex = Math.max(0, selectedIndex-1);
+	} else if (e.keyCode == Keys.Home) {
+	    selectedIndex = 0;
+	} else if (e.keyCode == Keys.End) {
+	    selectedIndex = inspecting.size()-1;
+	}
+    }
     override function update {
 	super.update();
+	const visible = Math.round(height / (cellHeight+border)) as Integer;
+	if (selectedIndex < low) {
+	    low = selectedIndex;
+	} else if (low + visible < selectedIndex) {
+	    low = selectedIndex - visible / 2;
+	}
+	hi = low + visible;
 	for (i in inspecting) {
 	    i.index = indexof i;
 	}
@@ -130,11 +184,16 @@ public class Inspector is ResizableNode {
 	     width: bind width;
 	     height: bind height;
 	     fillPaint: DARK_BG_PAINT;
+	     override function onMouseDown from (e is MouseEvent) to ()
+	     {
+		 selectedIndex = low+(-e.location.y + height / 2) / (border+cellHeight) as Integer;
+		 println("e={e}, selectedIndex=>{selectedIndex}");
+	     }
 	},
 	Group {
           transform: bind translate(0, height/2-cellHeight/2);
-	  content: bind foreach (i in inspecting) Group {
-	    override var transform = bind translate(0, -i.index * (border+cellHeight));
+	  content: bind foreach (i in inspecting[low..hi]) Group {
+	    override var transform = bind translate(0, (low-i.index) * (border+cellHeight));
 	    content: [TransformNode {
 		//tx: bind -width / 2;
 		content: Text.Label {
@@ -142,12 +201,12 @@ public class Inspector is ResizableNode {
 		    indent: 4;	
 		    text: bind i.label;
 		    font: bind font;
-		    foreground: FG_PAINT;
-		    background: BG_PAINT;
+		    foreground: bind if (i.index <> selectedIndex) FG_PAINT else SELECTED_FG_PAINT;
+		    background: bind if (i.index <> selectedIndex) BG_PAINT else SELECTED_BG_PAINT;
 		    height: bind cellHeight;	    
 		}
-	    }
-	    if not (i is InspectedNumber) then null else
+	    },
+	    if (i is InspectedNumber) then
 	    TransformNode {
 		tx: bind width / 2 - fieldWidth / 2-4;
 		content: NumberField {
@@ -155,8 +214,51 @@ public class Inspector is ResizableNode {
 	            width: bind fieldWidth;
 		    height: bind cellHeight;
 		}
-	    }]
+	    } else if (i is InspectedBoolean) then
+	    TransformNode {
+		tx: bind width / 2 - fieldWidth / 2-4;
+		content: BooleanField {
+		    i: bind i as InspectedBoolean;
+	            width: bind fieldWidth;
+		    height: bind cellHeight;
+		}
+	    } else if (i is InspectedObservable) {
+		null
+	    } else null]
 	 }
       }]
     }
+}
+
+public function inspect from (obj is Object) to (Inspected of ?)[]
+{
+    if (obj == null) then [] else {
+	    const members = Expression.introspect(getType(obj.getClass()) as F3ClassType);
+	    foreach (m in members) {
+		println("m={m} {m.m} t={m.t}");
+		if (m.isObservable)  {
+		    if (m.m is F3VarMember and m.t == NUMBER_TYPE) {
+			const ptr = (m.m as F3Local.VarMember).getPointer(obj as F3Object) as ObservableRef of Number;
+			InspectedNumber {
+			    label: m.m.getName();
+			    observable: Observables.observe(ptr);
+			    override function get to Number { ptr.get() }
+			    override function set from (x is Number) to () { ptr.set(x) }
+			}
+		    } else if (m.m is F3VarMember and m.t == BOOLEAN_TYPE) {
+			const ptr = (m.m as F3Local.VarMember).getPointer(obj as F3Object) as ObservableRef of Boolean;
+			InspectedBoolean {
+			    label: m.m.getName();
+			    observable: Observables.observe(ptr);
+			    override function get to Boolean { ptr.get() }
+			    override function set from (x is Boolean) to () { ptr.set(x) }
+			}
+		    } else {
+			InspectedObservable of Object {
+			    label: m.m.getName();
+			}
+		    }
+		} else null;
+	    }
+	}
 }

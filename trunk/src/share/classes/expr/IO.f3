@@ -1,61 +1,8 @@
 package expr;
 import org.json.simple.parser.*;
 import org.json.simple.JSONValue;
+import expr.Reflect.*;
 import f3.reflect.*;
-
-const ctx = F3Local.getContext();
-
-const STRING_TYPE = ctx.findClass("java.lang.String");
-const BOXED_NUMBER_TYPE = ctx.findClass("java.lang.Float");
-const NUMBER_TYPE = ctx.makeClassRef(java.lang.Float.TYPE);
-const BOXED_INTEGER_TYPE = ctx.findClass("java.lang.Integer");
-const INTEGER_TYPE = ctx.makeClassRef(java.lang.Integer.TYPE);
-const BOXED_BOOLEAN_TYPE = ctx.findClass("java.lang.Boolean");
-const BOOLEAN_TYPE = ctx.makeClassRef(java.lang.Boolean.TYPE);
-const DURATION_TYPE = ctx.findClass("f3.lang.Duration");
-
-const classMap = new java.util.HashMap of (String, java.util.Map of (String, F3VarMember));
-
-function getClass from (name is String) to F3ClassType 
-{
-    if (name == "Integer") then INTEGER_TYPE 
-	else if (name == "Number") then NUMBER_TYPE 
-	    else if (name == "Boolean") then BOOLEAN_TYPE 
-		else if (name == "String") then STRING_TYPE 
-		    else { ctx.findClass(name) }
-}
-
-function getVar from (classType is F3ClassType, name is String) to F3VarMember 
-{
-    var varMap = classMap[classType.getName()];
-    if (varMap == null) {
-        const vars = classType.getVariables(true);
-	println("vars={vars}");
-        varMap = new java.util.HashMap of (String, F3VarMember);
-        for (varMember in vars) {
-	    varMap.put(varMember.getName(), varMember);
-        }
-        classMap.put(classType.getName(), varMap);
-    }
-    return varMap[name];
-}
-
-function getVars from (classType is F3ClassType) to F3VarMember[]
-{
-    var varMap = classMap[classType.getName()];
-    if (varMap == null) {
-        const vars = classType.getVariables(true);
-	println("vars={vars}");
-        varMap = new java.util.HashMap of (String, F3VarMember);
-        for (varMember in vars) {
-	    varMap.put(varMember.getName(), varMember);
-        }
-        classMap.put(classType.getName(), varMap);
-    }
-    foreach (k in varMap.values()) k
-}
-
-
 
 public class JSONWriter is ContentHandler {
 
@@ -145,7 +92,7 @@ public class Handler is ContentHandler {
 	println("end object top={top}");
 	const currentObject = valueStack.pop() as java.util.Map of (String, Object);
 	const className = currentObject.get("class").toString();
-	const clazz = IO.getClass(className);
+	const clazz = Reflect.getType(className) as F3ClassType;
 	const inst = clazz.newInstance();
 	valueStack.push(inst);
 	for (ent in currentObject.entrySet()) {

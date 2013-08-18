@@ -383,14 +383,18 @@ public function run from (args is String[]) to ()
 									0, 
 									width,
 									height-toolMenu.bounds.height())
-		    	height: 260, width: 200;
-			cx: 160, cy: 800-210;	   
-			    content: Tabview {
+		    	height: 500, width: 200;
+			cx: 160, cy: 800-300;	   
+			    content: ResizableStageNode {
+			    
+			      content: Tabview {
 				tabs: 
 				[Tabview.Tab {
 				    title: "Inspector"
 				    content: inspector = Inspector {
-					inspecting: bind if currentTransform <> null then
+				    	inspecting: bind inspector.inspect(currentTransform);
+/*
+					var inspecting1 = bind if currentTransform <> null then null else
 					[InspectedNumber {
 					    label: "translateX";
 					    pointer: bind &currentTransform.tx;
@@ -411,7 +415,6 @@ public function run from (args is String[]) to ()
 					InspectedNumber {
 					    label: "rotateY";
 					    pointer: bind &currentTransform.ry;
-						
 					},
 					InspectedNumber {
 					    label: "rotateZ";
@@ -442,19 +445,20 @@ public function run from (args is String[]) to ()
 					InspectedNumber {
 					    label: "pivotZ";
 					    pointer: bind &currentTransform.pz;
-					}] else [];
+					}]
+*/
 				    }
 				 }, Tabview.Tab {}]
 			    }
-			      // }
-		     }
+			 }
+		     },
 		     InternalWindow {
-			    containerBounds: bind Bounds.boundsFromRect(0, 
-									0, 
-									width,
-									height-toolMenu.bounds.height())
+			containerBounds: bind Bounds.boundsFromRect(0, 
+								    0, 
+								    width,
+								    height-toolMenu.bounds.height())
 		    	height: 150, width: 820;
-			cx: 520, cy: 100;	   
+			cx: 520, cy: 252;	   
 			      //imageLoader: null;
 			      //content: ResizableStageNode {
 			    content: Tabview {
@@ -471,6 +475,26 @@ public function run from (args is String[]) to ()
 				 }]
 			    }
 			      // }
+		    },
+		    InternalWindow {
+			containerBounds: bind Bounds.boundsFromRect(0, 
+								    0, 
+								    width,
+								    height-toolMenu.bounds.height())
+		    	height: 150, width: 820;
+			cx: 520, cy: 100;	   
+			      //imageLoader: null;
+			      //content: ResizableStageNode {
+				content: Tabview {
+				tabs: 
+				[Tabview.Tab {
+				    title: "Expression"
+				    content: expr.prog.Expression.Canvas {
+				    }
+				 },
+				 Tabview.Tab {
+				 }]
+			       }
 		    },
 		    toolMenu]
                   }]

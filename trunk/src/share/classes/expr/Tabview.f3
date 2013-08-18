@@ -21,12 +21,17 @@ public class Tab {
     protected var index is Integer;
 }
 
-class TabImpl is TransformNode, MouseInputHandler {
+class TabImpl is TransformNode, MouseInputHandler, Focuser {
     public var tab is Tab;
     public var tabview is Tabview;
     override function onMouseDown from (e is MouseEvent) to ()
     {
 	tabview.selectedIndex = tab.index;
+    }
+    override public function getTargetOfFocus to Focusable {
+	const r = if (tab.content is Focusable) then (tab.content as Focusable) else null;
+	println("target of focus => {r}");
+	return r;
     }
 
 }
@@ -70,7 +75,7 @@ public class Tabview is ResizableNode {
 	var visibleCount = 0;
 	for (tab in tabs) { tab.index = indexof tab }
 	for (label in labels) {
-	    const w = label.content.layout.getShape().getBounds().width() + 6;
+	    const w = label.content.textShape.getBounds().width() + 6;
 	    if (x < width) {
 		maxLabelWidth = Math.max(maxLabelWidth, w);
 	    }

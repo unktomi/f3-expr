@@ -41,6 +41,7 @@ public class SliderField is AbstractNode
 	transform: translate(0, 1);
 	rightJustified: true;
         font: layoutEngine.createFont("font-size:11;font-family:Lucida;");
+	pickable: false;
     };
 
     const dark = Color.color(0.77, 0.77, 0.77);
@@ -71,6 +72,7 @@ public class SliderField is AbstractNode
     }
 
     override var internalContent = Group {
+        cursor: Cursor.Default;
 	content: bind
 	[lightRect,
         darkRect,
@@ -90,7 +92,7 @@ public class SliderField is AbstractNode
 		  t = clamp((event.location.x + width / 2) / width, 0.0, 1.0);
 	      }
 	}
-    	disp = internalContent.observeMouseDrag().subscribe(onDrag);
+    	disp = lightRect.observeMouseDrag().subscribe(onDrag);
     }
 	
 }
