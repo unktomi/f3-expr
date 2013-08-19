@@ -385,7 +385,7 @@ public function run from (args is String[]) to ()
 									height-toolMenu.bounds.height())
 		    	height: 500, width: 200;
 			cx: 160, cy: 800-300;	   
-			    content: ResizableStageNode {
+//			    content: ResizableStageNode {
 			    
 			      content: Tabview {
 				tabs: 
@@ -448,9 +448,18 @@ public function run from (args is String[]) to ()
 					}]
 */
 				    }
-				 }, Tabview.Tab {}]
+				 }, 
+				 Tabview.Tab {
+				     title: "Hierarchy";
+				     content:
+				     Treeview {
+					 model: TransformHierarchy.Model {
+					     h: bind transformHierarchy
+					 }
+				     }
+				 }]
 			    }
-			 }
+//			 }
 		     },
 		     InternalWindow {
 			containerBounds: bind Bounds.boundsFromRect(0, 

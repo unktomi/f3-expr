@@ -67,8 +67,14 @@ public class Tabview is ResizableNode {
 	font: bind font;
     };
 
+    var lastSelected is Tab;
+
     override function update {
 	super.update();
+	if (lastSelected <> selectedTab) {
+	    lastSelected = selectedTab;
+	    selectedTab.content.resize(contentWidth, contentHeight);
+	}
 	minTabWidth = width / Math.max(tabs.size(), 1);
 	var maxLabelWidth = 0.0;
 	var x = 0.0;

@@ -3,6 +3,30 @@ import expr.undo.*;
 import f3.media.scene.*;
 import f3.util.*;
 
+class Treenode is Treeview.Treenode {
+    public var n is Node;
+    override var label = bind if (n.id <> "") then n.id else "{n}";
+    override var canOpen = bind (n is Group) and {
+	var g = n as Group;
+	g.content.size() > 0;
+    }
+    override var children = bind foreach (x in (n as Group).content) Treenode { n: bind x };
+    override function open to () {
+	super.open();
+	println("open {n} => {children.size()}");
+    }
+}
+
+public class Model is Treeview.Treemodel {
+    public const h is TransformHierarchy;
+    override var root = Treenode { n:  bind h.root };
+    const selectionListener = 
+	h.observeSelection().subscribe(function from (tn is TransformNode) to () 
+				       {
+					   
+				       });
+}
+
 public class TransformHierarchy 
 {
     public var selectedNode is Node on replace {
