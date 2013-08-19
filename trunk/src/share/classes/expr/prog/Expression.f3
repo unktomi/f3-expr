@@ -295,8 +295,8 @@ public class Canvas is ResizableNode {
     var portPaint is Paint;
 
     const portArrow = Polygon {
-	points: [0, 0, 0, 10, 6, 5];
-	fillPaint: bind portPaint;
+	points: [-3.5, -4.5, -3.5, 4.5, 3.5, 0];
+	fillPaint: ColorPaint(Color.WHITE);
     }
 
     function pickOutput from (e is MouseEvent, t is F3Type) to ExpressionView 

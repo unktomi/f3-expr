@@ -61,7 +61,7 @@ public class Tabview is ResizableNode {
 	transform: translate(5, 0);
 	height: bind TAB_HEIGHT;
 	width: bind tabWidth;
-	background: null;
+	background: bind if (t == selectedTab) then FG_PAINT else BG_PAINT;
 	foreground: bind TEXT_PAINT;
 	text: bind t.title
 	font: bind font;
