@@ -2,6 +2,7 @@ package expr;
 import expr.undo.*;
 import f3.media.scene.*;
 import f3.util.*;
+import f3.util.Observer.*;
 
 class Treenode is Treeview.Treenode {
     public var n is Node;
@@ -23,8 +24,21 @@ public class Model is Treeview.Treemodel {
     const selectionListener = 
 	h.observeSelection().subscribe(function from (tn is TransformNode) to () 
 				       {
-					   
+					   foldLeft((), 
+						    function from (_ is (), t is Treeview.Treenode) to () {
+							const n = (t as Treenode).n;
+							if (n == tn) {
+							    selectionObserver.onNext(t);
+							}
+						    })
 				       });
+    function onSelectionChange from (tn is Treeview.Treenode) to ()
+    {
+	h.selectedNode = (tn as Treenode).n
+    }
+    init {
+	selectionObserver.subscribe(onSelectionChange);
+    }
 }
 
 public class TransformHierarchy 

@@ -11,7 +11,7 @@ import expr.undo.*;
 public class Manipulator is AbstractNode 
 {
     const assetUrl = "{__DIR__}manipulator_full_v1.ma";
-    const model = Ma.Model { url: assetUrl };
+    const model is Ma.Model = Ma.Model { url: assetUrl };
 
     const undoList = UndoList {};
 
@@ -422,6 +422,7 @@ public class Manipulator is AbstractNode
 
     override function update 
     {
+        super.update();
         if (moveX == null) createHandlers();
     }   
 

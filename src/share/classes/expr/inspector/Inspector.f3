@@ -92,11 +92,11 @@ public class InspectedObservable of a is Inspected of Observable of a
 
 const FG = Color.color(.2, .2, .2);
 const FG_PAINT = ColorPaint(FG);
-const SELECTED_FG = Color.color(.8, .8, .8);
+const SELECTED_FG = Color.color(.9, .9, .9);
 const SELECTED_FG_PAINT = ColorPaint(SELECTED_FG);
 const BG = Color.color(.8, .8, .8);
 const BG_PAINT = ColorPaint(BG);
-const SELECTED_BG = Color.color(.2, .2, .2);
+const SELECTED_BG = Color.color(.4, .4, .4);
 const SELECTED_BG_PAINT = ColorPaint(SELECTED_BG);
 const DARK_BG = Color.color(.5, .5, .5);
 const DARK_BG_PAINT = ColorPaint(DARK_BG);

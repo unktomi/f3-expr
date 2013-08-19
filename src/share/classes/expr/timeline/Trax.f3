@@ -173,7 +173,11 @@ public class Trax is ResizableNode {
 	    const d = if (not target.paused and targetNode.contentBounds.duration() > 0s) event.rem(targetNode.contentBounds.duration()) else event;
 	    currentFrame = Math.round((d.toMillis() / 1000) * frameRate) as Integer;
 	    //println("currentFrame {event} => {currentFrame}");
-	    playhead.x = frameToX(currentFrame);
+	    if (target.paused) {
+		playhead.x = frameToX(currentFrame);
+	    } else {
+		playhead.x = durationToX(d);
+	    }
 	}
     }
 
