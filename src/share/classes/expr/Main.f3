@@ -13,6 +13,21 @@ import expr.undo.*;
 import expr.inspector.*;
 import expr.inspector.Inspector.*;
 
+class CachedScene is Scene {
+    public var scene is Scene;
+    override var camera = Camera2D {tx: bind -scene.width/2, ty: bind -scene.height/2}
+    var stageNode is StageNode = StageNode {
+	content: scene;
+    }
+    override function update {
+	if (stageNode.width <> width or stageNode.height <> height) {
+	    stageNode.resize(width, height);
+	}
+	super.update();
+    }
+    override var content = bind stageNode;
+}
+
 class ResizableStageNode is ResizableNode {
     const stage is StageNode = StageNode {
 	depthBits: 0
@@ -211,6 +226,10 @@ public function run from (args is String[]) to ()
 	}
     }
 
+    const cachedScene = CachedScene {
+	scene: mainScene;
+    }
+
     const toolMenu is expr.toolmenu.ToolMenu = expr.toolmenu.ToolMenu {
 	transform: bind translate(stage.width /2, 
 				  stage.height - 10);
@@ -361,8 +380,8 @@ public function run from (args is String[]) to ()
 	     
 	}
 	height: 800, width: 1020;
-
-	content: [mainScene,
+	
+	content: [cachedScene,
 		  Scene {
                       background: null;
                       camera: camera;
@@ -542,7 +561,7 @@ public function run from (args is String[]) to ()
 	//currentResource.setClip(i);
     }
 
-    stage.addMouseInputHandler(viewer);
+    cachedScene.stageNode.addMouseInputHandler(viewer);
     stage.addKeyboardInputHandler(KeyboardInputHandler {
 
 	    override function onKeyInput from (event is KeyboardEvent) to () 
