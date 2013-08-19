@@ -1,0 +1,326 @@
+package expr;
+import f3.util.*;
+import f3.media.input.*;
+import f3.media.scene.*;
+import f3.media.scene.Shape2D.*;
+import f3.math.*;
+import f3.math.LinearMath.*;
+import java.lang.Math;
+import org.f3.runtime.Foldable;
+
+public class Treemodel is Foldable of Treenode {
+
+    public var root is Treenode;
+
+    override function foldLeft of b
+	from (z is b, f is function from (b, Treenode) to b) 
+	to b
+    {
+	root.foldLeft(z, f)
+    }
+
+    override function foldRight of b
+	from (z is b, f is function from (Treenode, b) to b) 
+	to b
+    {
+	root.foldRight(z, f);
+    }
+
+    function update {
+	rowCount = root.update(0, 0);
+    }
+
+    public var rowCount is Integer;
+
+    function getRows 
+	from (low is Integer, hi is Integer) 
+	to Treenode[]
+    {
+	var result is Treenode[];
+	root.getRows(low, hi, 
+		     function from (n is Treenode) to ()
+		     {
+			 insert n into result;
+		     });
+	return result;
+    }
+
+    public var selectionObserver is Subject of Treenode = Subject of Treenode {};
+}
+
+
+public abstract class Treenode is Foldable of Treenode {
+    public var row is Integer;
+    public var column is Integer;
+    public var isOpen is Boolean;
+    public var canOpen is Boolean;
+    public var parent is Treenode;
+    public var label is String;
+    protected var children is Treenode[];
+
+    function update from (r is Integer, c is Integer) to Integer
+    {
+	row = r; column = c;
+	var j = r+1;
+	if (isOpen) {
+	    var k = c+1;
+	    for (child in children) {
+		child.parent = this;
+		j = child.update(j, k);
+	    }
+	}
+	return j;
+    }
+
+    function getRows 
+	from (low is Integer, 
+	      hi is Integer, 
+	      add is function from Treenode to ()) 
+	to () 
+    {
+	if (low <= row and hi > row) {
+	    add(this)
+	}
+	if (isOpen) {
+	    var j = 0;
+	    for (c in children where c.getMinRow() > low and c.getMaxRow() < hi) {
+		c.getRows(low, hi, add);
+	    }
+	}
+    }
+
+    function getMinRow to Integer 
+    {
+	row
+    }
+
+    function getMaxRow to Integer 
+    {
+	if (isOpen) then children[children.size()-1].getMinRow() else row;
+    }
+
+    public bound function getChildren to Treenode[]
+    {
+	if (isOpen) then children else []
+    }
+
+    public function open to ()
+    {
+	isOpen = true;
+    }
+
+    public function close to ()
+    {
+	isOpen = false;
+    }
+
+    override function foldLeft of b
+	from (z is b, f is function from (b, Treenode) to b) to b
+    {
+	const r = f(z, this);
+	if (isOpen) {
+	    children.foldLeft(r, 
+			      function from (y is b, x is Treenode) to b
+			      {
+				  x.foldLeft(y, f)
+			      });
+	} else r;
+    }
+
+    override function foldRight of b
+	from (z is b, f is function from (Treenode, b) to b) to b
+    {
+	const r = 
+	    if (isOpen) 
+		then children.foldRight(z, 
+					function from (x is Treenode, y is b) to b
+					{
+					    x.foldRight(y, f)
+					})
+		else z;
+	f(this, r);
+    }
+}
+
+public class Treecell is AbstractNode {
+    const tv is Treeview;
+    const tn is Treenode; 
+    var fg is Paint = bind tv.getFg(tn.row);
+    var bg is Paint = bind tv.getBg(tn.row, tn.column);
+    override var transform = bind translate(0, -tn.row * tv.cellHeight);
+    override var internalContent = Group {
+	content: 
+	[Rectangle {
+	     height: bind tv.cellHeight;
+	     width: bind tv.cellWidth;
+	     fillPaint: bind bg;
+	 },
+	 TransformNode {
+	     tx: bind tv.indent *(tn.column+1);
+	     content:
+	     [TransformNode { 
+	         tx: bind -tv.cellWidth / 2;
+		 content: bind if (tn.isOpen) then tv.closeArrow(fg) else if (tn.canOpen) then tv.openArrow(fg) else null;
+	     },
+	     Text.Label {
+		 transform: bind translate(if (tn.canOpen) then 6 else 0, 0);
+					   
+		 font: bind tv.font;
+		 foreground: bind fg;
+		 background: null;
+		 height: bind tv.cellHeight;
+		 width: bind tv.cellWidth;
+		 text: bind tn.label;
+	     }];
+	 }]
+    };
+
+    const onClick = 
+	internalContent.observeMouseDown().subscribe(function from (e is MouseEvent) to () {
+
+		const limit = -tv.cellWidth/2+tv.indent*(tn.column+1)+6;
+		println("e={e.location.x}, limit={limit}");
+		if (tn.canOpen and e.location.x < limit) {
+		    if (not tn.isOpen) tn.open() else tn.close();
+		}
+		tv.selectionRow = tn.row;
+	    });
+
+}
+
+const MAX_DEPTH = 20;
+
+public class Treeview is ResizableNode, Focusable, KeyboardInputHandler {
+    public var selectionBackground is Paint = 
+	ColorPaint(Color.color(.4, .4, .4, 1));
+    public var parentSelectionBackground is Paint = 
+        ColorPaint(Color.color(.5, .5, .5, 1));
+    public var selectionForeground is Paint = 
+	ColorPaint(Color.color(.9, .9, .9, 1));
+    public var foreground is Paint = 
+	ColorPaint(Color.color(.1, .1, .1, 1));
+    
+    const bgs = foreach (i in [0..<MAX_DEPTH]) ColorPaint(Color.gray(getBackgroundGray(i)));
+
+    var cellHeight is Number = 16;
+    var cellWidth = bind width;
+
+    public var indent = 6;
+
+    const arrow is Polygon = Polygon {
+	points: [-3.5, -4.5, -3.5, 4.5, 3.5, 0];
+	fillPaint: ColorPaint(Color.WHITE);
+    };
+
+    var selectedTreenode is Treenode = bind rows[selectionRow];
+
+    override function onKeyDown from (e is KeyboardEvent) to ()
+    {
+	if (e.keyCode == Keys.Down) {
+	    selectionRow = Math.min(model.rowCount-1, selectionRow+1);
+	} else if (e.keyCode == Keys.Up) {
+	    selectionRow = Math.max(0, selectionRow-1);
+	} else if (e.keyCode == Keys.Home) {
+	    selectionRow = 0;
+	} else if (e.keyCode == Keys.End) {
+	    selectionRow = model.rowCount-1;
+	} else if (e.keyCode == Keys.Left) {
+	    if (selectedTreenode.isOpen) selectedTreenode.close();
+	    update();
+	} else if (e.keyCode == Keys.Right) {
+	    if (selectedTreenode.canOpen) selectedTreenode.open();
+	    update();
+	}
+    }
+
+    bound function closeArrow from (p is Paint) to Node { 
+	TransformNode {
+	    rz: -90;
+	    content:
+	    MeshNode {
+		mesh: bind arrow.fillMesh.mesh;
+		shader: bind effectLoader.loadPaintShader(p);
+	    }
+	}
+    }
+    bound function openArrow from (p is Paint) to Node { 
+	MeshNode {
+	    mesh: bind arrow.fillMesh.mesh;
+	    shader: bind effectLoader.loadPaintShader(p);
+	}
+    }
+
+    bound function getFg from (row is Integer) to Paint
+    {
+	if isSelected(row) then selectionForeground else foreground;
+    }
+
+    bound function getBg from (row is Integer, column is Integer) to Paint
+    {
+	if isSelected(row) then selectionBackground else getBackground(column);
+    }
+
+    bound function getBackground from (column is Integer) to Paint 
+    {
+	bgs[column]
+    }
+
+    bound function isSelected from (row is Integer) to Boolean
+    {
+	selectionRow == row
+    }
+
+    protected function getBackgroundGray
+       from (indentLevel is Integer) 
+       to Number
+    {  
+	const g = 0.8 - (2-(indentLevel mod 2)) * .1;
+	println("indentLevel={indentLevel} g={g}");
+	return g;
+    }	 
+
+    var scrollOffset is Integer;
+    var selectionRow is Integer on replace {
+    	model.selectionObserver.onNext(selectedTreenode);
+    }
+
+    var visibleRows = bind Math.round(height / cellHeight) as Integer;
+
+    public var model is Treemodel;
+
+    var rows is Treenode[];
+
+    var cells = bind foreach (tn in rows) Treecell { tv: this, tn: tn };
+
+    override function update {
+    	super.update();
+	model.update();
+	if (selectionRow < scrollOffset) {
+	    scrollOffset = selectionRow;
+	} else if (selectionRow > scrollOffset+visibleRows) {
+	    scrollOffset = selectionRow-visibleRows/2;
+	}
+	const i = scrollOffset;
+	const j = scrollOffset + visibleRows;
+	rows = model.getRows(i, j+1);
+	//println("getRows {i}, {j+1} => {rows}");
+    }
+
+    var treeBg is Paint = bind bgs[0];
+
+    override var internalContent = Group {
+	content:
+	[Rectangle {
+	    height: bind height;
+	    width: bind width;
+	    fillPaint: bind treeBg;
+	 },
+	 TransformNode {
+	     ty: bind height/2 - cellHeight/2;
+	     content: bind cells;
+	 }]
+    }
+
+    var font = bind layoutEngine.createFont("font-size:11;font-style:LucidaSans");
+	
+}
