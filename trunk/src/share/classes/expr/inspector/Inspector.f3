@@ -194,7 +194,14 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler {
           transform: bind translate(0, height/2-cellHeight/2);
 	  content: bind foreach (i in inspecting[low..hi]) Group {
 	    override var transform = bind translate(0, (low-i.index) * (border+cellHeight));
-	    content: [TransformNode {
+	    content: 
+	    [Rectangle {
+		 pickable: false;
+		 width: bind width;
+		 height: bind cellHeight;   
+		 fillPaint: bind if (i.index <> selectedIndex) BG_PAINT else SELECTED_BG_PAINT;
+	    },
+	    TransformNode {
 		//tx: bind -width / 2;
 		content: Text.Label {
 		    width: bind width;
