@@ -18,6 +18,7 @@ import java.lang.Math;
 
 public abstract class Inspected of a 
 {
+    public var member is Member;
     public var label is String;
     public var observable is Observable of a;
     protected var index is Integer;
@@ -90,11 +91,11 @@ public class InspectedObservable of a is Inspected of Observable of a
 }
 
 
-const FG = Color.color(.2, .2, .2);
+const FG = Color.color(.1, .1, .1, 1);
 const FG_PAINT = ColorPaint(FG);
-const SELECTED_FG = Color.color(.9, .9, .9);
+const SELECTED_FG = Color.color(.9, .9, .9, 1);
 const SELECTED_FG_PAINT = ColorPaint(SELECTED_FG);
-const BG = Color.color(.8, .8, .8);
+const BG = Color.color(.7, .7, .7);
 const BG_PAINT = ColorPaint(BG);
 const SELECTED_BG = Color.color(.4, .4, .4);
 const SELECTED_BG_PAINT = ColorPaint(SELECTED_BG);
@@ -146,13 +147,19 @@ class BooleanField is SliderField {
 
 public class Inspector is ResizableNode, Focusable, KeyboardInputHandler {
     public var inspecting is (Inspected of ?)[];
-    public var selectedIndex is Integer;
+    public var selectedIndex is Integer on replace {
+	if (selectedIndex < low) {
+	    low = selectedIndex;
+	} else if (low + visibleRows < selectedIndex) {
+	    low = selectedIndex - Math.round(visibleRows / 2.0) as Integer;
+	}
+    }
     var low is Integer;
-    var hi is Integer;
-    public var cellHeight is Number = 15;
+    var hi is Integer = bind low + visibleRows;
+    public var cellHeight is Number = 16;
     public var fieldWidth is Number = 64;
-    public var font is Text.Font = bind layoutEngine.createFont("font-size:12;font-style:LucidaSans");
-    public var border is Number = 1;
+    public var font is Text.Font = bind layoutEngine.createFont("font-size:11;font-style:LucidaSans");
+    public var border is Number = 0;
     override function onKeyDown from (e is KeyboardEvent) to ()
     {
 	if (e.keyCode == Keys.Down) {
@@ -165,19 +172,22 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler {
 	    selectedIndex = inspecting.size()-1;
 	}
     }
+
+    function scroll from (amount is Integer) to ()
+    {
+	low = Math.max(0, Math.min(low+amount, inspecting.size()-1-visibleRows));
+    }
+
+    var visibleRows = bind ((height / (cellHeight+border)) as Integer) -1;
+    var scrollOffset is Integer;
+
     override function update {
-	super.update();
-	const visible = Math.round(height / (cellHeight+border)) as Integer;
-	if (selectedIndex < low) {
-	    low = selectedIndex;
-	} else if (low + visible < selectedIndex) {
-	    low = selectedIndex - visible / 2;
-	}
-	hi = low + visible;
 	for (i in inspecting) {
 	    i.index = indexof i;
 	}
+	super.update();	
     }
+
     override var internalContent = Group {
 	content:
 	[Rectangle {
@@ -235,6 +245,11 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler {
 	 }
       }]
     }
+    const onWheel = 
+	internalContent.observeMouseWheel().subscribe(function from (event is MouseWheelEvent) to () {
+		const y = event.scroll.y as Integer;
+		scroll(y);
+	    });
 }
 
 public function inspect from (obj is Object) to (Inspected of ?)[]
@@ -247,6 +262,7 @@ public function inspect from (obj is Object) to (Inspected of ?)[]
 		    if (m.m is F3VarMember and m.t == NUMBER_TYPE) {
 			const ptr = (m.m as F3Local.VarMember).getPointer(obj as F3Object) as ObservableRef of Number;
 			InspectedNumber {
+			    member: m;
 			    label: m.m.getName();
 			    observable: Observables.observe(ptr);
 			    override function get to Number { ptr.get() }
@@ -255,6 +271,7 @@ public function inspect from (obj is Object) to (Inspected of ?)[]
 		    } else if (m.m is F3VarMember and m.t == BOOLEAN_TYPE) {
 			const ptr = (m.m as F3Local.VarMember).getPointer(obj as F3Object) as ObservableRef of Boolean;
 			InspectedBoolean {
+			    member: m;
 			    label: m.m.getName();
 			    observable: Observables.observe(ptr);
 			    override function get to Boolean { ptr.get() }
@@ -262,6 +279,7 @@ public function inspect from (obj is Object) to (Inspected of ?)[]
 			}
 		    } else {
 			InspectedObservable of Object {
+			    member: m;
 			    label: m.m.getName();
 			}
 		    }

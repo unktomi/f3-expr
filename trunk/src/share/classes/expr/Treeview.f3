@@ -46,6 +46,14 @@ public class Treemodel is Foldable of Treenode {
     }
 
     public var selectionObserver is Subject of Treenode = Subject of Treenode {};
+
+    public function open from (t is Treenode) to ()
+    {
+	if (not t.isOpen) {
+	    t.open();
+	    update();
+	}
+    }
 }
 
 
@@ -62,6 +70,11 @@ public abstract class Treenode is Foldable of Treenode {
     {
 	row = r; column = c;
 	var j = r+1;
+	if (isOpen) {
+	    if (not canOpen) {
+		close();
+	    }
+	}
 	if (isOpen) {
 	    var k = c+1;
 	    for (child in children) {
@@ -83,7 +96,7 @@ public abstract class Treenode is Foldable of Treenode {
 	}
 	if (isOpen) {
 	    var j = 0;
-	    for (c in children where c.getMinRow() > low and c.getMaxRow() < hi) {
+	    for (c in children /*where c.getMinRow() > low and c.getMaxRow() < hi*/) {
 		c.getRows(low, hi, add);
 	    }
 	}
@@ -106,6 +119,9 @@ public abstract class Treenode is Foldable of Treenode {
 
     public function open to ()
     {
+	if (not parent.isOpen) {
+	    parent.open();
+	}
 	isOpen = true;
     }
 
@@ -186,11 +202,17 @@ public class Treecell is AbstractNode {
 		tv.selectionRow = tn.row;
 	    });
 
+
 }
 
 const MAX_DEPTH = 20;
 
+class Content is Group, Scissored {
+}
+
+
 public class Treeview is ResizableNode, Focusable, KeyboardInputHandler {
+
     public var selectionBackground is Paint = 
 	ColorPaint(Color.color(.4, .4, .4, 1));
     public var parentSelectionBackground is Paint = 
@@ -231,6 +253,12 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler {
 	    if (selectedTreenode.canOpen) selectedTreenode.open();
 	    update();
 	}
+    }
+
+    function scroll from (amount is Integer) to ()
+    {
+	scrollOffset = Math.max(0, Math.min(scrollOffset + amount, model.rowCount-1 - visibleRows));
+	update();
     }
 
     bound function closeArrow from (p is Paint) to Node { 
@@ -282,11 +310,36 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler {
     var scrollOffset is Integer;
     var selectionRow is Integer on replace {
     	model.selectionObserver.onNext(selectedTreenode);
+	if (selectionRow < scrollOffset) {
+	    scrollOffset = selectionRow;
+	} else if (selectionRow > scrollOffset+visibleRows) {
+	    scrollOffset = selectionRow-visibleRows/2;
+	}
     }
 
-    var visibleRows = bind Math.round(height / cellHeight) as Integer;
+    var visibleRows = bind (Math.round(height / cellHeight - 0.5) as Integer);
 
-    public var model is Treemodel;
+    var selectionListener is Disposable;
+    
+    function isVisible from (t is Treenode) to ()
+    {
+	t.row >= scrollOffset and t.row < scrollOffset + visibleRows
+    }
+    
+    function select from (t is Treenode) to ()
+    {
+	model.open(t.parent);
+	selectionRow = t.row;
+    }
+
+
+    public var model is Treemodel on replace {
+	selectionListener.dispose();
+	selectionListener = model.selectionObserver.subscribe(function from (t is Treenode) to ()
+							      {
+								  select(t);
+							      });
+    }
 
     var rows is Treenode[];
 
@@ -295,20 +348,20 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler {
     override function update {
     	super.update();
 	model.update();
-	if (selectionRow < scrollOffset) {
-	    scrollOffset = selectionRow;
-	} else if (selectionRow > scrollOffset+visibleRows) {
-	    scrollOffset = selectionRow-visibleRows/2;
-	}
 	const i = scrollOffset;
 	const j = scrollOffset + visibleRows;
-	rows = model.getRows(i, j+1);
-	//println("getRows {i}, {j+1} => {rows}");
+	const newRows = model.getRows(i, j+1);
+	if (newRows <> rows) {
+	    println("getRows {i}, {j+1} => {rows.size()}");
+	}
+	rows = newRows;
+
     }
 
     var treeBg is Paint = bind bgs[0];
 
-    override var internalContent = Group {
+    override var internalContent = Content {
+	scissorBounds: bind Bounds.boundsFromRect(width, height);
 	content:
 	[Rectangle {
 	    height: bind height;
@@ -316,11 +369,18 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler {
 	    fillPaint: bind treeBg;
 	 },
 	 TransformNode {
-	     ty: bind height/2 - cellHeight/2;
+	     ty: bind height/2 - cellHeight/2 + scrollOffset * cellHeight;
 	     content: bind cells;
 	 }]
-    }
+    };
+
+	
 
     var font = bind layoutEngine.createFont("font-size:11;font-style:LucidaSans");
 	
+    const onWheel = 
+	internalContent.observeMouseWheel().subscribe(function from (event is MouseWheelEvent) to () {
+		const y = event.scroll.y as Integer;
+		scroll(y);
+	    });
 }
