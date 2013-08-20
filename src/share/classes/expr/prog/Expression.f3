@@ -2,6 +2,7 @@ package expr.prog;
 import f3.math.*;
 import f3.math.LinearMath.*;
 import expr.*;
+import expr.Treeview.*;
 import f3.reflect.*;
 import expr.Reflect.*;
 import f3.util.*;
@@ -12,6 +13,48 @@ import f3.media.scene.Shape2D.*;
 
 var exprMap = new java.util.HashMap of (F3ClassType, Member[]);
 
+const MAT4_TYPE = ctx.findClass("f3.math.Mat4");
+
+function makeFunMember from (name is String, params is F3Type[], ret is F3Type) to Member 
+{
+    FunctionMember {
+	ft: ctx.makeFunctionType(params, ret);
+	name: name;
+	t: ret;
+    }
+}
+
+const NUM_MEMBERS = 
+    foreach (op in ["+", "-", "*", "/", "remainder"]) {
+	makeFunMember(op, [NUMBER_TYPE, NUMBER_TYPE], NUMBER_TYPE)
+    };
+const INT_MEMBERS = 
+    foreach (op in ["+", "-", "*", "/", "remainder"]) {
+	makeFunMember(op, [INTEGER_TYPE, INTEGER_TYPE], INTEGER_TYPE)
+    };
+const BOOL_MEMBERS = 
+    [foreach (op in ["and", "or"]) {
+	makeFunMember(op, [BOOLEAN_TYPE, BOOLEAN_TYPE], BOOLEAN_TYPE)
+	}, makeFunMember("not", [BOOLEAN_TYPE], BOOLEAN_TYPE)];
+
+public function introspect from (t is F3Type) to Member[]
+{
+    if (t.getName() == "org.f3.runtime.F3Object" or
+	t.getName() == "org.f3.runtime.F3Base" or
+	t.getName() == "java.lang.Object") {
+	return []
+    }
+    if (t is F3ClassType) then introspect(t as F3ClassType) else if (true) [] else {
+	    if (t == NUMBER_TYPE) 
+		then NUM_MEMBERS
+		else if (t == INTEGER_TYPE)
+		    then INT_MEMBERS 
+		    else if (t == BOOLEAN_TYPE)
+			then BOOL_MEMBERS
+			else []
+    }
+}
+
 public function introspect from (clazz is F3ClassType) to Member[]
 {
     if (exprMap.containsKey(clazz)) {
@@ -19,8 +62,8 @@ public function introspect from (clazz is F3ClassType) to Member[]
     }
     var result is Member[];
     const funs = clazz.getFunctions(true);
-    for (f in funs where not f.getName().contains("$") and 
-	     OBJECT_TYPE <> f.getDeclaringClass()
+    for (f in funs where f.isPublic() and not f.getName().contains("$") and 
+	     OBJECT_TYPE <> f.getDeclaringClass() 
 	 ) { 
 	const ft = f.getType();
 	var rt = ft.getReturnType();
@@ -80,14 +123,14 @@ public function introspect from (clazz is F3ClassType) to Member[]
 	}
     }
     const vars = clazz.getVariables(true);
-    for (v in vars where not v.getName().contains("$") and not v.isStatic()) {
+    for (v in vars where not v.getName().contains("$") and not v.getName().startsWith("bnds") and not v.isStatic()) {
 	var toInsert is Member;
-	if (not v.isPublicInit() and not v.isDef()) {
+	if (true or not v.isPublicInit() and not v.isDef()) {
 	    var rt = v.getType();
 	    if (SUBJECT_TYPE.isAssignableFrom(rt) or OBSERVABLE_TYPE.isAssignableFrom(rt) or OBSERVER_TYPE.isAssignableFrom(rt)) {
 		rt = getTypeArguments(rt)[0];
 	    }	
-	    if (not v.isPublicRead()) {
+	    if (not v.isPublicRead() and not v.isPublicInit() and not v.isDef()) {
 		println("{v.getName()} => Subject of ({rt})");
 		toInsert = Member {
 		    m: v;
@@ -95,19 +138,21 @@ public function introspect from (clazz is F3ClassType) to Member[]
 		    isObserver: true;
 		    isObservable: true;
 		}
-	    } else if (v.isPublic()) {
+	    } else if (v.isPublic() or v.isPublicRead() or v.isPublicInit()) {
 		println("{v.getName()} => Observable of ({rt})");
 		toInsert = Member {
 		    m: v;
 		    t: rt
 		    isObservable: true;
 		}
+	    } else {
 	    }
 	}
 	if (toInsert <> null) {
 	    insert toInsert into result;
 	}
     }
+    result = foreach (x in result where not x.t.isAssignableFrom(MAT4_TYPE)) x;
     exprMap.put(clazz, result);
     return result;
 }
@@ -118,8 +163,15 @@ public class Member {
     public const name = m.getName();
     public var isObservable is Boolean;
     public var isObserver is Boolean;
+    public function getMembers to Member[]
+    {
+	Expression.introspect(t);
+    }
 }
 
+public class FunctionMember is Member {
+    public const ft is F3FunctionType;
+}
 
 public abstract class Expression {
     public var name is String;
@@ -136,7 +188,7 @@ function resultName from (ft is F3FunctionType) to String {
 
 public class MemberExpression is Expression {
     public const member is Member;
-    override var name = bind member.m.getName();
+    override var name = bind member.name;
     override const t = bind member.t;
 }
 
@@ -290,6 +342,23 @@ class ResultView is LinkView {
     }
 }
 
+class MemberTreenode is Treenode {
+    public var m is Member;
+    override var label = bind m.name;
+    readonly var members = bind m.getMembers();
+    override var canOpen = bind { var n = members.size(); n > 0 }
+    override var children = bind foreach (x in members) MemberTreenode { m: bind x };
+    override function open {
+    	children;
+	super.open();
+    }
+}
+
+class MemberTreemodel is Treemodel {
+    public var member is Member;
+    override var root = MemberTreenode { m: bind member };
+}
+
 public class Canvas is ResizableNode {
 
     var portPaint is Paint;
@@ -297,6 +366,18 @@ public class Canvas is ResizableNode {
     const portArrow = Polygon {
 	points: [-3.5, -4.5, -3.5, 4.5, 3.5, 0];
 	fillPaint: ColorPaint(Color.WHITE);
+    };
+
+    public var event is Member;
+
+    const treeModel = MemberTreemodel {
+	member: bind event;
+    };
+
+    override var internalContent = Treeview {
+	height: bind height;
+	width: bind width;
+	model: bind treeModel;
     }
 
     function pickOutput from (e is MouseEvent, t is F3Type) to ExpressionView 

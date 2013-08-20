@@ -66,9 +66,10 @@ public function run from (args is String[]) to ()
 {
 
     const currentResource is ResourceGroup = ResourceGroup {
-	id: "Main Scene";
+	id: "Spatial Hierarchy";
     }
     const currentAnimResource is ResourceTimeGroup = ResourceTimeGroup {
+	id: "Temporal Hierarchy";
     }
     const transformHierarchy = TransformHierarchy {
 	root: bind currentResource;
@@ -469,7 +470,7 @@ public function run from (args is String[]) to ()
 				    }
 				 }, 
 				 Tabview.Tab {
-				     title: "Hierarchy";
+				     title: "Objects";
 				     content:
 				     Treeview {
 					 model: TransformHierarchy.Model {
@@ -516,8 +517,9 @@ public function run from (args is String[]) to ()
 				content: Tabview {
 				tabs: 
 				[Tabview.Tab {
-				    title: "Expression"
+				    title: "Events"
 				    content: expr.prog.Expression.Canvas {
+					event: bind inspector.inspecting[inspector.selectedIndex].member;
 				    }
 				 },
 				 Tabview.Tab {

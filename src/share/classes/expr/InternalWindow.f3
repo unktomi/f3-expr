@@ -75,13 +75,13 @@ public class InternalWindow is ResizableNode {
     public var content is ResizableNode;
 
     const contentHolder = ContentHolder {
-        transform: translate(-6, 1);
+        transform: translate(-6, 0);
 	scissorBounds: bind Bounds.boundsFromRect(content.width, content.height);
 	content: bind content;
     }
 
     override var internalContent = Group {
-	content: bind [titleBar, buttonBar, line, TransformNode { ty: -8, content: bind contentHolder}, resizeCorner, leftSide, rightSide];
+	content: bind [titleBar, buttonBar, line, TransformNode { ty: -7, content: bind contentHolder}, resizeCorner, leftSide, rightSide];
     } 
     
     override function update {
@@ -89,6 +89,7 @@ public class InternalWindow is ResizableNode {
 	    dirty = false;
 	    resize(width, height);
 	}
+	super.update();
     }
        
 
