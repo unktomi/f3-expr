@@ -181,11 +181,11 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler {
     var visibleRows = bind ((height / (cellHeight+border)) as Integer) -1;
     var scrollOffset is Integer;
 
-    override function update {
+    override function preupdate {
 	for (i in inspecting) {
 	    i.index = indexof i;
 	}
-	super.update();	
+	super.preupdate();	
     }
 
     override var internalContent = Group {

@@ -19,14 +19,20 @@ class Treenode is Treeview.Treenode {
 public class Model is Treeview.Treemodel {
     public const h is TransformHierarchy;
     override var root = Treenode { n:  bind h.root };
+    public var selection is Treenode on replace {
+	if (h.selectedNode <> selection.n) {
+	    selectionObserver.onNext(selection);
+	}
+    }
     const selectionListener = 
 	h.observeSelection().subscribe(function from (tn is TransformNode) to () 
 				       {
 					   foldLeft((), 
 						    function from (_ is (), t is Treeview.Treenode) to () {
-							const n = (t as Treenode).n;
+							const ht = t as Treenode;
+							const n = ht.n;
 							if (n == tn) {
-							    selectionObserver.onNext(t);
+							    selection = ht;
 							}
 						    })
 				       });

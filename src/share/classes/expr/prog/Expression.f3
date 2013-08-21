@@ -173,10 +173,6 @@ public class FunctionMember is Member {
     public const ft is F3FunctionType;
 }
 
-public abstract class Expression {
-    public var name is String;
-    public const t is F3Type;
-}
 
 function argName from (ft is F3FunctionType, i is Integer) to String {
     ft.getArgumentType(i).getName()
@@ -186,16 +182,38 @@ function resultName from (ft is F3FunctionType) to String {
     ft.getReturnType().getName();
 }
 
-public class MemberExpression is Expression {
-    public const member is Member;
-    override var name = bind member.name;
-    override const t = bind member.t;
+public interface Expression {
+    public function getName to String;
+    public function getType to F3Type;
 }
 
-public class Function is Expression {
+public interface MemberExpression is Expression {
+    public const member is Member;
+    override function getName to String { member.name }
+}
+
+public interface ObservableExpression is Expression {
+    public var observers is ObserverExpression[];
+}
+
+public interface ObserverExpression is Expression {
+    public var observable is ObservableExpression;
+}
+
+public interface VarExpression is MemberExpression {
+    override function getType to F3Type { member.t }
+}
+
+public class GetVar is VarExpression, ObservableExpression {
+}
+
+public class SetVar is VarExpression, ObserverExpression {
+}
+
+public class Function is MemberExpression {
     public const fun is F3FunctionMember;
     const ft = fun.getType();
-    override var t = bind ft;
+    override function getType { ft }
     public var inputs is Parameter[] =
 	bind foreach (i in [0..<ft.minArgs()]) {
 	Parameter {
@@ -205,27 +223,23 @@ public class Function is Expression {
 	}
     }
     public var output is Result = Result {
-	name: resultName(ft);
 	t: ft.getReturnType()
     }
 }
 
-public class Parameter is Expression {
+public class Parameter is ObserverExpression {
+    public var name is String;
+    public var t is F3Type;
     public var target is Function;
-    public var source is Expression;
+    override function getName to String { name }
+    override function getType to F3Type { t }
 }
 
-public class Result is Expression {
+public class Result is ObservableExpression {
+    override function getName to String { "return" }
+    public var t is F3Type;
     public var source is Function;
-    public var target is Expression;
-}
-
-public class ObservableExpression is Expression {
-    public var observers is ObserverExpression[];
-}
-
-public class ObserverExpression is Expression {
-    public var observable is ObservableExpression;
+    override function getType to F3Type { t }
 }
 
 public class Program {
@@ -246,7 +260,7 @@ class ExpressionView is AbstractNode {
     var cellHeight is Number;
     var font is Text.Font;
     const label is Text.Label = Text.Label {
-	text: bind expression.name;
+	text: bind expression.getName();
 	height: bind cellHeight;
 	width: bind cellWidth;
 	font: bind font;
@@ -287,20 +301,21 @@ class FunctionView is AbstractNode {
 }
 
 class LinkView is ExpressionView {
-    public var target is ParameterView;
-    public var source is ResultView;
+    public var target is LinkedView;
+    public var source is LinkedView;
 }
 
 class LinkedView is ExpressionView {
-    var link is LinkView;
+    var links is LinkView;
 }
 
 class ParameterView is LinkedView {
+
     const parameter is Parameter;
+
     override var internalContent = Group {
 	content: 
 	[label]
-
     };
 
     override function onDown from (e is MouseEvent) to () 
@@ -315,7 +330,7 @@ class ParameterView is LinkedView {
 
 }
 
-class ResultView is LinkView {
+class ResultView is LinkedView {
 
     public var result is Result;
 
@@ -330,7 +345,7 @@ class ResultView is LinkView {
     override function onDrag from (e is MouseEvent) to () 
     {
 	//targetPos = e.location;
-	const source = canvas.pickInput(e, result.t);
+	const source = canvas.pickInput(e, result.getType());
     }
 
     override function onDown from (e is MouseEvent) to () 
@@ -386,7 +401,7 @@ public class Canvas is ResizableNode {
 	    const n = p.node;
 	    if (n is ResultView) {
 		const rv = n as ResultView;
-		if (rv.result.t.isAssignableFrom(t)) {
+		if (rv.result.getType().isAssignableFrom(t)) {
 		    return rv;
 		}
 	    }
@@ -403,13 +418,92 @@ public class Canvas is ResizableNode {
 	    const n = p.node;
 	    if (n is ParameterView) {
 		const pv = n as ParameterView;
-		if (t.isAssignableFrom(pv.parameter.t)) {
+		if (t.isAssignableFrom(pv.parameter.getType())) {
 		    return pv;
 		}
 	    }
 	}
 	null;
     }
+
+    function genSrc from (e is Expression) to String 
+    {
+	// Observable of a -> function from a to b; // map 
+	// Observable of a -> read var member // map 
+	// Observable of a -> Observer of a; // subscribe
+	// Observable of a -> Observer of a; // subscribe
+	// Observable of a -> write var member; // subscribe
+	// function from a to b -> function from b to c; // compose
+	/*
+	if (e is Function) {
+	    const f = e as Function;
+	    var isMap = f.inputs.size() == 1 and f.inputs[0].observable is ObservableExpression;
+	    if (isMap) {
+		"(foreach (i in {genSrc(f.inputs[0].observable)}) \{ {f.fun.name}(i) \})"; 
+	    } else {
+		var src = "{genSrc(f.inputs[0].observable)}.{f.fun.name}(";
+		var sep = "";
+		for (p in f.inputs[1..]) {
+		    src = src.concat(genSrc(p.observable));
+		    src = src.concat(sep);
+		    sep = ",";
+		}
+		src = src.concat(")");
+	    }
+	} else if (e is ObservableExpression) {
+	    const o = e as ObservableExpression;
+	    for (x in o.observers) {
+	    }
+	}
+	*/
+	"";
+    }
+
+    /*
+    function genReflect from (e is Expression) to function from (function from F3Value to F3Value) to F3Value;
+    {
+	// Observable of a -> function from a to b; // map 
+	// Observable of a -> read var member // map 
+	// Observable of a -> Observer of a; // subscribe
+	// Observable of a -> Observer of a; // subscribe
+	// Observable of a -> write var member; // subscribe
+	// function from a to b -> function from b to c; // compose
+	if (e is Function) {
+	    const f = e as Function;
+	    var isMap = f.inputs.size() == 1 and f.inputs[0].observable is ObservableExpression;
+	    if (isMap) {
+		const mapFun = getFunction(f.inputs[0].observable.getType(), "map");
+		const k0 = genReflect(f.inputs[0].observable);
+		function from (k is function from F3Value to F3Value) to F3Value 
+		{
+		    k0(function from (target is F3Value) to F3Value {
+			    const obj = target as F3ObjectValue;
+			    k1(function from (arg is F3Value) to F3Value {
+				    k(fun.asFunction(obj).invoke())
+				});
+			});
+		}
+	    } else {
+		const k0 = genReflect(f.inputs[0].observable);
+		const k1 = genReflect(f.inputs[1].observable);
+		function from (k is function from F3Value to F3Value) to F3Value 
+		{
+		    k0(function from (target is F3Value) to F3Value {
+			    const obj = target as F3ObjectValue;
+			    k1(function from (arg is F3Value) to F3Value {
+				    k(fun.asFunction(obj).invoke())
+				});
+			});
+		}
+	    }
+	} else if (e is ObservableExpression) {
+	    const o = e as ObservableExpression;
+	    for (x in o.observers) {
+	    }
+	}
+    }
+    */
+
 }
 
 

@@ -232,8 +232,7 @@ public function run from (args is String[]) to ()
     }
 
     const toolMenu is expr.toolmenu.ToolMenu = expr.toolmenu.ToolMenu {
-	transform: bind translate(stage.width /2, 
-				  stage.height - 10);
+    	transform: bind translate(stage.width /2, stage.height - 10);
 	height: 20;
 	width: bind stage.width;
 	pause: &player.paused;
