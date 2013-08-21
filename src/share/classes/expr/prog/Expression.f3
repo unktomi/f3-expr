@@ -1,4 +1,5 @@
 package expr.prog;
+import java.lang.Math;
 import f3.math.*;
 import f3.math.LinearMath.*;
 import expr.*;
@@ -188,7 +189,7 @@ public interface Expression {
 }
 
 public interface MemberExpression is Expression {
-    public const member is Member;
+    public var member is Member;
     override function getName to String { member.name }
 }
 
@@ -213,6 +214,12 @@ public class SetVar is VarExpression, ObserverExpression {
 public class Function is MemberExpression {
     public const fun is F3FunctionMember;
     const ft = fun.getType();
+    postinit {
+	member = Member {
+	    m: fun;
+	    t: ft;
+	}
+    }
     override function getType { ft }
     public var inputs is Parameter[] =
 	bind foreach (i in [0..<ft.minArgs()]) {
@@ -256,47 +263,72 @@ class ExpressionView is AbstractNode {
     public const canvas is Canvas;
     public var expression is Expression;
     public var pos is Point3;
-    var cellWidth is Number;
-    var cellHeight is Number;
-    var font is Text.Font;
+    var cellWidth is Number = 150;
+    var cellHeight is Number = bind canvas.cellHeight;
+    var font is Text.Font = bind canvas.font;
     const label is Text.Label = Text.Label {
 	text: bind expression.getName();
 	height: bind cellHeight;
 	width: bind cellWidth;
 	font: bind font;
+	foreground: bind canvas.textFg;
+	background: bind canvas.cellBg;
+	pickable: true;
     };
-    const d1 = label.observeMouseDown().subscribe(onDown);
-    const d2 = label.observeMouseUp().subscribe(onUp);
-    const d3 = label.observeMouseDrag().subscribe(onDrag);
     function onDown from (e is MouseEvent) to () 
     {
     }
     function onDrag from (e is MouseEvent) to () 
     {
+	println("dragging {label.text}");
 	pos += e.picked.dragPoint1 - e.picked.dragPoint0;
     }
     function onUp from (e is MouseEvent) to () 
     {
     }
+    var d1;
+    var d2;
+    var d3;
+    postinit {
+	d1 = label.observeMouseDown().subscribe(onDown);
+	d2 = label.observeMouseUp().subscribe(onUp);
+	d3 = label.observeMouseDrag().subscribe(onDrag);
+    }
 }
 
-class FunctionView is AbstractNode {
+class FunctionView is ExpressionView {
     public var fun is Function;
-    var inputs = bind foreach (p in fun.inputs) ParameterView {
+    override var transform = bind translate(pos);
+    override var expression = bind fun;
+    var inputs is ParameterView[] = bind foreach (p in fun.inputs) ParameterView {
+	canvas: bind canvas;
 	parameter: p
     };
     var output = ResultView {
+	canvas: bind canvas;
 	result: bind fun.output;
     };
-    override var internalContent = Group {
+    const io = Group {
+	transform: bind translate(0, -cellHeight);
 	content: 
 	[
 	 Group {
 	     content: bind inputs
 	 }
 	 Group {
+	     transform: bind translate(0, -inputs.size() * cellHeight);
 	     content: bind output;
 	 }]
+    };
+    override var internalContent = Group {
+	content: bind [label, io];
+    }
+
+    override function update {
+	super.update();
+	for (i in inputs) {
+	    i.index = indexof i;
+	}
     }
 }
 
@@ -313,10 +345,13 @@ class ParameterView is LinkedView {
 
     const parameter is Parameter;
 
-    override var internalContent = Group {
-	content: 
-	[label]
-    };
+    var index is Integer;
+    
+    override var transform = bind translate(0, index * -cellHeight);
+
+    override var expression = bind parameter;
+
+    override var internalContent = bind label;
 
     override function onDown from (e is MouseEvent) to () 
     {
@@ -333,13 +368,21 @@ class ParameterView is LinkedView {
 class ResultView is LinkedView {
 
     public var result is Result;
+    override var expression = bind result;
 
     override var internalContent = Group 
     {
-	content: 
-	[Text.Label {
-		//text: bind toString(result.t)
-	}]
+	content: ObjectExpressionView {
+	    canvas: bind canvas;
+	    width: 150;
+	    height: 200;
+	    event: Member {
+		m: null;
+	        t: bind result.getType();
+		name: "return"
+	    }
+	}
+
     }
 
     override function onDrag from (e is MouseEvent) to () 
@@ -374,9 +417,41 @@ class MemberTreemodel is Treemodel {
     override var root = MemberTreenode { m: bind member };
 }
 
+class ObjectExpressionView is ResizableNode {
+    public var event is Member;
+    public var canvas is Canvas;
+    var cellHeight = bind canvas.cellHeight;
+    const treeModel = MemberTreemodel {
+	member: bind event;
+    };
+    var treeHeight = bind Math.min(treeModel.rowCount, 5)*cellHeight;
+    const tv = Treeview {
+	transform: bind translate(0, -treeHeight/2+cellHeight/2);
+	height: bind treeHeight;
+	width: bind width;
+	model: bind treeModel;
+    };
+    override var internalContent = bind tv;
+    const onDrag2 = tv.observeMouseDrag().subscribe(function from (e is MouseEvent) to () {
+	    const tn = tv.selectedTreenode;
+	});
+}
+
+class Holder is Group, Scissored {
+}
+
 public class Canvas is ResizableNode {
 
+    readonly var font = bind layoutEngine.createFont("font-size:11;font-style:LucidaSans");
+
     var portPaint is Paint;
+
+    var BG = ColorPaint(Color.color(.9, .9, .9));
+
+    const cellBg = ColorPaint(Color.color(.7, .7, .7));
+    const textFg = ColorPaint(Color.color(.2, .2, .2));
+
+    var cellHeight = 16;
 
     const portArrow = Polygon {
 	points: [-3.5, -4.5, -3.5, 4.5, 3.5, 0];
@@ -385,15 +460,52 @@ public class Canvas is ResizableNode {
 
     public var event is Member;
 
-    const treeModel = MemberTreemodel {
-	member: bind event;
+    var rootView = bind if (event == null) then null else ObjectExpressionView {
+	canvas: this;
+	height: 100; width: 200;
+	event: bind event;
     };
 
-    override var internalContent = Treeview {
-	height: bind height;
-	width: bind width;
-	model: bind treeModel;
+    var cx is Number;
+    var cy is Number;
+
+    override var internalContent = Holder { 
+	scissorBounds: bind Bounds.boundsFromRect(width, height);
+	content:
+	Group {
+	    content:
+	    [Rectangle {
+		id: "canvas.bg"
+		debug: true;
+		width: bind width;
+		height: bind height;
+		fillPaint: bind ColorPaint(Color.color(.9, .9, .9));
+		override function onMouseDrag from (e is MouseEvent) to ()
+		{
+		    const d = (e.picked.dragPoint1-e.picked.dragPoint0);
+		    println("drag={e.drag}, sceneDrag={e.sceneDrag}");
+		    cx += d.x;
+		    cy += d.y;
+		} 	
+	    },
+	    Group 
+            { 
+		transform: bind translate(cx, cy);
+		content: bind [rootView, views]; 
+	    }]
+        };
+    };
+
+    const printlnFun = Function {
+	fun: getFunction("f3.lang.Builtins", "println", ["Object"]);
     }
+
+    var views is Node[] = FunctionView {
+	pos: new Point3(100, 0, 0);
+	canvas: this;
+	fun: printlnFun;
+    };
+
 
     function pickOutput from (e is MouseEvent, t is F3Type) to ExpressionView 
     {

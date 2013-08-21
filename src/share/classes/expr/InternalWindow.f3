@@ -27,7 +27,7 @@ public class InternalWindow is ResizableNode {
 	content.resize(w-2-12, h-38-3);
     }
 
-    override var transform = bind translate(Math.round(cx), Math.round(cy));
+    override var transform = bind translate(cx, cy);
     const self = this;
 
     const titleBar is Node = Rectangle {
@@ -76,7 +76,7 @@ public class InternalWindow is ResizableNode {
 
     const contentHolder = ContentHolder {
         transform: translate(-6, 0);
-	scissorBounds: bind Bounds.boundsFromRect(content.width, content.height);
+	scissorBounds: bind Bounds.boundsFromRect(content.width+1, content.height+1);
 	content: bind content;
     }
 
@@ -105,6 +105,18 @@ public class InternalWindow is ResizableNode {
 	}
     };
 
+    const onUp = DefaultObserver of MouseEvent {
+	override function onNext from (event is MouseEvent) to ()
+	{
+	    gridFit()
+	}
+    };
+
+    function gridFit {
+	cx = cx as Integer;
+	cy = cy as Integer;
+    }
+
     const onMove = DefaultObserver of MouseEvent {
 	override function onNext from (event is MouseEvent) to ()
 	{     	       		
@@ -119,8 +131,10 @@ public class InternalWindow is ResizableNode {
 	    cx = dx + clamp.x - p1.x;
 	    cy = dy + clamp.y - p1.y;
 	    //	    println("cx={cx} cy={cy}");
+	    gridFit()
 	}
     };
+
     const onResize = DefaultObserver of MouseEvent {
 	override function onNext from (event is MouseEvent) to ()
 	{     	       		
@@ -135,7 +149,9 @@ public class InternalWindow is ResizableNode {
 
     postinit {
 	titleBar.observeMouseDown().subscribe(onDown);
+	titleBar.observeMouseUp().subscribe(onUp);
 	titleBar.observeMouseDrag().subscribe(onMove);
     	resizeCorner.observeMouseDrag().subscribe(onResize);
+	resizeCorner.observeMouseUp().subscribe(onUp);
     }
 }
