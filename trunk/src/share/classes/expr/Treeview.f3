@@ -49,9 +49,8 @@ public class Treemodel is Foldable of Treenode {
 
     public function open from (t is Treenode) to ()
     {
-	if (not t.isOpen) {
-	    t.open();
-	    update();
+	if (not t.parent.isOpen) {
+	    t.parent.open();
 	}
     }
 }
@@ -236,6 +235,8 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler {
 
     var selectedTreenode is Treenode = bind rows[selectionRow];
 
+    var nextSelection is Treenode;
+
     override function onKeyDown from (e is KeyboardEvent) to ()
     {
 	if (e.keyCode == Keys.Down) {
@@ -328,10 +329,8 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler {
     
     function select from (t is Treenode) to ()
     {
-	model.open(t.parent);
-	selectionRow = t.row;
+	nextSelection = t;
     }
-
 
     public var model is Treemodel on replace {
 	selectionListener.dispose();
@@ -345,17 +344,20 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler {
 
     var cells = bind foreach (tn in rows) Treecell { tv: this, tn: tn };
 
-    override function update {
-    	super.update();
+    override function preupdate {
+	if (nextSelection <> null) {
+	    model.open(nextSelection);
+	}
 	model.update();
+	if (nextSelection <> null) {
+	    selectionRow = nextSelection.row;
+	    nextSelection = null;
+	}
 	const i = scrollOffset;
 	const j = scrollOffset + visibleRows;
 	const newRows = model.getRows(i, j+1);
-	if (newRows <> rows) {
-	    println("getRows {i}, {j+1} => {rows.size()}");
-	}
 	rows = newRows;
-
+	super.preupdate();
     }
 
     var treeBg is Paint = bind bgs[0];
