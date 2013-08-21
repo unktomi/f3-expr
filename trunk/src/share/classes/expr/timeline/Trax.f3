@@ -105,7 +105,7 @@ public class Playhead is AbstractNode
     public var height is Number = 500;
     public var trax is Trax;
 
-    override var transform = bind translate(x, 0, 0.5);
+    override var transform = bind translate(x, 0);
 
     const playhead_top = Image { 
 	url: "{__DIR__}playhead_top.png" 

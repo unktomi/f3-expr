@@ -101,8 +101,7 @@ public class Tabview is ResizableNode {
 		    height: TAB_HEIGHT+1;
 		    width: bind tabWidth;
 		    fillPaint: bind if (t == selectedTab) then FG_PAINT else BG_PAINT;
-		    strokePaint: bind if (t == selectedTab) then FG_PAINT else TEXT_PAINT;
-			//	    stroke: Stroke { width: 0.5 }
+		    //strokePaint: bind if (t == selectedTab) then FG_PAINT else TEXT_PAINT;
 		},
 		Group { content: bind labels[t.index] }]
 	    }
