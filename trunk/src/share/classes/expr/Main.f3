@@ -28,22 +28,28 @@ class CachedScene is Scene {
     override var content = bind stageNode;
 }
 
-class ResizableStageNode is ResizableNode {
+class ResizableStageNode is ResizableNode, Focuser {
     const stage is StageNode = StageNode {
-	depthBits: 0
+        background: Color.GRAY;
 	content: Scene {
-	    camera: Camera2D { tx: bind -width / 2.0, ty: bind -height / 2.0}
-	    content: bind content
+            background: Color.GRAY;
+	    camera: Camera2D {tx: bind Math.round(-width / 2.0), ty: bind Math.round(-height / 2.0) }
+	    content: bind content;
 	}
     }
-    override function resize from (x is Number, y is Number) to ()
+    override function resize from (w0 is Number, h0 is Number) to ()
     {
-	super.resize(x, y);
-	stage.resize(x as Integer, y as Integer);
-	content.resize(stage.width, stage.height);
+	const w = Math.round(w0);
+	const h = Math.round(h0);
+	super.resize(w, h);
+	content.resize(w, h);
+	stage.resize(w as Integer, h as Integer);
     }
-    override var internalContent = bind stage;
+    override var internalContent = Group { content: bind stage };
     public var content is ResizableNode;
+    override public function getTargetOfFocus to Focusable {
+	return stage;
+    }
 }
 
 function readTextFile from (url is String) to (String, Integer)
@@ -404,7 +410,7 @@ public function run from (args is String[]) to ()
 									height-toolMenu.bounds.height())
 		    	height: 500, width: 200;
 			cx: 160, cy: 800-300;	   
-//			    content: ResizableStageNode {
+			    content: ResizableStageNode {
 			    
 			      content: Tabview {
 				tabs: 
@@ -478,7 +484,7 @@ public function run from (args is String[]) to ()
 				     }
 				 }]
 			    }
-//			 }
+			 }
 		     },
 		     InternalWindow {
 			containerBounds: bind Bounds.boundsFromRect(0, 
@@ -488,7 +494,7 @@ public function run from (args is String[]) to ()
 		    	height: 150, width: 820;
 			cx: 520, cy: 252;	   
 			      //imageLoader: null;
-			      //content: ResizableStageNode {
+			      content: ResizableStageNode {
 			    content: Tabview {
 				tabs: 
 				[Tabview.Tab {
@@ -502,7 +508,7 @@ public function run from (args is String[]) to ()
 				     title: "Graph Editor"
 				 }]
 			    }
-			      // }
+			      }
 		    },
 		    InternalWindow {
 			containerBounds: bind Bounds.boundsFromRect(0, 
@@ -512,18 +518,20 @@ public function run from (args is String[]) to ()
 		    	height: 150, width: 820;
 			cx: 520, cy: 100;	   
 			      //imageLoader: null;
-			      //content: ResizableStageNode {
+			      content: ResizableStageNode {
 				content: Tabview {
 				tabs: 
 				[Tabview.Tab {
 				    title: "Events"
 				    content: expr.prog.Expression.Canvas {
 					event: bind inspector.inspecting[inspector.selectedIndex].member;
+					targetNode: bind currentTransform
 				    }
 				 },
 				 Tabview.Tab {
 				 }]
 			       }
+                          }
 		    },
 		    toolMenu]
                   }]
