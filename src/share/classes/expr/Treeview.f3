@@ -208,6 +208,7 @@ public class Treecell is AbstractNode {
 const MAX_DEPTH = 20;
 
 class Content is Group, Scissored {
+    override var contentBounds = bind scissorBounds;
 }
 
 public class Holder {

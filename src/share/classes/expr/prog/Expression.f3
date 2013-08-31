@@ -7,10 +7,12 @@ import expr.Treeview.*;
 import f3.reflect.*;
 import expr.Reflect.*;
 import f3.util.*;
+import f3.util.Observer.*;
 import f3.lang.*;
 import f3.media.input.*;
 import f3.media.scene.*;
 import f3.media.scene.Shape2D.*;
+
 
 var exprMap = new java.util.HashMap of (F3ClassType, Member[]);
 
@@ -70,29 +72,30 @@ public function introspect from (clazz is F3ClassType) to Member[]
 	var rt = ft.getReturnType();
 	var toInsert is Member;
 	if (ft.minArgs() == 0) {
+	    var rt_t = rt;
 	    if (SUBJECT_TYPE.isAssignableFrom(rt) or OBSERVABLE_TYPE.isAssignableFrom(rt) or OBSERVER_TYPE.isAssignableFrom(rt)) {
-		rt = getTypeArguments(rt)[0];
+		rt_t = getTypeArguments(rt)[0];
 	    } else {
 		continue;
 	    }	
 	    if (SUBJECT_TYPE.isAssignableFrom(rt)) {
 		toInsert = Member {
 		    m: f;
-		    t: rt
+		    t: rt_t
 		    isObservable: true, isObserver: true;
 		}
 		println("Subject of ({getTypeArguments(rt)})");
 	    }  else if (OBSERVABLE_TYPE.isAssignableFrom(rt)) {
 		toInsert = Member {
 		    m: f;
-		    t: rt
+		    t: rt_t
 		    isObservable: true;
 		}
 		println("Observable of ({getTypeArguments(rt)})");
 	    } else if (OBSERVER_TYPE.isAssignableFrom(rt)) {
 		toInsert = Member {
 		    m: f;
-		    t: rt
+		    t: rt_t
 		    isObserver: true;
 		}
 		println("Observer of ({getTypeArguments(rt)})");
@@ -131,7 +134,7 @@ public function introspect from (clazz is F3ClassType) to Member[]
 	    if (SUBJECT_TYPE.isAssignableFrom(rt) or OBSERVABLE_TYPE.isAssignableFrom(rt) or OBSERVER_TYPE.isAssignableFrom(rt)) {
 		rt = getTypeArguments(rt)[0];
 	    }	
-	    if (not v.isPublicRead() and not v.isPublicInit() and not v.isDef()) {
+	    if ((not v.isPublicRead() and not v.isPublicInit() and not v.isDef()) and v.isPublic()) {
 		println("{v.getName()} => Subject of ({rt})");
 		toInsert = Member {
 		    m: v;
@@ -168,6 +171,9 @@ public class Member {
     {
 	Expression.introspect(t);
     }
+    function toApply to String {
+	if (m is F3FunctionMember) then "{name}()" else "{name}";
+    }
 }
 
 public class FunctionMember is Member {
@@ -190,6 +196,7 @@ public interface Expression {
     public function getName to String;
     public function getType to F3Type;
     override function toString { "{getClass()}: {getName()} / {getType()}" }
+    public function toSource to String { "" }
 }
 
 public interface MemberExpression is Expression {
@@ -209,7 +216,41 @@ public interface VarExpression is MemberExpression {
     override function getType to F3Type { member.t }
 }
 
+function getIVar from (ob is ObserverExpression) to String {
+    var depth = 0;
+    var obs = ob;
+    while (true) {
+	var b = obs.observable;
+	if (b is Result) {
+	    b = (b as Result).source.inputs[0].observable;
+	} 
+	if (b is ObserverExpression) {
+	    obs = b as ObserverExpression;
+	    depth++;
+	} else {
+	    break;
+	}
+    }
+    if (depth == 0) then "i" else "i{depth}";
+}
+
 public class GetVar is VarExpression, ObservableExpression, ObserverExpression {
+    override public function toSource to String {
+	if (observers == []) {
+	    return "";
+	}
+	const i = getIVar(this);
+	if (observable is MemberExpression and (observable as MemberExpression).member.isObservable) {
+
+	    "(foreach ({i} in {observable.toSource()}) {i}.{member.toApply()})";
+	} else {
+	    if (observable == null) {
+		"{i}.{member.toApply()}";
+	    } else {
+		"{observable.toSource()}.{member.toApply()}";
+	    }
+	}
+    }
 }
 
 public class SetVar is VarExpression, ObserverExpression {
@@ -235,6 +276,27 @@ public class Function is MemberExpression {
     }
     public var output is Result = Result {
 	t: ft.getReturnType()
+    }
+
+    override public function toSource to String {
+	const observable = inputs[0].observable;
+	if (observable is MemberExpression) {
+	    const m = observable as MemberExpression;
+	    if (m.member.isObservable) {
+		const i = getIVar(inputs[0]);
+		if (fun.isStatic()) {
+		    "(foreach ({i} in {observable.toSource()}) {fun.getName()}({i}))";
+		} else {
+		    "(foreach ({i} in {observable.toSource()}) {i}.{fun.getName()}()";
+		}
+	    } else {
+		if (fun.isStatic()) {
+		    "{fun.getName()}({observable.toSource()})";
+		} else {
+		    "{observable.toSource()}.{fun.getName()}()";
+		}
+	    }
+	} else "";
     }
 }
 
@@ -267,6 +329,8 @@ public class ExpressionView is AbstractNode {
     override function toString { "{super.toString()}: {expression}" }
     public const canvas is Canvas;
     public var expression is Expression;
+    public bound function getPos to Point3 { getWorldPos() }
+    bound function getWorldPos to Point3 { (toSceneTransform * canvas.toLocal).getTranslation() }
     public var pos is Point3;
     public var cellWidth is Number = 150;
     public var cellHeight is Number = bind canvas.cellHeight;
@@ -295,7 +359,7 @@ public class ExpressionView is AbstractNode {
     var d2;
     var d3;
     postinit {
-	d1 = label.observeMouseDown().subscribe(onDown);
+	d1 = label.observeMouseUp().subscribe(onDown);
 	d2 = label.observeMouseUp().subscribe(onUp);
 	d3 = label.observeMouseDrag().subscribe(onDrag);
     }
@@ -349,7 +413,8 @@ class GetVarView is LinkedView {
 	    height: 200;
 	    get: bind get;
 	}
-    }
+    };
+    override bound function getLinkPos to Point3 { getWorldPos() }
 }
 
 class LinkView is ExpressionView {
@@ -378,6 +443,11 @@ class LinkView is ExpressionView {
 	delete obsvr from obsvb.observers;
 	println("UNLINKING {source} from {target}");
     }
+
+    override var internalContent = Group {
+	override var transform = bind translate(target.getLinkPos())
+	content: bind canvas.makeArrow(canvas.ARROW_COLOR);
+    }
 }
 
 class LinkedView is ExpressionView {
@@ -392,7 +462,9 @@ class LinkedView is ExpressionView {
 	    link.link();
 	}
     }
-    public function getLinkPos to Point3 { (toSceneTransform * canvas.toLocal).getTranslation() }
+    public bound function getLinkPos to Point3 { pos }
+
+
 }
 
 public class ParameterView is LinkedView {
@@ -417,7 +489,7 @@ public class ParameterView is LinkedView {
     {
     }
 
-    override function getLinkPos to Point3 { super.getLinkPos() - new Vec3(cellWidth/2, 0, 0) }
+    override bound function getLinkPos to Point3 { getWorldPos() - new Vec3(cellWidth/2, 0, 0) }
 }
 
 class ResultView is LinkedView {
@@ -431,10 +503,12 @@ class ResultView is LinkedView {
 	    canvas: bind canvas;
 	    width: 150;
 	    height: 200;
-	    event: Member {
-		m: null;
-	        t: bind result.getType();
-		name: "return"
+	    get: GetVar {
+		member: Member {
+		    m: null;
+		    t: bind result.getType();
+		    name: "return";
+		}
 	    }
 	}
 
@@ -454,7 +528,7 @@ class ResultView is LinkedView {
     {
     }
 
-    override function getLinkPos to Point3 { super.getLinkPos() + new Vec3(cellWidth/2, 0, 0) }
+    override bound function getLinkPos to Point3 { getWorldPos() + new Vec3(cellWidth/2, 0, 0) }
 }
 
 class MemberTreenode is Treenode {
@@ -498,6 +572,7 @@ public class MemberTreecell is Treeview.Treecell
 	if (pv <> null) {
 	    if (parentLink == null) {
 		parentLink = LinkView {
+		    visible: false;
 		    canvas: canvas;
 		    source: pv.linkedView;
 		    target: linkedView;
@@ -514,15 +589,16 @@ public class MemberTreecell is Treeview.Treecell
 
     const linkedView is GetVarView = GetVarView {
 	get: bind (tn as MemberTreenode).get;
-	override function getLinkPos to Point3 {
-	    const me = self.canvas.toLocal * self.boundsInScene;
-	    const container = self.canvas.toLocal * self.canvas.boundsInScene;
-	    return new Point3(me.right(), 
-			      Math.max(Math.min(0, me.center.y),
-				       canvas.height),
-			      0);
+	override bound function getLinkPos to Point3 
+	{
+	    var me = self.canvas.toLocal * self.boundsInScene;
+	    var container = self.canvas.toLocal * self.tv.boundsInScene;
+	    new Point3(me.right(), 
+		       Math.min(Math.max(container.bottom(), me.center.y), me.extent.y),
+		       0);
 	}
-    }
+    };
+	
 }
 
 class ObjectExpressionView is ResizableNode {
@@ -536,8 +612,24 @@ class ObjectExpressionView is ResizableNode {
 	    m: bind get.member;
 	}
     };
-    var treeHeight = bind Math.min(treeModel.rowCount, 5)*cellHeight;
+    var treeHeight = bind Math.min(treeModel.rowCount, 30)*cellHeight;
     const self = this;
+    const cellMap is java.util.Map of (MemberTreenode, MemberTreecell) =
+	java.util.HashMap of (MemberTreenode, MemberTreecell) {};
+
+    function getCell from (tn is MemberTreenode) to MemberTreecell {
+	var r = cellMap.get(tn);
+	if (r == null) {
+	    r = MemberTreecell {
+		canvas: canvas;
+		tn: tn;
+		tv: tv;
+	    }
+	    cellMap.put(tn, r);
+	}
+	return r;
+    }
+
     const tv is Treeview = Treeview {
 	transform: bind translate(0, -treeHeight/2+cellHeight/2);
 	height: bind treeHeight;
@@ -545,22 +637,18 @@ class ObjectExpressionView is ResizableNode {
 	model: bind treeModel;
 	override bound function createCell from (tn is Treenode) to Treecell 
 	{
-	    MemberTreecell {
-		canvas: bind self.canvas;
-		tn: bind tn;
-		tv: this;
-	    }
-	}
+	    self.getCell(tn as MemberTreenode)
+	}      
     };
     override var internalContent = bind tv;
 
     // fix me: move this stuff to canvas
 
     const linkStart is LinkedView = LinkedView {
-	override function getLinkPos to Point3 { pos }
+	override var toSceneTransform = bind translate(pos);
     };
     const linkEnd is LinkedView = LinkedView {
-	override function getLinkPos to Point3 { pos }
+	override var toSceneTransform = bind translate(pos);
     };
     const link is LinkView = LinkView {
 	canvas: bind canvas;
@@ -577,7 +665,6 @@ class ObjectExpressionView is ResizableNode {
 		const cell = tv.selectedTreecell as MemberTreecell;
 		const tn = tv.selectedTreenode as MemberTreenode;
 		const toLocal = canvas.toLocal;
-		cell.linkedView.unlink();
 		tmpLink = link;
 		println("CREATING LINK {e} ");
 		dx = 0; dy = 0;
@@ -585,13 +672,14 @@ class ObjectExpressionView is ResizableNode {
 	} );
     const onDrag = tv.observeMouseDrag().subscribe(function from (e is MouseEvent) to () {
 	    if (tmpLink == null) return;
+	    const cell = tv.selectedTreecell as MemberTreecell;
 	    if (not arrowVis) {
+		cell.linkedView.unlink();
 		startPos = canvas.toLocal * e.picked.dragPoint0;
 		insert canvas.targetArrow into canvas.views;
 		arrowVis = true;
 		link.link();
 	    }
-	    const cell = tv.selectedTreecell as MemberTreecell;
 	    const tn = tv.selectedTreenode as MemberTreenode;
 	    const toLocal = canvas.toLocal;
 	    const sourcePos = toLocal * cell.toSceneTransform.getTranslation();
@@ -623,7 +711,7 @@ class ObjectExpressionView is ResizableNode {
 		};
 		newlink.link();
 		canvas.dumpSrc();
-	    }
+	    } 
 	});
 
 }
@@ -694,6 +782,8 @@ public class Canvas is ResizableNode {
 
     public var event is Member;
 
+    public var targetNode is Node;
+
     var rootView is Node = Group { content: bind makeGetter(event) };
 
     var varRoot is GetVar;
@@ -748,8 +838,8 @@ public class Canvas is ResizableNode {
 	   },
 	   localSpace = Group 
            { 
-		transform: bind translate(cx, cy);
-		content: [Group { content: bind rootView }, Group { content: bind views }]; 
+	       transform: bind translate(cx, cy);
+	       content: [Group { content: bind rootView }, Group { content: bind views }, Group { content: bind arrows}]; 
 	   },
 	   MeshNode {
 		transform: bind translate(cx, cy);
@@ -771,6 +861,8 @@ public class Canvas is ResizableNode {
 	fun: printlnFun;
     };
 
+    var arrows is TransformNode[];
+
     var links is LinkView[];
 
     var lines = LineMesh {};
@@ -778,7 +870,7 @@ public class Canvas is ResizableNode {
     var linkMesh is AbstractMesh;
 
     function getLinkInfo {
-	foreach (link in links) {
+	foreach (link in links where link.visible) {
 	    var source = link.source;
 	    var sourcePos = source.getLinkPos();
 	    var target = link.target;
@@ -815,14 +907,19 @@ public class Canvas is ResizableNode {
     }
 
     const lineOff is Vec3 = new Vec3(15, 0, 0);
+    const lineOff1 is Vec3 = new Vec3(18.5, 0, 0);
 
     function genLines from (links is LinkInfo[]) to AbstractMesh {
 	lines.reset();
+	delete arrows[links.size()..];
+	while (arrows.size() < links.size()) {
+	    insert TransformNode { content: makeArrow(ARROW_COLOR) } into arrows; 
+	}
 	for (i in links) {
 	    const p0 = i.sourcePos;
 	    const sourceOff = lineOff*(i.sourceIndex+1);
 	    const p1 = p0 + sourceOff;
-	    const p5 = i.targetPos;
+	    const p5 = i.targetPos-lineOff1*(i.targetIndex);
 	    const targetOff = lineOff*(i.targetIndex+1);
 	    const p4 = i.targetPos - targetOff;
 	    const mid = p1.lerp(0.5, p4);
@@ -835,6 +932,8 @@ public class Canvas is ResizableNode {
 	    lines.lineTo(p4);
 	    lines.lineTo(p5);
 	    lines.lineTo(p5);
+	    arrows[indexof i].tx = p5.x;
+	    arrows[indexof i].ty = p5.y;
 	    println("gen lines {p0} {p1} {p2} {p3} {p4} {p5}");
 	}
 	const mesh = lines.getMesh();
@@ -848,7 +947,7 @@ public class Canvas is ResizableNode {
 	    const n = p.node;
 	    if (n is ResultView) {
 		const rv = n as ResultView;
-		if (rv.result.getType().isAssignableFrom(t)) {
+		if (rv.result.getType().isConvertibleFrom(t)) {
 		    return rv;
 		}
 	    }
@@ -865,7 +964,7 @@ public class Canvas is ResizableNode {
 	    const n = p.node;
 	    if (n is ParameterView) {
 		const pv = n as ParameterView;
-		if (pv.parameter.getType().isAssignableFrom(t)) {
+		if (pv.parameter.getType().isConvertibleFrom(t)) {
 		    return pv;
 		} else {
 		    println("NOT ASSIGNABLE {pv.parameter.getType()} <- {t}");
@@ -876,10 +975,73 @@ public class Canvas is ResizableNode {
     }
 
     function dumpSrc {
-	visit(varRoot);
+	println("DUMP SRC:");
+	unsubscribe();
+	println(visit(varRoot));
     }
 
-    function visit from (e is Expression) to String 
+    function getObservers from (e is Expression) to ObserverExpression[]
+    {
+	if (e is Parameter) 
+	    then (e as Parameter).target.output.observers 
+	    else if (e is ObservableExpression) 
+		then (e as ObservableExpression).observers 
+		else []
+    }
+    
+    function getTerminals from (e is Expression, 
+				result is function from Expression to ()) to ()
+    {
+	const obsvrs = getObservers(e);
+	println("observers for {e} => {obsvrs}");
+	if (obsvrs == []) {
+	    if (not (e is GetVar)) {
+		result(e);
+	    }
+	} else {
+	    for (x in obsvrs) {
+		getTerminals(x, result)
+	    }
+	}
+    }
+    
+    function visit from (e is Expression) to String
+    {
+	var terms is Expression[];
+	getTerminals(e, 
+		     function from (x is Expression) to ()
+		     {
+			 println("adding {x}");
+			 insert x into terms;
+		     });
+	var itype = (e as MemberExpression).member.m.getDeclaringClass();
+	var result = "var _ = function from (i is {itype.getName()}) to f3.util.Observable of ? \{";
+	for (x in terms) {
+	    var src is String;
+	    if (x is Parameter) {
+		src = (x as Parameter).target.toSource();
+	    } else {
+		src = x.toSource();
+	    }
+	    try {
+		const toCompile = "{result}{src}\}";
+		println("compiling: {toCompile}");
+		const r = evaluator.compileAndRun(toCompile);
+		println("{r.getClass()} => {r}");
+		const f = r as function from Node to Observable of ?;
+		subscribe(f(targetNode));
+		break;
+	    } catch (thr is java.lang.Throwable) {
+		thr.printStackTrace();
+	    }
+	    result = "{result}{src};";
+	}
+	result;
+    }
+
+    const evaluator = new org.f3.tools.script.ScriptShell(java.lang.Thread.currentThread().getContextClassLoader());
+
+    function visit1 from (e is Expression) to String 
     {
 	// Observable of a -> function from a to b; // map 
 	// Observable of a -> read var member // map 
@@ -888,23 +1050,62 @@ public class Canvas is ResizableNode {
 	// Observable of a -> write var member; // subscribe
 	// function from a to b -> function from b to c; // compose
 	println("VISIT {e} -> {e.getName()} is {e.getType()}");
+	var result = "_";
 	if (e is Function) {
 	    const f = e as Function;
-	    foreach (p in f.inputs) visit(p);
-	    visit(f.output);
-	} else if (e is ObservableExpression) {
-	    const o = e as ObservableExpression;
-	    println("observers = {o.observers.size()}");
-	    for (x in o.observers) {
-		println("observer = {x}");
+	    println(f.inputs.size());
+	    if (f.fun.isStatic()) {
+		"{f.fun.getName()}()";
+	    } else {
+		"{f.fun.getName()}()";
+	    }
+	} else if (e is GetVar) {
+	    const g = e as GetVar;
+	    const m = g.member;
+	    for (x in g.observers) {
+		var y is Expression = x;
 		if (x is Parameter) {
-		    visit((x as Parameter).target);
+		    var qg is GetVar = g;
+		    var prefix2 is String;
+		    while (qg <> null) {
+			const qm = qg.member;
+			prefix2 = 
+			    if (qm.m is F3FunctionMember) then {
+				    "{qm.name}()";
+				} else {
+				"{qm.name}";
+			    };
+			if (qm.isObservable) {
+			    prefix2 = "foreach (i in {prefix2}) i";
+			} 
+			if (result <> "") {
+			    result = "{result}.";
+			}
+			prefix2 = "{result}{prefix2}";
+			if (qg.observable is GetVar) {
+			    qg = qg.observable as GetVar;
+			} else {
+			    break;
+			}
+		    }
+		    var prefix = prefix2;
+		    const f is Function = (x as Parameter).target;
+		    if (f.fun.isStatic()) {
+			result = "\{ foreach (i in {result}) {f.getName()}(i{prefix}) \}";
+		    } else {
+			result = "\{ foreach (i in {result}) i{prefix}{f.getName()}() \}";
+		    }
 		} else {
-		    visit(x);
+		    var huh = visit(y);
+		    println("huh? {huh}");
+		    if (huh <> "_") {
+			result = huh;
+		    }
 		}
 	    }
+	    return result;
+	} else if (e is ObservableExpression) {
 	} else {
-
 	}
 	"";
     }
@@ -953,6 +1154,26 @@ public class Canvas is ResizableNode {
 	}
     }
     */
+
+
+    function unsubscribe {
+	const xs = subs;
+	subs = [];
+	for (x in xs) x.dispose();
+    }
+
+    var subs is Disposable[];
+
+    function subscribe of a from (obsvb is Observable of a) to ()
+    {
+	println("SUBSCRIBE {obsvb}");
+	insert obsvb.subscribe(DefaultObserver of a {
+		override function onNext from (x is a) to ()
+		{
+		    println("on next {obsvb} {x}");
+		}
+	}) into subs;	
+    }
 
 }
 

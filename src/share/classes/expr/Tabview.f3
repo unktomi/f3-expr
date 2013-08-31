@@ -58,7 +58,7 @@ public class Tabview is ResizableNode {
 
     var labels is Text.Label[] = bind foreach (t in tabs) Text.Label {
 	blocksPointer: false;
-	transform: translate(5, 0);
+	indent: 5;
 	height: bind TAB_HEIGHT;
 	width: bind tabWidth;
 	background: bind if (t == selectedTab) then FG_PAINT else BG_PAINT;
@@ -98,7 +98,7 @@ public class Tabview is ResizableNode {
 		tx: bind tabWidth * t.index
 		content: 
 		[Rectangle {
-		    height: TAB_HEIGHT+1;
+		    height: TAB_HEIGHT+2;
 		    width: bind tabWidth;
 		    fillPaint: bind if (t == selectedTab) then FG_PAINT else BG_PAINT;
 		    //strokePaint: bind if (t == selectedTab) then FG_PAINT else TEXT_PAINT;
