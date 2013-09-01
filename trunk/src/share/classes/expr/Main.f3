@@ -12,6 +12,10 @@ import expr.choices.SliderField;
 import expr.undo.*;
 import expr.inspector.*;
 import expr.inspector.Inspector.*;
+import expr.ResourceNode.*;
+import expr.AssetTree.*;
+import expr.timeline.*;
+import expr.prog.*;
 
 class CachedScene is Scene {
     public var scene is Scene;
@@ -96,6 +100,7 @@ public function run from (args is String[]) to ()
     var playerUrl is String;
 
     const mainTimeLayer = TimeLayer {
+	id: "Hierarchy";
 	content: bind currentAnimResource;
 	playCount: -1;
     }
@@ -151,9 +156,8 @@ public function run from (args is String[]) to ()
 	    const model = Ma.Model {
 		url: url;
 	    }
-	    const rn = ResourceNode {
-		url: url;
-		content: bind model.getSpatialRoot();
+	    const rn = MaResourceNode {
+	        model: model;
 	    }
 	    addResource(rn);
 	    const rtn = ResourceTimeNode {
@@ -161,8 +165,10 @@ public function run from (args is String[]) to ()
 		content: bind model.getTemporalRoot();
 		spatial: rn;
 	    }
-	    rn.temporal = rtn;
-	    addTimeResource(rtn);
+	    if (rtn.bounds.duration() > 0s) {
+		rn.temporal = rtn;
+		addTimeResource(rtn);
+	    }
 	} else if (url.endsWith(".svg")) {
 	    const svg = SVG {
 		url: url;
@@ -202,6 +208,23 @@ public function run from (args is String[]) to ()
     var canUndo is Boolean;
     var canRedo is Boolean;
     var savePoint is Integer;
+
+    var editorScene is Scene;
+    var popupLayer = Group {};
+
+    function getUnderMouseInEditor to Pick[] 
+    {
+	var result is Pick[];
+	foreach (x in editorScene.underMouse) {
+	    insert x into result;
+	    if (x.node is StageNode) {
+		for (y in (x.node as StageNode).content) {
+		    insert y.underMouse into result;
+		}
+	    }
+	}
+	return result;
+    }
 
     const mainScene = Scene {
     	override function update { 
@@ -399,11 +422,12 @@ public function run from (args is String[]) to ()
 			  scene: this;
 		      }
                   },
-		  Scene {
+		  editorScene = Scene {
                     background: null;
                     camera: Camera2D {}; 
 		    override var content =
-		    [InternalWindow {
+		    [Group { content: 
+		      [InternalWindow {
 			containerBounds: bind Bounds.boundsFromRect(0, 
 									0, 
 									width,
@@ -475,11 +499,71 @@ public function run from (args is String[]) to ()
 				    }
 				 }, 
 				 Tabview.Tab {
-				     title: "Objects";
+				     title: "Assets";
+				     content:
+				     Treeview {
+					 model: AssetTree.AssetModel {
+					     resources: bind currentResource;
+					 }
+
+					 var dragger is TransformNode;
+
+					 override function onMouseDrag from (e is MouseEvent) to () {
+					     if (dragger == null) {
+						 dragger = TransformNode {
+						     pickable: false;
+						     content: Group {
+							 transform: translate(-e.sceneLocation.x, 0);
+							 content: getDragCell();
+						     }
+						 }
+						 insert dragger into popupLayer.content;
+					     }
+					     dragger.tx = editorScene.mousePosition.x;
+					     dragger.ty = editorScene.mousePosition.y;
+					 }
+
+					 override function onMouseUp from (e is MouseEvent) to () 
+					 {
+					     var asset = (selectedTreenode as AssetTreenode).asset;
+					     if (asset is AssetTree.ClipAsset) {
+						 const clip = (asset as AssetTree.ClipAsset).clip;
+						 for (j in getUnderMouseInEditor()) {
+						     println("j={j.node}");
+						     if (j.node is Trax) { 
+							 (j.node as Trax).onDrop(j, clip);
+							 const t = ResourceTimeNode {
+							     url: asset.name;
+							     content: clip;
+							 }
+							 addTimeResource(t);
+							 break;
+						     } else if (j.node is Expression.Canvas) {
+							 (j.node as Expression.Canvas).onDrop(j, clip);
+							 break;
+						     }
+						 }
+					     }
+					     delete dragger from popupLayer.content;
+					     dragger = null;
+					 }
+				     }
+				 },
+				 Tabview.Tab {
+				     title: "Spatial";
 				     content:
 				     Treeview {
 					 model: TransformHierarchy.Model {
 					     h: bind transformHierarchy
+					 }
+				     }
+				 },
+				 Tabview.Tab {
+				     title: "Temporal";
+				     content:
+				     Treeview {
+					 model: TemporalHierarchy.Model {
+					     h: TemporalHierarchy { root: bind currentAnimResource }
 					 }
 				     }
 				 }]
@@ -505,35 +589,19 @@ public function run from (args is String[]) to ()
 				     }
 				 },
 				 Tabview.Tab {
-				     title: "Graph Editor"
-				 }]
-			    }
-			      }
-		    },
-		    InternalWindow {
-			containerBounds: bind Bounds.boundsFromRect(0, 
-								    0, 
-								    width,
-								    height-toolMenu.bounds.height())
-		    	height: 150, width: 820;
-			cx: 520, cy: 100;	   
-			      //imageLoader: null;
-			      content: ResizableStageNode {
-				content: Tabview {
-				tabs: 
-				[Tabview.Tab {
 				    title: "Events"
 				    content: expr.prog.Expression.Canvas {
 					event: bind inspector.inspecting[inspector.selectedIndex].member;
 					targetNode: bind currentTransform
 				    }
-				 },
-				 Tabview.Tab {
 				 }]
-			       }
-                          }
+
+			    }
+			      }
+		    }]
 		    },
-		    toolMenu]
+		    toolMenu, 
+                    popupLayer]
                   }]
     }
 

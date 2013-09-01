@@ -91,7 +91,7 @@ public class InspectedObservable of a is Inspected of Observable of a
 }
 
 
-const FG = Color.color(.2, .2, .2, 2);
+const FG = Color.color(.2, .2, .2, 1);
 const FG_PAINT = ColorPaint(FG);
 const SELECTED_FG = Color.color(.9, .9, .9, 1);
 const SELECTED_FG_PAINT = ColorPaint(SELECTED_FG);
@@ -158,7 +158,7 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler {
     var hi is Integer = bind low + visibleRows;
     public var cellHeight is Number = 16;
     public var fieldWidth is Number = 64;
-    public var font is Text.Font = bind layoutEngine.createFont("font-size:11;font-style:LucidaSans");
+    public var font is Text.Font = bind layoutEngine.createFont("font-size:11;font-family:Lucida Grande");
     public var border is Number = 0;
     override function onKeyDown from (e is KeyboardEvent) to ()
     {

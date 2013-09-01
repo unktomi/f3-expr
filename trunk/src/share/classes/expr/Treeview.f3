@@ -190,7 +190,6 @@ public class Treecell is AbstractNode {
 	     }];
 	 }]
     };
-
     const onClick = 
 	internalContent.observeMouseDown().subscribe(function from (e is MouseEvent) to () {
 
@@ -200,8 +199,12 @@ public class Treecell is AbstractNode {
 		    if (not tn.isOpen) tn.open() else tn.close();
 		}
 		tv.selectionRow = tn.row;
+		tv.onMouseDown(e);
 	    });
-
+    const onDrag = 
+	internalContent.observeMouseDrag().subscribe(tv.onMouseDrag);
+    const onUp = 
+	internalContent.observeMouseUp().subscribe(tv.onMouseUp);
 
 }
 
@@ -355,6 +358,10 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler {
         }
 
     public readonly var selectedTreecell is Treecell = bind cells[selectionRow].cell;
+
+    public function getDragCell to Treecell {
+	Treecell { tv: this, tn: selectedTreenode, transform: Mat4.<<1>> };
+    }
       
     protected bound function createCell from (tn is Treenode) to Treecell
     {
@@ -406,11 +413,15 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler {
 
 	
 
-    var font = bind layoutEngine.createFont("font-size:11;font-style:LucidaSans");
+    var font = bind layoutEngine.createFont("font-size:11;font-family:Vera");
 	
     const onWheel = 
 	internalContent.observeMouseWheel().subscribe(function from (event is MouseWheelEvent) to () {
 		const y = event.scroll.y as Integer;
 		scroll(y);
 	    });
+
+    public function onMouseDrag from (e is MouseEvent) to () {}
+    public function onMouseUp from (e is MouseEvent) to () {}
+    public function onMouseDown from (e is MouseEvent) to () {}
 }
