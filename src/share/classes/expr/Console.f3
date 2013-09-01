@@ -1,0 +1,6 @@
+package expr;
+
+public function println from (obj is Object) to () {
+    java.lang.System.out.print("Console: ");
+    java.lang.System.out.println(obj);
+}

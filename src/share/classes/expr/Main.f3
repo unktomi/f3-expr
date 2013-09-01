@@ -531,15 +531,21 @@ public function run from (args is String[]) to ()
 						 for (j in getUnderMouseInEditor()) {
 						     println("j={j.node}");
 						     if (j.node is Trax) { 
-							 (j.node as Trax).onDrop(j, clip);
 							 const t = ResourceTimeNode {
 							     url: asset.name;
 							     content: clip;
 							 }
 							 addTimeResource(t);
+							 (j.node as Trax).onDrop(j, t);
 							 break;
 						     } else if (j.node is Expression.Canvas) {
-							 (j.node as Expression.Canvas).onDrop(j, clip);
+							 const t = ResourceTimeNode {
+							     url: asset.name;
+							     id: asset.name;
+							     content: clip;
+							 }
+							 addTimeResource(t);
+							 (j.node as Expression.Canvas).onDrop(j, t);
 							 break;
 						     }
 						 }
@@ -592,7 +598,9 @@ public function run from (args is String[]) to ()
 				    title: "Events"
 				    content: expr.prog.Expression.Canvas {
 					event: bind inspector.inspecting[inspector.selectedIndex].member;
-					targetNode: bind currentTransform
+					 targetNode: bind currentTransform;
+					 targetSpace: bind mainScene.root;
+					 targetTime: bind mainTimeLayer;
 				    }
 				 }]
 
