@@ -76,7 +76,6 @@ public function introspect from (clazz is F3ClassType) to Member[]
 	    if (SUBJECT_TYPE.isAssignableFrom(rt) or OBSERVABLE_TYPE.isAssignableFrom(rt) or OBSERVER_TYPE.isAssignableFrom(rt)) {
 		rt_t = getTypeArguments(rt)[0];
 	    } else {
-		continue;
 	    }	
 	    if (SUBJECT_TYPE.isAssignableFrom(rt)) {
 		toInsert = Member {
@@ -100,7 +99,13 @@ public function introspect from (clazz is F3ClassType) to Member[]
 		}
 		println("Observer of ({getTypeArguments(rt)})");
 	    } else {
-		continue;
+		if (UNIT_TYPE == rt) {
+		    toInsert = Member {
+			m: f;
+			t: UNIT_TYPE;
+			isObservable: false, isObserver: true;
+		    }
+		}
 	    }
 	} else {
 	    if (UNIT_TYPE <> rt) {
@@ -109,17 +114,17 @@ public function introspect from (clazz is F3ClassType) to Member[]
 	    if (ft.minArgs() == 0) {
 		// observer of ()
 		rt = UNIT_TYPE;
+		toInsert = Member {
+		    m: f;
+		    t: rt;
+		    isObserver: true;
+		}
 	    } else if (ft.minArgs() == 1) {
 		// observer of ft.getArgumentType(0)
 		//println("{f.getName()} => Observer of ({ft.getArgumentType(0)})");
 	    } else if (ft.minArgs() == 1) {
 		// observer of (ft.getArgumentType(0), ft.getArgumentType(1))
 		continue;
-	    }
-	    toInsert = Member {
-		m: f;
-		t: rt;
-		isObserver: true;
 	    }
 	}
 	if (toInsert <> null) {
@@ -174,6 +179,10 @@ public class Member {
     function toApply to String {
 	if (m is F3FunctionMember) then "{if (m.isStatic()) then m.getName() else name}()" else "{name}";
     }
+    override function toString to String
+    {
+	"m={m},t={t},name={name},isObserver={isObserver},isObservable={isObservable}";
+    }
 }
 
 public class FunctionMember is Member {
@@ -196,6 +205,12 @@ public interface Expression {
     public function getType to F3Type;
     override function toString { "{getClass()}: {getName()} / {getType()}" }
     public function toSource to String { "" }
+}
+
+abstract class TimeNodeExpression is Expression {
+    public var timeNode is TimeNode;
+    override function getName to String { timeNode.id }
+    override function toSource { "getClip(\"{timeNode.id}\")" }
 }
 
 public interface MemberExpression is Expression {
@@ -367,6 +382,7 @@ public class ExpressionView is AbstractNode {
     }
 }
 
+
 class FunctionView is ExpressionView {
     public var fun is Function;
     override var transform = bind translate(pos);
@@ -404,12 +420,91 @@ class FunctionView is ExpressionView {
     }
 }
 
+public class InputMemberExpression is MemberExpression, ObserverExpression {
+    override function getType to F3Type { member.t }
+    public var target is Expression;
+    override public function toSource to String {
+	const i = getIVar(this);
+	if (observable is MemberExpression and (observable as MemberExpression).member.isObservable) {
+	    
+	    "(foreach ({i} in {observable.toSource()}) {target.toSource()}.{member.toApply()})";
+	} else {
+	    if (observable == null) {
+		if (member.isObservable) 
+		    then "{target.toSource()}.{member.toApply()}"
+		    else "f3.util.Observables.observe(&{target.toSource()}.{member.toApply()})";
+	    } else {
+		"(foreach ({i} in {observable.toSource()}) {target.toSource()}.{member.toApply()})";
+		//"{observable.toSource()}.{member.toApply()}";
+	    }
+	}
+    }
+}
+
+public class OutputMemberExpression is MemberExpression, ObservableExpression {
+    override function getType to F3Type { member.t }
+    public var source is Expression;
+    override public function toSource to String {
+	""
+    }
+}
+
+
+public class ObjectView is ExpressionView {
+    public var inputs is Member[];
+    public var outputs is Member[];
+    override var transform = bind translate(pos);
+
+    var inputViews is InputView[] = bind foreach (p in inputs) InputView {
+	canvas: bind canvas;
+	cellWidth: bind cellWidth;
+	expression: InputMemberExpression { member: p, target: bind expression }
+	override function getInputType to F3Type { expression.getType() }
+    };
+    var outputViews is OutputView[] = bind foreach (p in outputs) OutputView {
+	canvas: bind canvas;
+	cellWidth: bind cellWidth;
+	expression: OutputMemberExpression { member: p, source: bind expression }
+	override var resultType = bind expression.getType();
+    };
+    //    var outputViews = bind foreach (r in outputs) OutputView {
+    //	canvas: bind canvas;
+    //    };
+    const io = Group {
+	transform: bind translate(0, -cellHeight);
+	content: 
+	[
+	 Group {
+	     content: bind inputViews
+	 }
+	 Group {
+	     transform: bind translate(0, -inputs.size() * cellHeight);
+	     content: bind outputViews
+	 }]
+    };
+
+    override var internalContent = Group {
+	content: bind [label, io];
+    }
+
+    override function update {
+	super.update();
+	for (i in inputViews) {
+	    i.index = indexof i;
+	}
+	for (i in outputViews) {
+	    i.index = indexof i;
+	}
+    }
+}
+
+
 class GetVarView is LinkedView {
     public var get is GetVar;
     override var transform = bind translate(pos);
     override var expression = bind get;
     override var internalContent = Group {
-	content: ObjectExpressionView {
+	content: GetTreeview {
 	    canvas: bind canvas;
 	    width: 150;
 	    height: 200;
@@ -469,18 +564,11 @@ class LinkedView is ExpressionView {
 
 }
 
-public class ParameterView is LinkedView {
-
-    const parameter is Parameter;
-
+public class InputView is LinkedView {
     var index is Integer;
-    
+    public function getInputType to F3Type { null };
     override var transform = bind translate(0, index * -cellHeight);
-
-    override var expression = bind parameter;
-
     override var internalContent = bind label;
-
     override function onDown from (e is MouseEvent) to () 
     {
     }
@@ -490,47 +578,55 @@ public class ParameterView is LinkedView {
     override function onUp from (e is MouseEvent) to () 
     {
     }
-
     override bound function getLinkPos to Point3 { getWorldPos() - new Vec3(cellWidth/2, 0, 0) }
 }
 
-class ResultView is LinkedView {
+public class ParameterView is InputView {
+    const parameter is Parameter;
+    override var expression = bind parameter;    
+    override public function getInputType to F3Type {
+	parameter.getType();
+    }
+}
 
-    public var result is Result;
-    override var expression = bind result;
-
+public class OutputView is LinkedView {
+    public var resultType is F3Type;
+    public var index is Integer;
+    override var transform = bind translate(0, index * -cellHeight);
     override var internalContent = Group 
     {
-	content: ObjectExpressionView {
+	content: GetTreeview {
 	    canvas: bind canvas;
 	    width: 150;
 	    height: 200;
 	    get: GetVar {
 		member: Member {
 		    m: null;
-		    t: bind result.getType();
-		    name: "return";
+		    t: bind resultType;
+		    name: bind expression.getName();
 		}
 	    }
 	}
 
     }
-
     override function onDrag from (e is MouseEvent) to () 
     {
 	//targetPos = e.location;
-	const source = canvas.pickInput(e, result.getType());
+	//const source = canvas.pickInput(e, result.getType());
     }
-
     override function onDown from (e is MouseEvent) to () 
     {
     }
-
     override function onUp from (e is MouseEvent) to () 
     {
     }
-
     override bound function getLinkPos to Point3 { getWorldPos() + new Vec3(cellWidth/2, 0, 0) }
+}
+
+class ResultView is OutputView {
+    public var result is Result;
+    override var expression = bind result;
+    override var resultType = bind result.getType();
 }
 
 class MemberTreenode is Treenode {
@@ -600,10 +696,9 @@ public class MemberTreecell is Treeview.Treecell
 		       0);
 	}
     };
-	
 }
 
-class ObjectExpressionView is ResizableNode {
+class GetTreeview is ResizableNode {
     public var event is Member;
     public var canvas is Canvas;
     public var cellHeight = bind canvas.cellHeight;
@@ -742,6 +837,7 @@ public class LinkInfo {
     }
 }
 
+
 class Holder is Group, Scissored {
 }
 
@@ -750,9 +846,20 @@ public class Canvas is ResizableNode {
     public function onDrop from (where is Pick, clip is TimeNode) to ()
     {
 	println("ON DROP {where} {clip}");
+	const typ = Reflect.getType(clip.getClass().getName());
+	const members = introspect(typ);
+	for (m in members where not m.isObservable and m.isObserver) {
+	    println(m);
+	}
+	insert ObjectView {
+	    expression: TimeNodeExpression { timeNode: clip, override function getType to F3Type { typ }}
+	    canvas: this;
+	    inputs: foreach (m in members where not m.isObservable and m.isObserver and m.t == UNIT_TYPE) m;
+	    outputs: foreach (m in members where m.isObservable and m.m is F3FunctionMember) m;
+	} into views;
     }
 
-    readonly var font = bind layoutEngine.createFont("font-size:11;font-family:Vera");
+    readonly var font = bind layoutEngine.createFont("font-size:11;font-family:Lucida Grande");
 
     var portPaint is Paint;
 
@@ -790,6 +897,21 @@ public class Canvas is ResizableNode {
     public var event is Member;
 
     public var targetNode is Node on replace { reset() }
+
+    public var targetSpace is Node;
+    public var targetTime is TimeNode;
+
+    public function lookupSpatial from (id is String) to Node {
+	var r = targetSpace.lookup(id);
+	println("lookup {id} => {r}");
+	return r;
+    }
+
+    public function lookupTemporal from (id is String) to TimeNode {
+	var r = targetTime.lookup(id);
+	println("lookup {id} => {r}");
+	return r;
+    }
 
     function reset {
 	for (link in links) {
@@ -978,12 +1100,12 @@ public class Canvas is ResizableNode {
     {
 	for (p in e.scene.underMouse) {
 	    const n = p.node;
-	    if (n is ParameterView) {
-		const pv = n as ParameterView;
-		if (pv.parameter.getType().isConvertibleFrom(t)) {
+	    if (n is InputView) {
+		const pv = n as InputView;
+		if (pv.getInputType() == UNIT_TYPE or pv.getInputType().isConvertibleFrom(t)) {
 		    return pv;
 		} else {
-		    println("NOT ASSIGNABLE {pv.parameter.getType()} <- {t}");
+		    println("NOT ASSIGNABLE {pv.getInputType()} <- {t}");
 		}
 	    }
 	}
@@ -1031,7 +1153,7 @@ public class Canvas is ResizableNode {
 			 insert x into terms;
 		     });
 	var itype = (e as MemberExpression).member.m.getDeclaringClass();
-	var result = "var _ = function from (i is {itype.getName()}) to f3.util.Observable of ? \{";
+	var result = "var _ = function from (i is {itype.getName()}, getNode is function from String to f3.media.scene.Node, getClip is function from String to f3.media.scene.TimeNode) to f3.util.Observable of ? \{";
 	for (x in terms) {
 	    var src is String;
 	    if (x is Parameter) {
@@ -1044,9 +1166,10 @@ public class Canvas is ResizableNode {
 		println("compiling: {toCompile}");
 		const r = evaluator.compileAndRun(toCompile);
 		println("{r.getClass()} => {r}");
-		const f = r as function from Node to Observable of ?;
-		subscribe(f(targetNode), toCompile);
-		break;
+		const f = r as function from (Node, function from String to Node, function from String to TimeNode) to Observable of ?;
+		var obs is Observable of ?;
+		obs = f(targetNode, lookupSpatial, lookupTemporal);
+		subscribe(obs, toCompile);
 	    } catch (thr is java.lang.Throwable) {
 		thr.printStackTrace();
 	    }

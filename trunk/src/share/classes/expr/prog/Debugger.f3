@@ -1,0 +1,65 @@
+package expr.prog;
+import f3.util.*;
+
+public class Instrumenter of a is Observer of a {
+    public const debugger is Debugger;
+    public const target is Observer;
+    override function onNext from (x is a) to () {
+	debugger.onNext(this, x)
+    }
+    override function onError from (e is java.lang.Exception) to () {
+	debugger.onError(this, e)
+    }
+    override function onCompleted from () to () {
+	debugger.onCompleted(this)
+    }
+}
+
+public class Debugger {
+
+    public function pause from () to () {
+    }
+
+    public function resume from () to () {
+    }
+
+    public function stepInto from () to ()
+    {
+    }
+
+    public function stepOver from () to ()
+    {
+    }
+
+    public function stepOut from () to ()
+    {
+    }
+
+    public function setBreakpoint from (x is Instrumenter of ?) to () {
+    }
+
+    public function removeBreakpoint from (x is Instrumenter of ?) to () {
+    }
+    
+    public function instrument of a from (obsvr is Observer of a)
+	to Instrumenter of a
+    {
+	Instrumenter of a {
+	    debugger: this;
+	    target: obsvr;
+	}
+    }
+
+    public function onNext of a from (i is Instrumenter of a, x is a) to ()
+    {
+    }
+
+    public function onError of a from (i is Instrumenter of a,
+				       e is java.lang.Exception) to ()
+    {
+    }
+
+    public function onCompleted of a from (i is Instrumenter of a) to () 
+    {
+    }
+}

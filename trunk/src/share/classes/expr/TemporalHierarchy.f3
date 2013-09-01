@@ -1,0 +1,121 @@
+package expr;
+import expr.undo.*;
+import f3.media.scene.*;
+import f3.util.*;
+import f3.util.Observer.*;
+
+class Treenode is Treeview.Treenode {
+    public var n is TimeNode;
+    override var label = bind if (n.id <> "") then n.id else "{n}";
+    function asTimeGroup from (n is TimeNode) to TimeGroup { if (n is TimeGroup) then n as TimeGroup else null }
+    override var canOpen = bind { var g = asTimeGroup(n); g.content.size() > 0 }
+    override var children = bind foreach (x in (n as TimeGroup).content) if (n.id == null) then null else Treenode { n: bind x };
+    override function open to () {
+	super.open();
+	println("open {n} => {children.size()}");
+    }
+}
+
+public class Model is Treeview.Treemodel {
+    public const h is TemporalHierarchy;
+    override var root = Treenode { n:  bind h.root };
+    public var selection is Treenode on replace {
+	if (h.selectedTimeNode <> selection.n) {
+	    selectionObserver.onNext(selection);
+	}
+    }
+    const selectionListener = 
+	h.observeSelection().subscribe(function from (tn is TimeNode) to () 
+				       {
+					   foldLeft((), 
+						    function from (_ is (), t is Treeview.Treenode) to () {
+							const ht = t as Treenode;
+							const n = ht.n;
+							if (n == tn) {
+							    selection = ht;
+							}
+						    })
+				       });
+    function onSelectionChange from (tn is Treeview.Treenode) to ()
+    {
+	h.selectedTimeNode = (tn as Treenode).n
+    }
+    const disp = selectionObserver.subscribe(onSelectionChange);
+}
+
+public class TemporalHierarchy 
+{
+    public var selectedTimeNode is TimeNode on replace {
+	var p = selectedTimeNode;
+	while (p <> null and not (p is ResourceTimeNode)) {
+	    p = p.parent;
+	}
+	selectedTransform = p as ResourceTimeNode;
+	selection.onNext(selectedTransform);
+    };
+
+    public function clearSelection {
+	selectedTimeNode = null;
+    }
+
+    const undoList = UndoList {};
+
+    postinit {
+	undoList.addTarget("selectedTimeNode", &selectedTimeNode);
+    }
+
+    public var selectedTransform is TimeNode;
+
+    public var root is TimeNode;
+
+    public function selectTimeNode from (n is TimeNode) to ()
+    {
+	selectedTimeNode = n;
+    }
+
+    public function deleteSelection {
+	var old = selectedTransform;
+	var prev is ResourceTimeNode = null;
+	var next is ResourceTimeNode = null;
+	var t is TimeNode;
+	root.foldLeft((), 
+		      function from (_ is (), n is TimeNode) to () {
+			  if (n == old) {
+			      if (prev == null) {
+				  prev = n as ResourceTimeNode;
+			      } else t = prev;
+			  } else if (n is ResourceTimeNode) {
+			      if (prev == t) {
+				  next = n as ResourceTimeNode;
+			      }
+			      prev = n as ResourceTimeNode;
+			  }
+		      });
+	if (t == null) {
+	    t = next;
+	}
+	selectTimeNode(t);
+    }
+
+    public function move from (src is TimeNode, target is TimeNode) to ()
+    {
+	const srcParent = src.parent as TimeGroup;
+	delete src from srcParent.content;
+	var targetTimeGroup is TimeGroup;
+	if (not (target is TimeGroup)) {
+	    const parent = target.parent as TimeGroup;
+	    const i = f3.util.Sequences.indexOf(parent.content, target);
+	    insert src after parent.content[i];
+	} else {
+	    const parent = target as TimeGroup;
+	    insert src into parent.content;
+	}
+    }
+
+    const selection = Subject of TimeNode {};
+
+    public function observeSelection to Observable of TimeNode {
+	selection;
+    }
+	
+}

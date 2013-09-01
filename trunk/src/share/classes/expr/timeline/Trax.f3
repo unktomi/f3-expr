@@ -15,9 +15,14 @@ class TimeNodeView is AbstractNode
     public var row is Integer;
     public var trax is Trax;
     public var target is TimeNode;
-    public var playX is Number = bind trax.durationToX(target.playTime);
+    public var playX is Number = bind getPlayX(target.playTime);
     public var content is Node[] = bind getContent(target);
     public var expanded = false;
+
+    function getPlayX from (d is Duration) to Number {
+	println("{target.id} playTime => {d}");
+	trax.durationToX(d);
+    }
 
     function getWidth from (i0 is Interval, visible is Interval) to Number 
     {
@@ -164,7 +169,7 @@ public class Playhead is AbstractNode
     const up = observeMouseUp().subscribe(onUp);
 }
 
-public class Trax is ResizableNode, Focusable {
+public class Trax is ResizableNode, Focusable, KeyboardInputHandler {
 
     public function onDrop from (where is Pick, clip is TimeNode) to ()
     {

@@ -1,0 +1,92 @@
+package expr;
+import expr.Treeview.*;
+import f3.media.scene.*;
+import expr.ResourceNode.*;
+
+public abstract class Asset {
+    public var url is String;
+    public var name = bind { var slash = url.lastIndexOf("/"); url.substring(slash+1) };
+    public readonly var containedAssets is Asset[];
+}
+
+public class MaAsset is Asset {
+    public const model is Ma.Model;
+    override var url = bind model.url;
+    override var containedAssets = bind 
+	[foreach (cam in model.getCameras()) CameraAsset { name: cam.id, camera: cam  },
+	 foreach (clipLib in model.getClipLibraries()) ClipLibraryAsset { name: clipLib.id, clipLibrary: clipLib }];
+}
+
+public class CameraAsset is Asset {
+    public const camera is Camera;
+}
+
+public class ClipAsset is Asset {
+    public const clip is TimeNode;
+}
+
+public class ClipLibraryAsset is Asset {
+    public const clipLibrary is TimeGroup;
+    override var containedAssets = bind foreach (c in clipLibrary.content) ClipAsset { name: c.id, clip: c };
+}
+
+public class ImageAsset is Asset {
+}
+
+public class WebAsset is Asset {
+}
+
+public class SVGAsset is Asset {
+}
+
+public class TransitionLayerAsset is Asset {
+    override var name = "Transition Layer";
+}
+
+public class TimeLayerAsset is Asset {
+    override var name = "Time Layer";
+}
+
+public class ExprAsset is Asset {
+}
+
+public class AssetTreenode is Treenode {
+    public var asset is Asset;
+    override var canOpen = bind { var n = asset.containedAssets.size(); n > 0 };
+    override var children = bind foreach (x in asset.containedAssets) AssetTreenode {asset: x};
+    override var label = bind asset.name;
+    override function open {
+	children;
+	super.open();
+    }
+}
+
+function makeAsset from (r is ResourceNode) to Asset {
+    if (r is MaResourceNode) {
+	MaAsset {
+	    model: (r as MaResourceNode).model;
+	}
+    } else if (r.url.endsWith(".svg")) {
+	SVGAsset {
+	    url: r.url
+	} 
+    } else if (r.url.endsWith(".png")) {
+	ImageAsset {
+	    url: r.url;
+	}
+    } else {
+	WebAsset {
+	    url: r.url;
+	}
+    }
+}
+
+public class AssetModel is Treemodel {
+    public var resources is ResourceGroup;
+    override var root = AssetTreenode {
+	asset: Asset {
+	    name: "Assets";
+	    containedAssets: bind foreach (r in resources.resources) makeAsset(r);
+	}
+    }
+}
