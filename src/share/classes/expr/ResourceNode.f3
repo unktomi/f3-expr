@@ -6,3 +6,9 @@ public class ResourceNode is TransformNode {
     override var id = bind url;
     public var temporal is ResourceTimeNode;
 }
+
+public class MaResourceNode is ResourceNode {
+    public const model is Ma.Model;
+    override var url = bind model.url;
+    override var content = bind model.getSpatialRoot();
+}

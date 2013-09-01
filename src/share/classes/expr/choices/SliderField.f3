@@ -44,7 +44,7 @@ public class SliderField is AbstractNode
 	width: bind width+4;
 	transform: translate(0, 1);
 	rightJustified: true;
-        font: layoutEngine.createFont("font-size:11;font-family:Lucida;");
+        font: layoutEngine.createFont("font-size:11;font-family:Vera;");
 	pickable: false;
     };
 

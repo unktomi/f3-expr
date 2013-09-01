@@ -50,7 +50,7 @@ public class Tabview is ResizableNode {
     var contentWidth is Number = bind width;
     var contentHeight is Number = bind height - TAB_HEIGHT;
 
-    readonly var font = bind layoutEngine.createFont("font-size:11;font-style:LucidaSans");
+    readonly var font = bind layoutEngine.createFont("font-size:11;font-family:Vera");
 
     var tabWidth is Number = bind Math.max(minTabWidth, width / Math.max(tabs.size(), 1));
 
@@ -101,7 +101,7 @@ public class Tabview is ResizableNode {
 		    height: TAB_HEIGHT+2;
 		    width: bind tabWidth;
 		    fillPaint: bind if (t == selectedTab) then FG_PAINT else BG_PAINT;
-		    //strokePaint: bind if (t == selectedTab) then FG_PAINT else TEXT_PAINT;
+		    strokePaint: bind if (t == selectedTab) then FG_PAINT else TEXT_PAINT;
 		},
 		Group { content: bind labels[t.index] }]
 	    }
@@ -111,8 +111,8 @@ public class Tabview is ResizableNode {
     override var internalContent = TransformNode {
 	content:
 	[TransformNode {
-		//tx: bind -width / 2;
-	    tx: bind -tabWidth/2;
+            tx: bind -width / 2 + tabWidth/2;
+	    //tx: bind -tabWidth/2;
 	    ty: bind contentHeight / 2-1;
             content: bind tabLabels;
 	},

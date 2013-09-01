@@ -131,7 +131,8 @@ public function introspect from (clazz is F3ClassType) to Member[]
 	var toInsert is Member;
 	if (true or not v.isPublicInit() and not v.isDef()) {
 	    var rt = v.getType();
-	    if (SUBJECT_TYPE.isAssignableFrom(rt) or OBSERVABLE_TYPE.isAssignableFrom(rt) or OBSERVER_TYPE.isAssignableFrom(rt)) {
+	    var isObs = SUBJECT_TYPE.isAssignableFrom(rt) or OBSERVABLE_TYPE.isAssignableFrom(rt);
+	    if (isObs or OBSERVER_TYPE.isAssignableFrom(rt)) {
 		rt = getTypeArguments(rt)[0];
 	    }	
 	    if ((not v.isPublicRead() and not v.isPublicInit() and not v.isDef()) and v.isPublic()) {
@@ -147,9 +148,8 @@ public function introspect from (clazz is F3ClassType) to Member[]
 		toInsert = Member {
 		    m: v;
 		    t: rt
-		    isObservable: true;
+		    isObservable: isObs or v.isPublic();
 		}
-	    } else {
 	    }
 	}
 	if (toInsert <> null) {
@@ -172,14 +172,13 @@ public class Member {
 	Expression.introspect(t);
     }
     function toApply to String {
-	if (m is F3FunctionMember) then "{name}()" else "{name}";
+	if (m is F3FunctionMember) then "{if (m.isStatic()) then m.getName() else name}()" else "{name}";
     }
 }
 
 public class FunctionMember is Member {
     public const ft is F3FunctionType;
 }
-
 
 function argName from (ft is F3FunctionType, i is Integer) to String {
     const t = ft.getArgumentType(i);
@@ -245,9 +244,12 @@ public class GetVar is VarExpression, ObservableExpression, ObserverExpression {
 	    "(foreach ({i} in {observable.toSource()}) {i}.{member.toApply()})";
 	} else {
 	    if (observable == null) {
-		"{i}.{member.toApply()}";
+		if (member.isObservable) 
+		    then "{i}.{member.toApply()}"
+		    else "f3.util.Observables.observe(&{i}.{member.toApply()})";
 	    } else {
-		"{observable.toSource()}.{member.toApply()}";
+		"(foreach ({i} in {observable.toSource()}) {i}.{member.toApply()})";
+		//"{observable.toSource()}.{member.toApply()}";
 	    }
 	}
     }
@@ -282,10 +284,10 @@ public class Function is MemberExpression {
 	const observable = inputs[0].observable;
 	if (observable is MemberExpression) {
 	    const m = observable as MemberExpression;
-	    if (m.member.isObservable) {
+	    if (true or m.member.isObservable) {
 		const i = getIVar(inputs[0]);
 		if (fun.isStatic()) {
-		    "(foreach ({i} in {observable.toSource()}) {fun.getName()}({i}))";
+		    "(foreach ({i} in {observable.toSource()}) {fun.getDeclaringClass().getName()}.{fun.getName()}({i}))";
 		} else {
 		    "(foreach ({i} in {observable.toSource()}) {i}.{fun.getName()}()";
 		}
@@ -612,7 +614,7 @@ class ObjectExpressionView is ResizableNode {
 	    m: bind get.member;
 	}
     };
-    var treeHeight = bind Math.min(treeModel.rowCount, 30)*cellHeight;
+    var treeHeight = bind Math.min(treeModel.rowCount, 8)*cellHeight;
     const self = this;
     const cellMap is java.util.Map of (MemberTreenode, MemberTreecell) =
 	java.util.HashMap of (MemberTreenode, MemberTreecell) {};
@@ -710,8 +712,8 @@ class ObjectExpressionView is ResizableNode {
 		    target: found;
 		};
 		newlink.link();
-		canvas.dumpSrc();
 	    } 
+	    canvas.dumpSrc();
 	});
 
 }
@@ -745,7 +747,12 @@ class Holder is Group, Scissored {
 
 public class Canvas is ResizableNode {
 
-    readonly var font = bind layoutEngine.createFont("font-size:11;font-style:LucidaSans");
+    public function onDrop from (where is Pick, clip is TimeNode) to ()
+    {
+	println("ON DROP {where} {clip}");
+    }
+
+    readonly var font = bind layoutEngine.createFont("font-size:11;font-family:Vera");
 
     var portPaint is Paint;
 
@@ -782,7 +789,15 @@ public class Canvas is ResizableNode {
 
     public var event is Member;
 
-    public var targetNode is Node;
+    public var targetNode is Node on replace { reset() }
+
+    function reset {
+	for (link in links) {
+	    link.unlink();
+	}
+	links = [];
+	unsubscribe();
+    }
 
     var rootView is Node = Group { content: bind makeGetter(event) };
 
@@ -790,6 +805,7 @@ public class Canvas is ResizableNode {
 
     function makeGetter from (event is Member) to GetVarView {
 	if (event == null) then null else {
+		reset();
 		var r = GetVarView {
 		    parent: rootView;
 		    canvas: this;
@@ -852,10 +868,10 @@ public class Canvas is ResizableNode {
     };
 
     const printlnFun = Function {
-	fun: getFunction("f3.lang.Builtins", "println", ["Object"]);
+	fun: getFunction("expr.Console", "println", ["Object"]);
     }
 
-    var views is Node[] = FunctionView {
+    public var views is Node[] = FunctionView {
 	pos: new Point3(100, 0, 0);
 	canvas: this;
 	fun: printlnFun;
@@ -1029,7 +1045,7 @@ public class Canvas is ResizableNode {
 		const r = evaluator.compileAndRun(toCompile);
 		println("{r.getClass()} => {r}");
 		const f = r as function from Node to Observable of ?;
-		subscribe(f(targetNode));
+		subscribe(f(targetNode), toCompile);
 		break;
 	    } catch (thr is java.lang.Throwable) {
 		thr.printStackTrace();
@@ -1039,7 +1055,8 @@ public class Canvas is ResizableNode {
 	result;
     }
 
-    const evaluator = new org.f3.tools.script.ScriptShell(java.lang.Thread.currentThread().getContextClassLoader());
+    const evaluator = 
+	new org.f3.tools.script.ScriptShell(java.lang.Thread.currentThread().getContextClassLoader());
 
     function visit1 from (e is Expression) to String 
     {
@@ -1164,13 +1181,13 @@ public class Canvas is ResizableNode {
 
     var subs is Disposable[];
 
-    function subscribe of a from (obsvb is Observable of a) to ()
+    function subscribe of a from (obsvb is Observable of a, src is String) to ()
     {
 	println("SUBSCRIBE {obsvb}");
 	insert obsvb.subscribe(DefaultObserver of a {
 		override function onNext from (x is a) to ()
 		{
-		    println("on next {obsvb} {x}");
+		    println("on next {src} {x}");
 		}
 	}) into subs;	
     }
