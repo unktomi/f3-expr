@@ -225,8 +225,8 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler {
 	ColorPaint(Color.color(.4, .4, .4, 1));
     public var parentSelectionBackground is Paint = 
         ColorPaint(Color.color(.5, .5, .5, 1));
-    public var selectionForeground is Paint = 
-	ColorPaint(Color.color(.9, .9, .9, 1));
+    public var selectionForeground is Paint = bind if focused then
+	ColorPaint(Color.color(.9, .9, .9, 1)) else ColorPaint(Color.color(.77, .77, .77, 1));
     public var foreground is Paint = 
 	ColorPaint(Color.color(.2, .2 , .2));
     

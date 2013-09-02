@@ -332,10 +332,6 @@ public class Result is ObservableExpression {
     override function getType to F3Type { t }
 }
 
-public class Program {
-    public var start is ObservableExpression;
-}
-
 class DataArrow is MeshNode.Instance {
 }
 
@@ -896,7 +892,7 @@ public class Canvas is ResizableNode {
 
     public var event is Member;
 
-    public var targetNode is Node on replace { reset() }
+    public var targetNode is ResourceNode;
 
     public var targetSpace is Node;
     public var targetTime is TimeNode;
@@ -1174,6 +1170,9 @@ public class Canvas is ResizableNode {
 		thr.printStackTrace();
 	    }
 	    result = "{result}{src};";
+	    if (true) {
+		break;
+	    }
 	}
 	result;
     }
@@ -1314,7 +1313,46 @@ public class Canvas is ResizableNode {
 		}
 	}) into subs;	
     }
+}
 
+public class Editor is ResizableNode {
+
+    public var targetNode is ResourceNode;
+    public var event is Member;
+
+    public var targetSpace is Node;
+    public var targetTime is TimeNode;
+
+    var canvas = bind getCanvas(targetNode, event);
+
+    override var internalContent = bind canvas;
+
+    function getCanvas from (target is ResourceNode, event is Member) to Canvas
+    {
+	var prog is Program;
+	for (x in target.programs) {
+	    if (x.event == event) {
+		prog = x;
+		break;
+	    }
+	}
+	if (prog == null) {
+	    prog = Program {event: event};
+	    insert prog into target.programs;
+	}
+	if (prog.canvas == null) {
+	    prog.canvas = Canvas {
+		height: bind height;
+		width: bind width;
+		targetNode: target,
+		event: event;
+		targetSpace: targetSpace;
+		targetTime: targetTime;
+	    }
+	}
+	return prog.canvas;
+    }
+    
 }
 
 

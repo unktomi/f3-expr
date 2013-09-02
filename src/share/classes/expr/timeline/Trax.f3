@@ -209,10 +209,12 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler {
     }
 
     var timelineListener is Disposable;
+    
+    public var loop is Boolean;
 
     const onPlayhead = DefaultObserver of Duration {
 	override function onNext from (event is Duration) to () {
-	    const d = if (not target.paused and targetNode.contentBounds.duration() > 0s) event.rem(targetNode.contentBounds.duration()) else event;
+	    const d = if (loop and not target.paused and targetNode.contentBounds.duration() > 0s) event.rem(targetNode.bounds.start + targetNode.contentBounds.duration()) else event;
 	    currentFrame = Math.round((d.toMillis() / 1000) * frameRate) as Integer;
 	    //println("currentFrame {event} => {currentFrame}");
 	    if (target.paused) {
@@ -228,7 +230,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler {
 	timelineListener = target.observePlayhead().subscribe(onPlayhead);
     }
 
-    public var targetNode is TimeLayer;
+    public var targetNode is TimeNode;
 
     public var temporalHierarchy is TemporalHierarchy;
 
@@ -522,12 +524,14 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler {
 		advancePlayhead(-1);
 	    } else {
 		selectedTimeNodeView.target.playTime -= frameToDuration(1);
+		updatePlayhead()
 	    }
 	} else if (e.keyCode == Keys.Right) {
 	    if (e.metaKey) {
 		advancePlayhead(1);
 	    } else {
 		selectedTimeNodeView.target.playTime += frameToDuration(1);
+		updatePlayhead()
 	    }
 	} else if (e.keyCode == Keys.Delete or e.keyCode == Keys.Backspace) {
 	    if (selectedTimeNodeView.target <> null) {
