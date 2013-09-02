@@ -48,6 +48,16 @@ public class InspectedNumber is InspectedRange of Number
     }
 }
 
+public class InspectedDuration is InspectedRange of Duration 
+{
+    public const low is Duration;
+    public const hi is Duration;
+    override function get from (t is Number) to Duration
+    { 
+	if (hi > low) then low + (hi - low)*t else 1ms*t;
+    }
+}
+
 public class InspectedChoice of a is InspectedRange of a 
 {
     public const choices is (..a)[];
@@ -145,6 +155,27 @@ class BooleanField is SliderField {
     }
 }
 
+class DurationField is SliderField {
+    public var i is InspectedDuration;
+    var disp is Disposable;
+    function onChange from (n is Duration) to () 
+    {
+	println("on change {n}");
+	t = n.toMillis();
+    }
+    postinit {
+	onChange(i.get());
+	disp = i.observable.subscribe(onChange);
+    }
+    override var t on replace {
+	println("t={t}");
+    }
+    override function getText from (t is Number) to String
+    {
+	"{t/1000}s"
+    }
+}
+
 public class Inspector is ResizableNode, Focusable, KeyboardInputHandler {
     public var inspecting is (Inspected of ?)[];
     public var selectedIndex is Integer on replace {
@@ -239,6 +270,14 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler {
 	            width: bind fieldWidth;
 		    height: bind cellHeight;
 		}
+	    } else if (i is InspectedDuration) then
+	    TransformNode {
+		tx: bind width / 2 - fieldWidth / 2-4;
+		content: DurationField {
+		    i: bind i as InspectedDuration;
+	            width: bind fieldWidth;
+		    height: bind cellHeight;
+		}
 	    } else if (i is InspectedObservable) {
 		null
 	    } else null]
@@ -276,6 +315,15 @@ public function inspect from (obj is Object) to (Inspected of ?)[]
 			    observable: Observables.observe(ptr);
 			    override function get to Boolean { ptr.get() }
 			    override function set from (x is Boolean) to () { ptr.set(x) }
+			}
+		    } else if (m.m is F3VarMember and m.t == DURATION_TYPE) {
+			const ptr = (m.m as F3Local.VarMember).getPointer(obj as F3Object) as ObservableRef of Duration;
+			InspectedDuration {
+			    member: m;
+			    label: m.m.getName();
+			    observable: Observables.observe(ptr);
+			    override function get to Duration { ptr.get() }
+			    override function set from (x is Duration) to () { ptr.set(x) }
 			}
 		    } else {
 			InspectedObservable of Object {

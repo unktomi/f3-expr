@@ -1,0 +1,24 @@
+package expr;
+import f3.util.*;
+import f3.media.scene.*;
+import f3.media.scene.Shape2D.*;
+import f3.media.input.*;
+
+public class ToggleButton is ResizableNode {
+    public var baseURL is String;
+    public var selected is Boolean;
+    const hidden = Button {
+        baseURL: bind "{baseURL}_hidden" 
+	onPress: function { selected = false; onSelect(selected); subject.onNext(selected) } 
+    };
+    const show = Button {
+        baseURL: bind "{baseURL}_show" 
+	onPress: function { selected = true; onSelect(selected); subject.onNext(selected) }
+    };
+    override var internalContent = Group {
+	content: bind if (selected) then hidden else show;
+    }
+    const subject = Subject of (Boolean) {};
+    public function observeSelection to Observable of (Boolean) { subject }
+    public var onSelect is function from Boolean to ();
+}

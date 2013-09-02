@@ -10,6 +10,33 @@ import f3.math.LinearMath.*;
 import java.lang.Math;
 import expr.undo.*;
 
+public const CLIP_COLOR = Color.rgb(50, 50, 50);
+public const CLIP_SELECTED_COLOR = Color.rgb(77, 77, 77);
+public const CLIP_LABEL_COLOR = Color.rgb(180, 180, 180);
+public const CLIP_SELECTED_LABEL_COLOR = Color.rgb(230, 230, 230);
+
+public const CHANNEL_COLOR = Color.rgb(140, 140, 140);
+public const CHANNEL_LABEL_COLOR = Color.rgb(51, 51, 51);
+public const CHANNEL_SELECTED_COLOR = Color.rgb(166, 166, 166);
+public const CHANNEL_SELECTED_LABEL_COLOR = Color.rgb(26, 26, 26);
+
+public const MODEL_COLOR = Color.rgb(80, 50, 50);
+public const MODEL_SELECTED_COLOR = Color.rgb(130, 50, 50);
+
+public const SOUND_COLOR = Color.rgb(50, 80, 50);
+public const SOUND_SELECTED_COLOR = Color.rgb(50, 130, 50);
+
+public const MOVIE_COLOR = Color.rgb(50, 50, 80);
+public const MOVIE_SELECTED_COLOR = Color.rgb(50, 50, 130);
+
+
+public const CLIP_PAINT = ColorPaint(CLIP_COLOR);
+public const CLIP_SELECTED_PAINT = ColorPaint(CLIP_SELECTED_COLOR);
+
+public const CLIP_LABEL_PAINT = ColorPaint(CLIP_LABEL_COLOR);
+public const CLIP_SELECTED_LABEL_PAINT = ColorPaint(CLIP_SELECTED_LABEL_COLOR);
+
+
 class TimeNodeView is AbstractNode 
 {
     public var row is Integer;
@@ -19,8 +46,9 @@ class TimeNodeView is AbstractNode
     public var content is Node[] = bind getContent(target);
     public var expanded = false;
 
+    public var selected is Boolean;
+
     function getPlayX from (d is Duration) to Number {
-	println("{target.id} playTime => {d}");
 	trax.durationToX(d);
     }
 
@@ -29,19 +57,21 @@ class TimeNodeView is AbstractNode
 	trax.durationToX(i0.duration())
     }
 
+    var selected1 = bind selected and trax.focused;
+
     bound function getFill from (target is TimeNode) to Paint 
     {
-	return ColorPaint(Color.color(.3, .3, .3));
+	if (selected) then CLIP_SELECTED_PAINT else CLIP_PAINT;
     }
 
     bound function getContent from (target is TimeNode) to Node[]
     {
 	[]
     }
-
+    const self = this;
     var w = bind getWidth(target.bounds, trax.visibleInterval);
     var h = bind trax.getViewHeight();
-    var fg = ColorPaint(Color.color(.7, .7, .7, 1));
+    var fg = bind if (selected1) then CLIP_SELECTED_LABEL_PAINT else CLIP_LABEL_PAINT;//ColorPaint(Color.color(.7, .7, .7, 1));
     var bg = bind getFill(target);
     override var transform = bind translate(playX + w / 2.0, trax.height / 2 + 2 - 15 -(row+1)*trax.getViewHeight());
     override var internalContent = Group {
@@ -55,6 +85,7 @@ class TimeNodeView is AbstractNode
 		     override function onMouseDown from (event is MouseEvent) to ()
 		     {
 			 dx = trax.durationToX(target.playTime);
+			 trax.selectTimeNodeView(self)
 		     }
 		     override function onMouseDrag from (event is MouseEvent) to ()
 		     {
@@ -64,7 +95,7 @@ class TimeNodeView is AbstractNode
 		     }
 		     override function onMouseUp from (event is MouseEvent) to ()
 		     {
-			 println("commit playTime={target.playTime}, pickable={target.pickable}");
+			 //println("commit playTime={target.playTime}, pickable={target.pickable}");
 			 MasterUndoable.commit();
 		     }
 		content: 
@@ -73,6 +104,7 @@ class TimeNodeView is AbstractNode
 		     height: bind h;
 		     width: bind w;
 		     fillPaint: bind bg;
+		     strokePaint: bind CLIP_LABEL_PAINT;
 		     blocksPointer: true;
 		 },
 		 Text.Label {
@@ -152,7 +184,7 @@ public class Playhead is AbstractNode
 	override function onNext from (event is MouseEvent) to ()
 	{
 	    tx += (event.picked.dragPoint1 - event.picked.dragPoint0).x;
-	    //println("drag {tx}");
+	    println("drag {tx}");
 	    trax.movePlayheadTo(tx);
 	}
     };
@@ -198,6 +230,16 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler {
 
     public var targetNode is TimeLayer;
 
+    public var temporalHierarchy is TemporalHierarchy;
+
+    public var removeClip is function from TimeNode to ();
+
+
+    var selectedTimeNodeView is TimeNodeView = null on replace old {
+	old.selected = false;
+	selectedTimeNodeView.selected = true;
+    }
+    
     const undoList = UndoList {};
 
     readonly var visibleInterval = bind
@@ -316,11 +358,16 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler {
 	target.setPlayhead(target.playhead);
     }
 
+    function advancePlayhead from (frames is Integer) to ()
+    {
+	target.setPlayhead(target.playhead + frameToDuration(frames));
+    }
+
     function movePlayheadTo from (x is Number) to ()
     {
 	const scrollX = frameToX(scrollOffset);
 	const d = xToDuration(x+scrollX);
-	target.setPlayhead(d);
+	target.setPlayhead(frameToDuration(durationToFrame(d)));
 	println("move playhead to {x}, scrollX={scrollX} d={d} frame={durationToFrame(d)}");
     }
 
@@ -369,9 +416,9 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler {
     function drawLines from (w is Number, h is Number, viewHeight is Number) to AbstractMesh {
 	println("TIMELINE={target}");
 	const x0 = -w / 2 + 15;
-	const y0 = h / 2 - viewHeight-5;
-	var x = x0;
-	var y = y0;
+	const y0 = Math.round(h / 2 - viewHeight-5);
+	var x is Number = x0;
+	var y is Number = y0;
 	var mid is Boolean = false;
 	lineMesh.reset();
 	lineMesh.moveTo(x, y);
@@ -385,6 +432,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler {
 	    lineMesh.moveTo(x, y);
 	    lineMesh.lineTo(x + width-pixelsPerFrame(), y);
 	    y -= viewHeight;
+	    println("y={y}");
 	}
 	const mesh = lineMesh.getMesh();
 	mesh.updateBounds();
@@ -394,6 +442,12 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler {
 
     public function selectClip from (clip is TimeNode) to ()
     {
+	for (i in timeNodeViews) {
+	    if (i.target == clip) {
+		selectTimeNodeView(i);
+		break;
+	    }
+	}
     }
     
     override var internalContent = Group {
@@ -405,8 +459,6 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler {
 		fillPaint: bind ColorPaint(backgroundColor);
 		override function onMouseDown from (event is MouseEvent) to ()
 		{
-		    println("event={event}");
-		    println("event.sceneLoc={event.sceneLocation}");
 		    if (event.location.y >= height / 2 -15) {
 			movePlayheadTo(event.location.x+width/2-10);
 		    }
@@ -444,12 +496,59 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler {
     }
 
     override function onKeyDown from (e is KeyboardEvent) to () {
+	var i = selectedTimeNodeView.row;
+	if (e.keyCode == Keys.Down) {
+	    const n = timeNodeViews[i+1];
+	    if (n <> null) {
+		selectTimeNodeView(n);
+	    }
+	} else if (e.keyCode == Keys.Up) {
+	    const n = timeNodeViews[i-1];
+	    if (n <> null) {
+		selectTimeNodeView(n);
+	    }
+	} else if (e.keyCode == Keys.Home) {
+	    const n = timeNodeViews[0];
+	    if (n <> null) {
+		selectTimeNodeView(n);
+	    }
+	} else if (e.keyCode == Keys.End) {
+	    const n = timeNodeViews[clips.size()-1];
+	    if (n <> null) {
+		selectTimeNodeView(n);
+	    }
+	} else if (e.keyCode == Keys.Left) {
+	    if (e.metaKey) {
+		advancePlayhead(-1);
+	    } else {
+		selectedTimeNodeView.target.playTime -= frameToDuration(1);
+	    }
+	} else if (e.keyCode == Keys.Right) {
+	    if (e.metaKey) {
+		advancePlayhead(1);
+	    } else {
+		selectedTimeNodeView.target.playTime += frameToDuration(1);
+	    }
+	} else if (e.keyCode == Keys.Delete or e.keyCode == Keys.Backspace) {
+	    if (selectedTimeNodeView.target <> null) {
+		var selectedIndex = selectedTimeNodeView.row;
+		removeClip(selectedTimeNodeView.target);
+		selectedIndex = Math.min(selectedIndex, clips.size()-1);
+		selectTimeNodeView(timeNodeViews[selectedIndex]);
+	    }
+	}
     }
-
     override function onKeyUp from (e is KeyboardEvent) to () {
     }
 
     override function onKeyInput from (e is KeyboardEvent) to () {
+    }
+
+    function selectTimeNodeView from (x is TimeNodeView) to () {
+	if (x <> null) {
+	    temporalHierarchy.selectTimeNode(x.target);
+	}
+	selectedTimeNodeView = x;
     }
 
 }
