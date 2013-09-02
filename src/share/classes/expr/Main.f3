@@ -84,6 +84,7 @@ public function run from (args is String[]) to ()
     const transformHierarchy = TransformHierarchy {
 	root: bind currentResource;
     }
+    const temporalHierarchy = TemporalHierarchy { root: bind currentAnimResource }
     var currentCamera is Camera;
     var TheWebBrowserFactory is AbstractWebBrowserFactory;
     try {
@@ -210,6 +211,7 @@ public function run from (args is String[]) to ()
     var savePoint is Integer;
 
     var editorScene is Scene;
+    var internalWindowsLayer is Group;
     var popupLayer = Group {};
 
     function getUnderMouseInEditor to Pick[] 
@@ -266,6 +268,10 @@ public function run from (args is String[]) to ()
 	width: bind stage.width;
 	pause: &player.paused;
 	onRewind: player.setPlayhead.apply(0s);
+	onHideFloating: function from (b is Boolean) to ()
+	{
+	    internalWindowsLayer.visible = b;
+	}
     };
     
     var manip is expr.manipulator.Manipulator;
@@ -285,6 +291,12 @@ public function run from (args is String[]) to ()
 	transformHierarchy.clearSelection();
 	MasterUndoable.reset();
     }
+
+    const undoList = expr.undo.UndoList {} on replace {
+	undoList.addTarget("nodes", &currentResource.resources);
+	undoList.addTarget("timenodes", &currentAnimResource.resources);
+    }
+
 
     function open from (url is String) to ()
     {
@@ -426,79 +438,19 @@ public function run from (args is String[]) to ()
                     background: null;
                     camera: Camera2D {}; 
 		    override var content =
-		    [Group { content: 
+		    [internalWindowsLayer = Group { content: 
 		      [InternalWindow {
 			containerBounds: bind Bounds.boundsFromRect(0, 
 									0, 
 									width,
 									height-toolMenu.bounds.height())
-		    	height: 500, width: 200;
+		    	height: 400, width: 300;
 			cx: 160, cy: 800-300;	   
 			    content: ResizableStageNode {
 			    
 			      content: Tabview {
 				tabs: 
 				[Tabview.Tab {
-				    title: "Inspector"
-				    content: inspector = Inspector {
-				    	inspecting: bind inspector.inspect(currentTransform);
-/*
-					var inspecting1 = bind if currentTransform <> null then null else
-					[InspectedNumber {
-					    label: "translateX";
-					    pointer: bind &currentTransform.tx;
-					},
-					InspectedNumber {
-					    label: "translateY";
-					    pointer: bind &currentTransform.ty;
-						
-					},
-					InspectedNumber {
-					    label: "translateZ";
-					    pointer: bind &currentTransform.tz;
-					}
-					InspectedNumber {
-					    label: "rotateX";
-					    pointer: bind &currentTransform.rx;
-					},
-					InspectedNumber {
-					    label: "rotateY";
-					    pointer: bind &currentTransform.ry;
-					},
-					InspectedNumber {
-					    label: "rotateZ";
-					    pointer: bind &currentTransform.rz;
-					}
-					InspectedNumber {
-					    label: "scaleX";
-					    pointer: bind &currentTransform.sx;
-					},
-					InspectedNumber {
-					    label: "scaleY";
-					    pointer: bind &currentTransform.sy;
-						
-					},
-					InspectedNumber {
-					    label: "scaleZ";
-					    pointer: bind &currentTransform.sz;
-					}
-					InspectedNumber {
-					    label: "pivotX";
-					    pointer: bind &currentTransform.px;
-					},
-					InspectedNumber {
-					    label: "pivotY";
-					    pointer: bind &currentTransform.py;
-						
-					},
-					InspectedNumber {
-					    label: "pivotZ";
-					    pointer: bind &currentTransform.pz;
-					}]
-*/
-				    }
-				 }, 
-				 Tabview.Tab {
 				     title: "Assets";
 				     content:
 				     Treeview {
@@ -558,19 +510,45 @@ public function run from (args is String[]) to ()
 				 Tabview.Tab {
 				     title: "Spatial";
 				     content:
-				     Treeview {
-					 model: TransformHierarchy.Model {
-					     h: bind transformHierarchy
-					 }
+				     Tabview {
+					 tabs:
+					 [Tabview.Tab {
+					     title: "Inspector";
+					     content: inspector = Inspector {
+						 inspecting: bind inspector.inspect(currentTransform);
+					     }
+					  },
+					  Tabview.Tab {
+					     title: "Hierarchy"
+					     content:
+					     Treeview {
+						 model: TransformHierarchy.Model {
+						     h: bind transformHierarchy;
+						 }
+					     }
+					 }]
 				     }
 				 },
 				 Tabview.Tab {
 				     title: "Temporal";
 				     content:
-				     Treeview {
-					 model: TemporalHierarchy.Model {
-					     h: TemporalHierarchy { root: bind currentAnimResource }
-					 }
+				     Tabview {
+					 tabs:
+					 [Tabview.Tab {
+					     title: "Inspector";
+					     content: inspector = Inspector {
+						 inspecting: bind inspector.inspect(temporalHierarchy.selectedTransform);
+					     }
+					  },
+					  Tabview.Tab {
+					     title: "Hierarchy"
+					     content:
+					     Treeview {
+						 model: TemporalHierarchy.Model {
+						     h: bind temporalHierarchy
+						 }
+					     }
+					 }]
 				     }
 				 }]
 			    }
@@ -581,8 +559,8 @@ public function run from (args is String[]) to ()
 								    0, 
 								    width,
 								    height-toolMenu.bounds.height())
-		    	height: 150, width: 820;
-			cx: 520, cy: 252;	   
+		    	height: 300, width: 820;
+			cx: 520, cy: 160;	   
 			      //imageLoader: null;
 			      content: ResizableStageNode {
 			    content: Tabview {
@@ -590,8 +568,13 @@ public function run from (args is String[]) to ()
 				[Tabview.Tab {
 				    title: "Timeline"
 				    content: trax = expr.timeline.Trax {
-				      target: player;
-				      targetNode: mainTimeLayer;
+					     target: player;
+					     targetNode: mainTimeLayer;
+					     temporalHierarchy: temporalHierarchy;
+					     removeClip: function from (clip is TimeNode) to ()
+					     {
+						 deleteAnimResource(clip)
+					     }
 				     }
 				 },
 				 Tabview.Tab {
@@ -607,7 +590,7 @@ public function run from (args is String[]) to ()
 			    }
 			      }
 		    }]
-		    },
+			},
 		    toolMenu, 
                     popupLayer]
                   }]
@@ -628,6 +611,13 @@ public function run from (args is String[]) to ()
 	}
 	println("camera={camera.tx}, {camera.ty}, {camera.tz}");
 	*/
+    }
+    function deleteAnimResource from (n is TimeNode) to () {
+	if (n is ResourceTimeNode) {
+	    const rn = n as ResourceTimeNode;
+	    delete n as ResourceTimeNode from currentAnimResource.resources;
+	    trax.setClips(currentAnimResource.resources);
+	}
     }
 
     function deleteResource from (n is Node) to () {

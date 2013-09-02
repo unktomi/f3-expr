@@ -50,6 +50,8 @@ public class ToolMenu is ResizableNode {
 
     public var onRewind is function from () to ();
 
+    public var onHideFloating is function from Boolean to ();
+
     const play is Button = Button {
         height: 18, width: 28;
 	baseURL: "{__DIR__}play"
@@ -76,8 +78,19 @@ public class ToolMenu is ResizableNode {
         height: 18, width: 28;
 	baseURL: "{__DIR__}sound"
     };
+    
+    const floaters = ToggleButton {
+        height: 18, width: 28;
+	baseURL: "{__DIR__}floaters"
+	onSelect: onHideFloating
+    };
 
-    function layout from (buttons is Button[]) to Node[] {
+    const fullScreen = Button {
+        height: 18, width: 28;
+	baseURL: "{__DIR__}fullScreen"
+    };
+
+    function layout from (buttons is ResizableNode[]) to Node[] {
 	foreach (b in buttons) {
 	    TransformNode {
 		tx: bind b.width * indexof b + 1;
@@ -86,7 +99,7 @@ public class ToolMenu is ResizableNode {
 	}
     }
     
-    var buttons = bind [record, rewind, play, loop, sound];
+    var buttons = bind [floaters, fullScreen, record, rewind, play, loop, sound];
 
     const box = Group {
 	content: bind layout(buttons);
