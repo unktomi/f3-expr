@@ -1,0 +1,8 @@
+package expr.prog;
+import Expression.Canvas;
+import Expression.Member;
+
+public class Program {
+    public var event is Member;
+    public var canvas is Canvas;
+}

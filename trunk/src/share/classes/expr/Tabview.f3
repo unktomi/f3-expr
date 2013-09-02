@@ -29,14 +29,18 @@ class TabImpl is TransformNode, MouseInputHandler, Focuser {
 	tabview.selectedIndex = tab.index;
     }
     override public function getTargetOfFocus to Focusable {
-	const r = if (tab.content is Focusable) then (tab.content as Focusable) else null;
-	println("target of focus => {r}");
+	const r = if (tab.content is Focuser) then (tab.content as Focuser).getTargetOfFocus() else null;
 	return r;
     }
 
 }
 
-public class Tabview is ResizableNode {
+public class Tabview is ResizableNode, Focuser {
+
+    override public function getTargetOfFocus to Focusable 
+    {
+	if (selectedTab.content is Focuser) then (selectedTab.content as Focuser).getTargetOfFocus() else null;
+    }
 
     override function resize from (w is Number, h is Number) to ()
     {
@@ -90,23 +94,21 @@ public class Tabview is ResizableNode {
 	minTabWidth = maxLabelWidth;
     }
 
-    const tabLabels = Group {
-	content: bind foreach (t in tabs) {
-	    TabImpl {
-		tabview: this;
-		tab: t;
-		tx: bind tabWidth * t.index
-		content: 
-		[Rectangle {
+    var tabLabels is TabImpl[] = bind foreach (t in tabs) {
+	TabImpl {
+	    tabview: this;
+	    tab: t;
+	    tx: bind tabWidth * t.index
+	    content: 
+	    [Rectangle {
 		    height: TAB_HEIGHT+2;
 		    width: bind tabWidth;
 		    fillPaint: bind if (t == selectedTab) then FG_PAINT else BG_PAINT;
 		    strokePaint: bind if (t == selectedTab) then FG_PAINT else TEXT_PAINT;
 		},
 		Group { content: bind labels[t.index] }]
-	    }
 	}
-    };
+    }
 	
     override var internalContent = TransformNode {
 	content:

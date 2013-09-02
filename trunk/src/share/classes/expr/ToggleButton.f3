@@ -6,7 +6,7 @@ import f3.media.input.*;
 
 public class ToggleButton is ResizableNode {
     public var baseURL is String;
-    public var selected is Boolean;
+    public var selected is Boolean = true;
     const hidden = Button {
         baseURL: bind "{baseURL}_hidden" 
 	onPress: function { selected = false; onSelect(selected); subject.onNext(selected) } 

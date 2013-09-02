@@ -49,6 +49,7 @@ public class ToolMenu is ResizableNode {
     }
 
     public var onRewind is function from () to ();
+    public var toggleLoop is function from () to ();
 
     public var onHideFloating is function from Boolean to ();
 
@@ -72,6 +73,7 @@ public class ToolMenu is ResizableNode {
     const loop is Button = Button {
         height: 18, width: 28;
 	baseURL: "{__DIR__}loop"
+	onPress: toggleLoop;
     };
 
     const sound = Button {

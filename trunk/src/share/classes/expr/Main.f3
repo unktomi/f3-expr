@@ -100,10 +100,11 @@ public function run from (args is String[]) to ()
 
     var playerUrl is String;
 
-    const mainTimeLayer = TimeLayer {
+    const mainTimeLayer = TimeGroup {
 	id: "Hierarchy";
 	content: bind currentAnimResource;
-	playCount: -1;
+	playRange: bind if (loop) then null else Interval { start: 0s, end: Duration.INDEFINITE };
+	playCount:  bind if (loop) then -1 else 1;
     }
 
     const player = Timeline {
@@ -202,7 +203,8 @@ public function run from (args is String[]) to ()
     }
 
     var trax is expr.timeline.Trax;
-    var inspector is Inspector;
+    var inspector1 is Inspector;
+    var inspector2 is Inspector;
     var currentTransform = bind transformHierarchy.selectedTransform;
     currentCamera = camera;
 
@@ -262,6 +264,8 @@ public function run from (args is String[]) to ()
 	scene: mainScene;
     }
 
+    var loop is Boolean = true;
+
     const toolMenu is expr.toolmenu.ToolMenu = expr.toolmenu.ToolMenu {
     	transform: bind translate(stage.width /2, stage.height - 10);
 	height: 20;
@@ -272,6 +276,7 @@ public function run from (args is String[]) to ()
 	{
 	    internalWindowsLayer.visible = b;
 	}
+	toggleLoop: function { loop = not loop; () }
     };
     
     var manip is expr.manipulator.Manipulator;
@@ -478,6 +483,16 @@ public function run from (args is String[]) to ()
 					 override function onMouseUp from (e is MouseEvent) to () 
 					 {
 					     var asset = (selectedTreenode as AssetTreenode).asset;
+					     if (asset is AssetTree.MaAsset) {
+						 const t = (asset as AssetTree.MaAsset).model.getTemporalRoot();
+						 if (t.bounds.duration() > 0s) {
+						     asset = AssetTree.ClipAsset {
+							 clip: t;
+							 url: asset.url;
+							 name: asset.name;
+						     }
+						 }
+					     }
 					     if (asset is AssetTree.ClipAsset) {
 						 const clip = (asset as AssetTree.ClipAsset).clip;
 						 for (j in getUnderMouseInEditor()) {
@@ -514,8 +529,8 @@ public function run from (args is String[]) to ()
 					 tabs:
 					 [Tabview.Tab {
 					     title: "Inspector";
-					     content: inspector = Inspector {
-						 inspecting: bind inspector.inspect(currentTransform);
+					     content: inspector1 = Inspector {
+						 inspecting: bind Inspector.inspect(currentTransform);
 					     }
 					  },
 					  Tabview.Tab {
@@ -524,6 +539,15 @@ public function run from (args is String[]) to ()
 					     Treeview {
 						 model: TransformHierarchy.Model {
 						     h: bind transformHierarchy;
+						 }
+						 override function onKeyDown from (e is KeyboardEvent) to ()
+						 {
+						     if (e.keyCode == Keys.Delete or
+							 e.keyCode == Keys.Backspace) {
+							 const toDelete = currentTransform;
+							 transformHierarchy.deleteSelection();
+							 deleteResource(toDelete);
+						     } else super.onKeyDown(e);
 						 }
 					     }
 					 }]
@@ -536,8 +560,8 @@ public function run from (args is String[]) to ()
 					 tabs:
 					 [Tabview.Tab {
 					     title: "Inspector";
-					     content: inspector = Inspector {
-						 inspecting: bind inspector.inspect(temporalHierarchy.selectedTransform);
+					     content: inspector2 = Inspector {
+						 inspecting: bind Inspector.inspect(temporalHierarchy.selectedTransform);
 					     }
 					  },
 					  Tabview.Tab {
@@ -546,6 +570,36 @@ public function run from (args is String[]) to ()
 					     Treeview {
 						 model: TemporalHierarchy.Model {
 						     h: bind temporalHierarchy
+						 }
+						 var dragger is TransformNode;
+						 var clip is TimeNode;
+						 override function onMouseDrag from (e is MouseEvent) to () {
+						     if (dragger == null) {
+							 clip = (selectedTreenode as TemporalHierarchy.Treenode).n;
+							 dragger = TransformNode {
+							     pickable: false;
+							     content: Group {
+								 transform: translate(-e.sceneLocation.x, 0);
+								 content: getDragCell();
+							     }
+							 }
+							 insert dragger into popupLayer.content;
+						     }
+						     dragger.tx = editorScene.mousePosition.x;
+						     dragger.ty = editorScene.mousePosition.y;
+						 }
+						 
+						 override function onMouseUp from (e is MouseEvent) to () 
+						 {
+						     for (j in getUnderMouseInEditor()) {
+							 if (j.node is Expression.Canvas) {
+							     (j.node as Expression.Canvas).onDrop(j, clip);
+							     break;
+							 }
+						     }
+						     delete dragger from popupLayer.content;
+						     clip = null;
+						     dragger = null;
 						 }
 					     }
 					 }]
@@ -559,7 +613,7 @@ public function run from (args is String[]) to ()
 								    0, 
 								    width,
 								    height-toolMenu.bounds.height())
-		    	height: 300, width: 820;
+		    	height: 305, width: 820;
 			cx: 520, cy: 160;	   
 			      //imageLoader: null;
 			      content: ResizableStageNode {
@@ -568,6 +622,7 @@ public function run from (args is String[]) to ()
 				[Tabview.Tab {
 				    title: "Timeline"
 				    content: trax = expr.timeline.Trax {
+					     loop: bind loop;
 					     target: player;
 					     targetNode: mainTimeLayer;
 					     temporalHierarchy: temporalHierarchy;
@@ -579,9 +634,9 @@ public function run from (args is String[]) to ()
 				 },
 				 Tabview.Tab {
 				    title: "Events"
-				    content: expr.prog.Expression.Canvas {
-					event: bind inspector.inspecting[inspector.selectedIndex].member;
-					 targetNode: bind currentTransform;
+				    content: expr.prog.Expression.Editor {
+					 event: bind inspector1.inspecting[inspector1.selectedIndex].member;
+					 targetNode: bind currentTransform as ResourceNode;
 					 targetSpace: bind mainScene.root;
 					 targetTime: bind mainTimeLayer;
 				    }

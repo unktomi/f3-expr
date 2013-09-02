@@ -1,10 +1,12 @@
 package expr;
 import f3.media.scene.*;
+import expr.prog.Program;
 
 public class ResourceNode is TransformNode {
     public var url is String;
     override var id = bind url;
     public var temporal is ResourceTimeNode;
+    public var programs is Program[];
 }
 
 public class MaResourceNode is ResourceNode {

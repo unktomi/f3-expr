@@ -4,7 +4,7 @@ import f3.media.scene.*;
 import f3.util.*;
 import f3.util.Observer.*;
 
-class Treenode is Treeview.Treenode {
+public class Treenode is Treeview.Treenode {
     public var n is TimeNode;
     override var label = bind if (n.id <> "") then n.id else "{n}";
     function asTimeGroup from (n is TimeNode) to TimeGroup { if (n is TimeGroup) then n as TimeGroup else null }
