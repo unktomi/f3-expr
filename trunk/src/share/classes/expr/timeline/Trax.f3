@@ -1,5 +1,6 @@
 package expr.timeline;
 import expr.*;
+import expr.Names.*;
 import f3.media.scene.*;
 import f3.media.scene.Shape2D.*;
 import f3.media.input.*;
@@ -114,7 +115,7 @@ class TimeNodeView is AbstractNode
 		     width: bind w;
 		     background: null;
 		     foreground: fg;
-		     text: bind target.id;
+		     text: bind formatName(target.id);
 		     font: bind timeNodeViewFont;
 		 },
 		 Rectangle is MouseInputHandler {
@@ -135,6 +136,7 @@ class TimeNodeView is AbstractNode
 	 }
     }
 }
+
 
 public class Playhead is AbstractNode 
 {
@@ -217,6 +219,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	    const d = if (loop and not target.paused and targetNode.contentBounds.duration() > 0s) event.rem(targetNode.bounds.start + targetNode.contentBounds.duration()) else event;
 	    currentFrame = (d.toMillis() / 1000) * frameRate;
 	    //println("currentFrame {event} => {currentFrame}");
+            refreshPlayhead();
 	    if (target.paused) {
 		playhead.x = frameToX(currentFrame);
 	    } else {
@@ -284,7 +287,10 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
     function autoScrollRight {
     }
 
-    public var currentFrame is Number on replace {
+    public var currentFrame is Number on replace { refreshPlayhead() }
+
+    function refreshPlayhead from () to () 
+    {
 	if (not playhead.dragging) {
 	    if (currentFrame < scrollOffset) {
 		scrollOffset = currentFrame;
@@ -449,7 +455,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	}
     }
 
-    function drawLines from (w is Number, h is Number, viewHeight is Number) to AbstractMesh {
+    function drawLines from (w is Number, h is Number, viewHeight is Number, offset is Number) to AbstractMesh {
 	println("TIMELINE={target} pp={pixelsPerFrame()}");
 	const x0 = -w / 2 + 15;
 	const y0 = Math.round(h / 2 - viewHeight-5);
@@ -519,7 +525,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
          MeshNode {
 	     id: "lines"
 	     pickable: false;
-	     override var mesh = bind getSelf().drawLines(getSelf().width, getSelf().height, getViewHeight());
+	     override var mesh = bind getSelf().drawLines(getSelf().width, getSelf().height, getViewHeight(), scrollOffset);
 	     shader: effectLoader.loadPaintShader(ColorPaint(Color.color(.75, .75, .75)));
 	 },
 	 TransformNode { 

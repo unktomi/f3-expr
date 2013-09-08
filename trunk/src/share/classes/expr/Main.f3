@@ -17,6 +17,76 @@ import expr.AssetTree.*;
 import expr.timeline.*;
 import expr.prog.*;
 
+public class InternalWindowState {
+    public var id is String;
+    public var cx is Number;
+    public var cy is Number;
+    public var width is Number;
+    public var height is Number;
+}
+
+public class EditorState {
+    public var windowWidth is Integer;
+    public var windowHeight is Integer;
+    public var internalWindows: InternalWindowState[];
+}
+
+
+function saveEditorState from (scene is Scene) to () {
+    var internalWindows is InternalWindowState[];
+    const f is function from ((), Node) to () 
+        = function from (_ is (), n is Node) to ()
+        {
+            if (n is InternalWindow) {
+                const w = n as InternalWindow;
+                insert InternalWindowState {
+                    id: w.id;
+                    cx: w.cx;
+                    cy: w.cy;
+                    width: w.width;
+                    height: w.height;
+                } into internalWindows;
+            }
+        };
+    scene.root.foldLeft((), f);
+    const w = new java.io.BufferedWriter(new java.io.FileWriter(".expr.editorstate"));
+    IO.writeObject(w, EditorState {
+            windowHeight: scene.stage.height;
+            windowWidth: scene.stage.width;
+            internalWindows: internalWindows;
+        });
+    w.flush();
+    w.close();
+}
+
+function loadEditorState from (scene is Scene) to () {
+    const file = new java.io.File(".expr.editorstate");
+    if (file.exists()) {
+        const s = IO.readObject(new java.io.BufferedReader(new java.io.FileReader(file))) as EditorState;
+        const f is function from ((), Node) to () 
+            = function from (_ is (), n is Node) to ()
+        {
+            if (n is InternalWindow) {
+                const w = n as InternalWindow;
+                for (x in s.internalWindows) {
+                    if (x.id == w.id) {
+                        w.cx = x.cx;
+                        w.cy = x.cy;
+                        w.width = x.width;
+                        w.height = x.height;
+                        break;
+                    }
+                }
+            }
+        };
+        scene.root.foldLeft((), f);
+        if (s.windowHeight <> 0 and s.windowWidth <> 0) {
+            (scene.stage as JoglStage).resizeWindow(s.windowWidth, s.windowHeight);
+        }
+    }
+}
+
+
 class CachedScene is Scene {
     public var scene is Scene;
     override var camera = Camera2D {tx: bind -scene.width/2, ty: bind -scene.height/2}
@@ -353,6 +423,13 @@ public function run from (args is String[]) to ()
     }
 
     var stage is JoglStage = JoglStage {
+        onClose: function from () to Boolean {
+            if (fileDirty()) {
+                save();
+            }
+            saveEditorState(editorScene);
+            return true;
+        }
         title: bind "{currentResource.url} {if (savePoint <> MasterUndoable.now) then " (Unsaved)" else ""}";
         menubar: Menu.Bar {
 	    menus: 
@@ -442,18 +519,31 @@ public function run from (args is String[]) to ()
 		      }
                   },
 		  editorScene = Scene {
+                    var lastTime is Long;
+                    override function update {
+                        const now = java.lang.System.currentTimeMillis();
+                        if (lastTime == 0) {
+                            loadEditorState(this);
+                            lastTime = now;
+                        } else if (now - lastTime > 2000) {
+                            saveEditorState(this);
+                            lastTime = now;
+                        }
+                        super.update();
+                    }
                     background: null;
                     camera: Camera2D {}; 
 		    override var content =
 		    [internalWindowsLayer = Group { content: 
 		      [InternalWindow {
+                        id: "Editor1";            
 			containerBounds: bind Bounds.boundsFromRect(0, 
-									0, 
-									width,
-									height-toolMenu.bounds.height())
+                                                                    0, 
+                                                                    width,
+                                                                    height-toolMenu.bounds.height())
 		    	height: 400, width: 300;
 			cx: 160, cy: 800-300;	   
-//			    content: ResizableStageNode {
+			    content: ResizableStageNode {
 			    
 			      content: Tabview {
 				tabs: 
@@ -461,6 +551,7 @@ public function run from (args is String[]) to ()
 				     title: "Assets";
 				     content:
                                      Scrollpane { 
+                                         canZoomVertical: false;
                                          content: Treeview {
 					 model: AssetTree.AssetModel {
 					     resources: bind currentResource;
@@ -526,13 +617,17 @@ public function run from (args is String[]) to ()
 					 tabs:
 					 [Tabview.Tab {
 					     title: "Inspector";
-					     content: inspector1 = Inspector {
-						 inspecting: bind Inspector.inspect(currentTransform);
-					     }
+                                                 content: Scrollpane {
+                                                     canZoomVertical: false;
+                                                     content: inspector1 = Inspector {
+                                                         inspecting: bind Inspector.inspect(currentTransform);
+                                                     }
+                                                 }
 					  },
 					  Tabview.Tab {
 					     title: "Hierarchy"
                                              content: Scrollpane {
+                                                  canZoomVertical: false;
                                                   content:
                                                   Treeview {
                                                       model: TransformHierarchy.Model {
@@ -559,14 +654,18 @@ public function run from (args is String[]) to ()
                                              tabs:
                                              [Tabview.Tab {
                                                      title: "Inspector";
-                                                     content: inspector2 = Inspector {
-                                                         inspecting: bind Inspector.inspect(temporalHierarchy.selectedTransform);
+                                                     content: Scrollpane {
+                                                         canZoomVertical: false;
+                                                         content: inspector2 = Inspector {
+                                                             inspecting: bind Inspector.inspect(temporalHierarchy.selectedTransform);
+                                                         }
                                                      }
                                                  },
                                                  Tabview.Tab {
                                                      title: "Hierarchy";
                                                      content:
                                                      Scrollpane {
+                                                         canZoomVertical: false;
                                                          content:
                                                          Treeview {
                                                              model: TemporalHierarchy.Model {
@@ -608,9 +707,10 @@ public function run from (args is String[]) to ()
                                      }
 				 }]
 			    }
-			 //}
+			 }
 		     },
 		     InternalWindow {
+                        id: "Editor2";            
 			containerBounds: bind Bounds.boundsFromRect(0, 
 								    0, 
 								    width,
@@ -765,6 +865,7 @@ public function run from (args is String[]) to ()
 
     stage.invoke(function {
 	    //viewer.focusCamera(currentTransform);
+            
 	});
 
 }

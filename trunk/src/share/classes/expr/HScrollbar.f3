@@ -13,6 +13,7 @@ public class HScrollbar is ResizableNode {
 
     public var tx is Number;
     public var sx is Number = 1.0;
+    public var canZoom is Boolean = true;
 
     var bg is Paint = ColorPaint(Color.color(.80, .80, .80));
     var fg is Paint = ColorPaint(Color.color(.56, .56, .56));
@@ -47,7 +48,9 @@ public class HScrollbar is ResizableNode {
             const thumbx2 = thumbx1 + sx * width;
             dragType = 0;
             println("PRESS {x}, thumb: {thumbx1}..{thumbx2}");
-            if (x > thumbx1 and x < thumbx2) {
+            if (not canZoom) {
+                dragType = PAN;
+            } else if (x > thumbx1 and x < thumbx2) {
                 if (x < thumbx1 + height) {
                     // left zoom
                     dragType = LEFT_ZOOM;
@@ -118,10 +121,12 @@ public class HScrollbar is ResizableNode {
                      content: bind thumbMesh;
                  },
                  TransformNode {
+                     visible: bind canZoom;
                      tx: bind -sx*thumbWidth/2 + height;
                      content: bind line1;
                  },
                  TransformNode {
+                     visible: bind canZoom;
                      tx: bind sx*thumbWidth/2 - height;
                      content: bind line2;
                  }]
