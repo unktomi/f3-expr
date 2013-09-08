@@ -837,17 +837,18 @@ public class LinkInfo {
 class Holder is Group, Scissored {
 }
 
-public class Canvas is ResizableNode {
+public class Canvas is ResizableNode, Focusable, KeyboardInputHandler {
 
     public function onDrop from (where is Pick, clip is TimeNode) to ()
     {
-	println("ON DROP {where} {clip}");
+	println("ON DROP {where.scenePoint}, {where.dragPoint1} {clip}");
 	const typ = Reflect.getType(clip.getClass().getName());
 	const members = introspect(typ);
 	for (m in members where not m.isObservable and m.isObserver) {
 	    println(m);
 	}
 	insert ObjectView {
+	    pos: toLocal * where.scenePoint;
 	    expression: TimeNodeExpression { timeNode: clip, override function getType to F3Type { typ }}
 	    canvas: this;
 	    inputs: foreach (m in members where not m.isObservable and m.isObserver and m.t == UNIT_TYPE) m;
@@ -917,17 +918,15 @@ public class Canvas is ResizableNode {
 	unsubscribe();
     }
 
-    var rootView is Node = Group { content: bind makeGetter(event) };
+    var rootView is Node = TransformNode { tx: bind -width / 2.0 + 120, content: bind makeGetter(event) };
 
     var varRoot is GetVar;
 
     function makeGetter from (event is Member) to GetVarView {
 	if (event == null) then null else {
-		reset();
 		var r = GetVarView {
 		    parent: rootView;
 		    canvas: this;
-		    pos: new Point3(-width/2+120, 0, 0);
 		    get: varRoot = GetVar {
 			member: event;
 		    }
@@ -1315,7 +1314,9 @@ public class Canvas is ResizableNode {
     }
 }
 
-public class Editor is ResizableNode {
+public class Editor is ResizableNode, Focuser {
+
+    override public function getTargetOfFocus to Focusable { canvas }
 
     public var targetNode is ResourceNode;
     public var event is Member;

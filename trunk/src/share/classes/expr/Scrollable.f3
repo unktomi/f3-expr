@@ -1,0 +1,10 @@
+package expr;
+
+public interface Scrollable {
+    public bound function getTx to Number { 0.0 }
+    public bound function getSx to Number { 1.0 }
+    public bound function getTy to Number { 0.0 }
+    public bound function getSy to Number { 1.0 }
+    public abstract function setX from (tx is Number, sx is Number) to ();
+    public abstract function setY from (ty is Number, sy is Number) to ();
+}

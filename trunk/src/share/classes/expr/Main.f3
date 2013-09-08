@@ -43,8 +43,8 @@ class ResizableStageNode is ResizableNode, Focuser {
     }
     override function resize from (w0 is Number, h0 is Number) to ()
     {
-	const w = Math.round(w0);
-	const h = Math.round(h0);
+	const w = Math.round(w0+1);
+	const h = Math.round(h0+1);
 	super.resize(w, h);
 	content.resize(w, h);
 	stage.resize(w as Integer, h as Integer);
@@ -144,7 +144,7 @@ public function run from (args is String[]) to ()
     function addTimeResource from (rn is ResourceTimeNode) to ()
     {
 	insert rn into currentAnimResource.resources;
-	trax.setClips(currentAnimResource.resources);
+	//trax.setClips(currentAnimResource.resources);
 	trax.selectClip(rn);
     }
 
@@ -265,6 +265,7 @@ public function run from (args is String[]) to ()
     }
 
     var loop is Boolean = true;
+    var full is Boolean = false;
 
     const toolMenu is expr.toolmenu.ToolMenu = expr.toolmenu.ToolMenu {
     	transform: bind translate(stage.width /2, stage.height - 10);
@@ -277,6 +278,7 @@ public function run from (args is String[]) to ()
 	    internalWindowsLayer.visible = b;
 	}
 	toggleLoop: function { loop = not loop; () }
+	toggleFullscreen: function { full = not full; stage.setFullscreen(full) }
     };
     
     var manip is expr.manipulator.Manipulator;
@@ -333,7 +335,7 @@ public function run from (args is String[]) to ()
 		j.playCount = i.playCount;
 	    }
 	}
-	trax.setClips(currentAnimResource.resources);
+	//trax.setClips(currentAnimResource.resources);
 	MasterUndoable.reset();
 	MasterUndoable.commit();
 	savePoint = MasterUndoable.now;
@@ -451,14 +453,15 @@ public function run from (args is String[]) to ()
 									height-toolMenu.bounds.height())
 		    	height: 400, width: 300;
 			cx: 160, cy: 800-300;	   
-			    content: ResizableStageNode {
+//			    content: ResizableStageNode {
 			    
 			      content: Tabview {
 				tabs: 
 				[Tabview.Tab {
 				     title: "Assets";
 				     content:
-				     Treeview {
+                                     Scrollpane { 
+                                         content: Treeview {
 					 model: AssetTree.AssetModel {
 					     resources: bind currentResource;
 					 }
@@ -470,7 +473,7 @@ public function run from (args is String[]) to ()
 						 dragger = TransformNode {
 						     pickable: false;
 						     content: Group {
-							 transform: translate(-e.sceneLocation.x, 0);
+							 //transform: translate(-e.sceneLocation.x, 0);
 							 content: getDragCell();
 						     }
 						 }
@@ -487,32 +490,25 @@ public function run from (args is String[]) to ()
 						 const t = (asset as AssetTree.MaAsset).model.getTemporalRoot();
 						 if (t.bounds.duration() > 0s) {
 						     asset = AssetTree.ClipAsset {
-							 clip: t;
+							 override function getClip to TimeNode { t }
 							 url: asset.url;
 							 name: asset.name;
 						     }
 						 }
 					     }
 					     if (asset is AssetTree.ClipAsset) {
-						 const clip = (asset as AssetTree.ClipAsset).clip;
+						 const clip = (asset as AssetTree.ClipAsset).getClip();
 						 for (j in getUnderMouseInEditor()) {
 						     println("j={j.node}");
 						     if (j.node is Trax) { 
-							 const t = ResourceTimeNode {
-							     url: asset.name;
-							     content: clip;
-							 }
+							 const t = 
+							     if (not (clip is ResourceTimeNode)) 
+								 then ResourceTimeNode {
+								     url: asset.url;
+								     content: clip;
+								 } else clip as ResourceTimeNode;
 							 addTimeResource(t);
 							 (j.node as Trax).onDrop(j, t);
-							 break;
-						     } else if (j.node is Expression.Canvas) {
-							 const t = ResourceTimeNode {
-							     url: asset.name;
-							     id: asset.name;
-							     content: clip;
-							 }
-							 addTimeResource(t);
-							 (j.node as Expression.Canvas).onDrop(j, t);
 							 break;
 						     }
 						 }
@@ -520,7 +516,8 @@ public function run from (args is String[]) to ()
 					     delete dragger from popupLayer.content;
 					     dragger = null;
 					 }
-				     }
+				       }
+                                     }
 				 },
 				 Tabview.Tab {
 				     title: "Spatial";
@@ -535,78 +532,83 @@ public function run from (args is String[]) to ()
 					  },
 					  Tabview.Tab {
 					     title: "Hierarchy"
-					     content:
-					     Treeview {
-						 model: TransformHierarchy.Model {
-						     h: bind transformHierarchy;
-						 }
-						 override function onKeyDown from (e is KeyboardEvent) to ()
-						 {
-						     if (e.keyCode == Keys.Delete or
-							 e.keyCode == Keys.Backspace) {
-							 const toDelete = currentTransform;
-							 transformHierarchy.deleteSelection();
-							 deleteResource(toDelete);
-						     } else super.onKeyDown(e);
-						 }
-					     }
+                                             content: Scrollpane {
+                                                  content:
+                                                  Treeview {
+                                                      model: TransformHierarchy.Model {
+                                                          h: bind transformHierarchy;
+                                                      }
+                                                      override function onKeyDown from (e is KeyboardEvent) to ()
+                                                      {
+                                                          if (e.keyCode == Keys.Delete or
+                                                              e.keyCode == Keys.Backspace) {
+                                                              const toDelete = currentTransform;
+                                                              transformHierarchy.deleteSelection();
+                                                              deleteResource(toDelete);
+                                                          } else super.onKeyDown(e);
+                                                      }
+                                                  }
+                                              }
 					 }]
 				     }
 				 },
 				 Tabview.Tab {
 				     title: "Temporal";
 				     content:
-				     Tabview {
-					 tabs:
-					 [Tabview.Tab {
-					     title: "Inspector";
-					     content: inspector2 = Inspector {
-						 inspecting: bind Inspector.inspect(temporalHierarchy.selectedTransform);
-					     }
-					  },
-					  Tabview.Tab {
-					     title: "Hierarchy"
-					     content:
-					     Treeview {
-						 model: TemporalHierarchy.Model {
-						     h: bind temporalHierarchy
-						 }
-						 var dragger is TransformNode;
-						 var clip is TimeNode;
-						 override function onMouseDrag from (e is MouseEvent) to () {
-						     if (dragger == null) {
-							 clip = (selectedTreenode as TemporalHierarchy.Treenode).n;
-							 dragger = TransformNode {
-							     pickable: false;
-							     content: Group {
-								 transform: translate(-e.sceneLocation.x, 0);
-								 content: getDragCell();
-							     }
-							 }
-							 insert dragger into popupLayer.content;
-						     }
-						     dragger.tx = editorScene.mousePosition.x;
-						     dragger.ty = editorScene.mousePosition.y;
-						 }
-						 
-						 override function onMouseUp from (e is MouseEvent) to () 
-						 {
-						     for (j in getUnderMouseInEditor()) {
-							 if (j.node is Expression.Canvas) {
-							     (j.node as Expression.Canvas).onDrop(j, clip);
-							     break;
-							 }
-						     }
-						     delete dragger from popupLayer.content;
-						     clip = null;
-						     dragger = null;
-						 }
-					     }
+                                         Tabview {
+                                             tabs:
+                                             [Tabview.Tab {
+                                                     title: "Inspector";
+                                                     content: inspector2 = Inspector {
+                                                         inspecting: bind Inspector.inspect(temporalHierarchy.selectedTransform);
+                                                     }
+                                                 },
+                                                 Tabview.Tab {
+                                                     title: "Hierarchy";
+                                                     content:
+                                                     Scrollpane {
+                                                         content:
+                                                         Treeview {
+                                                             model: TemporalHierarchy.Model {
+                                                                 h: bind temporalHierarchy
+                                                                     }
+                                                             var dragger is TransformNode;
+                                                             var clip is TimeNode;
+                                                             override function onMouseDrag from (e is MouseEvent) to () {
+                                                                 if (dragger == null) {
+                                                                     clip = (selectedTreenode as TemporalHierarchy.Treenode).n;
+                                                                     dragger = TransformNode {
+                                                                         pickable: false;
+                                                                         content: Group {
+                                                                             transform: translate(-e.sceneLocation.x, 0);
+                                                                             content: getDragCell();
+                                                                         }
+                                                                     }
+                                                                     insert dragger into popupLayer.content;
+                                                                 }
+                                                                 dragger.tx = editorScene.mousePosition.x;
+                                                                 dragger.ty = editorScene.mousePosition.y;
+                                                             }
+                                                             
+                                                             override function onMouseUp from (e is MouseEvent) to () 
+                                                             {
+                                                                 for (j in getUnderMouseInEditor()) {
+                                                                     if (j.node is Expression.Canvas) {
+                                                                         (j.node as Expression.Canvas).onDrop(j, clip);
+                                                                         break;
+                                                                     }
+                                                                 }
+                                                                 delete dragger from popupLayer.content;
+                                                                 clip = null;
+                                                                 dragger = null;
+                                                             }
+                                                         }
+                                                     }
 					 }]
-				     }
+                                     }
 				 }]
 			    }
-			 }
+			 //}
 		     },
 		     InternalWindow {
 			containerBounds: bind Bounds.boundsFromRect(0, 
@@ -621,16 +623,19 @@ public function run from (args is String[]) to ()
 				tabs: 
 				[Tabview.Tab {
 				    title: "Timeline"
-				    content: trax = expr.timeline.Trax {
-					     loop: bind loop;
-					     target: player;
-					     targetNode: mainTimeLayer;
-					     temporalHierarchy: temporalHierarchy;
-					     removeClip: function from (clip is TimeNode) to ()
-					     {
-						 deleteAnimResource(clip)
-					     }
-				     }
+				    content: Scrollpane {
+                                             content: trax = expr.timeline.Trax {
+                                                 clips: bind currentAnimResource.resources;
+                                                 loop: bind loop;
+                                                 target: player;
+                                                 targetNode: mainTimeLayer;
+                                                 temporalHierarchy: temporalHierarchy;
+                                                 removeClip: function from (clip is TimeNode) to ()
+                                                 {
+                                                     deleteAnimResource(clip);
+                                                 }
+                                             }
+                                         }
 				 },
 				 Tabview.Tab {
 				    title: "Events"
@@ -671,7 +676,7 @@ public function run from (args is String[]) to ()
 	if (n is ResourceTimeNode) {
 	    const rn = n as ResourceTimeNode;
 	    delete n as ResourceTimeNode from currentAnimResource.resources;
-	    trax.setClips(currentAnimResource.resources);
+	    //trax.setClips(currentAnimResource.resources);
 	}
     }
 
@@ -681,7 +686,7 @@ public function run from (args is String[]) to ()
 	    delete n as ResourceNode from currentResource.resources;
 	    if (rn.temporal <> null) {
 		delete rn.temporal from currentAnimResource.resources;
-		trax.setClips(currentAnimResource.resources);
+		//trax.setClips(currentAnimResource.resources);
 	    }
 	}
     }

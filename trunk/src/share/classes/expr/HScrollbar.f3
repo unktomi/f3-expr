@@ -1,0 +1,130 @@
+package expr;
+import f3.media.input.*;
+import f3.media.scene.*;
+import f3.media.scene.Shape2D.*;
+import f3.math.LinearMath.*;
+import java.lang.Math;
+
+const LEFT_ZOOM = 1;
+const RIGHT_ZOOM = 2;
+const PAN = 3;
+
+public class HScrollbar is ResizableNode {
+
+    public var tx is Number;
+    public var sx is Number = 1.0;
+
+    var bg is Paint = ColorPaint(Color.color(.80, .80, .80));
+    var fg is Paint = ColorPaint(Color.color(.56, .56, .56));
+    var outline is Paint = ColorPaint(Color.color(.26, .26, .26));
+
+    public function setRect from (tx is Number, sx is Number) to ()
+    {
+        this.tx = tx;
+        this.sx = sx;
+    }
+
+    var dragType is Integer;
+
+    const self = this;
+
+    const run is Rectangle = Rectangle is MouseInputHandler {
+        height: bind height;
+        width: bind width;
+        fillPaint: bind bg;
+        //strokePaint: bind outline;
+
+        var dx = 0.0;
+        var tx0 = 0.0;
+        var x0 = 0.0;
+        var w0 = 0.0;
+
+        override function onMouseDown from (e is MouseEvent) to ()
+        {
+            const x = e.location.x + width/2;
+            const tx = self.tx * width;
+            const thumbx1 = tx;
+            const thumbx2 = thumbx1 + sx * width;
+            dragType = 0;
+            println("PRESS {x}, thumb: {thumbx1}..{thumbx2}");
+            if (x > thumbx1 and x < thumbx2) {
+                if (x < thumbx1 + height) {
+                    // left zoom
+                    dragType = LEFT_ZOOM;
+                } else if (x >= thumbx2 - height) {
+                    // right zoom
+                    dragType = RIGHT_ZOOM;
+                } else {
+                    // pan
+                    dragType = PAN;
+                }
+            }
+            dx = 0.0;
+            tx0 = self.tx;
+            x0 = tx0 * width;
+            w0 = self.sx * width;
+        }
+
+        override function onMouseDrag from (e is MouseEvent) to ()
+        {
+            dx += e.drag.x;
+            var tx = tx0 * width + dx;
+            var sx = ((x0 + w0) - tx) / width;
+            if (dragType == LEFT_ZOOM) {
+            } else if (dragType == RIGHT_ZOOM) {
+                tx = self.tx;
+                sx = (w0+dx)/width;
+            } else if (dragType == PAN) {
+                sx = self.sx;
+            }
+            tx = Math.min(Math.max(0, tx / width), 1.0-sx);  
+            //tx = Math.round(1000*tx)/1000;
+            //sx = Math.round(1000*sx)/1000;
+            println("hsb: tx={tx} sx={sx}");
+            setRect(tx, sx);
+        }
+    }
+
+    var thumbWidth = bind width-4;
+
+    const thumbMesh = Rectangle {
+        height: bind height-4;
+        width: bind thumbWidth;
+        arcWidth: bind height-2;
+        arcHeight: bind height-2;
+        fillPaint: bind fg;
+        pickable: no;
+    };
+
+    const line1 = Path {
+        content: bind [MoveTo { x: 0, y: height/2}, LineTo { x: 0, y: -height/2}];
+        strokePaint: bind bg;
+    }
+
+    const line2 = Path {
+        content: bind [MoveTo { x: 0, y: height/2}, LineTo { x: 0, y: -height/2}];
+        strokePaint: bind bg;
+    };
+    
+    override var internalContent = Group {
+        content: bind 
+        [run, 
+         TransformNode {
+                visible: bind sx <> 1.0 or tx <> 0
+                tx: bind tx * width - width / 2.0 + (sx * width) / 2.0;
+                content:
+                [TransformNode {
+                     sx: bind sx;
+                     content: bind thumbMesh;
+                 },
+                 TransformNode {
+                     tx: bind -sx*thumbWidth/2 + height;
+                     content: bind line1;
+                 },
+                 TransformNode {
+                     tx: bind sx*thumbWidth/2 - height;
+                     content: bind line2;
+                 }]
+            }]
+    };
+}

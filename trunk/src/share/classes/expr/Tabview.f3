@@ -29,8 +29,7 @@ class TabImpl is TransformNode, MouseInputHandler, Focuser {
 	tabview.selectedIndex = tab.index;
     }
     override public function getTargetOfFocus to Focusable {
-	const r = if (tab.content is Focuser) then (tab.content as Focuser).getTargetOfFocus() else null;
-	return r;
+	if (tab.content is Focuser) then (tab.content as Focuser).getTargetOfFocus() else null;
     }
 
 }

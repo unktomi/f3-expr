@@ -2,6 +2,7 @@ package expr;
 import expr.Treeview.*;
 import f3.media.scene.*;
 import expr.ResourceNode.*;
+import f3.math.*;
 
 public abstract class Asset {
     public var url is String;
@@ -13,8 +14,16 @@ public class MaAsset is Asset {
     public const model is Ma.Model;
     override var url = bind model.url;
     override var containedAssets = bind 
-	[foreach (cam in model.getCameras()) CameraAsset { name: cam.id, camera: cam  },
-	 foreach (clipLib in model.getClipLibraries()) ClipLibraryAsset { name: clipLib.id, clipLibrary: clipLib }];
+	[foreach (cam in model.getCameras()) CameraAsset { 
+		url: "{url}#{cam.id}";
+		name: cam.id; 
+		camera: cam;
+	 },
+	 foreach (clipLib in model.getClipLibraries()) ClipLibraryAsset { 
+	     url: "{url}#{clipLib.id}";
+	     name: clipLib.id;
+	     clipLibrary: clipLib;
+	 }];
 }
 
 public class CameraAsset is Asset {
@@ -22,13 +31,32 @@ public class CameraAsset is Asset {
 }
 
 public class ClipAsset is Asset {
-    public const clip is TimeNode;
+    public function getClip to TimeNode { null }
 }
 
 public class ClipLibraryAsset is Asset {
     public const clipLibrary is TimeGroup;
-    override var containedAssets = bind foreach (c in clipLibrary.content) ClipAsset { name: c.id, clip: c };
+    override var containedAssets = bind foreach (c in clipLibrary.content) makeClipAsset(c);
+    function makeClipAsset from (c is TimeNode) to ClipAsset {
+	ClipAsset { 
+	    url: "{url}#{c.id}";
+	    name: c.id; 
+	    override function getClip to TimeNode { c } 
+	}
+    }
 }
+
+public class TransitionLayerAsset is ClipAsset {
+    override var name = "Transition Layer";
+    override var url = "node://TransitionLayer";
+    override public function getClip to TimeNode {
+	TransitionLayer {
+	    id: "Transition Layer";
+	    playRange: Interval { start: 0s, end: Duration.INDEFINITE }
+	}
+    }
+}
+
 
 public class ImageAsset is Asset {
 }
@@ -37,10 +65,6 @@ public class WebAsset is Asset {
 }
 
 public class SVGAsset is Asset {
-}
-
-public class TransitionLayerAsset is Asset {
-    override var name = "Transition Layer";
 }
 
 public class TimeLayerAsset is Asset {
@@ -86,7 +110,8 @@ public class AssetModel is Treemodel {
     override var root = AssetTreenode {
 	asset: Asset {
 	    name: "Assets";
-	    containedAssets: bind foreach (r in resources.resources) makeAsset(r);
+	    containedAssets: bind 
+	    [TransitionLayerAsset{}, foreach (r in resources.resources) makeAsset(r)]
 	}
     }
 }
