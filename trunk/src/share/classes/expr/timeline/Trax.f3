@@ -312,7 +312,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 
     bound function durationToFrame from (d is Duration) to Number
     {
-	(d / 1s) * frameRate
+	Math.round((d / 1s) * frameRate);
     }
 
     bound function frameToDuration from (frames is Number) to Duration {
@@ -332,7 +332,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 
     bound function xToFrame from (x is Number) to Number
     {
-	(x / pixelsPerFrame());
+	Math.round(x / pixelsPerFrame());
     }
 
     bound function durationToX from (d0 is Duration) to Number
@@ -394,7 +394,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
     }
 
     function targetSx from (dur is Duration, bounds is Interval) to Number {
-        if (0s == bounds.end) then 1.0 else dur/bounds.end;
+        if (0s == bounds.end) then 1.0 else dur/(dur + bounds.end);
     }
     override public function setY from (tx is Number, sx is Number) to ()
     {
@@ -465,7 +465,11 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	lineMesh.reset();
 	lineMesh.moveTo(x, y);
         var pp is Integer = pixelsPerFrame();
-	for (i in [0..<w step pp]) {
+        var off0 = offset mod 10;
+	var off = (offset - off0);
+        off0 *= pp;
+        x -= off0;
+	for (i in [0..(w+off0) step pp]) {
 	    var n = if (mid) then 3 else 5;
 	    mid = not mid;
 	    lineMesh.moveTo(x+i, y);
@@ -473,7 +477,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	}
 	for (i in [0..<h step pp]) {
 	    lineMesh.moveTo(x, y);
-	    lineMesh.lineTo(x + width-pp, y);
+	    lineMesh.lineTo(x + off0+width-pp, y);
 	    y -= viewHeight;
 	    println("y={y}");
 	}
