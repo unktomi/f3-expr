@@ -8,6 +8,9 @@ public class Scrollpane is ResizableNode {
 
     public var content is ResizableNode;
 
+    public var canZoomVertical is Boolean = true;
+    public var canZoomHorizontal is Boolean = true;
+
     function findScrollable {
         var r is Scrollable = null;
         const f is function from ((), Node) to () 
@@ -56,6 +59,7 @@ public class Scrollpane is ResizableNode {
             tx: bind width/2 - W / 2;
             ty: bind H/2
             content: VScrollbar {
+                canZoom: bind canZoomVertical;
                 width: W;
                 height: bind height-H;
                 ty: bind currentScrollable.getTy();
@@ -72,6 +76,7 @@ public class Scrollpane is ResizableNode {
             ty: bind -height/2 + H / 2;
             tx: bind -W/2
             content: HScrollbar {
+                canZoom: bind canZoomHorizontal;
                 height: H;
                 width: bind width-W;
                 tx: bind currentScrollable.getTx();

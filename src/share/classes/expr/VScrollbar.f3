@@ -9,6 +9,7 @@ import java.lang.Math;
 public class VScrollbar is ResizableNode {
     public var ty is Number;
     public var sy is Number;
+    public var canZoom is Boolean = true;
     public function setRect from (ty is Number, sy is Number) to ()
     {
         this.ty = ty;
@@ -16,6 +17,7 @@ public class VScrollbar is ResizableNode {
     }
     const hsb = this;
     override var internalContent = HScrollbar {
+        canZoom: bind canZoom;
         override var transform = bind rotate(-90, Vec3.Z_AXIS);
         height: bind width;
         width: bind height;

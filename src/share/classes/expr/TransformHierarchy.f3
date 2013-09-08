@@ -3,10 +3,11 @@ import expr.undo.*;
 import f3.media.scene.*;
 import f3.util.*;
 import f3.util.Observer.*;
+import expr.Names.*;
 
 class Treenode is Treeview.Treenode {
     public var n is Node;
-    override var label = bind if (n.id <> "") then n.id else "{n}";
+    override var label = bind if (n.id <> "") then formatName(n.id) else "{n}";
     function asGroup from (n is Node) to Group { if (n is Group) then n as Group else null }
     override var canOpen = bind { var g = asGroup(n); g.content.size() > 0 }
     override var children = bind foreach (x in (n as Group).content) Treenode { n: bind x };

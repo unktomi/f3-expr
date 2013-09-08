@@ -176,7 +176,25 @@ class DurationField is SliderField {
     }
 }
 
-public class Inspector is ResizableNode, Focusable, KeyboardInputHandler {
+public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scrollable {
+    override public bound function getTx to Number { 0.0 }
+    override public bound function getSx to Number { 1.0 }
+    override public bound function getTy to Number 
+    { 
+        low / ((inspecting.size()+1) as Number);
+    }
+    override public bound function getSy to Number 
+    { 
+        Math.min(visibleRows / ((inspecting.size()+1) as Number), 1.0);
+    }
+    override public function setX from (tx is Number, sx is Number) to ()
+    {
+    }
+    override public function setY from (ty is Number, sy is Number) to ()
+    {
+        low = Math.round(ty * inspecting.size()) as Integer;
+    }
+
     public var inspecting is (Inspected of ?)[];
     public var selectedIndex is Integer on replace {
 	if (selectedIndex < low) {

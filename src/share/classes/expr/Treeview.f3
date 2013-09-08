@@ -265,7 +265,7 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
 
     function scroll from (amount is Integer) to ()
     {
-	scrollOffset = Math.max(0, Math.min(scrollOffset + amount, model.rowCount-1 - visibleRows));
+	scrollOffset = Math.max(0, Math.min(scrollOffset + amount, model.rowCount - visibleRows));
     }
 
     bound function closeArrow from (p is Paint) to Node { 
@@ -433,7 +433,7 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
     }
     override public bound function getSy to Number 
     { 
-        Math.min(visibleRows / ((1+model.rowCount) as Number), 1.0);
+        Math.min(visibleRows / ((model.rowCount) as Number), 1.0);
     }
     override public function setX from (tx is Number, sx is Number) to ()
     {
