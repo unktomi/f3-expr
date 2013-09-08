@@ -201,7 +201,7 @@ public class Playhead is AbstractNode
     const up = observeMouseUp().subscribe(onUp);
 }
 
-public class Trax is ResizableNode, Focusable, KeyboardInputHandler {
+public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable {
 
     public function onDrop from (where is Pick, clip is TimeNode) to ()
     {
@@ -215,7 +215,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler {
     const onPlayhead = DefaultObserver of Duration {
 	override function onNext from (event is Duration) to () {
 	    const d = if (loop and not target.paused and targetNode.contentBounds.duration() > 0s) event.rem(targetNode.bounds.start + targetNode.contentBounds.duration()) else event;
-	    currentFrame = Math.round((d.toMillis() / 1000) * frameRate) as Integer;
+	    currentFrame = (d.toMillis() / 1000) * frameRate;
 	    //println("currentFrame {event} => {currentFrame}");
 	    if (target.paused) {
 		playhead.x = frameToX(currentFrame);
@@ -248,7 +248,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler {
 	new Interval(frameToDuration(scrollOffset), 
 		     frameToDuration(scrollOffset+visibleFrameCount));
 
-    var clips is TimeNode[] on replace deleted[i..j] = inserted {
+    public var clips is TimeNode[] on replace deleted[i..j] = inserted {
 	for (x in deleted[i..j]) {
 	    undoList.removeTarget(&x.playTime);
 	    undoList.removeTarget(&x.pickable);
@@ -257,11 +257,9 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler {
 	    undoList.addTarget("{x.id}.playtime", &x.playTime);
 	    undoList.addTarget("{x.id}.pickable", &x.pickable);
 	}
-    }
+    };
 
-    public function setClips from (clips is TimeNode[]) to ()
-    {
-        this.clips = clips;
+    override function update {
 	for (t in timeNodeViews) t.row = indexof t;
     }
 
@@ -272,7 +270,8 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler {
 	foreach (t in content) makeTimeNodeView(null, t)
     }
 
-    var frameRate is Integer = 24;
+    var frameRate is Number = bind Math.round(frameRateN);
+    var frameRateN is Number = 24.0;
 
     const lineMesh = LineMesh {};
     const backgroundColor is Color = Color.color(0.90, 0.90, 0.90);
@@ -285,7 +284,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler {
     function autoScrollRight {
     }
 
-    public var currentFrame is Integer on replace {
+    public var currentFrame is Number on replace {
 	if (not playhead.dragging) {
 	    if (currentFrame < scrollOffset) {
 		scrollOffset = currentFrame;
@@ -303,52 +302,55 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler {
     
     const PIXELS_PER_FRAME = 10;
     
-    var visibleFrameCount is Integer = bind Math.round((width-10) / PIXELS_PER_FRAME) as Integer;
+    var visibleFrameCount is Number = bind (width-10) / pixelsPerFrame();
 
-    function durationToFrame from (d is Duration) to Integer 
+    bound function durationToFrame from (d is Duration) to Number
     {
-	Math.round((d / 1s) * frameRate) as Integer;
+	(d / 1s) * frameRate
     }
 
-    function frameToDuration from (frames is Integer) to Duration {
+    bound function frameToDuration from (frames is Number) to Duration {
 	(1s / frameRate) * frames
     }
     
-    function frameTo from (d is Duration) to Duration {
-	const seconds = d / 1s;
-	const frames = Math.round(seconds * frameRate);
+    bound function frameTo from (d is Duration) to Duration {
+	var seconds = d / 1s;
+	var frames = Math.round((seconds * frameRate));
 	return (1s / frameRate) * frames;
     }
 
-    function xToDuration from (x is Number) to Duration
+    bound function xToDuration from (x is Number) to Duration
     {
-	1s * x / (10 * frameRate);
+	1s * x / (pixelsPerFrame() * frameRate);
     }
 
-    function xToFrame from (x is Number) to Integer
+    bound function xToFrame from (x is Number) to Number
     {
-	Math.round(x / 10) as Integer;
+	(x / pixelsPerFrame());
     }
 
-    function durationToX from (d0 is Duration) to Number
+    bound function durationToX from (d0 is Duration) to Number
     {
 	durationToX(d0, false);
     }
 
-    function durationToX from (d0 is Duration, loop is Boolean) to Number
+    bound function durationToX from (d0 is Duration, loop is Boolean) to Number
     {
-	const d = if (loop and targetNode.contentBounds.duration() > 0s) d0.rem(targetNode.contentBounds.duration()) else d0;
-	const pixels = d / 1s * pixelsPerSecond();
+	var d = if (loop and targetNode.contentBounds.duration() > 0s) d0.rem(targetNode.contentBounds.duration()) else d0;
+	var pixels = d / 1s * pixelsPerSecond();
 	return pixels;
     }
     
-    function pixelsPerSecond to Number {  
+    bound function pixelsPerSecond to Number {  
 	pixelsPerFrame() * frameRate;
     }
 
-    function pixelsPerFrame to Integer { 10 }
-
-    function frameToX from (frame is Integer) to Number {
+    bound function pixelsPerFrame to Integer { 
+        Math.max(1, frameRateN / 24.0 * PIXELS_PER_FRAME) as Integer;
+    }
+    
+    bound function frameToX from (frame is Number) to Number 
+    {
 	frame * pixelsPerFrame();
     }
 
@@ -360,7 +362,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler {
 	target.setPlayhead(target.playhead);
     }
 
-    function advancePlayhead from (frames is Integer) to ()
+    function advancePlayhead from (frames is Number) to ()
     {
 	target.setPlayhead(target.playhead + frameToDuration(frames));
     }
@@ -375,14 +377,40 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler {
 
     function getSelf to Trax { this }
 
+    var dur = bind targetNode.contentBounds.end;
+
+    override bound function getTx to Number { 
+        if (dur == 0s) then 0.0 else frameToDuration(scrollOffset) /  dur;
+    }
+
+    override bound function getSx to Number { 
+        targetSx(visibleInterval.duration(), targetNode.contentBounds);
+    }
+
+    function targetSx from (dur is Duration, bounds is Interval) to Number {
+        if (0s == bounds.end) then 1.0 else dur/bounds.end;
+    }
+    override public function setY from (tx is Number, sx is Number) to ()
+    {
+    }
+    override public function setX from (tx is Number, sx is Number) to ()
+    {
+        println("tx={tx} sx={sx}");
+        scrollOffset = durationToFrame(dur * tx);
+        var cur = getSx() / frameRateN * 24.0;
+        if (sx <> 0) {
+            //frameRateN = sx / cur;
+        }
+    }
+
     const playhead is Playhead = Playhead {
 	id: "playhead";
 	trax: this;
 	override var height = bind getSelf().height;
     }
-    var scrollOffset is Integer;
-    var visibleDuration is Duration;
-    var labels is Node[] = bind drawLabels(width, height, scrollOffset);
+    var scrollOffset is Number;
+    var visibleDuration is Duration = bind visibleInterval.duration();
+    var labels is Node[] = bind drawLabels(width, height, scrollOffset, frameRate);
     var font = bind layoutEngine.createFont("font-size:8;font-family:Lucida Grande");
     var timeNodeViewFont = bind layoutEngine.createFont("font-size:11;font-family:Lucida Grande");
 
@@ -395,28 +423,34 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler {
 	}
     }
 
-    function drawLabels from (w is Number, h is Number, offset is Integer) to Node[] 
+    function drawLabels from (w is Number, h is Number, offset is Number, frameRateN is Number) to Node[] 
     {
 	//println("draw labels {offset}");
 	const x = -w / 2 + 15;
 	const y = h / 2 - 19;
-	var off = offset - 10;
+        var pp = pixelsPerFrame();
+        println("offset={offset}");
+        var off0 = offset mod 10;
+	var off = (offset - off0);
+        println("off0={off0}, off={off}");
+        off *= pp;
+        off0 *= pp;
+        println("off0={off0}, off={off}");
 	foreach (i in [0..<w step 100]) {
-	    off += 10;
 	    Text.Label {
 		height: 10;
 		width: 30;
 		background: this.backgroundPaint;
 		foreground: this.foregroundPaint;
-		transform: translate(x+i+10, y+10);
+		transform: translate(-off0+x+i+10, y+10);
 		font: font;
-		text: "{off}"
+		text: "{Math.round((off+i)/pp) as Integer}"
 	    }
 	}
     }
 
     function drawLines from (w is Number, h is Number, viewHeight is Number) to AbstractMesh {
-	println("TIMELINE={target}");
+	println("TIMELINE={target} pp={pixelsPerFrame()}");
 	const x0 = -w / 2 + 15;
 	const y0 = Math.round(h / 2 - viewHeight-5);
 	var x is Number = x0;
@@ -424,15 +458,16 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler {
 	var mid is Boolean = false;
 	lineMesh.reset();
 	lineMesh.moveTo(x, y);
-	for (i in [0..<w step pixelsPerFrame()]) {
+        var pp is Integer = pixelsPerFrame();
+	for (i in [0..<w step pp]) {
 	    var n = if (mid) then 3 else 5;
 	    mid = not mid;
 	    lineMesh.moveTo(x+i, y);
 	    lineMesh.lineTo(x+i, y+n);
 	}
-	for (i in [0..<h step pixelsPerFrame()]) {
+	for (i in [0..<h step pp]) {
 	    lineMesh.moveTo(x, y);
-	    lineMesh.lineTo(x + width-pixelsPerFrame(), y);
+	    lineMesh.lineTo(x + width-pp, y);
 	    y -= viewHeight;
 	    println("y={y}");
 	}
@@ -468,13 +503,13 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler {
 		    startOff = scrollOffset;
 		}
 		var dx = 0.0;
-		var startOff = 0;
+		var startOff = 0.0;
 		override function onMouseDrag from (event is MouseEvent) to ()
 		{
 		    if (event.location.y < height / 2 -15) {
 			dx += (event.picked.dragPoint1 - event.picked.dragPoint0).x;
 			const off = scrollOffset;
-			scrollOffset = -xToFrame(dx) + startOff;
+			scrollOffset = Math.round(-xToFrame(dx) + startOff);
 			const delta = scrollOffset - off;
 			target.setPlayhead(target.playhead);
 		    }

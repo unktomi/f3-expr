@@ -1,0 +1,26 @@
+package expr;
+import f3.media.input.*;
+import f3.media.scene.*;
+import f3.media.scene.Shape2D.*;
+import f3.math.LinearMath.*;
+import f3.math.*;
+import java.lang.Math;
+
+public class VScrollbar is ResizableNode {
+    public var ty is Number;
+    public var sy is Number;
+    public function setRect from (ty is Number, sy is Number) to ()
+    {
+        this.ty = ty;
+        this.sy = sy;
+    }
+    const hsb = this;
+    override var internalContent = HScrollbar {
+        override var transform = bind rotate(-90, Vec3.Z_AXIS);
+        height: bind width;
+        width: bind height;
+        tx: bind ty;
+        sx: bind sy;
+        setRect: setRect;
+    }
+}

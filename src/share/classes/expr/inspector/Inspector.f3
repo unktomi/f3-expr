@@ -278,6 +278,20 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler {
 	            width: bind fieldWidth;
 		    height: bind cellHeight;
 		}
+	    } else if (i is InspectedString) then
+	    TransformNode {
+		tx: bind width / 2 - fieldWidth / 2-4;
+		var j = i as InspectedString;
+		content: Text.Area {
+		    text: j.get();
+	            width: bind width-fieldWidth;
+		    height: bind cellHeight;
+		    rightJustified: true;
+		    font: bind font;
+		    foreground: bind if (i.index <> selectedIndex) FG_PAINT else SELECTED_FG_PAINT;
+		    background: bind if (i.index <> selectedIndex) BG_PAINT else SELECTED_BG_PAINT;
+
+		}
 	    } else if (i is InspectedObservable) {
 		null
 	    } else null]
@@ -324,6 +338,14 @@ public function inspect from (obj is Object) to (Inspected of ?)[]
 			    observable: Observables.observe(ptr);
 			    override function get to Duration { ptr.get() }
 			    override function set from (x is Duration) to () { ptr.set(x) }
+			}
+		    } else if (m.m is F3VarMember and m.t == STRING_TYPE) {
+			const ptr = (m.m as F3Local.VarMember).getPointer(obj as F3Object) as ObservableRef of String;
+		        InspectedString {
+			    label: m.m.getName();
+			    observable: Observables.observe(ptr);
+			    override function get to String { var s = ptr.get(); println("{label} => get={s}"); s }
+			    override function set from (x is String) to () { ptr.set(x) }
 			}
 		    } else {
 			InspectedObservable of Object {

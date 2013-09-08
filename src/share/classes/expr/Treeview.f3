@@ -219,7 +219,7 @@ public class Holder {
     public var n is Treenode;
 }
 
-public class Treeview is ResizableNode, Focusable, KeyboardInputHandler {
+public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrollable {
 
     public var selectionBackground is Paint = 
 	ColorPaint(Color.color(.4, .4, .4, 1));
@@ -424,4 +424,22 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler {
     public function onMouseDrag from (e is MouseEvent) to () {}
     public function onMouseUp from (e is MouseEvent) to () {}
     public function onMouseDown from (e is MouseEvent) to () {}
+
+    override public bound function getTx to Number { 0.0 }
+    override public bound function getSx to Number { 1.0 }
+    override public bound function getTy to Number 
+    { 
+        scrollOffset / (model.rowCount as Number);
+    }
+    override public bound function getSy to Number 
+    { 
+        Math.min(visibleRows / ((1+model.rowCount) as Number), 1.0);
+    }
+    override public function setX from (tx is Number, sx is Number) to ()
+    {
+    }
+    override public function setY from (ty is Number, sy is Number) to ()
+    {
+        scrollOffset = Math.round(ty * model.rowCount) as Integer;
+    }
 }
