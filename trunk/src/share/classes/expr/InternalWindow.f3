@@ -21,8 +21,8 @@ public class InternalWindow is ResizableNode, Focuser {
 
     override function resize from (w0 is Number, h0 is Number) to ()
     {
-	const w = Math.round(2*w0)/2;
-	const h = Math.round(2*h0)/2;
+	const w = Math.round(w0);
+	const h = Math.round(h0);
 	super.resize(w, h);
 	content.resize(w, h-28);
     }
@@ -30,12 +30,19 @@ public class InternalWindow is ResizableNode, Focuser {
     override var transform = bind translate(cx, cy);
     const self = this;
 
-    const titleBar is Node = Rectangle is Focuser {
-        override function getTargetOfFocus from () to Focusable {  self.getTargetOfFocus() }
-	override var transform = bind translate(0, self.height / 2 - 5);
-	height: 12;
-	override var width = bind self.width;
-	fillPaint: ColorPaint(Color.color(.2, .2, .2));
+    const titleBar is Node = Group {
+        override var transform = bind translate(0, self.height / 2 - 5);
+        content:
+        [Rectangle is Focuser {
+                override function getTargetOfFocus from () to Focusable {  self.getTargetOfFocus() }
+                height: 12;
+                override var width = bind self.width;
+                fillPaint: ColorPaint(Color.color(.2, .2, .2));
+            },
+        Image {
+            url: bind "{__DIR__}close.png";
+            transform: bind translate(-width/2+11.5, 0);
+        }]
     };
 
     const line is Node = Rectangle {
@@ -45,18 +52,28 @@ public class InternalWindow is ResizableNode, Focuser {
 	fillPaint: ColorPaint(Color.color(.44, .44, .44));
     }
 
-    const buttonBar is Node = Rectangle {
-	override var transform = bind translate(0, self.height / 2 - 9 - 10);
-	height: 18;
-	override var width = bind self.width;
-	fillPaint: ColorPaint(Color.color(.3, .3, .3));
+    const buttonBar is Node = Group {
+        transform: bind translate(0, self.height / 2 - 9 - 10);
+        content: 
+        [Rectangle {
+            height: 18;
+            override var width = bind self.width;
+            fillPaint: ColorPaint(Color.color(.3, .3, .3));
+        },
+        Image {
+            transform: bind translate(-width/2 + 74/2, 1);
+            url: bind "{__DIR__}navigate.png";
+        },
+        Image {
+            transform: bind translate(width/2 - 8.5, 0);
+            url: bind "{__DIR__}lock.png";
+        }]
     };
 
-    const resizeCorner is Node = Rectangle {
-	override var transform = bind translate(self.width/2 - 7.5, -self.height/2 + 7.5);
-	height: 15;
-	width: 15
-	fillPaint: ColorPaint(Color.color(.65, .65, .65));
+    const resizeCorner is Node = Image {
+	override var transform = bind translate(self.width/2 - 7, -self.height/2 + 7-1);
+        url: bind "{__DIR__}resize-corner.png";
+	//fillPaint: ColorPaint(Color.color(.65, .65, .65));
     };
 
     const leftSide is Node = Rectangle {
@@ -81,13 +98,12 @@ public class InternalWindow is ResizableNode, Focuser {
     public var content is ResizableNode;
 
     const contentHolder = ContentHolder {
-        transform: translate(0, -6);
 	scissorBounds: bind Bounds.boundsFromRect(content.width+1, content.height+1);
 	content: bind content;
     }
 
     override var internalContent = Group {
-	content: bind [titleBar, buttonBar, line, TransformNode { ty: -7, content: bind contentHolder}, 
+	content: bind [titleBar, buttonBar, line, TransformNode { ty: -14, content: bind contentHolder}, 
         resizeCorner, leftSide, rightSide];
     } 
     
