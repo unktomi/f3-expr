@@ -113,8 +113,8 @@ class ResizableStageNode is ResizableNode, Focuser {
     }
     override function resize from (w0 is Number, h0 is Number) to ()
     {
-	const w = Math.round(w0+1);
-	const h = Math.round(h0+1);
+	const w = Math.round(w0);
+	const h = Math.round(h0);
 	super.resize(w, h);
 	content.resize(w, h);
 	stage.resize(w as Integer, h as Integer);

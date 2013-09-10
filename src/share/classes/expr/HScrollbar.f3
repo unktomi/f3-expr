@@ -16,8 +16,9 @@ public class HScrollbar is ResizableNode {
     public var canZoom is Boolean = true;
 
     var bg is Paint = ColorPaint(Color.color(.80, .80, .80));
-    var fg is Paint = ColorPaint(Color.color(.56, .56, .56));
-    var outline is Paint = ColorPaint(Color.color(.26, .26, .26));
+    var fg is Paint = ColorPaint(Color.color(.4, .4, .4));
+    var linec is Paint = ColorPaint(Color.color(.5, .5, .5));
+    var outline is Paint = ColorPaint(Color.color(.2, .2, .2));
 
     public function setRect from (tx is Number, sx is Number) to ()
     {
@@ -88,25 +89,27 @@ public class HScrollbar is ResizableNode {
         }
     }
 
-    var thumbWidth = bind width-4;
+    var thumbWidth = bind width-5;
+    var thumbHeight = bind height-4;
 
     const thumbMesh = Rectangle {
-        height: bind height-4;
+        height: bind thumbHeight;
         width: bind thumbWidth;
         arcWidth: bind height-2;
         arcHeight: bind height-2;
         fillPaint: bind fg;
+        strokePaint: bind linec;
         pickable: no;
     };
 
     const line1 = Path {
-        content: bind [MoveTo { x: 0, y: height/2}, LineTo { x: 0, y: -height/2}];
-        strokePaint: bind bg;
+        content: bind [MoveTo { x: 0, y: thumbHeight/2}, LineTo { x: 0, y: -thumbHeight/2}];
+        strokePaint: bind linec;
     }
 
     const line2 = Path {
-        content: bind [MoveTo { x: 0, y: height/2}, LineTo { x: 0, y: -height/2}];
-        strokePaint: bind bg;
+        content: bind [MoveTo { x: 0, y: thumbHeight/2}, LineTo { x: 0, y: -thumbHeight/2}];
+        strokePaint: bind linec;
     };
     
     override var internalContent = Group {
@@ -117,17 +120,18 @@ public class HScrollbar is ResizableNode {
                 tx: bind tx * width - width / 2.0 + (sx * width) / 2.0;
                 content:
                 [TransformNode {
+                     ty: 0.5;
                      sx: bind sx;
                      content: bind thumbMesh;
                  },
                  TransformNode {
                      visible: bind canZoom;
-                     tx: bind -sx*thumbWidth/2 + height;
+                     tx: bind -sx*thumbWidth/2 + 6;
                      content: bind line1;
                  },
                  TransformNode {
                      visible: bind canZoom;
-                     tx: bind sx*thumbWidth/2 - height;
+                     tx: bind sx*thumbWidth/2 - 6;
                      content: bind line2;
                  }]
             }]
