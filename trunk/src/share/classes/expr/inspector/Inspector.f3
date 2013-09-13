@@ -207,7 +207,7 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
     var hi is Integer = bind low + visibleRows;
     public var cellHeight is Number = 16;
     public var fieldWidth is Number = 64;
-    public var font is Text.Font = bind layoutEngine.createFont("font-size:10;font-family:Lucida Grande;font-weight:boldx");
+    public var font is Text.Font = bind layoutEngine.createFont("font-size:10;font-family:Lucida Grande;font-weight:bold");
     public var border is Number = 0;
     override function onKeyDown from (e is KeyboardEvent) to ()
     {

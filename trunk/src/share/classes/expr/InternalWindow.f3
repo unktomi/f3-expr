@@ -24,7 +24,7 @@ public class InternalWindow is ResizableNode, Focuser {
 	const w = Math.round(w0);
 	const h = Math.round(h0);
 	super.resize(w, h);
-	content.resize(w, h-28);
+	content.resize(w, h-26);
     }
 
     override var transform = bind translate(cx, cy);
@@ -41,7 +41,7 @@ public class InternalWindow is ResizableNode, Focuser {
             },
         Image {
             url: bind "{__DIR__}close.png";
-            transform: bind translate(-width/2+11.5, 0);
+            transform: bind translate(-width/2+6.5, 0);
         }]
     };
 

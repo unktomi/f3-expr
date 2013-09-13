@@ -37,15 +37,41 @@ public const CLIP_SELECTED_PAINT = ColorPaint(CLIP_SELECTED_COLOR);
 public const CLIP_LABEL_PAINT = ColorPaint(CLIP_LABEL_COLOR);
 public const CLIP_SELECTED_LABEL_PAINT = ColorPaint(CLIP_SELECTED_LABEL_COLOR);
 
-
 class TimeNodeView is AbstractNode 
 {
     public var row is Integer;
     public var trax is Trax;
     public var target is TimeNode;
     public var playX is Number = bind getPlayX(target.playTime);
-    public var content is Node[] = bind getContent(target);
+    public var content is TransformNode[] = bind getContent(target);
     public var expanded = false;
+
+    public function getRow from (row is Integer) to TimeNodeView {
+        if (row == 0) {
+            return this;
+        }
+        if (expanded) {
+            var j = 0;
+            for (k in content) {
+                const i = k.content[0] as TimeNodeView;
+                if (j + i.rowCount > row) {
+                    return i.getRow(j);
+                }
+                j += i.rowCount;
+            }
+        }
+        return null;
+    }
+
+    public var rowCount is Integer = bind if (not expanded) then 1 else getRowCount(content, 1);
+
+    bound function getRowCount from (content is Group[], result is Integer) to Integer {
+        if (content == []) then result else {
+                var x = content[0].content[0] as TimeNodeView;
+                var xs = content[1..];
+                var dummy = getRowCount(xs, result + x.rowCount);
+            }
+    }
 
     public var selected is Boolean;
 
@@ -55,7 +81,7 @@ class TimeNodeView is AbstractNode
 
     function getWidth from (i0 is Interval, visible is Interval) to Number 
     {
-	trax.durationToX(i0.duration())
+    	trax.durationToX(i0.duration())
     }
 
     var selected1 = bind selected and trax.focused;
@@ -65,24 +91,47 @@ class TimeNodeView is AbstractNode
 	if (selected) then CLIP_SELECTED_PAINT else CLIP_PAINT;
     }
 
-    bound function getContent from (target is TimeNode) to Node[]
+    bound function getContent from (target is TimeNode) to TransformNode[]
     {
-	[]
+        if (target is TimeGroup) {
+            var g = target as TimeGroup;
+            foreach (x in g.content) TransformNode { content: bind trax.makeTimeNodeView(null, x) }
+        } else []
     }
+
+    override function update to () 
+    {
+        if (expanded) {
+            var y = 0.0;
+            for (i in content) {
+                i.ty = y;
+                const tv = i.content[0] as TimeNodeView;
+                y -= trax.getViewHeight() * tv.rowCount;
+            }
+        }
+        super.update();
+    }
+
     const self = this;
     var w = bind getWidth(target.bounds, trax.visibleInterval);
     var h = bind trax.getViewHeight();
-    var fg = bind if (selected1) then CLIP_SELECTED_LABEL_PAINT else CLIP_LABEL_PAINT;//ColorPaint(Color.color(.7, .7, .7, 1));
+    var fg = bind if w == 0 then bg else if (selected1) then CLIP_SELECTED_LABEL_PAINT else CLIP_LABEL_PAINT;//ColorPaint(Color.color(.7, .7, .7, 1));
     var bg = bind getFill(target);
-    override var transform = bind translate(playX + w / 2.0, trax.height / 2 + 2 - 15 -(row+1)*trax.getViewHeight());
+    override var transform = bind translate(playX + w / 2.0, -(row+1)*trax.getViewHeight());
     override var internalContent = Group {
 	content:
 	Group {
             var dx is Number;
-	    content: bind
-	    [
-             Group is MouseInputHandler {
-		 visible: bind w > 0;
+	    content:
+	    [Group {
+		content: 
+                 [Rectangle is MouseInputHandler {
+                     transform: bind translate(trax.durationToX(target.contentBounds.start), 0);
+		     height: bind h;
+		     width: bind w;
+		     fillPaint: bind bg;
+		     strokePaint: bind CLIP_LABEL_PAINT;
+		     blocksPointer: true;
 		     override function onMouseDown from (event is MouseEvent) to ()
 		     {
 			 dx = trax.durationToX(target.playTime);
@@ -97,24 +146,16 @@ class TimeNodeView is AbstractNode
 		     override function onMouseUp from (event is MouseEvent) to ()
 		     {
 			 //println("commit playTime={target.playTime}, pickable={target.pickable}");
-			 MasterUndoable.commit();
+                         MasterUndoable.commit();
 		     }
-		content: 
-		[Rectangle
-		 {
-		     height: bind h;
-		     width: bind w;
-		     fillPaint: bind bg;
-		     strokePaint: bind CLIP_LABEL_PAINT;
-		     blocksPointer: true;
 		 },
 		 Text.Label {
 		     blocksPointer: false;
 		     transform: bind translate(20, font.descent);
 		     //height: bind h;
-		     width: bind w;
+		     width: bind Math.max(w, 100);
 		     background: null;
-		     foreground: fg;
+		     foreground: bind fg;
 		     text: bind formatName(target.id);
 		     font: bind timeNodeViewFont;
 		 },
@@ -128,15 +169,29 @@ class TimeNodeView is AbstractNode
 		     {
 			 target.pickable = not target.pickable;
 		     }
-		 }]
+                     blocksPointer: true;
+		 },
+                 TransformNode {
+                     visible: bind target is TimeGroup and { var g = target as TimeGroup; g.content.size() > 0 }
+                     tx: bind -w/2 + 13;
+                     rz: bind if (expanded) then -90 else 0;
+                     content: Polygon is MouseInputHandler {
+                         points: [-3.5, -4.5, -3.5, 4.5, 3.5, 0];
+                         fillPaint: bind fg;
+                         override function onMouseDown from (event is MouseEvent) to ()
+                         {
+                             expanded = not expanded;
+                         }
+                     }
+                 }]
 	      },
               Group { 
-                   content: bind if (expanded) then content else [] 
+                  transform: bind translate(-w/2, 0);
+                  content: bind if (expanded) then content else [] 
 	      }]
 	 }
     }
 }
-
 
 public class Playhead is AbstractNode 
 {
@@ -205,9 +260,42 @@ public class Playhead is AbstractNode
 
 public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable {
 
-    public function onDrop from (where is Pick, clip is TimeNode) to ()
+    const arrow is Polygon = Polygon {
+	points: [-3.5, -4.5, -3.5, 4.5, 3.5, 0];
+	fillPaint: ColorPaint(Color.WHITE);
+    };
+
+    bound function arrowIcon (p is Paint, f is function from () to ()) to Node 
     {
-	println("ON DROP {where} {clip}");
+	MeshNode is MouseInputHandler {
+            blocksPointer: true;
+            override function onMouseDown from (e is MouseEvent) to () 
+            {
+                println("mouse down {e}");
+                f();
+            }
+	    mesh: bind arrow.fillMesh.mesh;
+	    shader: bind effectLoader.loadPaintShader(p);
+	}
+    }
+
+    public function onDrop from (where is Pick, clip is TimeNode, add is function from TimeNode to ()) to ()
+    {
+	//println("ON DROP {where} {clip}");
+        const pt = toSceneTransform.inverse() * where.scenePoint;
+        println("ON DROP {pt}");
+        println("row={yToRow(pt.y)}");
+        const row = yToRow(pt.y);
+        const targetNode = rowToTimeNodeView(row).target;
+        println("targetNode={targetNode}");
+        if (targetNode is TimeGroup) {
+            insert clip into (targetNode as TimeGroup).content;
+        } else if (targetNode <> null) {
+            const g = targetNode as TimeGroup;
+            insert clip after g.content[Sequences.indexOf(g.content, targetNode)];
+        } else {
+            add(clip);
+        }
     }
 
     var timelineListener is Disposable;
@@ -324,6 +412,24 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	var frames = Math.round((seconds * frameRate));
 	return (1s / frameRate) * frames;
     }
+    
+    function rowToTimeNodeView from (row is Integer) to TimeNodeView
+    {
+        var j = 0;
+        for (i in timeNodeViews) {
+            if (j + i.rowCount > row) {
+                return i.getRow(j);
+            }
+            j += i.rowCount;
+        }
+        return null;
+    }
+
+    function yToRow from (y0 is Number) to Integer 
+    {
+        const y = y0 - height/2;
+        -Math.round(y / getViewHeight() + 2) as Integer;
+    }
 
     bound function xToDuration from (x is Number) to Duration
     {
@@ -420,13 +526,13 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
     var font = bind layoutEngine.createFont("font-size:8;font-family:Lucida Grande");
     var timeNodeViewFont = bind layoutEngine.createFont("font-size:10;font-family:Lucida Grande;font-weight:bold");
 
-    function makeTimeNodeView from (parent is TimeNodeView, t is TimeNode) to TimeNodeView {
-	println("Make time node view {parent}: {t}");
-	TimeNodeView {
-	    trax: this;
-	    target: t;
-	    expanded: t.id == "";
-	}
+    function makeTimeNodeView from (parent is TimeNodeView, t0 is TimeNode) to TimeNodeView 
+    {
+        const t = if (t0 is ResourceTimeNode) then (t0 as ResourceTimeNode).content[0] else t0;
+        TimeNodeView {
+            trax: this;
+            target: t;
+        }
     }
 
     function drawLabels from (w is Number, h is Number, offset is Number, frameRateN is Number) to Node[] 
@@ -535,7 +641,8 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	 TransformNode { 
 	     override var tx = bind -getSelf().width/2+15-frameToX(scrollOffset);
 	     content:
-	     [Group {
+	     [TransformNode {
+                 ty: bind height / 2 + 2 - 15;
 		 content: bind timeNodeViews;
 	     },
 	     TransformNode { ty: -6, content: bind playhead }]

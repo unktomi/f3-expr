@@ -113,8 +113,8 @@ class ResizableStageNode is ResizableNode, Focuser {
     }
     override function resize from (w0 is Number, h0 is Number) to ()
     {
-	const w = Math.round(w0);
-	const h = Math.round(h0);
+	const w = Math.ceil(w0);
+	const h = Math.ceil(h0);
 	super.resize(w, h);
 	content.resize(w, h);
 	stage.resize(w as Integer, h as Integer);
@@ -214,8 +214,6 @@ public function run from (args is String[]) to ()
     function addTimeResource from (rn is ResourceTimeNode) to ()
     {
 	insert rn into currentAnimResource.resources;
-	//trax.setClips(currentAnimResource.resources);
-	trax.selectClip(rn);
     }
 
 
@@ -558,6 +556,7 @@ public function run from (args is String[]) to ()
 					 }
 
 					 var dragger is TransformNode;
+                                         var tn is AssetTree.AssetTreenode;
 
 					 override function onMouseDrag from (e is MouseEvent) to () {
 					     if (dragger == null) {
@@ -572,11 +571,12 @@ public function run from (args is String[]) to ()
 					     }
 					     dragger.tx = editorScene.mousePosition.x;
 					     dragger.ty = editorScene.mousePosition.y;
+                                             tn = (selectedTreenode as AssetTreenode);
 					 }
 
 					 override function onMouseUp from (e is MouseEvent) to () 
 					 {
-					     var asset = (selectedTreenode as AssetTreenode).asset;
+					     var asset = tn.asset;
 					     if (asset is AssetTree.MaAsset) {
 						 const t = (asset as AssetTree.MaAsset).model.getTemporalRoot();
 						 if (t.bounds.duration() > 0s) {
@@ -589,17 +589,22 @@ public function run from (args is String[]) to ()
 					     }
 					     if (asset is AssetTree.ClipAsset) {
 						 const clip = (asset as AssetTree.ClipAsset).getClip();
-						 for (j in getUnderMouseInEditor()) {
+                                                 const picked = getUnderMouseInEditor();
+						 for (j in picked) {
 						     println("j={j.node}");
 						     if (j.node is Trax) { 
-							 const t = 
-							     if (not (clip is ResourceTimeNode)) 
-								 then ResourceTimeNode {
-								     url: asset.url;
-								     content: clip;
-								 } else clip as ResourceTimeNode;
-							 addTimeResource(t);
-							 (j.node as Trax).onDrop(j, t);
+							 (j.node as Trax).onDrop(j, clip, 
+                                                                                 function from (t is TimeNode) to ()
+                                                                                 {
+                                                                                     const rtn = 
+                                                                                         if (t is ResourceTimeNode) 
+                                                                                             then t as ResourceTimeNode 
+                                                                                             else ResourceTimeNode {
+                                                                                                     url: asset.url;
+                                                                                                     content: t;
+                                                                                                 };
+                                                                                     addTimeResource(rtn);
+                                                                                 });
 							 break;
 						     }
 						 }
