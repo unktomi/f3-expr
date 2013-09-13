@@ -56,7 +56,7 @@ public class Scrollpane is ResizableNode {
                 content: bind content
         },
         TransformNode {
-            tx: bind width/2 - W / 2-1;
+            tx: bind width/2 - W / 2;
             ty: bind H/2
             content: VScrollbar {
                 canZoom: bind canZoomVertical;
@@ -73,7 +73,7 @@ public class Scrollpane is ResizableNode {
             }
         },
         TransformNode {
-            ty: bind -height/2 + H / 2;
+            ty: bind -height/2 + H / 2
             tx: bind -W/2
             content: HScrollbar {
                 canZoom: bind canZoomHorizontal;

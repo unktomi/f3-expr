@@ -49,10 +49,11 @@ public class ClipLibraryAsset is Asset {
 public class TransitionLayerAsset is ClipAsset {
     override var name = "Transition Layer";
     override var url = "node://TransitionLayer";
+    var count = 1;
     override public function getClip to TimeNode {
 	TransitionLayer {
-	    id: "Transition Layer";
-	    playRange: Interval { start: 0s, end: Duration.INDEFINITE }
+	    id: "/Transition Layer {count++}";
+	    playRange: Interval { start: 0s, end: 1s }
 	}
     }
 }

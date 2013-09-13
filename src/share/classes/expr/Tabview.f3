@@ -51,7 +51,7 @@ public class Tabview is ResizableNode, Focuser {
     public readonly var selectedTab is Tab = bind tabs[selectedIndex];
 
     var contentWidth is Number = bind width;
-    var contentHeight is Number = bind height - TAB_HEIGHT;
+    var contentHeight is Number = bind height - TAB_HEIGHT-2;
 
     readonly var font = bind layoutEngine.createFont("font-size:10;font-family:Lucida Grande;font-weight:bold");
 
