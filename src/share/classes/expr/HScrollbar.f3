@@ -34,7 +34,6 @@ public class HScrollbar is ResizableNode {
         height: bind height;
         width: bind width;
         fillPaint: bind bg;
-        //strokePaint: bind outline;
 
         var dx = 0.0;
         var tx0 = 0.0;
@@ -82,25 +81,26 @@ public class HScrollbar is ResizableNode {
                 sx = self.sx;
             }
             tx = Math.min(Math.max(0, tx / width), 1.0-sx);  
-            //tx = Math.round(1000*tx)/1000;
-            //sx = Math.round(1000*sx)/1000;
-            println("hsb: tx={tx} sx={sx}");
             setRect(tx, sx);
         }
     }
 
-    var thumbWidth = bind width-5;
+    var runWidth = bind width - 4;
+    var thumbWidth = bind runWidth-5;
     var thumbHeight = bind height-4;
 
-    const thumbMesh = Rectangle {
-        height: bind thumbHeight;
-        width: bind thumbWidth;
-        arcWidth: bind height-2;
-        arcHeight: bind height-2;
-        fillPaint: bind fg;
-        strokePaint: bind linec;
-        pickable: no;
-    };
+
+    const thumbMesh = {
+        Rectangle {
+            height: bind thumbHeight;
+            width: bind thumbWidth;
+            arcWidth: bind height-2;
+            arcHeight: bind height-2;
+            fillPaint: bind fg;
+            strokePaint: bind linec;
+            pickable: no;
+        }
+    }
 
     const line1 = Path {
         content: bind [MoveTo { x: 0, y: thumbHeight/2}, LineTo { x: 0, y: -thumbHeight/2}];
@@ -117,7 +117,7 @@ public class HScrollbar is ResizableNode {
         [run, 
          TransformNode {
                 visible: bind sx <> 1.0 or tx <> 0
-                tx: bind tx * width - width / 2.0 + (sx * width) / 2.0;
+                tx: bind tx * runWidth - runWidth / 2.0 + (sx * runWidth) / 2.0;
                 content:
                 [TransformNode {
                      ty: 0.5;

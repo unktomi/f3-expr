@@ -194,7 +194,6 @@ public class Treecell is AbstractNode {
 	internalContent.observeMouseDown().subscribe(function from (e is MouseEvent) to () {
 
 		const limit = -tv.cellWidth/2+tv.indent*(tn.column+1)+6;
-		println("e={e.location.x}, limit={limit}");
 		if (tn.canOpen and e.location.x < limit) {
 		    if (not tn.isOpen) tn.open() else tn.close();
 		}
@@ -311,7 +310,6 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
        to Number
     {  
 	const g = 0.8 - (2-(indentLevel mod 2)) * .1;
-	println("indentLevel={indentLevel} g={g}");
 	return g;
     }	 
 
@@ -365,7 +363,7 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
       
     protected bound function createCell from (tn is Treenode) to Treecell
     {
-	Treecell { tv: this, tn: bind tn };
+	Treecell { tv: bind this, tn: bind tn };
     }
 
     public function getView from (tn is Treenode) to Treecell {

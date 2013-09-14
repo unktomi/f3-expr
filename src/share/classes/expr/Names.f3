@@ -6,5 +6,30 @@ public function formatName from (str is String) to String
         const slash = str.lastIndexOf(ch);
         if (slash > 0) return str.substring(slash+1);
     }
-    return str;
+    return uncamelCase(str);
+}
+
+public function uncamelCase from (str is String) to String 
+{
+    const buf = new java.lang.StringBuffer();
+    const seps = "_.";
+    var last is Character = "a".charAt(0);
+    var forceUpper = true;
+    for (c0 in str.toCharArray()) {
+        const c = if (forceUpper) then Character.toUpperCase(c0) else c0;
+        forceUpper = false;
+        if (seps.indexOf(c) >= 0) {
+            buf.append(" ");
+            forceUpper = true;
+        } else { 
+            if (Character.isUpperCase(c)) {
+                if (not Character.isWhitespace(last)) {
+                    buf.append(" ");
+                }
+            }
+            buf.append(c);
+        }
+        last = c;
+    }
+    buf.toString();
 }

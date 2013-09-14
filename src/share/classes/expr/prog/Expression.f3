@@ -12,6 +12,7 @@ import f3.lang.*;
 import f3.media.input.*;
 import f3.media.scene.*;
 import f3.media.scene.Shape2D.*;
+import expr.Names.*;
 
 
 var exprMap = new java.util.HashMap of (F3ClassType, Member[]);
@@ -348,14 +349,26 @@ public class ExpressionView is AbstractNode {
     public var cellWidth is Number = 150;
     public var cellHeight is Number = bind canvas.cellHeight;
     public var font is Text.Font = bind canvas.font;
-    public const label is Text.Label = Text.Label {
-	text: bind expression.getName();
+    public var label is Text.Label = bind Text.Label {
+	text: bind formatName(expression.getName());
 	height: bind cellHeight;
 	width: bind cellWidth;
 	font: bind font;
 	foreground: bind canvas.textFg;
 	background: bind canvas.cellBg;
 	pickable: true;
+        indent: 4;
+    };
+    public var title is Node = bind Group {
+           content: bind
+           [label,
+           Rectangle {
+                height: 1;
+                width: bind cellWidth;
+                fillPaint: bind canvas.textFg;
+                pickable: false;
+                cy: bind -cellHeight/2;
+            }];
     };
     function onDown from (e is MouseEvent) to () 
     {
@@ -405,7 +418,7 @@ class FunctionView is ExpressionView {
 	 }]
     };
     override var internalContent = Group {
-	content: bind [label, io];
+	content: bind [title, io];
     }
 
     override function update {
@@ -480,7 +493,7 @@ public class ObjectView is ExpressionView {
     };
 
     override var internalContent = Group {
-	content: bind [label, io];
+	content: bind [title, io];
     }
 
     override function update {
@@ -837,7 +850,29 @@ public class LinkInfo {
 class Holder is Group, Scissored {
 }
 
-public class Canvas is ResizableNode, Focusable, KeyboardInputHandler {
+public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollable {
+
+    public bound function getTx to Number { 1.0-(cx + width/2.0) / width }
+    public bound function getSx to Number { 
+        //Math.max(width / localSpace.contentBounds.width(), 1.0);
+        0.1
+    }    
+    public bound function getTy to Number { (cy + height/2.0) / height }
+
+    public bound function getSy to Number { 
+        //Math.max(height / localSpace.contentBounds.height(), 1.0);
+        0.1
+    }
+
+    public function setX from (tx is Number, sx is Number) to ()
+    {
+        cx = (0.5-tx) * width;
+    }
+
+    public function setY from (ty is Number, sy is Number) to ()
+    {
+        cy = ty * height - height/2.0;
+    }
 
     public function onDrop from (where is Pick, clip is TimeNode) to ()
     {
@@ -868,6 +903,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler {
 
     const cellBg = ColorPaint(Color.color(.7, .7, .7));
     const textFg = ColorPaint(Color.color(.2, .2, .2));
+    const titleBg = ColorPaint(Color.color(.9, .9, .9));
 
     var ARROW_COLOR = Color.color(.2, .2, .2);
 
@@ -950,6 +986,8 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler {
     var cx is Number;
     var cy is Number;
 
+    const canvas = this;
+
     override var internalContent = Holder { 
 	scissorBounds: bind Bounds.boundsFromRect(width, height);
 	content:
@@ -965,8 +1003,8 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler {
 		{
 		    const d = (e.picked.dragPoint1-e.picked.dragPoint0);
 		    println("drag={e.drag}, sceneDrag={e.sceneDrag}");
-		    cx += d.x;
-		    cy += d.y;
+		    canvas.cx += d.x;
+		    canvas.cy += d.y;
 		} 	
 	   },
 	   localSpace = Group 
@@ -1324,9 +1362,15 @@ public class Editor is ResizableNode, Focuser {
     public var targetSpace is Node;
     public var targetTime is TimeNode;
 
-    var canvas = bind getCanvas(targetNode, event);
+    var canvas is Canvas = bind getCanvas(targetNode, event);
 
-    override var internalContent = bind canvas;
+    override var internalContent = bind sp;
+
+    const sp = Scrollpane {
+        width: bind width;
+        height: bind height;
+        content: bind canvas;
+    }
 
     function getCanvas from (target is ResourceNode, event is Member) to Canvas
     {
@@ -1343,8 +1387,8 @@ public class Editor is ResizableNode, Focuser {
 	}
 	if (prog.canvas == null) {
 	    prog.canvas = Canvas {
-		height: bind height;
-		width: bind width;
+                width: width;
+                height: height;
 		targetNode: target,
 		event: event;
 		targetSpace: targetSpace;

@@ -46,16 +46,57 @@ class TimeNodeView is AbstractNode
     public var content is TransformNode[] = bind getContent(target);
     public var expanded = false;
 
+    function updateRows from (row is Integer) to Integer
+    {
+        this.row = row;
+        var j = row+1;
+        if (expanded) {
+            for (k in content) {
+                const i = k.content[0] as TimeNodeView;
+                j = i.updateRows(j);
+            }
+        } 
+        rowCount = j - row;
+        return j;
+    }
+
+    override function toString to String 
+    {
+        "TimeNodeView {target}";
+    }
+
+    public function close to ()
+    {
+        expanded = false;
+    }
+
+    public function open to ()
+    {
+        getParentTimeNodeView().open();
+        expanded = true;
+    }
+
+    public function getParentTimeNodeView to TimeNodeView {
+        var p = parent;
+        while (p <> null and not (p is TimeNodeView)) {
+            p = p.parent;
+            if (p is Trax) {
+                return null;
+            }
+        }
+        return p as TimeNodeView;
+    }
+
     public function getRow from (row is Integer) to TimeNodeView {
         if (row == 0) {
             return this;
         }
         if (expanded) {
-            var j = 0;
+            var j = 1;
             for (k in content) {
                 const i = k.content[0] as TimeNodeView;
                 if (j + i.rowCount > row) {
-                    return i.getRow(j);
+                    return i.getRow(row-j);
                 }
                 j += i.rowCount;
             }
@@ -63,7 +104,7 @@ class TimeNodeView is AbstractNode
         return null;
     }
 
-    public var rowCount is Integer = bind if (not expanded) then 1 else getRowCount(content, 1);
+    public var rowCount is Integer;
 
     bound function getRowCount from (content is Group[], result is Integer) to Integer {
         if (content == []) then result else {
@@ -75,13 +116,15 @@ class TimeNodeView is AbstractNode
 
     public var selected is Boolean;
 
-    function getPlayX from (d is Duration) to Number {
-	trax.durationToX(d);
+    function getPlayX from (d is Duration) to Number 
+    {
+        trax.durationToX(d, false);
     }
 
     function getWidth from (i0 is Interval, visible is Interval) to Number 
     {
-    	trax.durationToX(i0.duration())
+        const i = if (i0.duration() == 0s) then visible.end else i0.duration();
+    	trax.durationToX(i);
     }
 
     var selected1 = bind selected and trax.focused;
@@ -102,10 +145,11 @@ class TimeNodeView is AbstractNode
     override function update to () 
     {
         if (expanded) {
-            var y = 0.0;
+            var y = -trax.getViewHeight();
             for (i in content) {
                 i.ty = y;
                 const tv = i.content[0] as TimeNodeView;
+                //println("row = {tv.row}, rowcount = {tv.rowCount} for {tv.target.id}");
                 y -= trax.getViewHeight() * tv.rowCount;
             }
         }
@@ -117,7 +161,8 @@ class TimeNodeView is AbstractNode
     var h = bind trax.getViewHeight();
     var fg = bind if w == 0 then bg else if (selected1) then CLIP_SELECTED_LABEL_PAINT else CLIP_LABEL_PAINT;//ColorPaint(Color.color(.7, .7, .7, 1));
     var bg = bind getFill(target);
-    override var transform = bind translate(playX + w / 2.0, -(row+1)*trax.getViewHeight());
+    var bg1 = ColorPaint(Color.color(.83, .83, .83));
+    override var transform = bind translate(playX + w / 2.0, 0);
     override var internalContent = Group {
 	content:
 	Group {
@@ -125,7 +170,12 @@ class TimeNodeView is AbstractNode
 	    content:
 	    [Group {
 		content: 
-                 [Rectangle is MouseInputHandler {
+                [Rectangle {
+		     height: bind h;
+		     width: bind w + trax.durationToX(target.contentBounds.start);
+		     fillPaint: bind bg1;
+                },
+                Rectangle is MouseInputHandler {
                      transform: bind translate(trax.durationToX(target.contentBounds.start), 0);
 		     height: bind h;
 		     width: bind w;
@@ -151,7 +201,7 @@ class TimeNodeView is AbstractNode
 		 },
 		 Text.Label {
 		     blocksPointer: false;
-		     transform: bind translate(20, font.descent);
+                     transform: bind translate(20+trax.durationToX(target.contentBounds.start), font.descent);
 		     //height: bind h;
 		     width: bind Math.max(w, 100);
 		     background: null;
@@ -286,11 +336,14 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
         println("ON DROP {pt}");
         println("row={yToRow(pt.y)}");
         const row = yToRow(pt.y);
-        const targetNode = rowToTimeNodeView(row).target;
+        const tv = rowToTimeNodeView(row);
+        const targetNode = tv.target;
         println("targetNode={targetNode}");
         if (targetNode is TimeGroup) {
+            tv.getParentTimeNodeView().open();
             insert clip into (targetNode as TimeGroup).content;
         } else if (targetNode <> null) {
+            tv.open();
             const g = targetNode as TimeGroup;
             insert clip after g.content[Sequences.indexOf(g.content, targetNode)];
         } else {
@@ -351,8 +404,14 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
     };
 
     override function update {
-	for (t in timeNodeViews) t.row = indexof t;
+        var j = 0;
+	for (t in timeNodeViews) {
+            j = t.updateRows(j);
+        }
+        rowCount = j;
     }
+
+    var rowCount is Integer;
 
     readonly var timeNodeViews is TimeNodeView[] = bind getTimeNodes(clips);
     
@@ -418,7 +477,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
         var j = 0;
         for (i in timeNodeViews) {
             if (j + i.rowCount > row) {
-                return i.getRow(j);
+                return i.getRow(row-j);
             }
             j += i.rowCount;
         }
@@ -448,7 +507,8 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 
     bound function durationToX from (d0 is Duration, loop is Boolean) to Number
     {
-	var d = if (loop and targetNode.contentBounds.duration() > 0s) d0.rem(targetNode.contentBounds.duration()) else d0;
+        var dur = targetNode.contentBounds.duration();
+	var d = if (loop and dur > 0s) d0.rem(dur) else d0;
 	var pixels = d / 1s * pixelsPerSecond();
 	return pixels;
     }
@@ -534,6 +594,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
             target: t;
         }
     }
+
 
     function drawLabels from (w is Number, h is Number, offset is Number, frameRateN is Number) to Node[] 
     {
@@ -642,7 +703,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	     override var tx = bind -getSelf().width/2+15-frameToX(scrollOffset);
 	     content:
 	     [TransformNode {
-                 ty: bind height / 2 + 2 - 15;
+                 ty: bind height / 2 + 2 - 15 - getViewHeight();
 		 content: bind timeNodeViews;
 	     },
 	     TransformNode { ty: -6, content: bind playhead }]
@@ -652,29 +713,31 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
     override function onKeyDown from (e is KeyboardEvent) to () {
 	var i = selectedTimeNodeView.row;
 	if (e.keyCode == Keys.Down) {
-	    const n = timeNodeViews[i+1];
+	    const n = rowToTimeNodeView(i+1);
 	    if (n <> null) {
 		selectTimeNodeView(n);
 	    }
 	} else if (e.keyCode == Keys.Up) {
-	    const n = timeNodeViews[i-1];
+	    const n = rowToTimeNodeView(i-1);
 	    if (n <> null) {
 		selectTimeNodeView(n);
 	    }
 	} else if (e.keyCode == Keys.Home) {
-	    const n = timeNodeViews[0];
+	    const n = rowToTimeNodeView(0);
 	    if (n <> null) {
 		selectTimeNodeView(n);
 	    }
 	} else if (e.keyCode == Keys.End) {
-	    const n = timeNodeViews[clips.size()-1];
+	    const n = rowToTimeNodeView(rowCount-1);
 	    if (n <> null) {
 		selectTimeNodeView(n);
 	    }
 	} else if (e.keyCode == Keys.Left) {
 	    if (e.metaKey) {
 		advancePlayhead(-1);
-	    } else {
+	    } else  if (selectedTimeNodeView.expanded) {
+                selectedTimeNodeView.close();
+            } else {
 		selectedTimeNodeView.target.playTime -= frameToDuration(1);
 		updatePlayhead()
 	    }
@@ -682,15 +745,19 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	    if (e.metaKey) {
 		advancePlayhead(1);
 	    } else {
-		selectedTimeNodeView.target.playTime += frameToDuration(1);
-		updatePlayhead()
+                if (not selectedTimeNodeView.expanded) {
+                    selectedTimeNodeView.open();
+                } else {
+                    selectedTimeNodeView.target.playTime += frameToDuration(1);
+                    updatePlayhead();
+                }
 	    }
 	} else if (e.keyCode == Keys.Delete or e.keyCode == Keys.Backspace) {
 	    if (selectedTimeNodeView.target <> null) {
 		var selectedIndex = selectedTimeNodeView.row;
 		removeClip(selectedTimeNodeView.target);
-		selectedIndex = Math.min(selectedIndex, clips.size()-1);
-		selectTimeNodeView(timeNodeViews[selectedIndex]);
+		selectedIndex = Math.min(selectedIndex, rowCount-1);
+		selectTimeNodeView(rowToTimeNodeView(selectedIndex));
 	    }
 	}
     }
@@ -702,7 +769,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 
     function selectTimeNodeView from (x is TimeNodeView) to () {
 	if (x <> null) {
-	    temporalHierarchy.selectTimeNode(x.target);
+            //    temporalHierarchy.selectTimeNode(x.target);
 	}
 	selectedTimeNodeView = x;
     }

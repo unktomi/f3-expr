@@ -1,12 +1,21 @@
 package expr;
 import f3.media.scene.*;
+import f3.media.input.*;
 
 const W = 14.0;
 const H = 14.0;
 
-public class Scrollpane is ResizableNode {
+public class Scrollpane is ResizableNode, Focuser {
+
+    override public function getTargetOfFocus to Focusable 
+    {
+	if (content is Focuser) then (content as Focuser).getTargetOfFocus() 
+            else null;
+    }
 
     public var content is ResizableNode;
+
+    public var leftInset is Number = 0.0;
 
     public var canZoomVertical is Boolean = true;
     public var canZoomHorizontal is Boolean = true;
@@ -29,6 +38,7 @@ public class Scrollpane is ResizableNode {
                 }
             };
         internalContent.foldLeft((), f);
+        var p = currentScrollable;
         if (r <> null) {
             currentScrollable = r;
         } else {
@@ -45,6 +55,7 @@ public class Scrollpane is ResizableNode {
     override function update {
         findScrollable();
         super.update();
+        content.resize(width-W, height-H);
     }
 
     var currentScrollable is Scrollable;
@@ -74,11 +85,11 @@ public class Scrollpane is ResizableNode {
         },
         TransformNode {
             ty: bind -height/2 + H / 2
-            tx: bind -W/2
+            tx: bind -W/2 +leftInset/2;
             content: HScrollbar {
                 canZoom: bind canZoomHorizontal;
                 height: H;
-                width: bind width-W;
+                width: bind width-W-leftInset;
                 tx: bind currentScrollable.getTx();
                 sx: bind currentScrollable.getSx();
                 override function setRect from (tx is Number, 
