@@ -51,7 +51,7 @@ function saveEditorState from (scene is Scene) to () {
     scene.root.foldLeft((), f);
     const w = new java.io.BufferedWriter(new java.io.FileWriter(".expr.editorstate"));
     IO.writeObject(w, EditorState {
-            windowHeight: scene.stage.height;
+            windowHeight: scene.stage.height+21;
             windowWidth: scene.stage.width;
             internalWindows: internalWindows;
         });
@@ -749,6 +749,7 @@ public function run from (args is String[]) to ()
 					 targetNode: bind currentTransform as ResourceNode;
 					 targetSpace: bind mainScene.root;
 					 targetTime: bind mainTimeLayer;
+                                         visible: bind currentTransform <> null;
 				    }
 				 }]
 

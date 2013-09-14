@@ -52,8 +52,7 @@ public class TransitionLayerAsset is ClipAsset {
     var count = 1;
     override public function getClip to TimeNode {
 	TransitionLayer {
-	    id: "/Transition Layer {count++}";
-	    playRange: Interval { start: 0s, end: 1s }
+	    id: "Transition Layer {count++}";
 	}
     }
 }
