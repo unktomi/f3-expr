@@ -2,7 +2,11 @@ package expr;
 import expr.Treeview.*;
 import f3.media.scene.*;
 import expr.ResourceNode.*;
+import expr.prog.Expression;
+import expr.prog.Expression.Member;
+import expr.inspector.Inspector;
 import f3.math.*;
+import f3.reflect.*;
 
 public abstract class Asset {
     public var url is String;
@@ -105,13 +109,105 @@ function makeAsset from (r is ResourceNode) to Asset {
     }
 }
 
+public class PackageAsset is Asset {
+    public var packages is PackageAsset[];
+    public var classNames is String[];
+    override var containedAssets = bind [packages, foreach (c in classNames) ClassAsset { className: c }];
+}
+
+public class ClassAsset is Asset {
+    public const className is String;
+    override var name = bind Names.formatName(className);
+    public var clazz is F3ClassType = bind Reflect.getType(className.replace("/", ".")) as F3ClassType;
+    override var containedAssets = bind foreach (m in Expression.introspect(clazz)) MemberAsset {
+        member: m;
+    }
+}
+
+public class MemberAsset is Asset {
+    public const member is Member;
+    override var name = bind Names.formatName(member.m.getName());
+}
+
+const packMap = new java.util.HashMap of (String, PackageAsset);
+
+function findPackage from (str is String) to PackageAsset {
+    var r = packMap.get(str);
+    if (r == null) {
+        println("FIND PACK: {str}");
+        if (str == "") {
+            r = PackageAsset {
+                name: "Code";
+            }
+            packMap.put(str, r);
+            return r;
+        }
+        const slash = str.lastIndexOf("/");
+        const parentName = if (slash < 0) then "" else str.substring(0, slash);
+        const name = str.substring(slash + 1);
+        const p = findPackage(parentName);
+        r = PackageAsset {
+            name: name;
+        }
+        insert r into p.packages;
+        packMap.put(str, r);
+    }
+    return r;
+}
+
+function getPackageAssets to PackageAsset {
+    const bcp = java.lang.System.getProperty("boot.class.path");
+    const cp = java.lang.System.getProperty("java.class.path");
+    for (x in [bcp.split(java.io.File.pathSeparator), cp.split(java.io.File.pathSeparator)]) {
+        println("CLASSPATH: {x}");
+        const f = new java.io.File(x);
+        if (f.isDirectory()) {
+            for (file in f.listFiles()) {
+                const name = file.getName();
+                if (not name.endsWith(".class")) {
+                    continue;
+                }
+                const slash = name.lastIndexOf("/");
+                if (slash < 0) continue;
+                const parentName = name.substring(0, slash);
+                const pack = findPackage(parentName);
+                insert name.substring(0, name.length()-6) into pack.classNames;
+            }
+        } else {
+            const jar = new java.util.jar.JarFile(f.getAbsolutePath());
+            const e = jar.entries();
+            while (e.hasMoreElements()) {
+                const entry = e.nextElement();
+                const name = entry.getName();
+                if (not name.endsWith(".class")) {
+                    continue;
+                }
+                if (name.contains("$Mixin") or name.contains("$BFunc") or name.contains("$ObjLit") or name.contains("Local$") or name.contains("$Script")) {
+                    continue;
+                }
+                for (i in [0..9]) {
+                    if (name.contains("${i}")) {
+                        continue;
+                    }
+                }
+                const slash = name.lastIndexOf("/");
+                if (slash < 0) continue;
+                const parentName = name.substring(0, slash);
+                const pack = findPackage(parentName);
+                insert name.substring(slash+1, name.length()-6) into pack.classNames;
+            }
+        }
+    }
+    return packMap.get("");
+}
+
 public class AssetModel is Treemodel {
     public var resources is ResourceGroup;
     override var root = AssetTreenode {
 	asset: Asset {
 	    name: "Assets";
 	    containedAssets: bind 
-	    [TransitionLayerAsset{}, foreach (r in resources.resources) makeAsset(r)]
+	    [getPackageAssets(), TransitionLayerAsset{}, foreach (r in resources.resources) makeAsset(r)]
 	}
     }
 }

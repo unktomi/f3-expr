@@ -12,7 +12,7 @@ public function formatName from (str is String) to String
 public function uncamelCase from (str is String) to String 
 {
     const buf = new java.lang.StringBuffer();
-    const seps = "_.";
+    const seps = "_.$";
     var last is Character = "a".charAt(0);
     var forceUpper = true;
     for (c0 in str.toCharArray()) {
