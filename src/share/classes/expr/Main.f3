@@ -708,12 +708,38 @@ public function run from (args is String[]) to ()
                                                              }
                                                          }
                                                      }
-					 }]
-                                     }
-				 }]
-			    }
-			 }
-		     },
+					 }]; 
+                                         }
+                                 },
+                                         Tabview.Tab {
+				            title: "Other";
+                                             content:
+                                             Tabview {
+                                                 tabs:
+                                                 [Tabview.Tab {
+                                                     title: "Inspector";
+                                                     content: Scrollpane {
+                                                        canZoomVertical: false;
+                                                             //content: inspector3 = Inspector {
+                                                             //      inspecting: bind Inspector.inspect(otherHierarchy.selectedObject);
+                                                             //}
+                                                     }
+                                                  },
+                                                  Tabview.Tab {
+                                                      title: "Hierarchy";
+                                                      content:
+                                                      Scrollpane {
+                                                          canZoomVertical: false;
+                                                          //content:
+                                                          //Treeview {
+                                                          //}]
+                                                      }
+                                                  }];
+                                             }
+                                         }];
+                             }
+                         }
+                     },
 		     InternalWindow {
                         id: "Editor2";            
 			containerBounds: bind Bounds.boundsFromRect(0, 
@@ -779,11 +805,15 @@ public function run from (args is String[]) to ()
 	*/
     }
     function deleteAnimResource from (n is TimeNode) to () {
-	if (n is ResourceTimeNode) {
-	    const rn = n as ResourceTimeNode;
-	    delete n as ResourceTimeNode from currentAnimResource.resources;
-	    //trax.setClips(currentAnimResource.resources);
-	}
+        var x = n;
+        while (x <> null) {
+            if (x is ResourceTimeNode) {
+                const rn = x as ResourceTimeNode;
+                delete n as ResourceTimeNode from currentAnimResource.resources;
+                return;
+            }
+            x = x.parent;
+        }
     }
 
     function deleteResource from (n is Node) to () {

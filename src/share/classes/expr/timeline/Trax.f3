@@ -39,6 +39,7 @@ public const CLIP_SELECTED_LABEL_PAINT = ColorPaint(CLIP_SELECTED_LABEL_COLOR);
 
 class TimeNodeView is AbstractNode 
 {
+    public var cy is Number;
     public var row is Integer;
     public var trax is Trax;
     public var target is TimeNode;
@@ -149,7 +150,6 @@ class TimeNodeView is AbstractNode
             for (i in content) {
                 i.ty = y;
                 const tv = i.content[0] as TimeNodeView;
-                //println("row = {tv.row}, rowcount = {tv.rowCount} for {tv.target.id}");
                 y -= trax.getViewHeight() * tv.rowCount;
             }
         }
@@ -167,8 +167,8 @@ class TimeNodeView is AbstractNode
 	content:
 	Group {
             var dx is Number;
-	    content:
-	    [Group {
+	    content: bind
+	    [if (target == null) then null else Group {
 		content: 
                 [Rectangle {
 		     height: bind h;
@@ -234,7 +234,7 @@ class TimeNodeView is AbstractNode
                          }
                      }
                  }]
-	      },
+              },
               Group { 
                   transform: bind translate(-w/2, 0);
                   content: bind if (expanded) then content else [] 
@@ -404,11 +404,14 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
     };
 
     override function update {
-        var j = 0;
-	for (t in timeNodeViews) {
-            j = t.updateRows(j);
-        }
-        rowCount = j;
+        root.updateRows(0);
+        rowCount = root.rowCount;
+    }
+
+    const root is TimeNodeView = TimeNodeView {
+        expanded: true;
+        trax: this;
+        override var content = bind foreach (tv in timeNodeViews) TransformNode { content: bind tv }
     }
 
     var rowCount is Integer;
@@ -703,8 +706,8 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	     override var tx = bind -getSelf().width/2+15-frameToX(scrollOffset);
 	     content:
 	     [TransformNode {
-                 ty: bind height / 2 + 2 - 15 - getViewHeight();
-		 content: bind timeNodeViews;
+                 ty: bind height / 2 + 2 - 15; 
+                 content: bind root;
 	     },
 	     TransformNode { ty: -6, content: bind playhead }]
 	 }]
