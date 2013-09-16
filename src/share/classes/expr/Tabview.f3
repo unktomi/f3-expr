@@ -13,6 +13,7 @@ const FG_PAINT is Paint = ColorPaint(FG);
 const BG_PAINT is Paint = ColorPaint(BG);
 const TEXT_PAINT is Paint = ColorPaint(TEXT_COLOR);
 
+
 const TAB_HEIGHT = 15;
 
 public class Tab {

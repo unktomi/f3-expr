@@ -1,50 +1,69 @@
 package expr.prog;
 import f3.util.*;
 
-public class Instrumenter of a is Observer of a {
+public class Instrumenter of a is Observer of a 
+{
     public const debugger is Debugger;
+    public const location is Object;
     public const target is Observer;
-    override function onNext from (x is a) to () {
+
+    override function onNext from (x is a) to () 
+    {
 	debugger.onNext(this, x)
     }
-    override function onError from (e is java.lang.Exception) to () {
+
+    override function onError from (e is java.lang.Exception) to () 
+    {
 	debugger.onError(this, e)
     }
-    override function onCompleted from () to () {
+
+    override function onCompleted from () to () 
+    {
 	debugger.onCompleted(this)
     }
 }
 
-public class Debugger {
+public class Debugger 
+{
+    var programCounter is Instrumenter of ?;
 
-    public function pause from () to () {
+    public var paused is Boolean;
+
+    public function pause to ()
+    {
+        paused = true;
     }
 
-    public function resume from () to () {
+    public function resume to () 
+    {
+        paused = false;
     }
 
-    public function stepInto from () to ()
+    public function stepInto to ()
     {
     }
 
-    public function stepOver from () to ()
+    public function stepOver to ()
     {
     }
 
-    public function stepOut from () to ()
+    public function stepOut to ()
     {
     }
 
-    public function setBreakpoint from (x is Instrumenter of ?) to () {
+    public function setBreakpoint from (location is Object) to () 
+    {
     }
 
-    public function removeBreakpoint from (x is Instrumenter of ?) to () {
+    public function removeBreakpoint from (location is Object) to () 
+    {
     }
     
-    public function instrument of a from (obsvr is Observer of a)
+    public function instrument of a from (location is Object, obsvr is Observer of a)
 	to Instrumenter of a
     {
 	Instrumenter of a {
+            location: location;
 	    debugger: this;
 	    target: obsvr;
 	}

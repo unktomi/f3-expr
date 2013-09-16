@@ -755,6 +755,8 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
                     updatePlayhead();
                 }
 	    }
+        } else if (e.keyCode == Keys.Spacebar) {
+            target.paused = not target.paused;
 	} else if (e.keyCode == Keys.Delete or e.keyCode == Keys.Backspace) {
 	    if (selectedTimeNodeView.target <> null) {
 		var selectedIndex = selectedTimeNodeView.row;

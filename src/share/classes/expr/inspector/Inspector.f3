@@ -188,10 +188,11 @@ class StringField is ResizableNode {
         rightJustified: true;
         font: bind font;
         foreground: bind if (not selected) then FG_PAINT else SELECTED_FG_PAINT;
-        background: bind if (not selected) then TEXT_BG_PAINT else SELECTED_BG_PAINT;
+        //background: bind if (not selected) then TEXT_BG_PAINT else SELECTED_BG_PAINT;
+        background: null;
     };
     const d = area.observeText().subscribe(function from (t is String) to () {
-            string.set(t)
+            try { string.set(t) } catch (e is org.f3.runtime.AssignToBoundException) { } // hack  
         });
     override var internalContent = bind area;
     postinit {
@@ -325,7 +326,7 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
                 tx: bind width * .33 / 2;
                 content: StringField {
                         string: bind i as InspectedString;
-                        width: bind width * .67;
+                        width: bind width;
                         height: bind cellHeight;
                         font: bind font;
                         selected : bind i.index == selectedIndex;

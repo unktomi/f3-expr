@@ -168,6 +168,13 @@ public function introspect from (clazz is F3ClassType) to Member[]
 }
 
 public class Member {
+    public function serialize to MemberNode {
+        MemberNode {
+            declaringClass: m.getDeclaringClass().getName();
+            name: m.getName();
+            outputType: t.getName();
+        }
+    }
     public const m is F3Member; 
     public const t is F3Type;
     public const name = m.getName();
@@ -188,6 +195,14 @@ public class Member {
 
 public class FunctionMember is Member {
     public const ft is F3FunctionType;
+    override public function serialize to MemberNode {
+        FunctionMemberNode {
+            declaringClass: m.getDeclaringClass().getName();
+            name: m.getName();
+            outputType: t.getName();
+            inputTypes: foreach (i in [0..<ft.minArgs()]) ft.getArgumentType(i).getName();
+        }
+    }
 }
 
 function argName from (ft is F3FunctionType, i is Integer) to String {
@@ -339,7 +354,7 @@ class DataArrow is MeshNode.Instance {
 class ControlArrow is MeshNode.Instance {
 }
 
-public class ExpressionView is AbstractNode {
+public abstract class ExpressionView is AbstractNode {
     override function toString { "{super.toString()}: {expression}" }
     public const canvas is Canvas;
     public var expression is Expression;
@@ -389,10 +404,23 @@ public class ExpressionView is AbstractNode {
 	d2 = label.observeMouseUp().subscribe(onUp);
 	d3 = label.observeMouseDrag().subscribe(onDrag);
     }
+
+    public abstract function serialize to ExprNode; 
 }
 
 
 class FunctionView is ExpressionView {
+    public override function serialize to ExprNode {
+        const n = FunNode {
+            x: pos.x;
+            y: pos.y;
+            member: fun.member.serialize();
+        }
+        canvas.serializationMap.put(this, n);
+        n.inputs = foreach (i in inputs) canvas.serialize(i);
+        n.output = canvas.serialize(output);
+        return n;
+    } 
     public var fun is Function;
     override var transform = bind translate(pos);
     override var expression = bind fun;
@@ -464,6 +492,19 @@ public class ObjectView is ExpressionView {
     public var outputs is Member[];
     override var transform = bind translate(pos);
 
+    public override function serialize to ExprNode {
+        const n = ObjNode {
+            x: pos.x;
+            y: pos.y;
+            //inputMembers: foreach (i in inputs) i.serialize();
+            //outputMembers: foreach (i in output) i.serialize();
+        }
+        canvas.serializationMap.put(this, n);
+        n.inputs = foreach (i in inputViews) canvas.serialize(i);
+        n.outputs = foreach (i in outputViews) canvas.serialize(i);
+        return n;
+    }
+
     var inputViews is InputView[] = bind foreach (p in inputs) InputView {
 	canvas: bind canvas;
 	cellWidth: bind cellWidth;
@@ -509,21 +550,40 @@ public class ObjectView is ExpressionView {
 
 
 class GetVarView is LinkedView {
+    public override function serialize to ExprNode {
+        const n = GetNode {
+            x: pos.x;
+            y: pos.y;
+            member: get.member.serialize();
+        }
+        canvas.serializationMap.put(this, n);
+        foreach (link in tv.getLinks()) canvas.serialize(link);
+        return n;
+    }
+    
     public var get is GetVar;
+    const tv = GetTreeview {
+        canvas: bind canvas;
+        width: 150;
+        height: 200;
+        get: bind get;
+    }
     override var transform = bind translate(pos);
     override var expression = bind get;
     override var internalContent = Group {
-	content: GetTreeview {
-	    canvas: bind canvas;
-	    width: 150;
-	    height: 200;
-	    get: bind get;
-	}
+	content: bind tv;
     };
     override bound function getLinkPos to Point3 { getWorldPos() }
 }
 
 class LinkView is ExpressionView {
+    override public function serialize to ExprNode {
+        const n = LinkNode {}
+        canvas.serializationMap.put(this, n);
+        n.source = canvas.serialize(source);
+        n.target = canvas.serialize(target);
+        return n;
+    }
     public var target is LinkedView;
     public var source is LinkedView;
     function link from () to () {
@@ -556,7 +616,7 @@ class LinkView is ExpressionView {
     }
 }
 
-class LinkedView is ExpressionView {
+abstract class LinkedView is ExpressionView {
     var links is LinkView[];
     function unlink from () to () {
 	for (link in links) {
@@ -569,11 +629,22 @@ class LinkedView is ExpressionView {
 	}
     }
     public bound function getLinkPos to Point3 { pos }
-
-
 }
 
 public class InputView is LinkedView {
+    public override function serialize to ExprNode {
+        const pt = getWorldPos();
+        var n = ParamNode {
+            index: index;
+            x: pt.x;
+            y: pt.y;
+        }
+        canvas.serializationMap.put(this, n);
+        for (link in links) {
+            canvas.serialize(link);
+        }
+        return n;
+    }
     var index is Integer;
     public function getInputType to F3Type { null };
     override var transform = bind translate(0, index * -cellHeight);
@@ -599,6 +670,19 @@ public class ParameterView is InputView {
 }
 
 public class OutputView is LinkedView {
+    public override function serialize to ExprNode {
+        const pt = getWorldPos();
+        const n = ResultNode {
+            index: index;
+            x: pt.x;
+            y: pt.y;
+        }
+        canvas.serializationMap.put(this, n);
+        for (link in links) {
+            canvas.serialize(link);
+        }
+        return n;
+    }
     public var resultType is F3Type;
     public var index is Integer;
     override var transform = bind translate(0, index * -cellHeight);
@@ -718,6 +802,12 @@ class GetTreeview is ResizableNode {
 	    m: bind get.member;
 	}
     };
+    public function getLinks to LinkView[]
+    {
+        foreach (x in cellMap.values() where x.parentLink.target.visible) {
+            x.parentLink
+        }
+    }
     var treeHeight = bind Math.min(treeModel.rowCount, 8)*cellHeight;
     const self = this;
     const cellMap is java.util.Map of (MemberTreenode, MemberTreecell) =
@@ -751,9 +841,11 @@ class GetTreeview is ResizableNode {
     // fix me: move this stuff to canvas
 
     const linkStart is LinkedView = LinkedView {
+        override function serialize to ExprNode { null }
 	override var toSceneTransform = bind translate(pos);
     };
     const linkEnd is LinkedView = LinkedView {
+        override function serialize to ExprNode { null }
 	override var toSceneTransform = bind translate(pos);
     };
     const link is LinkView = LinkView {
@@ -793,11 +885,8 @@ class GetTreeview is ResizableNode {
 	    dy += e.screenDrag.y;
 	    linkStart.pos = sourcePos + new Vec3(cell.bounds.extent.x, 0, 0);
 	    linkEnd.pos = startPos + new Vec3(dx-7, dy, 0);
-	    println("e={e.sceneLocation} / {e.location}");
-	    println("link from {linkStart.pos} to {linkEnd.pos}");
 	    canvas.targetArrow.tx = linkEnd.pos.x;
 	    canvas.targetArrow.ty = linkEnd.pos.y;
-	    println("picked => {canvas.pickInput(e, tn.m.t)}");
 	});
     const onUp = tv.observeMouseUp().subscribe(function from (e is MouseEvent) to () {
 	    if (tmpLink == null) return;
@@ -850,26 +939,27 @@ public class LinkInfo {
 class Holder is Group, Scissored {
 }
 
-public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollable {
+public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollable, MouseInputHandler {
 
-    public bound function getTx to Number { 1.0-(cx + width/2.0) / width }
-    public bound function getSx to Number { 
+    override public bound function getTx to Number { 1.0-(cx + width/2.0) / width }
+    override public bound function getSx to Number { 
         //Math.max(width / localSpace.contentBounds.width(), 1.0);
         0.1
     }    
-    public bound function getTy to Number { (cy + height/2.0) / height }
 
-    public bound function getSy to Number { 
+    override public bound function getTy to Number { (cy + height/2.0) / height }
+
+    override public bound function getSy to Number { 
         //Math.max(height / localSpace.contentBounds.height(), 1.0);
-        0.1
+        0.2
     }
 
-    public function setX from (tx is Number, sx is Number) to ()
+    override public function setX from (tx is Number, sx is Number) to ()
     {
         cx = (0.5-tx) * width;
     }
 
-    public function setY from (ty is Number, sy is Number) to ()
+    override public function setY from (ty is Number, sy is Number) to ()
     {
         cy = ty * height - height/2.0;
     }
@@ -954,7 +1044,9 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 	unsubscribe();
     }
 
-    var rootView is Node = TransformNode { tx: bind -width / 2.0 + 120, content: bind makeGetter(event) };
+    var rootView is Node = TransformNode { tx: bind -width / 2.0 + 120, content: bind rootExprView };
+
+    var rootExprView is GetVarView = bind makeGetter(event);
 
     var varRoot is GetVar;
 
@@ -1009,18 +1101,28 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 	   },
 	   localSpace = Group 
            { 
-	       transform: bind translate(cx, cy);
-	       content: [Group { content: bind rootView }, Group { content: bind views }, Group { content: bind arrows}]; 
-	   },
-	   MeshNode {
-		transform: bind translate(cx, cy);
-		id: "lines"
-		pickable: false;
-		override var mesh = bind linkMesh;
-		shader: effectLoader.loadPaintShader(ColorPaint(Color.color(.25, .25, .25)));
-	    }]
+	       transform: bind translate(cx, cy) * scale(zoomx, zoomy);
+	       content: [Group { content: bind rootView }, Group { content: bind views }, Group { content: bind arrows},
+                         MeshNode {
+                             id: "lines"
+                                 pickable: false;
+                             override var mesh = bind linkMesh;
+                             shader: effectLoader.loadPaintShader(ColorPaint(Color.color(.25, .25, .25)));
+                         }]
+           }]
         };
     };
+
+    var zoomx = 1.0;
+    var zoomy = 1.0;
+
+    override function onMouseWheel from (e is MouseWheelEvent) to ()
+    {
+        if (e.metaKey) {
+            zoomy *= 1+e.scroll.y*.1;
+            zoomx = zoomy;
+        }
+    }
 
     const printlnFun = Function {
 	fun: getFunction("expr.Console", "println", ["Object"]);
@@ -1175,9 +1277,27 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 	    }
 	}
     }
+
+    const serializationMap = new java.util.IdentityHashMap of (ExpressionView, ExprNode);
+
+    function serialize from (e is ExpressionView) to ExprNode {
+        if (e == null) return null;
+        var r = serializationMap.get(e);
+        println("serializing: { e } => { r }");
+        if (r <> null) return r;
+        return e.serialize();
+    }
     
     function visit from (e is Expression) to String
     {
+        serializationMap.clear();
+        serialize(rootExprView);
+        const w = new java.io.StringWriter();
+        println("root={rootExprView} => {serializationMap.get(rootExprView)}");
+        for (obj in serializationMap.values()) {
+            IO.writeObject(w, obj);
+        }
+        println("serialize => {w}");
 	var terms is Expression[];
 	getTerminals(e, 
 		     function from (x is Expression) to ()
@@ -1350,6 +1470,52 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 		}
 	}) into subs;	
     }
+}
+
+public class MemberNode {
+    public var name is String;
+    public var declaringClass is String;
+    public var outputType is String;
+}
+
+public class VarMemberNode is MemberNode {
+}
+
+public class FunctionMemberNode is MemberNode {
+    public var inputTypes is String[];
+}
+
+public class ExprNode {
+    public var id is String;
+    public var x is Number;
+    public var y is Number;
+    public var member is MemberNode;
+}
+
+public class FunNode is ExprNode {
+    public var inputs is ExprNode[];
+    public var output is ExprNode;
+}
+
+public class LinkNode is ExprNode {
+    public var source is ExprNode;
+    public var target is ExprNode;
+}
+
+public class ObjNode is ExprNode {
+    public var inputs is ExprNode[];
+    public var outputs is ExprNode[];
+}
+
+public class GetNode is ExprNode {
+}
+
+public class ParamNode is ExprNode {
+    public var index is Integer;
+}
+
+public class ResultNode is ExprNode {
+    public var index is Integer;
 }
 
 public class Editor is ResizableNode, Focuser {
