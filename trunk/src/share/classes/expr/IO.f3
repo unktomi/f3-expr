@@ -185,6 +185,9 @@ function writeObject from (writer is ContentHandler, obj is Object) to ()
 
 function writeValue from (writer is ContentHandler, k is F3Value) to ()
 {
+    if (k == null or k.isNull()) {
+        return;
+    }
     if (k is F3PrimitiveValue) {
 	writer.primitive((k as F3PrimitiveValue).asObject());
     } else if (k is F3SequenceValue) {
@@ -196,7 +199,7 @@ function writeValue from (writer is ContentHandler, k is F3Value) to ()
 	}
 	writer.endArray();
     } else {
-	const t = k.getType();
+	const t = (k as F3ObjectValue).getClassType();
 	if (STRING_TYPE.isAssignableFrom(t)) {
 	    writer.primitive((k as F3Local.ObjectValue).asObject());
 	} else if (DURATION_TYPE.isAssignableFrom(t)) {

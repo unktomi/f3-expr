@@ -329,6 +329,7 @@ public function run from (args is String[]) to ()
     }
 
     const cachedScene = CachedScene {
+        background: null;
 	scene: mainScene;
     }
 
@@ -502,6 +503,7 @@ public function run from (args is String[]) to ()
 	     }]
 	     
 	}
+
 	height: 800, width: 1020;
 	
 	content: [cachedScene,
@@ -809,7 +811,7 @@ public function run from (args is String[]) to ()
         while (x <> null) {
             if (x is ResourceTimeNode) {
                 const rn = x as ResourceTimeNode;
-                delete n as ResourceTimeNode from currentAnimResource.resources;
+                delete x as ResourceTimeNode from currentAnimResource.resources;
                 return;
             }
             x = x.parent;

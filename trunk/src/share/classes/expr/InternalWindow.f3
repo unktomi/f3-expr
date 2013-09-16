@@ -11,6 +11,9 @@ import java.lang.Math;
 class ContentHolder is Group, Scissored {
 }
 
+const selectedTitlePaint = ColorPaint(Color.color(.2, .2, .2));
+const titlePaint = ColorPaint(Color.color(.3, .3, .3));
+
 public class InternalWindow is ResizableNode, Focuser {
 
     public var containerBounds is Bounds;
@@ -18,6 +21,8 @@ public class InternalWindow is ResizableNode, Focuser {
     public var cy is Number;
 
     var dirty = true;
+
+    public var selected is Boolean;
 
     override function resize from (w0 is Number, h0 is Number) to ()
     {
@@ -37,9 +42,10 @@ public class InternalWindow is ResizableNode, Focuser {
                 override function getTargetOfFocus from () to Focusable {  self.getTargetOfFocus() }
                 height: 12;
                 override var width = bind self.width;
-                fillPaint: ColorPaint(Color.color(.2, .2, .2));
+                fillPaint: bind if selected then selectedTitlePaint else titlePaint;
             },
         Image {
+            visible: bind selected;
             url: bind "{__DIR__}close.png";
             transform: bind translate(-width/2+6.5, 0);
         }]
@@ -58,7 +64,7 @@ public class InternalWindow is ResizableNode, Focuser {
         [Rectangle {
             height: 18;
             override var width = bind self.width;
-            fillPaint: ColorPaint(Color.color(.3, .3, .3));
+            fillPaint: bind titlePaint;
         },
         Image {
             transform: bind translate(-width/2 + 74/2, 1);
@@ -112,6 +118,8 @@ public class InternalWindow is ResizableNode, Focuser {
 	    dirty = false;
 	    resize(width, height);
 	}
+        var g = parent as Group;
+        selected = g.content[g.content.size()-1] == this;
 	super.update();
     }
 
@@ -123,7 +131,14 @@ public class InternalWindow is ResizableNode, Focuser {
 	{
 	    dx = cx;
 	    dy = cy;
-	    toFront()
+            toFront();
+	}
+    };
+
+    const onButtonDown = DefaultObserver of MouseEvent {
+	override function onNext from (event is MouseEvent) to ()
+	{
+
 	}
     };
 
@@ -170,7 +185,8 @@ public class InternalWindow is ResizableNode, Focuser {
     };
 
     postinit {
-	titleBar.observeMouseDown().subscribe(onDown);
+	internalContent.observeMouseDown().subscribe(onDown);
+        buttonBar.observeMouseDown().subscribe(onButtonDown);
 	titleBar.observeMouseUp().subscribe(onUp);
 	titleBar.observeMouseDrag().subscribe(onMove);
     	resizeCorner.observeMouseDrag().subscribe(onResize);

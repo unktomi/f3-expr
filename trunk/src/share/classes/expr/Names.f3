@@ -15,14 +15,16 @@ public function uncamelCase from (str is String) to String
     const seps = "_.$";
     var last is Character = "a".charAt(0);
     var forceUpper = true;
-    for (c0 in str.toCharArray()) {
+    for (i in [0..<str.length()]) {
+        const c0 = str.charAt(i);
+        const c1 = if str.length() > i+1 then str.charAt(i+1) else "A".charAt(0);
         const c = if (forceUpper) then Character.toUpperCase(c0) else c0;
         forceUpper = false;
         if (seps.indexOf(c) >= 0) {
             buf.append(" ");
             forceUpper = true;
         } else { 
-            if (Character.isUpperCase(c)) {
+            if (Character.isUpperCase(c) and not Character.isUpperCase(c1)) {
                 if (not Character.isWhitespace(last)) {
                     buf.append(" ");
                 }

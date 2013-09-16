@@ -7,7 +7,8 @@ import expr.Names.*;
 
 public class Treenode is Treeview.Treenode {
     public var n is TimeNode;
-    override var label = bind if (n.id <> "") then formatName(n.id) else "{n}";
+    var label0 = bind if (n.parent is ResourceTimeNode) then "Main Timeline" else if (n.id <> "") then formatName(n.id) else "{n}";
+    override var label = bind label0;
     function asTimeGroup from (n is TimeNode) to TimeGroup { if (n is TimeGroup) then n as TimeGroup else null }
     override var canOpen = bind { var g = asTimeGroup(n); g.content.size() > 0 }
     override var children = bind foreach (x in getChildren(n)) Treenode { n: bind x };
