@@ -61,6 +61,7 @@ public function introspect from (t is F3Type) to Member[]
 
 public function introspect from (clazz is F3ClassType) to Member[]
 {
+    if (clazz == null) return [];
     if (exprMap.containsKey(clazz)) {
 	return exprMap.get(clazz);
     }
