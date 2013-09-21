@@ -111,17 +111,18 @@ function makeAsset from (r is ResourceNode) to Asset {
 
 public class PackageAsset is Asset {
     public var packages is PackageAsset[];
-    public var classNames is String[];
-    override var containedAssets = bind [packages, foreach (c in classNames) ClassAsset { className: c }];
+    public var classes is ClassAsset[];
+    override var containedAssets = bind [packages, classes]
 }
 
 public class ClassAsset is Asset {
     public const className is String;
-    override var name = bind Names.formatName(className);
+    public var classes is ClassAsset[];
+    override var name = bind Names.formatClassName(className);
     public var clazz is F3ClassType = bind Reflect.getType(className.replace("/", ".")) as F3ClassType;
-    override var containedAssets = bind foreach (m in Expression.introspect(clazz)) MemberAsset {
+    override var containedAssets = bind [classes, foreach (m in Expression.introspect(clazz)) MemberAsset {
         member: m;
-    }
+        }];
 }
 
 public class MemberAsset is Asset {
@@ -155,6 +156,8 @@ function findPackage from (str is String) to PackageAsset {
     return r;
 }
 
+const excluded = ["jogamp", "com/sun", "com/jogamp", "org.antlr", "org/antlr", "org/json", "org/f3", "jogl", "f3/jogl", "f3/animation", "f3/date", "f3/reflect", "f3/f3unit", "f3/lang", "javax"];
+
 function getPackageAssets to PackageAsset {
     const bcp = java.lang.System.getProperty("boot.class.path");
     const cp = java.lang.System.getProperty("java.class.path");
@@ -171,7 +174,7 @@ function getPackageAssets to PackageAsset {
                 if (slash < 0) continue;
                 const parentName = name.substring(0, slash);
                 const pack = findPackage(parentName);
-                insert name.substring(0, name.length()-6) into pack.classNames;
+                // @TODO
             }
         } else {
             const jar = new java.util.jar.JarFile(f.getAbsolutePath());
@@ -182,19 +185,50 @@ function getPackageAssets to PackageAsset {
                 if (not name.endsWith(".class")) {
                     continue;
                 }
-                if (name.contains("$Mixin") or name.contains("$BFunc") or name.contains("$ObjLit") or name.contains("Local$") or name.contains("$Script")) {
+
+                if (name.contains("$Mixin") or name.contains("BFunc$") or name.contains("$ObjLit") or name.contains("Local$") or name.contains("$Script")) {
                     continue;
                 }
+                var bad = false;
                 for (i in [0..9]) {
                     if (name.contains("${i}")) {
-                        continue;
+                        bad = true;
+                        break;
                     }
                 }
+                if (bad) continue;
+                for (i in excluded) {
+                    if (name.startsWith(i)) {
+                        bad = true;
+                        break;
+                    }
+                }
+                if (bad) continue;
+                println("class asset: {name}");
                 const slash = name.lastIndexOf("/");
                 if (slash < 0) continue;
                 const parentName = name.substring(0, slash);
                 const pack = findPackage(parentName);
-                insert name.substring(slash+1, name.length()-6) into pack.classNames;
+                var target is ClassAsset = null;
+                var className = name.substring(0, name.length()-6);
+                var dollar = className.lastIndexOf("$");
+                var containedClassName is String;
+                if (dollar > 0) {
+                    containedClassName = className;
+                    className = className.substring(0, dollar);
+                }
+                for (clazz in pack.classes) {
+                    if (clazz.className == className) {
+                        target = clazz;
+                        break;
+                    }
+                }
+                if (target == null) {
+                    insert (target = ClassAsset { className: className }) into pack.classes;
+                }
+                if (dollar > 0) {
+                    insert ClassAsset { className: containedClassName} into target.classes;
+                }
             }
         }
     }

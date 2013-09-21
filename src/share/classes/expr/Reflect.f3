@@ -65,7 +65,16 @@ public function getType from (name is String) to F3Type
 	    else if (name == "Boolean") then BOOLEAN_TYPE 
 		else if (name == "String") then STRING_TYPE 
 		    else if (name == "Object") then OBJECT_TYPE 
-			else { ctx.findClass(name) }
+			else { 
+                            var cls is F3ClassType; 
+                            try { 
+                                cls = ctx.findClass(name); 
+                            } catch (e is java.lang.Throwable) {
+                                println(e);
+                                cls = null
+                            } 
+                            cls;
+                        }
 }
 
 public function getVar from (classType is F3ClassType, name is String) to F3VarMember 

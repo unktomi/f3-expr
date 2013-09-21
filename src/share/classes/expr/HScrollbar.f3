@@ -74,13 +74,15 @@ public class HScrollbar is ResizableNode {
             var tx = tx0 * width + dx;
             var sx = ((x0 + w0) - tx) / width;
             if (dragType == LEFT_ZOOM) {
+                tx /= width;
             } else if (dragType == RIGHT_ZOOM) {
                 tx = self.tx;
                 sx = (w0+dx)/width;
             } else if (dragType == PAN) {
                 sx = self.sx;
+                tx /= width;
             }
-            tx = Math.min(Math.max(0, tx / width), 1.0-sx);  
+            tx = Math.min(Math.max(tx, 0.0), 1.0-sx);
             setRect(tx, sx);
         }
     }

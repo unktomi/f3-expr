@@ -37,6 +37,11 @@ public const CLIP_SELECTED_PAINT = ColorPaint(CLIP_SELECTED_COLOR);
 public const CLIP_LABEL_PAINT = ColorPaint(CLIP_LABEL_COLOR);
 public const CLIP_SELECTED_LABEL_PAINT = ColorPaint(CLIP_SELECTED_LABEL_COLOR);
 
+function debugPrint of a (label is String, value is a) to a {
+    println("{label}: {value}");
+    return value;
+}
+
 class TimeNodeView is AbstractNode 
 {
     public var cy is Number;
@@ -171,14 +176,14 @@ class TimeNodeView is AbstractNode
 	    [if (target == null) then null else Group {
 		content: 
                 [Rectangle {
-		     height: bind h;
-		     width: bind w + trax.durationToX(target.contentBounds.start);
+                     width: bind w + trax.durationToX(target.contentBounds.start);               
+                     height: bind h;
 		     fillPaint: bind bg1;
                 },
                 Rectangle is MouseInputHandler {
-                     transform: bind translate(trax.durationToX(target.contentBounds.start), 0);
-		     height: bind h;
-		     width: bind w;
+                     transform: bind translate(trax.durationToX(target.contentBounds.start), 0)
+                     height: bind h;
+                     width: bind w;
 		     fillPaint: bind bg;
 		     strokePaint: bind CLIP_LABEL_PAINT;
 		     blocksPointer: true;
@@ -423,7 +428,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	foreach (t in content) makeTimeNodeView(null, t)
     }
 
-    var frameRate is Number = bind Math.round(frameRateN);
+    var frameRate is Number = bind frameRateN;
     var frameRateN is Number = 24.0;
 
     const lineMesh = LineMesh {};
@@ -520,8 +525,8 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	pixelsPerFrame() * frameRate;
     }
 
-    bound function pixelsPerFrame to Integer { 
-        Math.max(1, frameRateN / 24.0 * PIXELS_PER_FRAME) as Integer;
+    bound function pixelsPerFrame to Number { 
+        frameRateN / 24.0 * PIXELS_PER_FRAME;
     }
     
     bound function frameToX from (frame is Number) to Number 
@@ -552,29 +557,38 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 
     function getSelf to Trax { this }
 
-    var dur = bind targetNode.contentBounds.end;
+
 
     override bound function getTx to Number { 
         if (dur == 0s) then 0.0 else frameToDuration(scrollOffset) /  dur;
     }
 
     override bound function getSx to Number { 
-        targetSx(visibleInterval.duration(), targetNode.contentBounds);
+        targetSx(visibleInterval.duration(), targetNode.contentBounds) * (frameRate / frameRateN)
     }
 
     function targetSx from (dur is Duration, bounds is Interval) to Number {
         if (0s == bounds.end) then 1.0 else dur/(dur + bounds.end);
     }
+
     override public function setY from (tx is Number, sx is Number) to ()
     {
     }
+
+    var dur = bind visibleInterval.duration() + targetNode.contentBounds.end;
     override public function setX from (tx is Number, sx is Number) to ()
     {
         println("tx={tx} sx={sx}");
+        const cur = getSx();
+        println("cur={cur}");
+        println("pixelsPerFrame={pixelsPerFrame()}");
+        println("frameRateN={frameRateN}");
         scrollOffset = durationToFrame(dur * tx);
-        var cur = getSx() / frameRateN * 24.0;
         if (sx <> 0) {
-            //frameRateN = sx / cur;
+            frameRateN *= cur / sx;
+            //println("tx=>{getTx()} sx=>{getSx()}");
+            println("pixelsPerFrame={pixelsPerFrame()}");
+            println("frameRateN={frameRateN}");
         }
     }
 
@@ -599,29 +613,29 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
     }
 
 
-    function drawLabels from (w is Number, h is Number, offset is Number, frameRateN is Number) to Node[] 
+    bound function drawLabels from (w is Number, h is Number, offset is Number, frameRateN is Number) to Node[] 
     {
 	//println("draw labels {offset}");
-	const x = -w / 2 + 15;
-	const y = h / 2 - 19;
+	var x = -w / 2 + 15 + 15;
+	var y = h / 2 - 19;
         var pp = pixelsPerFrame();
-        println("offset={offset}");
-        var off0 = offset mod 10;
-	var off = (offset - off0);
-        println("off0={off0}, off={off}");
-        off *= pp;
-        off0 *= pp;
-        println("off0={off0}, off={off}");
-	foreach (i in [0..<w step 100]) {
-	    Text.Label {
+        var off0 = offset mod pp;
+	var off = (offset - off0) * pp;
+        var off1 = off0 * pp;
+	foreach (i in [0..(w+100) step 100]) {
+	    var t = Text.Label {
 		height: 10;
 		width: 30;
-		background: this.backgroundPaint;
-		foreground: this.foregroundPaint;
-		transform: translate(-off0+x+i+10, y+10);
-		font: font;
-		text: "{Math.round((off+i)/pp) as Integer}"
+		background: bind this.backgroundPaint;
+		foreground: bind this.foregroundPaint;
+		transform: bind translate(-off1+x+i, y+10);
+		font: bind font;
+		text: bind "{Math.round((off+i)/pp) as Integer}"
 	    }
+            TransformNode {
+                tx: bind -t.content.textShape.getBounds().width() / 2
+                content: t
+            }
 	}
     }
 
@@ -634,7 +648,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	var mid is Boolean = false;
 	lineMesh.reset();
 	lineMesh.moveTo(x, y);
-        var pp is Integer = pixelsPerFrame();
+        var pp is Integer = PIXELS_PER_FRAME;
         var off0 = offset mod 10;
 	var off = (offset - off0);
         off0 *= pp;
@@ -699,7 +713,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
          MeshNode {
 	     id: "lines"
 	     pickable: false;
-	     override var mesh = bind getSelf().drawLines(getSelf().width, getSelf().height, getViewHeight(), scrollOffset);
+	     override var mesh = bind getSelf().drawLines(getSelf().width, getSelf().height, getViewHeight(), 0);//scrollOffset);
 	     shader: effectLoader.loadPaintShader(ColorPaint(Color.color(.75, .75, .75)));
 	 },
 	 TransformNode { 
