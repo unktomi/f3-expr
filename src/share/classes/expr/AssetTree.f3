@@ -89,7 +89,7 @@ public class AssetTreenode is Treenode {
     }
 }
 
-function makeAsset from (r is ResourceNode) to Asset {
+public function makeAsset from (r is ResourceNode) to Asset {
     if (r is MaResourceNode) {
 	MaAsset {
 	    model: (r as MaResourceNode).model;

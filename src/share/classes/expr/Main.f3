@@ -142,8 +142,27 @@ function readTextFile from (url is String) to (String, Integer)
 
 }
 
+public class MainContext is Context.GroupContext {
+    public var currentEvent is Context;
+    override bound function getContent to Context[] {
+        [currentEvent, content]
+    }
+}
+
 public function run from (args is String[]) to ()
 {
+    var currentEventContext = bind Context.MemberContext {
+        member: inspector1.inspecting[inspector1.selectedIndex].member;
+    };
+
+    var mainContext is Context = MainContext {
+        name: "main";
+        currentEvent: bind currentEventContext;
+    }
+
+    var contextModel is Context.ContextTreemodel = Context.ContextTreemodel {
+        rootContext: bind mainContext;
+    } 
 
     const currentResource is ResourceGroup = ResourceGroup {
 	id: "Spatial Hierarchy";
@@ -209,6 +228,8 @@ public function run from (args is String[]) to ()
 	insert rn into currentResource.resources;
 	transformHierarchy.selectNode(rn);
 	viewer.focusCamera(rn);
+        insert Context.AssetContext { asset: AssetTree.makeAsset(rn) } into contextModel.selectedGroupContext.content;
+        println("added asset to context { contextModel.selectedContext }");
     }
 
     function addTimeResource from (rn is ResourceTimeNode) to ()
@@ -221,7 +242,24 @@ public function run from (args is String[]) to ()
     {
 	playerUrl = url;
 	if (url.endsWith(".expr")) {
-
+	    const model = ExprNode {
+                webBrowserFactory: TheWebBrowserFactory
+		url: url;
+	    }
+	    const rn = ResourceNode {
+                url: url;
+                content: bind model.spatialRoot;
+	    }
+	    addResource(rn);
+	    const rtn = ResourceTimeNode {
+		url: url;
+		content: bind model.temporalRoot;
+		spatial: rn;
+	    }
+	    if (rtn.bounds.duration() > 0s) {
+		rn.temporal = rtn;
+		addTimeResource(rtn);
+	    }
 	} else if (url.endsWith(".ma")) {
 	    const model = Ma.Model {
 		url: url;
@@ -535,7 +573,25 @@ public function run from (args is String[]) to ()
                     camera: Camera2D {}; 
 		    override var content =
 		    [internalWindowsLayer = Group { content: 
-		      [InternalWindow {
+                       [InternalWindow {
+                                    id: "Editor3";
+			containerBounds: bind Bounds.boundsFromRect(0, 
+                                                                    0, 
+                                                                    width,
+                                                                    height-toolMenu.bounds.height())
+		    	height: 400, width: 300;
+                                    content: ResizableStageNode {
+                                        content: Tabview {
+                                            tabs: Tabview.Tab {
+                                                title: "Context";
+                                                content: Treeview {
+                                                    model: bind contextModel                                                  
+                                                }
+                                            }
+                                        }
+                                    }
+                       },
+                       InternalWindow {
                         id: "Editor1";            
 			containerBounds: bind Bounds.boundsFromRect(0, 
                                                                     0, 
