@@ -373,6 +373,8 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
 	return null;
     }
 
+    var modelSelection is Treenode on replace { model.selectionObserver.onNext(modelSelection) }
+
     override function preupdate {
 	if (nextSelection <> null) {
 	    model.open(nextSelection);
@@ -383,6 +385,7 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
 	    nextSelection = null;
 	    selectionRow = row;
 	}
+        modelSelection = selectedTreenode;
 	const i = scrollOffset;
 	const j = scrollOffset + visibleRows;
 	//const newRows = model.getRows(i, j+1);

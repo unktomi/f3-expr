@@ -1,0 +1,91 @@
+package expr;
+import f3.media.scene.*;
+import expr.Treeview.*;
+import expr.prog.Expression.Member;
+import f3.reflect.*;
+import expr.AssetTree.*;
+import expr.Context.*;
+
+public class Context {
+    public var parent is Context;
+    public var name is String;
+    public var contextType is F3Type;
+    public bound function getContent to Context[]  { [] }
+}
+
+public abstract class GroupContext is Context {
+    public var content is Context[];
+    public override bound function getContent to Context[]  { content }
+}
+
+public class CallContext is Context {
+    public var enclosingMethod is F3FunctionMember;
+    public var localVars is LocalVarContext[];
+    public override bound function getContent to Context[] { 
+        [if enclosingMethod.isStatic() then null else ThisContext { call: this },
+         foreach (i in [0..enclosingMethod.getType().minArgs()]) 
+         { 
+             ParameterContext {
+                 call: this;
+                 index: i;
+             }
+         },
+         localVars];
+    }
+}
+
+public class AssetContext is Context {
+    public var asset is Asset;
+    override var name = bind asset.name;
+    override public bound function getContent to Context[] { foreach (x in asset.containedAssets) AssetContext { asset: x } }
+}
+
+public class VarContext is Context {
+    public var call is CallContext;
+    public var varType is F3Type;
+}
+
+public class ParameterContext is VarContext {
+    public var index is Integer;
+    override var contextType = bind call.enclosingMethod.getType().getArgumentType(index); 
+}
+
+public class ThisContext is VarContext {
+    override var contextType = bind call.enclosingMethod.getDeclaringClass();
+}
+
+public class LocalVarContext is Context {
+}
+
+public class MemberContext is GroupContext {
+    public var member is Member;
+    override var name = bind member.name;
+    /*
+    public override bound function getContent to Context[] { 
+        [foreach (x in member.getMembers()) MemberContext { member: x }, content]
+    }
+    */
+}
+
+public class ContextTreemodel is Treemodel {
+    public var rootContext is Context;
+    public var selectedContext is Context;
+    public var selectedGroupContext is GroupContext;
+    override var root = ContextTreenode { context: bind rootContext };
+    const disp = selectionObserver.subscribe(function from (tn is Treenode) to () {
+            selectedContext = (tn as ContextTreenode).context;
+            var p = tn;
+            while (p <> null and not ((p as ContextTreenode).context is GroupContext)) {
+                p = p.parent;
+            }
+            selectedGroupContext = (p as ContextTreenode).context as GroupContext;
+            println("selected context => {selectedContext}");
+        });
+}
+
+public class ContextTreenode is Treenode {
+    public var context is Context;
+    override var label = bind context.name;
+    override var canOpen = bind sizeof context.getContent() > 0;
+    override var children = bind foreach (c in context.getContent()) ContextTreenode { context: bind c }
+}

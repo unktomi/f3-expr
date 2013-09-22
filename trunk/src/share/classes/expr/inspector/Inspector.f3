@@ -323,7 +323,7 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
 		}
 	    } else if (i is InspectedString) then
 	    TransformNode {
-                tx: bind width * .33 / 2;
+                    //tx: bind width * .33 / 2;
                 content: StringField {
                         string: bind i as InspectedString;
                         width: bind width;

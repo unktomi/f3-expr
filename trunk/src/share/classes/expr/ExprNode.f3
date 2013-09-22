@@ -1,0 +1,79 @@
+package expr;
+import expr.Resources.*;
+import f3.media.scene.*;
+
+public class ModelContent {
+    public var spatialRoot is Node;
+    public var temporalRoot is TimeNode;
+}
+
+public class ExprNode is AbstractNode {
+    public var webBrowserFactory is AbstractWebBrowserFactory = the AbstractWebBrowserFactory;
+    public var url is String;
+    override var id = bind url;
+    public var spatialRoot is Node = bind modelContent.spatialRoot;
+    public var temporalRoot is TimeNode = bind modelContent.temporalRoot;
+    public var modelContent = bind loadResource(url);
+    var timeline = Timeline {
+        content: TimeGroup {
+            playCount: -1;
+            content: bind temporalRoot;
+        }
+    }
+
+    function loadResource from (url is String) to ModelContent 
+    {
+        if (url.endsWith(".ma")) {
+	    const model = Ma.Model {
+		url: url;
+	    }
+            ModelContent {
+                spatialRoot: bind model.getSpatialRoot();
+                temporalRoot: bind model.getTemporalRoot();
+            }
+        } else if (url.endsWith(".expr")) {
+            var r = Resources.open(url);
+            var spatialRoot = Group {
+                content: foreach (x in r.spatialResources) {
+                    TransformNode {
+                        id: "transform"
+                        tx: x.tx;
+                        ty: x.ty;
+                        tz: x.tz;
+                        rx: x.rx;
+                        ry: x.ry;
+                        rz: x.rz;
+                        sx: x.sx;
+                        sy: x.sy;
+                        sz: x.sz;
+                        px: x.px;
+                        py: x.py;
+                        pz: x.pz
+                        content: ExprNode {
+                            url: x.url
+                        }
+                    }
+                }
+            }
+            ModelContent {
+                spatialRoot: spatialRoot;
+            }
+	} else if (url.endsWith(".png") or url.endsWith(".jpg") or url.endsWith(".tif") or url.endsWith(".tiff") or url.endsWith(".tga")) {
+	    const image = Image { 
+		url: url;
+	    }
+            ModelContent {
+                spatialRoot: image;
+            }
+        } else {
+            ModelContent {
+                spatialRoot: WebBrowser {
+                    url: url;
+                }
+            }
+        }
+    }
+    override var internalContent = bind spatialRoot;
+}
+
+
