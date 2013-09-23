@@ -111,28 +111,41 @@ const SELECTED_BG = Color.color(.4, .4, .4);
 const SELECTED_BG_PAINT = ColorPaint(SELECTED_BG);
 const DARK_BG = Color.color(.5, .5, .5);
 const DARK_BG_PAINT = ColorPaint(DARK_BG);
+const TRANSPARENT_PAINT = ColorPaint(Color.TRANSPARENT);
+const SEMI_TRANSPARENT_PAINT = ColorPaint(Color.color(1, 1, 1, 0.1));
 
 const TEXT_BG_PAINT = ColorPaint(Color.color(.82, .82, .82));
 
 class NumberField is SliderField {
     public var i is InspectedNumber;
+    public var min is Number = 0.0;
+    public var max is Number = 1.0;
     var disp is Disposable;
     function onChange from (n is Number) to () 
     {
-	println("on change {n}");
-	t = n;
+	t = (n-min) / (max-min);
     }
     postinit {
-	t = i.get();
-	println("I.observable = {i.observable}");
+        onChange(i.get());
 	disp = i.observable.subscribe(onChange);
     }
     override var t on replace {
-	println("t={t}");
+        var n = min + (max - min)*t;
+        i.set(n);
+    }
+    override function onCommit to () {
+        const n = i.get();
+        if (n < min) {
+            min = n;
+        }
+        if (n > max) {
+            max = n;
+        }
+        onChange(n);
     }
     override function getText from (t is Number) to String
     {
-	"{%.04f t}"
+	"{%.04f (min + (max - min)*t)}"
     }
 }
 
@@ -142,18 +155,18 @@ class BooleanField is SliderField {
     function onChange from (n is Boolean) to () 
     {
 	println("on change {n}");
-	t = if (n) then 1.0 else 0.0;
+	t = if (n) then 1.0 else 0.5;
     }
     postinit {
 	onChange(i.get());
 	disp = i.observable.subscribe(onChange);
     }
     override var t on replace {
-	println("t={t}");
+        i.set(t > 0.5);
     }
     override function getText from (t is Number) to String
     {
-	if (t == 0.0) then "No" else "Yes";
+	if (t <= 0.5) then "No" else "Yes";
     }
 }
 
@@ -333,7 +346,14 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
                 }    
 	    } else if (i is InspectedObservable) {
 		null
-	    } else null]
+            } else null,
+            Rectangle {
+		 pickable: false;
+		 width: bind width;
+		 height: bind cellHeight;   
+		 strokePaint: bind if (i.index <> selectedIndex) BG_PAINT else SELECTED_BG_PAINT;
+                 fillPaint:bind if (i.index <> selectedIndex) TRANSPARENT_PAINT else SEMI_TRANSPARENT_PAINT;
+	    }]
 	 }
       }]
     }
