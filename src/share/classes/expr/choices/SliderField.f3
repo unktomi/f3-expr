@@ -20,6 +20,7 @@ public class SliderField is AbstractNode
 {
     public var height is Number = bind textArea.height;
     public var width is Number = 64;
+
     public var t is Number on replace {
 	setText(getText(t));
     }
@@ -45,7 +46,7 @@ public class SliderField is AbstractNode
 	transform: translate(0, 1);
 	rightJustified: true;
         font: layoutEngine.createFont("font-size:10;font-family:Lucida Grande;font-weight:bold");
-	pickable: false;
+        pickable: false;
     };
 
     const dark = Color.color(0.77, 0.77, 0.77);
@@ -59,18 +60,22 @@ public class SliderField is AbstractNode
     }
 
     const self = this;
-    var w = bind self.width*self.t;
+    var w = bind runWidth*self.t;
+
+    var dragw is Number;
+    var runWidth = bind width + dragw;
 
     const darkRect is Rectangle = Rectangle {
 	fillPaint: bind ColorPaint(dark);
-	override var transform = bind translate(-self.width/2 + self.w/2, 0);
+	override var transform = bind translate(-runWidth/2 + self.w/2, 0);
 	height: bind height;
 	override var width = bind self.w;
+        pickable: false;
     }
 
     const borderRect is Rectangle = Rectangle {
 	fillPaint: bind ColorPaint(border);
-	override var transform = bind translate(-self.width/2 + self.width * self.t - 0.5, 0, 0)
+	override var transform = bind translate(-runWidth/2 + runWidth * self.t - 0.5, 0, 0)
 	height: bind height;
 	width: 1
     }
@@ -82,21 +87,34 @@ public class SliderField is AbstractNode
         darkRect,
 	textArea,
 	borderRect]
-    } on replace {
-	createHandlers()
+    } 
+
+    const onDrag = DefaultObserver of MouseEvent {
+        override function onNext from (event is MouseEvent) to ()
+        {     	       		
+            t = (event.location.x + width / 2) / width;
+         }
+    };
+
+    const onUp = DefaultObserver of MouseEvent {
+        override function onNext from (event is MouseEvent) to ()
+        {     	       		
+            onCommit();
+         }
+    };
+
+    public function onCommit to () {
     }
 
-    var disp is Disposable;
+    var disp1 = lightRect.observeMouseDrag().subscribe(onDrag);
+    var disp2 = lightRect.observeMouseUp().subscribe(onUp);
+    var disp3 = lightRect.observeMouseDown().subscribe(function from (e is MouseEvent) to ()
+                                                       {
+                                                           if (e.clickCount > 1) {
+                                                           }
+                                                       });
 
-    function createHandlers {
-        const onDrag = DefaultObserver of MouseEvent {
-	      override function onNext from (event is MouseEvent) to ()
-	      {     	       		
-		  
-		  t = clamp((event.location.x + width / 2) / width, 0.0, 1.0);
-	      }
-	}
-    	disp = lightRect.observeMouseDrag().subscribe(onDrag);
-    }
-	
+    const subject = Subject of Number {};
+    public function observeAlpha to Observable of Number { subject }
+
 }
