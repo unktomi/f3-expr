@@ -497,8 +497,6 @@ public class ObjectView is ExpressionView {
         const n = ObjNode {
             x: pos.x;
             y: pos.y;
-            //inputMembers: foreach (i in inputs) i.serialize();
-            //outputMembers: foreach (i in output) i.serialize();
         }
         canvas.serializationMap.put(this, n);
         n.inputs = foreach (i in inputViews) canvas.serialize(i);
@@ -875,7 +873,7 @@ class GetTreeview is ResizableNode {
 	    if (not arrowVis) {
 		cell.linkedView.unlink();
 		startPos = canvas.toLocal * e.picked.dragPoint0;
-		insert canvas.targetArrow into canvas.views;
+		insert canvas.targetArrow into canvas.arrows;
 		arrowVis = true;
 		link.link();
 	    }
@@ -897,7 +895,7 @@ class GetTreeview is ResizableNode {
 	    arrowVis = false;
 	    tmpLink = null;
 	    link.unlink();
-	    delete canvas.targetArrow from canvas.views;
+	    delete canvas.targetArrow from canvas.arrows;
 	    if (found <> null) {
 		cell.link();
 		const newlink = LinkView { 
@@ -941,6 +939,8 @@ class Holder is Group, Scissored {
 }
 
 public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollable, MouseInputHandler {
+
+    var prog is Program;
 
     override public bound function getTx to Number { 1.0-(cx + width/2.0) / width }
     override public bound function getSx to Number { 
@@ -1081,25 +1081,28 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     const canvas = this;
 
+    const bgRect = Rectangle {
+        factory: canvas.pathFactory;
+        id: "canvas.bg"
+        debug: true;
+        width: bind width;
+        height: bind height;
+        fillPaint: bind ColorPaint(Color.color(.9, .9, .9));
+        override function onMouseDrag from (e is MouseEvent) to ()
+        {
+            const d = (e.picked.dragPoint1-e.picked.dragPoint0);
+            println("drag={e.drag}, sceneDrag={e.sceneDrag}");
+            canvas.cx += d.x;
+            canvas.cy += d.y;
+        } 	
+    };
+
     override var internalContent = Holder { 
 	scissorBounds: bind Bounds.boundsFromRect(width, height);
 	content:
 	Group {
 	    content:
-	    [Rectangle {
-		id: "canvas.bg"
-		debug: true;
-		width: bind width;
-		height: bind height;
-		fillPaint: bind ColorPaint(Color.color(.9, .9, .9));
-		override function onMouseDrag from (e is MouseEvent) to ()
-		{
-		    const d = (e.picked.dragPoint1-e.picked.dragPoint0);
-		    println("drag={e.drag}, sceneDrag={e.sceneDrag}");
-		    canvas.cx += d.x;
-		    canvas.cy += d.y;
-		} 	
-	   },
+           [Group { content: bind bgRect },
 	   localSpace = Group 
            { 
 	       transform: bind translate(cx, cy) * scale(zoomx, zoomy);
@@ -1129,11 +1132,13 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 	fun: getFunction("expr.Console", "println", ["Object"]);
     }
 
-    public var views is Node[] = FunctionView {
+    public var views is ExpressionView[]
+     = FunctionView {
 	pos: new Point3(100, 0, 0);
 	canvas: this;
 	fun: printlnFun;
     };
+
 
     var arrows is TransformNode[];
 
@@ -1295,10 +1300,22 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         serialize(rootExprView);
         const w = new java.io.StringWriter();
         println("root={rootExprView} => {serializationMap.get(rootExprView)}");
-        for (obj in serializationMap.values()) {
-            IO.writeObject(w, obj);
+
+
+        foreach (obj in views) {
+            var x = serialize(obj);
+            println("serialize {obj} => {x}");
         }
+        var todo = ExprScene {};
+        foreach (j in serializationMap.values()) {
+            insert j into todo.views;
+        }
+        IO.writeObject(w, todo);
         println("serialize => {w}");
+        var des = IO.readObject(new java.io.StringReader(w.toString()));
+        prog.code = todo;
+
+        println("deserialized to {des}");
 	var terms is Expression[];
 	getTerminals(e, 
 		     function from (x is Expression) to ()
@@ -1324,6 +1341,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 		var obs is Observable of ?;
 		obs = f(targetNode, lookupSpatial, lookupTemporal);
 		subscribe(obs, toCompile);
+                prog.compiled = toCompile;
 	    } catch (thr is java.lang.Throwable) {
 		thr.printStackTrace();
 	    }
@@ -1493,6 +1511,10 @@ public class ExprNode {
     public var member is MemberNode;
 }
 
+public class ExprScene {
+    public var views is ExprNode[];
+}
+
 public class FunNode is ExprNode {
     public var inputs is ExprNode[];
     public var output is ExprNode;
@@ -1553,7 +1575,9 @@ public class Editor is ResizableNode, Focuser {
 	    insert prog into target.programs;
 	}
 	if (prog.canvas == null) {
+            println("creating canvas with {pathFactory}");
 	    prog.canvas = Canvas {
+                pathFactory: pathFactory;
                 width: width;
                 height: height;
 		targetNode: target,
@@ -1561,6 +1585,7 @@ public class Editor is ResizableNode, Focuser {
 		targetSpace: targetSpace;
 		targetTime: targetTime;
 	    }
+            prog.canvas.prog = prog;
 	}
 	return prog.canvas;
     }

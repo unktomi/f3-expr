@@ -160,7 +160,6 @@ class TimeNodeView is AbstractNode
         }
         super.update();
     }
-
     const self = this;
     var w = bind getWidth(target.bounds, trax.visibleInterval);
     var h = bind trax.getViewHeight();
@@ -168,6 +167,12 @@ class TimeNodeView is AbstractNode
     var bg = bind getFill(target);
     var bg1 = ColorPaint(Color.color(.83, .83, .83));
     override var transform = bind translate(playX + w / 2.0, 0);
+    function getTrackName from (target is TimeNode) to String
+    {
+        println("target: {target.id} <= {target.getClass()}");
+        println("parent: {target.parent.id} <= {target.parent.getClass()}");
+        if ((target.parent is ResourceTimeNode) and target.parent.id == target.id) then "Main Timeline" else formatName(target.id);
+    }   
     override var internalContent = Group {
 	content:
 	Group {
@@ -211,7 +216,7 @@ class TimeNodeView is AbstractNode
 		     width: bind Math.max(w, 100);
 		     background: null;
 		     foreground: bind fg;
-		     text: bind formatName(target.id);
+		     text: bind getTrackName(target);
 		     font: bind timeNodeViewFont;
 		 },
 		 Rectangle is MouseInputHandler {
@@ -605,7 +610,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 
     function makeTimeNodeView from (parent is TimeNodeView, t0 is TimeNode) to TimeNodeView 
     {
-        const t = if (t0 is ResourceTimeNode) then (t0 as ResourceTimeNode).content[0] else t0;
+        const t = t0; //if (t0 is ResourceTimeNode) then (t0 as ResourceTimeNode).content[0] else t0;
         TimeNodeView {
             trax: this;
             target: t;
