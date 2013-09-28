@@ -1,8 +1,11 @@
 package expr.prog;
 import Expression.Canvas;
 import Expression.Member;
+import Expression.ExprScene;
 
 public class Program {
     public var event is Member;
     public var canvas is Canvas;
+    public var code is ExprScene;
+    public var compiled is String;
 }

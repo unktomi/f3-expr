@@ -89,10 +89,15 @@ public class SliderField is AbstractNode
 	borderRect]
     } 
 
+    public function setT from (t is Number) to ()
+    {
+        this.t = t;
+    }     
+
     const onDrag = DefaultObserver of MouseEvent {
         override function onNext from (event is MouseEvent) to ()
         {     	       		
-            t = (event.location.x + width / 2) / width;
+            setT((event.location.x + width / 2) / width);
          }
     };
 
@@ -100,7 +105,7 @@ public class SliderField is AbstractNode
         override function onNext from (event is MouseEvent) to ()
         {     	       		
             onCommit();
-         }
+        }
     };
 
     public function onCommit to () {

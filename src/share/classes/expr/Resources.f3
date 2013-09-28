@@ -2,10 +2,12 @@ package expr;
 import f3.media.scene.*;
 import f3.media.svg.SVG;
 import java.io.File;
+import expr.prog.Expression.ExprScene;
 
 public class Resource {
     public var id is String;
     public var url is String;
+    public var programs is ProgramResource[];
 }
 
 public class ProjectResource is Resource {
@@ -70,6 +72,10 @@ function makeResource from (n is ResourceNode) to SpatialResource {
 	px: n.px;
 	py: n.py;
 	pz: n.pz;
+        programs: foreach (p in n.programs) ProgramResource {
+            code: p.code;
+            compiled: p.compiled;
+        }
     }
 }
 
@@ -88,7 +94,11 @@ public class SceneResource is Resource {
     public var name is String;
     public var spatialResources is SpatialResource[];
     public var temporalResources is TemporalResource[];
-    public var logicResources is Resource[];
+}
+
+public class ProgramResource is Resource {
+    public var code is ExprScene;
+    public var compiled is String;
 }
 
 public function save 

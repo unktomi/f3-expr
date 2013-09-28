@@ -833,7 +833,7 @@ public function run from (args is String[]) to ()
 					 targetNode: bind currentTransform as ResourceNode;
 					 targetSpace: bind mainScene.root;
 					 targetTime: bind mainTimeLayer;
-                                         visible: bind currentTransform <> null;
+                                         //visible: bind currentTransform <> null;
 				    }
 				 }]
 

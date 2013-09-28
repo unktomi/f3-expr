@@ -152,6 +152,10 @@ class NumberField is SliderField {
 class BooleanField is SliderField {
     public var i is InspectedBoolean;
     var disp is Disposable;
+    override function setT from (t is Number) to ()
+    {
+	this.t = if (t > 0.5) then 1.0 else 0.5;
+    }
     function onChange from (n is Boolean) to () 
     {
 	println("on change {n}");
@@ -176,7 +180,7 @@ class DurationField is SliderField {
     function onChange from (n is Duration) to () 
     {
 	println("on change {n}");
-	t = n.toMillis();
+	t = n.toMillis() / 1000.0;
     }
     postinit {
 	onChange(i.get());
@@ -184,10 +188,11 @@ class DurationField is SliderField {
     }
     override var t on replace {
 	println("t={t}");
+        i.set(Duration.valueOf(t * 1000.0));
     }
     override function getText from (t is Number) to String
     {
-	"{t/1000}s"
+	"{%.04f t}s"
     }
 }
 
