@@ -107,7 +107,7 @@ class ResizableStageNode is ResizableNode, Focuser {
         background: Color.GRAY;
 	content: Scene {
             background: Color.GRAY;
-	    camera: Camera2D {tx: bind Math.round(-width / 2.0), ty: bind Math.round(-height / 2.0) }
+	    camera: Camera2D { tx: bind Math.round(-width / 2.0), ty: bind Math.round(-height / 2.0) }
 	    content: bind content;
 	}
     }
@@ -833,7 +833,7 @@ public function run from (args is String[]) to ()
 					 targetNode: bind currentTransform as ResourceNode;
 					 targetSpace: bind mainScene.root;
 					 targetTime: bind mainTimeLayer;
-                                         //visible: bind currentTransform <> null;
+                                         visible: bind currentTransform <> null;
 				    }
 				 }]
 
