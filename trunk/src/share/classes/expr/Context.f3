@@ -1,10 +1,12 @@
 package expr;
 import f3.media.scene.*;
 import expr.Treeview.*;
+import expr.prog.Expression;
 import expr.prog.Expression.Member;
 import f3.reflect.*;
 import expr.AssetTree.*;
 import expr.Context.*;
+import expr.Names.*;
 
 public class Context {
     public var parent is Context;
@@ -31,6 +33,24 @@ public class CallContext is Context {
              }
          },
          localVars];
+    }
+}
+
+public class ResourceNodeContext is Context {
+    public var resource is ResourceNode;
+    override var name = bind formatName(resource.id);
+    var members = bind Expression.introspect(Reflect.getType("f3.media.scene.TransformNode") as F3ClassType);
+    public override bound function getContent to Context[] { 
+        foreach (x in members) if (not x.name.startsWith("observe")) then null else MemberContext { member: x }
+    }
+}
+
+public class ResourceTimeNodeContext is Context {
+    public var resource is ResourceTimeNode;
+    override var name = bind formatName(resource.id);
+    var members = bind Expression.introspect(Reflect.getType("f3.media.scene.TimeNode") as F3ClassType);
+    public override bound function getContent to Context[] { 
+        foreach (x in members) MemberContext { member: x }
     }
 }
 
@@ -71,6 +91,7 @@ public class ContextTreemodel is Treemodel {
     public var rootContext is Context;
     public var selectedContext is Context;
     public var selectedGroupContext is GroupContext;
+    public var selectedMember is Member;
     override var root = ContextTreenode { context: bind rootContext };
     const disp = selectionObserver.subscribe(function from (tn is Treenode) to () {
             selectedContext = (tn as ContextTreenode).context;
@@ -79,6 +100,17 @@ public class ContextTreemodel is Treemodel {
                 p = p.parent;
             }
             selectedGroupContext = (p as ContextTreenode).context as GroupContext;
+            p = tn;
+            var m is Member = null;
+            while (p <> null) {
+                var j = (p as ContextTreenode).context;
+                m = if (j is MemberContext) then (j as MemberContext).member else null;
+                if (m <> null) {
+                    break;
+                }
+                p = p.parent;
+            }
+            selectedMember = m;
             println("selected context => {selectedContext}");
         });
 }

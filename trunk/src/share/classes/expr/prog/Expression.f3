@@ -83,6 +83,7 @@ public function introspect from (clazz is F3ClassType) to Member[]
 		toInsert = Member {
 		    m: f;
 		    t: rt_t
+                    rt: rt;
 		    isObservable: true, isObserver: true;
 		}
 		println("Subject of ({getTypeArguments(rt)})");
@@ -90,6 +91,7 @@ public function introspect from (clazz is F3ClassType) to Member[]
 		toInsert = Member {
 		    m: f;
 		    t: rt_t
+                    rt: rt;
 		    isObservable: true;
 		}
 		println("Observable of ({getTypeArguments(rt)})");
@@ -97,6 +99,7 @@ public function introspect from (clazz is F3ClassType) to Member[]
 		toInsert = Member {
 		    m: f;
 		    t: rt_t
+                    rt: rt;
 		    isObserver: true;
 		}
 		println("Observer of ({getTypeArguments(rt)})");
@@ -105,6 +108,7 @@ public function introspect from (clazz is F3ClassType) to Member[]
 		    toInsert = Member {
 			m: f;
 			t: UNIT_TYPE;
+                        rt: rt;
 			isObservable: false, isObserver: true;
 		    }
 		}
@@ -119,6 +123,7 @@ public function introspect from (clazz is F3ClassType) to Member[]
 		toInsert = Member {
 		    m: f;
 		    t: rt;
+                    rt: rt;
 		    isObserver: true;
 		}
 	    } else if (ft.minArgs() == 1) {
@@ -176,6 +181,7 @@ public class Member {
             outputType: t.getName();
         }
     }
+    public const rt is F3Type;
     public const m is F3Member; 
     public const t is F3Type;
     public const name = m.getName();
@@ -185,9 +191,19 @@ public class Member {
     {
 	Expression.introspect(t);
     }
+
+    function toObservable to String {
+        const app = toApply();
+        if (OBSERVABLE_TYPE.isAssignableFrom(t)) {
+            return app;
+        }
+        return "f3.util.Observables.observe(&{app})";
+    }
+
     function toApply to String {
 	if (m is F3FunctionMember) then "{if (m.isStatic()) then m.getName() else name}()" else "{name}";
     }
+
     override function toString to String
     {
 	"m={m},t={t},name={name},isObserver={isObserver},isObservable={isObservable}";
@@ -276,7 +292,7 @@ public class GetVar is VarExpression, ObservableExpression, ObserverExpression {
 	    "(foreach ({i} in {observable.toSource()}) {i}.{member.toApply()})";
 	} else {
 	    if (observable == null) {
-		if (member.isObservable) 
+		if (OBSERVABLE_TYPE.isAssignableFrom(member.rt)) 
 		    then "{i}.{member.toApply()}"
 		    else "f3.util.Observables.observe(&{i}.{member.toApply()})";
 	    } else {
@@ -468,7 +484,7 @@ public class InputMemberExpression is MemberExpression, ObserverExpression {
 	    "(foreach ({i} in {observable.toSource()}) {target.toSource()}.{member.toApply()})";
 	} else {
 	    if (observable == null) {
-		if (member.isObservable) 
+		if (true or member.isObservable) 
 		    then "{target.toSource()}.{member.toApply()}"
 		    else "f3.util.Observables.observe(&{target.toSource()}.{member.toApply()})";
 	    } else {
@@ -1130,15 +1146,16 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     const printlnFun = Function {
 	fun: getFunction("expr.Console", "println", ["Object"]);
-    }
+    };
 
-    public var views is ExpressionView[]
+    public var views is ExpressionView[] = [];
+    /*
      = FunctionView {
 	pos: new Point3(100, 0, 0);
 	canvas: this;
 	fun: printlnFun;
     };
-
+    */
 
     var arrows is TransformNode[];
 
@@ -1495,6 +1512,15 @@ public class MemberNode {
     public var name is String;
     public var declaringClass is String;
     public var outputType is String;
+    public function deserialize to Member {
+        const members = introspect(Reflect.getType(declaringClass) as F3ClassType);
+        for (m in members) {
+            if (m.name == name) {
+                return m;
+            }
+        }
+        return null;
+    }
 }
 
 public class VarMemberNode is MemberNode {
@@ -1509,6 +1535,10 @@ public class ExprNode {
     public var x is Number;
     public var y is Number;
     public var member is MemberNode;
+    public function createView from (canvas is Canvas) to ExpressionView {
+        println("implement me!: {this}");
+        return null;
+    }
 }
 
 public class ExprScene {
@@ -1531,6 +1561,19 @@ public class ObjNode is ExprNode {
 }
 
 public class GetNode is ExprNode {
+    public function createView from (canvas is Canvas) to GetVarView {
+        GetVarView {
+            pathFactory: canvas.pathFactory;
+            layoutEngine: canvas.layoutEngine;
+            imageLoader: canvas.imageLoader;
+            effectLoader: canvas.effectLoader;
+            canvas: canvas;
+            pos: new Point3(x, y, 0);
+            get: GetVar {
+                member: member.deserialize();
+            }
+        }
+    }
 }
 
 public class ParamNode is ExprNode {
@@ -1561,6 +1604,7 @@ public class Editor is ResizableNode, Focuser {
         content: bind canvas;
     }
 
+
     function getCanvas from (target is ResourceNode, event is Member) to Canvas
     {
 	var prog is Program;
@@ -1585,6 +1629,12 @@ public class Editor is ResizableNode, Focuser {
 		targetSpace: targetSpace;
 		targetTime: targetTime;
 	    }
+            for (v in prog.code.views) {
+                const j = v.createView(canvas);
+                if (j <> null) {
+                    insert j into canvas.views;
+                }
+            }
             prog.canvas.prog = prog;
 	}
 	return prog.canvas;

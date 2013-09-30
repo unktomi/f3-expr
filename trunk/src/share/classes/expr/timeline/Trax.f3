@@ -451,7 +451,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 
     function refreshPlayhead from () to () 
     {
-	if (not playhead.dragging) {
+	if (not playhead.dragging and not backgroundDragging) {
 	    if (currentFrame < scrollOffset) {
 		scrollOffset = currentFrame;
 	    } else if (currentFrame > scrollOffset + visibleFrameCount) {
@@ -610,7 +610,10 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 
     function makeTimeNodeView from (parent is TimeNodeView, t0 is TimeNode) to TimeNodeView 
     {
-        const t = t0; //if (t0 is ResourceTimeNode) then (t0 as ResourceTimeNode).content[0] else t0;
+        var t = t0;
+        if (t0 is ResourceTimeNode and (t0 as ResourceTimeNode).content[0] is TransitionLayer) {
+            t = (t0 as ResourceTimeNode).content[0] as TransitionLayer;
+        }
         TimeNodeView {
             trax: this;
             target: t;
@@ -685,6 +688,8 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	    }
 	}
     }
+
+    var backgroundDragging = false;
     
     override var internalContent = Group {
 	content: 
@@ -697,20 +702,32 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 		{
 		    if (event.location.y >= height / 2 -15) {
 			movePlayheadTo(event.location.x+width/2-10);
-		    }
+		    } else {
+                        backgroundDragging = true;
+                    }
 		    dx = 0;
 		    startOff = scrollOffset;
 		}
 		var dx = 0.0;
 		var startOff = 0.0;
+		override function onMouseUp from (event is MouseEvent) to () 
+                {
+                    backgroundDragging = false;
+                }
 		override function onMouseDrag from (event is MouseEvent) to ()
 		{
-		    if (event.location.y < height / 2 -15) {
+		    if (backgroundDragging) {
 			dx += (event.picked.dragPoint1 - event.picked.dragPoint0).x;
 			const off = scrollOffset;
 			scrollOffset = Math.round(-xToFrame(dx) + startOff);
 			const delta = scrollOffset - off;
-			target.setPlayhead(target.playhead);
+                        if (target.playhead < visibleInterval.start) {
+                            target.setPlayhead(visibleInterval.start);
+                        } else if (target.playhead > visibleInterval.end) {
+                            target.setPlayhead(visibleInterval.end - frameToDuration(1));
+                        } else {
+                            target.setPlayhead(target.playhead);
+                        }
 		    }
 		}
 	 },

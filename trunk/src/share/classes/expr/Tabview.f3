@@ -63,7 +63,7 @@ public class Tabview is ResizableNode, Focuser {
     var labels is Text.Label[] = bind foreach (t in tabs) Text.Label {
 	blocksPointer: false;
 	indent: 5;
-	height: bind TAB_HEIGHT;
+	//height: bind TAB_HEIGHT;
 	width: bind tabWidth;
 	background: bind if (t == selectedTab) then FG_PAINT else BG_PAINT;
 	foreground: bind TEXT_PAINT;

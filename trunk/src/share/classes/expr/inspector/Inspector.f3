@@ -312,7 +312,7 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
 		    font: bind font;
 		    foreground: bind if (i.index <> selectedIndex) FG_PAINT else SELECTED_FG_PAINT;
 		    background: bind if (i.index <> selectedIndex) BG_PAINT else SELECTED_BG_PAINT;
-		    height: bind cellHeight;	    
+		    //height: bind cellHeight;	    
 		}
 	    },
 	    if (i is InspectedNumber) then
@@ -412,10 +412,13 @@ public function inspect from (obj is Object) to (Inspected of ?)[]
 			    override function set from (x is String) to () { ptr.set(x) }
 			}
 		    } else {
+                    /*
 			InspectedObservable of Object {
 			    member: m;
 			    label: m.m.getName();
 			}
+                        */
+                        null
 		    }
 		} else null;
 	    }
