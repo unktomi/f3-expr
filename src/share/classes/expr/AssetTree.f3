@@ -115,11 +115,41 @@ public class PackageAsset is Asset {
     override var containedAssets = bind [packages, classes]
 }
 
-public class ClassAsset is Asset {
+public class RootPackageAsset is PackageAsset {
+    public var primitives is TypeAsset[] = 
+        [PrimitiveTypeAsset {
+                name: "Boolean";
+                t: Reflect.BOOLEAN_TYPE;
+        },
+        PrimitiveTypeAsset {
+                name: "Integer";
+                t: Reflect.INTEGER_TYPE;
+        },
+        PrimitiveTypeAsset {
+                name: "Number";
+                t: Reflect.NUMBER_TYPE;
+        },
+        ClassAsset {
+                className: "String";
+                clazz: Reflect.STRING_TYPE;
+        }];
+    override var containedAssets = bind [primitives, packages, classes]
+}
+
+public class TypeAsset is Asset {
+    public var t is F3Type;
+    override var name = bind t.getName();
+}
+
+public class PrimitiveTypeAsset is TypeAsset {
+}
+
+public class ClassAsset is TypeAsset {
     public const className is String;
     public var classes is ClassAsset[];
     override var name = bind Names.formatClassName(className);
     public var clazz is F3ClassType = bind Reflect.getType(className.replace("/", ".")) as F3ClassType;
+    override var t = bind clazz;
     override var containedAssets = bind [classes, foreach (m in Expression.introspect(clazz)) MemberAsset {
         member: m;
         }];
@@ -137,7 +167,7 @@ function findPackage from (str is String) to PackageAsset {
     if (r == null) {
         println("FIND PACK: {str}");
         if (str == "") {
-            r = PackageAsset {
+            r = RootPackageAsset {
                 name: "Code";
             }
             packMap.put(str, r);

@@ -14,7 +14,7 @@ function clamp from (n is Number, lo is Number, hi is Number) to Number
 }
 
 const FG = ColorPaint(Color.color(.2, .2, .2));
-const BG = ColorPaint(Color.color(0, 0, 0, 0));
+const BG = ColorPaint(Color.color(.85, .85, .85, 1));
 
 public class SliderField is AbstractNode
 {
@@ -41,7 +41,7 @@ public class SliderField is AbstractNode
 
     const textArea is Text.Area = Text.Area {
 	foreground: FG;
-        background: BG;
+        background: null;
 	width: bind width+4;
 	transform: translate(0, 1);
 	rightJustified: true;
