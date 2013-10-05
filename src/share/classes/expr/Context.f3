@@ -13,6 +13,12 @@ public class Context {
     public var name is String;
     public var contextType is F3Type;
     public bound function getContent to Context[]  { [] }
+    public function updateParent to () {
+        for (c in getContent()) {
+            c.parent = this;
+            c.updateParent();
+        }
+    }
 }
 
 public abstract class GroupContext is Context {
@@ -41,7 +47,7 @@ public class ResourceNodeContext is Context {
     override var name = bind formatName(resource.id);
     var members = bind Expression.introspect(Reflect.getType("f3.media.scene.TransformNode") as F3ClassType);
     public override bound function getContent to Context[] { 
-        foreach (x in members) if (not x.name.startsWith("observe")) then null else MemberContext { member: x }
+        foreach (x in members) if (not x.name.startsWith("observe")) then null else MemberContext { member: x, parent: this }
     }
 }
 
@@ -50,7 +56,7 @@ public class ResourceTimeNodeContext is Context {
     override var name = bind formatName(resource.id);
     var members = bind Expression.introspect(Reflect.getType("f3.media.scene.TimeNode") as F3ClassType);
     public override bound function getContent to Context[] { 
-        foreach (x in members) MemberContext { member: x }
+        foreach (x in members) MemberContext { member: x, parent: this }
     }
 }
 

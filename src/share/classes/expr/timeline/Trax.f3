@@ -263,12 +263,12 @@ public class Playhead is AbstractNode
 
     const playhead_top = Image { 
 	url: "{__DIR__}playhead_top.png" 
-	transform: bind translate(0, height/2);
+	transform: bind translate(0, height/2-5);
     };
 
     const playhead_middle = Image { 
 	url: "{__DIR__}playhead_middle.png";
-	transform: bind scale(1, (height-15)/8)
+	transform: bind translate(0, -5) * scale(1, (height-15)/8)
     };
 
     const playhead_bottom = Image { 
@@ -657,19 +657,21 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	lineMesh.reset();
 	lineMesh.moveTo(x, y);
         var pp is Integer = PIXELS_PER_FRAME;
-        var off0 = offset mod 10;
-	var off = (offset - off0);
-        off0 *= pp;
-        x -= off0;
-	for (i in [0..(w+off0) step pp]) {
+        var off0 = offset mod pp;
+	var off = (offset - off0) * pp;
+        var off1 = off0 * pp;
+        x += off1;
+        println("OFF={offset}");
+	for (i in [0..(w+off) step pp]) {
 	    var n = if (mid) then 3 else 5;
 	    mid = not mid;
 	    lineMesh.moveTo(x+i, y);
 	    lineMesh.lineTo(x+i, y+n);
 	}
+        x = x0;
 	for (i in [0..<h step pp]) {
 	    lineMesh.moveTo(x, y);
-	    lineMesh.lineTo(x + off0+width-pp, y);
+	    lineMesh.lineTo(x + width, y);
 	    y -= viewHeight;
 	    println("y={y}");
 	}
@@ -700,8 +702,8 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 		fillPaint: bind ColorPaint(backgroundColor);
 		override function onMouseDown from (event is MouseEvent) to ()
 		{
-		    if (event.location.y >= height / 2 -15) {
-			movePlayheadTo(event.location.x+width/2-10);
+		    if (event.location.y >= height / 2 - 20) {
+			movePlayheadTo(event.location.x+width/2-15);
 		    } else {
                         backgroundDragging = true;
                     }
@@ -735,7 +737,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
          MeshNode {
 	     id: "lines"
 	     pickable: false;
-	     override var mesh = bind getSelf().drawLines(getSelf().width, getSelf().height, getViewHeight(), 0);//scrollOffset);
+	     override var mesh = bind getSelf().drawLines(getSelf().width, getSelf().height, getViewHeight(), scrollOffset);
 	     shader: effectLoader.loadPaintShader(ColorPaint(Color.color(.75, .75, .75)));
 	 },
 	 TransformNode { 

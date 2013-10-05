@@ -106,7 +106,7 @@ class ResizableStageNode is ResizableNode, Focuser {
     const stage is StageNode = StageNode {
         background: Color.GRAY;
 	content: Scene {
-            background: Color.GRAY;
+            background: Color.color(.3, .3, .3);
 	    camera: Camera2D { tx: bind Math.round(-width / 2.0), ty: bind Math.round(-height / 2.0) }
 	    content: bind content;
 	}
@@ -146,10 +146,6 @@ public class MainContext is Context.GroupContext {}
 
 public function run from (args is String[]) to ()
 {
-    var currentEventContext = bind Context.MemberContext {
-        member: inspector1.inspecting[inspector1.selectedIndex].member;
-    };
-
     var mainContext is Context = MainContext {
         name: "Start";
     }
@@ -157,6 +153,32 @@ public function run from (args is String[]) to ()
     var contextModel is Context.ContextTreemodel = Context.ContextTreemodel {
         rootContext: bind mainContext;
     } 
+
+    var lastContext is Context;
+
+    function handleContextVisibility from (ctx is Context, v is Boolean) to ()
+    {
+        var c = ctx;
+        while (c <> null) {
+            println("c={c} v={v}");
+            for (c1 in [c, c.getContent()]) {
+                if (c1 is Context.ResourceNodeContext) {
+                    const rc = c1 as Context.ResourceNodeContext;
+                    println("visible = {v} => {rc.resource}");
+                    rc.resource.visible = v;
+                }
+            }
+            c = c.parent;
+        }
+    }
+
+    var selectionHandler = contextModel.selectionObserver.subscribe(function from (tn is Treeview.Treenode) to () {
+            mainContext.updateParent();
+            const ctx = (tn as Context.ContextTreenode).context;
+            handleContextVisibility(lastContext, false);
+            lastContext = ctx;
+            handleContextVisibility(ctx, true);
+        }); 
 
     const currentResource is ResourceGroup = ResourceGroup {
 	id: "Spatial Hierarchy";
@@ -222,8 +244,11 @@ public function run from (args is String[]) to ()
 	insert rn into currentResource.resources;
 	transformHierarchy.selectNode(rn);
 	viewer.focusCamera(rn);
-        //insert Context.AssetContext { asset: AssetTree.makeAsset(rn) } into contextModel.selectedGroupContext.content;
-        insert Context.ResourceNodeContext { resource: rn } into contextModel.selectedGroupContext.content;
+        insert Context.ResourceNodeContext { 
+            parent: contextModel.selectedGroupContext; 
+            resource: rn;
+        } 
+        into contextModel.selectedGroupContext.content;
         println("added asset to context { contextModel.selectedContext }");
     }
 
@@ -231,6 +256,11 @@ public function run from (args is String[]) to ()
     {
         rn.updateParent();
 	insert rn into currentAnimResource.resources;
+        insert Context.ResourceTimeNodeContext { 
+            parent: contextModel.selectedGroupContext; 
+            resource: rn;
+        } 
+        into contextModel.selectedGroupContext.content;
     }
 
     function doDrop from (url is String) to () 
@@ -579,8 +609,11 @@ public function run from (args is String[]) to ()
                                         content: Tabview {
                                             tabs: Tabview.Tab {
                                                 title: "Events";
-                                                content: Treeview {
-                                                    model: bind contextModel                                                  
+                                                content: Scrollpane {
+                                                    canZoomVertical: false;
+                                                    content: Treeview {
+                                                        model: bind contextModel;
+                                                    }                                                  
                                                 }
                                             }
                                         }
