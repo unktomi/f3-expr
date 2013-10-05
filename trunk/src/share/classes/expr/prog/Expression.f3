@@ -240,7 +240,22 @@ public interface Expression {
     public function toSource to String { "" }
 }
 
-abstract class TimeNodeExpression is Expression {
+public abstract class ObjectExpression is Expression {
+    public var inputMembers is Member[];
+    public var outputMembers is Member[];
+    public var inputs is InputMemberExpression[] = bind foreach (p in inputMembers) 
+        InputMemberExpression {
+        target: this;
+        member: p;
+    }
+    public var outputs is OutputMemberExpression[] = bind foreach (p in outputMembers) 
+        OutputMemberExpression {
+        source: this;
+        member: p;
+    }
+}
+
+abstract class TimeNodeExpression is ObjectExpression {
     public var timeNode is TimeNode;
     override function getName to String { timeNode.id }
     override function toSource { "getClip(\"{timeNode.id}\")" }
@@ -476,7 +491,7 @@ class FunctionView is ExpressionView {
 
 public class InputMemberExpression is MemberExpression, ObserverExpression {
     override function getType to F3Type { member.t }
-    public var target is Expression;
+    public var target is ObjectExpression;
     override public function toSource to String {
 	const i = getIVar(this);
 	if (observable is MemberExpression and (observable as MemberExpression).member.isObservable) {
@@ -497,7 +512,7 @@ public class InputMemberExpression is MemberExpression, ObserverExpression {
 
 public class OutputMemberExpression is MemberExpression, ObservableExpression {
     override function getType to F3Type { member.t }
-    public var source is Expression;
+    public var source is ObjectExpression;
     override public function toSource to String {
 	""
     }
@@ -505,9 +520,11 @@ public class OutputMemberExpression is MemberExpression, ObservableExpression {
 
 
 public class ObjectView is ExpressionView {
-    public var inputs is Member[];
-    public var outputs is Member[];
+
     override var transform = bind translate(pos);
+
+    public var objectExpr is ObjectExpression;
+    override var expression = bind objectExpr;
 
     public override function serialize to ExprNode {
         const n = ObjNode {
@@ -520,17 +537,17 @@ public class ObjectView is ExpressionView {
         return n;
     }
 
-    var inputViews is InputView[] = bind foreach (p in inputs) InputView {
+    var inputViews is InputView[] = bind foreach (p in objectExpr.inputs) InputView {
 	canvas: bind canvas;
 	cellWidth: bind cellWidth;
-	expression: InputMemberExpression { member: p, target: bind expression }
-	override function getInputType to F3Type { expression.getType() }
+	expression: p;
+	override function getInputType to F3Type { this.expression.getType() }
     };
-    var outputViews is OutputView[] = bind foreach (p in outputs) OutputView {
+    var outputViews is OutputView[] = bind foreach (p in objectExpr.outputs) OutputView {
 	canvas: bind canvas;
 	cellWidth: bind cellWidth;
-	expression: OutputMemberExpression { member: p, source: bind expression }
-	override var resultType = bind expression.getType();
+	expression: p;
+	override var resultType = bind this.expression.getType();
     };
     //    var outputViews = bind foreach (r in outputs) OutputView {
     //	canvas: bind canvas;
@@ -543,7 +560,7 @@ public class ObjectView is ExpressionView {
 	     content: bind inputViews
 	 }
 	 Group {
-	     transform: bind translate(0, -inputs.size() * cellHeight);
+	     transform: bind translate(0, -objectExpr.inputs.size() * cellHeight);
 	     content: bind outputViews
 	 }]
     };
@@ -991,10 +1008,12 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 	}
 	insert ObjectView {
 	    pos: toLocal * where.scenePoint;
-	    expression: TimeNodeExpression { timeNode: clip, override function getType to F3Type { typ }}
+	    objectExpr: TimeNodeExpression { 
+                timeNode: clip, override function getType to F3Type { typ }
+                inputMembers: foreach (m in members where not m.isObservable and m.isObserver and m.t == UNIT_TYPE) m;
+                outputMembers: foreach (m in members where m.isObservable and m.m is F3FunctionMember) m;
+            }
 	    canvas: this;
-	    inputs: foreach (m in members where not m.isObservable and m.isObserver and m.t == UNIT_TYPE) m;
-	    outputs: foreach (m in members where m.isObservable and m.m is F3FunctionMember) m;
 	} into views;
     }
 
@@ -1278,11 +1297,21 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     function getObservers from (e is Expression) to ObserverExpression[]
     {
+        var result = 
 	if (e is Parameter) 
 	    then (e as Parameter).target.output.observers 
+            else if (e is InputMemberExpression) then {
+               const outs = (e as InputMemberExpression).target.outputs;
+               foreach (x in outs) {
+                   println("OUT {x} => {x.observers}");
+                   x.observers
+               }
+            }
 	    else if (e is ObservableExpression) 
 		then (e as ObservableExpression).observers 
-		else []
+		else [];
+        println("GET PARAMETERS {e} => {result}");
+        return result;
     }
     
     function getTerminals from (e is Expression, 
@@ -1318,7 +1347,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         const w = new java.io.StringWriter();
         println("root={rootExprView} => {serializationMap.get(rootExprView)}");
 
-
+        /*
         foreach (obj in views) {
             var x = serialize(obj);
             println("serialize {obj} => {x}");
@@ -1333,6 +1362,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         prog.code = todo;
 
         println("deserialized to {des}");
+        */
 	var terms is Expression[];
 	getTerminals(e, 
 		     function from (x is Expression) to ()
