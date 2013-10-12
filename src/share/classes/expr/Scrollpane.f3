@@ -79,6 +79,7 @@ public class Scrollpane is ResizableNode, Focuser {
                                                 sy is Number) 
                     to ()
                 {
+                    println("SET RECT  {ty} {sy}");
                     currentScrollable.setY(ty, sy);
                 }
             }

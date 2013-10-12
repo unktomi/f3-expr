@@ -39,6 +39,8 @@ public class SliderField is AbstractNode
 	textArea.setText(text);
     }
 
+    var textAreaEnabled = false;
+
     const textArea is Text.Area = Text.Area {
 	foreground: FG;
         background: null;
@@ -46,10 +48,14 @@ public class SliderField is AbstractNode
 	transform: translate(0, 1);
 	rightJustified: true;
         font: layoutEngine.createFont("font-size:10;font-family:Lucida Grande;font-weight:bold");
-        pickable: false;
+        pickable: bind textAreaEnabled;
     };
 
-    const dark = Color.color(0.77, 0.77, 0.77);
+    var textAreaCommit = textArea.observeCommit().subscribe(function from (_ is ()) to () {
+            textAreaEnabled = false;
+        });
+
+    const dark = Color.color(0.77, 0.77, 0.77, 0.77);
     const light = Color.color(0.85, 0.85, 0.85);
     const border = Color.color(.5, .5, .5);
 
@@ -94,11 +100,22 @@ public class SliderField is AbstractNode
         this.t = t;
     }     
 
+    const onDown = DefaultObserver of MouseEvent {
+        override function onNext from (event is MouseEvent) to ()
+        {
+            if (event.clickCount > 1) {
+                textAreaEnabled = true;
+                event.scene.setFocus(textArea);
+                textArea.selectAll();
+            }
+        }
+    };
+
     const onDrag = DefaultObserver of MouseEvent {
         override function onNext from (event is MouseEvent) to ()
         {     	       		
             setT((event.location.x + width / 2) / width);
-         }
+        }
     };
 
     const onUp = DefaultObserver of MouseEvent {
@@ -113,11 +130,7 @@ public class SliderField is AbstractNode
 
     var disp1 = lightRect.observeMouseDrag().subscribe(onDrag);
     var disp2 = lightRect.observeMouseUp().subscribe(onUp);
-    var disp3 = lightRect.observeMouseDown().subscribe(function from (e is MouseEvent) to ()
-                                                       {
-                                                           if (e.clickCount > 1) {
-                                                           }
-                                                       });
+    var disp3 = lightRect.observeMouseDown().subscribe(onDown);
 
     const subject = Subject of Number {};
     public function observeAlpha to Observable of Number { subject }

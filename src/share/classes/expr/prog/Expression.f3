@@ -129,7 +129,14 @@ public function introspect from (clazz is F3ClassType) to Member[]
 	    } else if (ft.minArgs() == 1) {
 		// observer of ft.getArgumentType(0)
 		//println("{f.getName()} => Observer of ({ft.getArgumentType(0)})");
-	    } else if (ft.minArgs() == 1) {
+		toInsert = Member {
+		    m: f;
+		    t: ft.getArgumentType(0);
+                    rt: rt;
+		    isObserver: true;
+                    isObservable: false;
+		}
+	    } else {
 		// observer of (ft.getArgumentType(0), ft.getArgumentType(1))
 		continue;
 	    }
@@ -201,7 +208,11 @@ public class Member {
     }
 
     function toApply to String {
-	if (m is F3FunctionMember) then "{if (m.isStatic()) then m.getName() else name}()" else "{name}";
+        toApply("");
+    }
+
+    function toApply from (arg is String) to String {
+	if (m is F3FunctionMember) then "{if (m.isStatic()) then m.getName() else name}({arg})" else "{name}";
     }
 
     override function toString to String
@@ -259,6 +270,12 @@ abstract class TimeNodeExpression is ObjectExpression {
     public var timeNode is TimeNode;
     override function getName to String { timeNode.id }
     override function toSource { "getClip(\"{timeNode.id}\")" }
+}
+
+abstract class NodeExpression is ObjectExpression {
+    public var node is Node;
+    override function getName to String { node.id }
+    override function toSource { "(getNode(\"{node.id}\") as {getType().getName()})" }
 }
 
 public interface MemberExpression is Expression {
@@ -387,6 +404,7 @@ class ControlArrow is MeshNode.Instance {
 }
 
 public abstract class ExpressionView is AbstractNode {
+    public function unlink from () to () {}
     override function toString { "{super.toString()}: {expression}" }
     public const canvas is Canvas;
     public var expression is Expression;
@@ -396,13 +414,14 @@ public abstract class ExpressionView is AbstractNode {
     public var cellWidth is Number = 150;
     public var cellHeight is Number = bind canvas.cellHeight;
     public var font is Text.Font = bind canvas.font;
+    var selected is Boolean = bind canvas.selectedExpr == this;
     public var label is Text.Label = bind Text.Label {
 	text: bind formatName(expression.getName());
 	height: bind cellHeight;
 	width: bind cellWidth;
 	font: bind font;
 	foreground: bind canvas.textFg;
-	background: bind canvas.cellBg;
+	background: bind if (selected) then canvas.cellSelectedBg else canvas.cellBg;
 	pickable: true;
         indent: 4;
     };
@@ -419,6 +438,7 @@ public abstract class ExpressionView is AbstractNode {
     };
     function onDown from (e is MouseEvent) to () 
     {
+        canvas.selectedExpr = this;
     }
     function onDrag from (e is MouseEvent) to () 
     {
@@ -432,7 +452,7 @@ public abstract class ExpressionView is AbstractNode {
     var d2;
     var d3;
     postinit {
-	d1 = label.observeMouseUp().subscribe(onDown);
+	d1 = label.observeMouseDown().subscribe(onDown);
 	d2 = label.observeMouseUp().subscribe(onUp);
 	d3 = label.observeMouseDrag().subscribe(onDrag);
     }
@@ -494,7 +514,12 @@ public class InputMemberExpression is MemberExpression, ObserverExpression {
     public var target is ObjectExpression;
     override public function toSource to String {
 	const i = getIVar(this);
-	if (observable is MemberExpression and (observable as MemberExpression).member.isObservable) {
+        println("INPUT MEMBER EXPR {this}");
+        println("INPUT MEMBER EXPR i={i}");
+        var res = 
+        if (member.m is F3FunctionMember and (member.m as F3FunctionMember).getType().minArgs() > 0) {
+            "(foreach ({i} in {observable.toSource()}) {target.toSource()}.{member.toApply(i)})";
+	} else if (observable is MemberExpression and (observable as MemberExpression).member.isObservable) {
 	    
 	    "(foreach ({i} in {observable.toSource()}) {target.toSource()}.{member.toApply()})";
 	} else {
@@ -507,6 +532,8 @@ public class InputMemberExpression is MemberExpression, ObserverExpression {
 		//"{observable.toSource()}.{member.toApply()}";
 	    }
 	}
+        println("INPUT MEMBER EXPR res={res}");
+        return res;
     }
 }
 
@@ -526,6 +553,11 @@ public class ObjectView is ExpressionView {
     public var objectExpr is ObjectExpression;
     override var expression = bind objectExpr;
 
+    override function unlink from () to () {
+        for (i in inputViews) i.unlink();
+        for (i in outputViews) i.unlink();
+    }
+
     public override function serialize to ExprNode {
         const n = ObjNode {
             x: pos.x;
@@ -543,6 +575,7 @@ public class ObjectView is ExpressionView {
 	expression: p;
 	override function getInputType to F3Type { this.expression.getType() }
     };
+
     var outputViews is OutputView[] = bind foreach (p in objectExpr.outputs) OutputView {
 	canvas: bind canvas;
 	cellWidth: bind cellWidth;
@@ -594,7 +627,7 @@ class GetVarView is LinkedView {
     }
     
     public var get is GetVar;
-    const tv = GetTreeview {
+    const tv is GetTreeview = GetTreeview {
         canvas: bind canvas;
         width: 150;
         height: 200;
@@ -629,7 +662,7 @@ class LinkView is ExpressionView {
 	println("LINKING {source} to {target}");
     }
 
-    function unlink from () to () {
+    override function unlink from () to () {
 	delete this from target.links;
 	delete this from source.links;
 	delete this from canvas.links;
@@ -650,7 +683,7 @@ class LinkView is ExpressionView {
 
 abstract class LinkedView is ExpressionView {
     var links is LinkView[];
-    function unlink from () to () {
+    override function unlink from () to () {
 	for (link in links) {
 	    link.unlink();
 	}
@@ -975,6 +1008,8 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     var prog is Program;
 
+    var selectedExpr is ExpressionView;
+
     override public bound function getTx to Number { 1.0-(cx + width/2.0) / width }
     override public bound function getSx to Number { 
         //Math.max(width / localSpace.contentBounds.width(), 1.0);
@@ -996,6 +1031,23 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     override public function setY from (ty is Number, sy is Number) to ()
     {
         cy = ty * height - height/2.0;
+    }
+
+    public function onDrop from (where is Pick, clip is Node) to ()
+    {
+	println("ON DROP {where.scenePoint}, {where.dragPoint1} {clip}");
+	const typ = Reflect.getType(clip.getClass().getName());
+        var names = new java.util.HashSet of String;
+	const members = foreach (m in introspect(typ) where not m.name.contains("pdate") and names.add(m.name)) m;
+	insert ObjectView {
+	    pos: toLocal * where.scenePoint;
+	    objectExpr: NodeExpression { 
+                node: clip, override function getType to F3Type { typ }
+                inputMembers: foreach (m in members where not m.isObservable and m.isObserver and m.rt == UNIT_TYPE) m;
+                //outputMembers: foreach (m in members where m.isObservable and m.m is F3FunctionMember) m;
+            }
+	    canvas: this;
+	} into views;
     }
 
     public function onDrop from (where is Pick, clip is TimeNode) to ()
@@ -1026,7 +1078,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     public var toLocal is Mat4 = bind localSpace.toSceneTransform.inverse();
 
     var BG = ColorPaint(Color.color(.9, .9, .9));
-
+    const cellSelectedBg = ColorPaint(Color.color(.80, .80, .80));
     const cellBg = ColorPaint(Color.color(.7, .7, .7));
     const textFg = ColorPaint(Color.color(.2, .2, .2));
     const titleBg = ColorPaint(Color.color(.9, .9, .9));
@@ -1054,11 +1106,14 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     }
 
     public var event is Member;
+    public var eventContext is Context.MemberContext;
 
     public var targetNode is ResourceNode;
 
     public var targetSpace is Node;
     public var targetTime is TimeNode;
+    public var targetTimeline is Timeline;
+    public var instanceSpace is Group;
 
     public function lookupSpatial from (id is String) to Node {
 	var r = targetSpace.lookup(id);
@@ -1154,6 +1209,19 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     var zoomx = 1.0;
     var zoomy = 1.0;
+
+    function deleteSelection to () {
+        var n = selectedExpr;
+        selectedExpr = null;
+        n.unlink();
+        delete n from views;
+    }
+
+    override function onKeyDown from (e is KeyboardEvent) to () {
+        if (e.keyCode == Keys.Delete or e.keyCode == Keys.Backspace) {
+            deleteSelection();
+        }
+    }
 
     override function onMouseWheel from (e is MouseWheelEvent) to ()
     {
@@ -1529,9 +1597,24 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     function subscribe of a from (obsvb is Observable of a, src is String) to ()
     {
 	println("SUBSCRIBE {obsvb}");
+        var count = 0;
+        var rs = foreach (x in eventContext.content) {
+            if (x is Context.ResourceNodeContext) {
+                (x as Context.ResourceNodeContext).resource;
+            } else null;
+        }
 	insert obsvb.subscribe(DefaultObserver of a {
 		override function onNext from (x is a) to ()
 		{
+                    for (r in rs) {
+                        var n = r.instance("#inst#{count}#{r.id}");
+                        println("INSERTING {n} into {instanceSpace} at {targetTimeline.playhead}");
+                        insert EventLayer.EventNode {
+                            timestamp: targetTimeline.playhead;
+                            event: n;
+                        } into instanceSpace.content;
+                    }
+                    count++;
 		    println("on next {src} {x}");
 		}
 	}) into subs;	
@@ -1591,7 +1674,7 @@ public class ObjNode is ExprNode {
 }
 
 public class GetNode is ExprNode {
-    public function createView from (canvas is Canvas) to GetVarView {
+    public override function createView from (canvas is Canvas) to GetVarView {
         GetVarView {
             pathFactory: canvas.pathFactory;
             layoutEngine: canvas.layoutEngine;
@@ -1619,10 +1702,13 @@ public class Editor is ResizableNode, Focuser {
     override public function getTargetOfFocus to Focusable { canvas }
 
     public var targetNode is ResourceNode;
-    public var event is Member;
+    public var eventContext is Context.MemberContext;
+    public var event is Member = bind eventContext.member;
 
     public var targetSpace is Node;
     public var targetTime is TimeNode;
+    public var targetTimeline is Timeline;
+    public var instanceSpace is Group;
 
     var canvas is Canvas = bind getCanvas(targetNode, event);
 
@@ -1656,8 +1742,11 @@ public class Editor is ResizableNode, Focuser {
                 height: height;
 		targetNode: target,
 		event: event;
+                eventContext: eventContext;
 		targetSpace: targetSpace;
 		targetTime: targetTime;
+		targetTimeline: targetTimeline;
+                instanceSpace: instanceSpace;
 	    }
             for (v in prog.code.views) {
                 const j = v.createView(canvas);

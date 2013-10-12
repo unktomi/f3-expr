@@ -5,7 +5,7 @@ import f3.util.*;
 import f3.util.Observer.*;
 import expr.Names.*;
 
-class Treenode is Treeview.Treenode {
+public class Treenode is Treeview.Treenode {
     public var n is Node;
     override var label = bind if (n.parent is ResourceNode) then "Main Scene" else if (n.id <> "") then formatName(n.id) else "{n}";
     function asGroup from (n is Node) to Group { if (n is Group) then n as Group else null }

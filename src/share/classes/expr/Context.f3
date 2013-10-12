@@ -44,7 +44,7 @@ public class CallContext is Context {
 
 public class ResourceNodeContext is Context {
     public var resource is ResourceNode;
-    override var name = bind formatName(resource.id);
+    override var name = bind "{formatName(resource.id)} [Scene]";
     var members = bind Expression.introspect(Reflect.getType("f3.media.scene.TransformNode") as F3ClassType);
     public override bound function getContent to Context[] { 
         foreach (x in members) if (not x.name.startsWith("observe")) then null else MemberContext { member: x, parent: this }
@@ -53,17 +53,23 @@ public class ResourceNodeContext is Context {
 
 public class ResourceTimeNodeContext is Context {
     public var resource is ResourceTimeNode;
-    override var name = bind formatName(resource.id);
+    override var name = bind "{formatName(resource.id)} [Timeline]";
     var members = bind Expression.introspect(Reflect.getType("f3.media.scene.TimeNode") as F3ClassType);
     public override bound function getContent to Context[] { 
-        foreach (x in members) MemberContext { member: x, parent: this }
+        foreach (x in members) if (not x.name.startsWith("observe")) then null else MemberContext { member: x, parent: this }
     }
 }
 
 public class AssetContext is Context {
     public var asset is Asset;
     override var name = bind asset.name;
-    override public bound function getContent to Context[] { foreach (x in asset.containedAssets) AssetContext { asset: x } }
+    override public bound function getContent to Context[] { foreach (x in asset.containedAssets) AssetContext { asset: x, parent: this } }
+}
+
+public class ClosureVarContext is Context {
+    public var varType is TypeAsset;
+    public var varName is String = "variable";
+    override var name = bind "{varName} [{varType.name}]";
 }
 
 public class VarContext is Context {
@@ -97,7 +103,8 @@ public class ContextTreemodel is Treemodel {
     public var rootContext is Context;
     public var selectedContext is Context;
     public var selectedGroupContext is GroupContext;
-    public var selectedMember is Member;
+    public var selectedMember is Member = bind selectedMemberContext.member;
+    public var selectedMemberContext is MemberContext;
     override var root = ContextTreenode { context: bind rootContext };
     const disp = selectionObserver.subscribe(function from (tn is Treenode) to () {
             selectedContext = (tn as ContextTreenode).context;
@@ -107,16 +114,16 @@ public class ContextTreemodel is Treemodel {
             }
             selectedGroupContext = (p as ContextTreenode).context as GroupContext;
             p = tn;
-            var m is Member = null;
+            var m is MemberContext = null;
             while (p <> null) {
                 var j = (p as ContextTreenode).context;
-                m = if (j is MemberContext) then (j as MemberContext).member else null;
+                m = if (j is MemberContext) then (j as MemberContext) else null;
                 if (m <> null) {
                     break;
                 }
                 p = p.parent;
             }
-            selectedMember = m;
+            selectedMemberContext = m;
             println("selected context => {selectedContext}");
         });
 }
@@ -125,5 +132,5 @@ public class ContextTreenode is Treenode {
     public var context is Context;
     override var label = bind context.name;
     override var canOpen = bind sizeof context.getContent() > 0;
-    override var children = bind foreach (c in context.getContent()) ContextTreenode { context: bind c }
+    override var children = bind foreach (c in context.getContent()) ContextTreenode { context: bind c, parent: this }
 }
