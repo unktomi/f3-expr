@@ -262,6 +262,14 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
 	}
     }
 
+    public function pick from (y is Number) to Treenode 
+    {
+        const offset = y - (height/2 + scrollOffset * cellHeight);
+        const i = -(offset / cellHeight) as Integer;
+        println("offset={offset} i={i}");
+        return cells[i].cell.tn;
+    }
+
     function scroll from (amount is Integer) to ()
     {
 	scrollOffset = Math.max(0, Math.min(scrollOffset + amount, model.rowCount - visibleRows));
@@ -341,10 +349,7 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
 
     public var model is Treemodel on replace {
 	selectionListener.dispose();
-	selectionListener = model.selectionObserver.subscribe(function from (t is Treenode) to ()
-							      {
-								  //select(t);
-							      });
+	//selectionListener = model.selectionObserver.subscribe(select);
     }
 
     var rows is Treenode[];

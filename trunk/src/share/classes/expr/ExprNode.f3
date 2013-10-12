@@ -8,12 +8,12 @@ public class ModelContent {
 }
 
 public class ExprNode is AbstractNode {
-    public var webBrowserFactory is AbstractWebBrowserFactory = the AbstractWebBrowserFactory;
+    public const webBrowserFactory is AbstractWebBrowserFactory = the AbstractWebBrowserFactory;
     public var url is String;
     override var id = bind url;
     public var spatialRoot is Node = bind modelContent.spatialRoot;
     public var temporalRoot is TimeNode = bind modelContent.temporalRoot;
-    public var modelContent = bind loadResource(url);
+    public var modelContent is ModelContent = bind loadResource(url);
     var timeline = Timeline {
         content: TimeGroup {
             playCount: -1;

@@ -129,7 +129,7 @@ class TimeNodeView is AbstractNode
 
     function getWidth from (i0 is Interval, visible is Interval) to Number 
     {
-        const i = if (i0.duration() == 0s) then visible.end else i0.duration();
+        const i = if (i0.duration() == 0s) then visible.end - i0.start else i0.duration();
     	trax.durationToX(i);
     }
 
@@ -178,7 +178,8 @@ class TimeNodeView is AbstractNode
 	Group {
             var dx is Number;
 	    content: bind
-	    [if (target == null) then null else Group {
+	    [if (target == null) then null else Group { 
+                visible: bind row > trax.scrollY;
 		content: 
                 [Rectangle {
                      width: bind w + trax.durationToX(target.contentBounds.start);               
@@ -563,7 +564,6 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
     function getSelf to Trax { this }
 
 
-
     override bound function getTx to Number { 
         if (dur == 0s) then 0.0 else frameToDuration(scrollOffset) /  dur;
     }
@@ -576,13 +576,22 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
         if (0s == bounds.end) then 1.0 else dur/(dur + bounds.end);
     }
 
-    override public function setY from (tx is Number, sx is Number) to ()
-    {
+    var dur = bind visibleInterval.duration() + targetNode.contentBounds.end;
+    var traxHeight = bind height - 20;
+    var sy0 = bind Math.min(traxHeight / Math.max(root.bounds.height(), 1), 1.0);
+    var ty0 = bind if root.bounds.height() == 0 then 0.0 else (scrollY * getViewHeight()) / root.bounds.height();
+
+    override bound function getSy to Number { sy0 }
+
+    override bound function getTy to Number { ty0 }
+
+    override public function setY from (ty is Number, sy is Number) to () {
+        scrollY = (ty * root.bounds.height() / getViewHeight()) as Integer;
     }
 
-    var dur = bind visibleInterval.duration() + targetNode.contentBounds.end;
     override public function setX from (tx is Number, sx is Number) to ()
     {
+        println("Y {getTy()}, {getSy()} / {sy0} root bounds={root.bounds.height()} height={height}, scrollY={scrollY}");
         println("tx={tx} sx={sx}");
         const cur = getSx();
         println("cur={cur}");
@@ -602,6 +611,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	trax: this;
 	override var height = bind getSelf().height;
     }
+    var scrollY is Integer;
     var scrollOffset is Number;
     var visibleDuration is Duration = bind visibleInterval.duration();
     var labels is Node[] = bind drawLabels(width, height, scrollOffset, frameRate);
@@ -741,10 +751,10 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	     shader: effectLoader.loadPaintShader(ColorPaint(Color.color(.75, .75, .75)));
 	 },
 	 TransformNode { 
-	     override var tx = bind -getSelf().width/2+15-frameToX(scrollOffset);
+	     tx: bind -getSelf().width/2+15-frameToX(scrollOffset);
 	     content:
 	     [TransformNode {
-                 ty: bind height / 2 + 2 - 15; 
+                 ty: bind height / 2 + 2 - 15 + scrollY * getViewHeight(); 
                  content: bind root;
 	     },
 	     TransformNode { ty: -6, content: bind playhead }]

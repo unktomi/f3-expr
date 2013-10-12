@@ -31,8 +31,8 @@ public class EditorState {
     public var internalWindows: InternalWindowState[];
 }
 
-
-function saveEditorState from (scene is Scene) to () {
+function saveEditorState from (scene is Scene) to () 
+{
     var internalWindows is InternalWindowState[];
     const f is function from ((), Node) to () 
         = function from (_ is (), n is Node) to ()
@@ -59,7 +59,8 @@ function saveEditorState from (scene is Scene) to () {
     w.close();
 }
 
-function loadEditorState from (scene is Scene) to () {
+function loadEditorState from (scene is Scene) to () 
+{
     const file = new java.io.File(".expr.editorstate");
     if (file.exists()) {
         const s = IO.readObject(new java.io.BufferedReader(new java.io.FileReader(file))) as EditorState;
@@ -85,7 +86,6 @@ function loadEditorState from (scene is Scene) to () {
         }
     }
 }
-
 
 class CachedScene is Scene {
     public var scene is Scene;
@@ -150,6 +150,8 @@ public function run from (args is String[]) to ()
         name: "Start";
     }
 
+    var contextTree is Treeview;
+
     var contextModel is Context.ContextTreemodel = Context.ContextTreemodel {
         rootContext: bind mainContext;
     } 
@@ -160,7 +162,7 @@ public function run from (args is String[]) to ()
     {
         var c = ctx;
         while (c <> null) {
-            println("c={c} v={v}");
+            println("c={c.name} parent={c.parent.name} v={v}");
             for (c1 in [c, c.getContent()]) {
                 if (c1 is Context.ResourceNodeContext) {
                     const rc = c1 as Context.ResourceNodeContext;
@@ -222,7 +224,7 @@ public function run from (args is String[]) to ()
 	ty: 3.0;
 	tz: 13;
 	near: 1;
-	far: 100;
+	far: 1000;
 	content: PointLight {}
     }
 
@@ -361,17 +363,22 @@ public function run from (args is String[]) to ()
 	return result;
     }
 
+    var instanceSpace is Group = Group {id: "Instance Space"};
+
     const mainScene = Scene {
     	override function update { 
 	    super.update();
 	    canUndo = MasterUndoable.canUndo();
 	    canRedo = MasterUndoable.canRedo();
+            instanceSpace.content = instanceSpace.content[ x | { var y = x as EventLayer.EventNode; y.timestamp <= player.playhead }];
 	}
 	background: Color.GRAY;
 	override var camera = bind currentCamera on invalidate {
 	    println("scene camera invalidated {currentCamera}");
 	}
-	content: bind transformHierarchy.root;
+	content: bind [transformHierarchy.root, Group {
+                content: bind instanceSpace;
+            }];
 	override function injectMouseDown from (event is MouseEvent) to ()
 	{
 	    super.injectMouseDown(event);
@@ -611,9 +618,17 @@ public function run from (args is String[]) to ()
                                                 title: "Events";
                                                 content: Scrollpane {
                                                     canZoomVertical: false;
-                                                    content: Treeview {
+                                                    content: contextTree = Treeview {
                                                         model: bind contextModel;
-                                                    }                                                  
+                                                        override function onKeyDown from (e is KeyboardEvent) to ()
+                                                        {
+                                                            if (e.keyCode == Keys.Delete or
+                                                                e.keyCode == Keys.Backspace) {
+                                                                const toDelete = contextModel.selectedContext;
+                                                                delete toDelete from contextModel.selectedGroupContext.content;
+                                                            } else super.onKeyDown(e);
+                                                        }                                       
+                                                    }
                                                 }
                                             }
                                         }
@@ -649,7 +664,7 @@ public function run from (args is String[]) to ()
 						 dragger = TransformNode {
 						     pickable: false;
 						     content: Group {
-							 //transform: translate(-e.sceneLocation.x, 0);
+							 transform: translate(-e.location.x, 0);
 							 content: getDragCell();
 						     }
 						 }
@@ -695,6 +710,35 @@ public function run from (args is String[]) to ()
 						     }
 						 }
 					     }
+                                             if (asset is AssetTree.TypeAsset) {
+                                                 const picked = getUnderMouseInEditor();
+						 for (j in picked) {
+                                                     if (j.node == contextTree) {
+                                                         contextModel.rootContext.updateParent();
+                                                         const pt = j.node.toSceneTransform.inverse() * j.scenePoint;
+                                                         var target = (contextTree.pick(pt.y) as Context.ContextTreenode).context;
+                                                         var ctx = target;
+                                                         var insertionPoint = 0;
+                                                         if (not (ctx is Context.GroupContext)) {
+                                                             ctx = ctx.parent;
+                                                             insertionPoint = 0;
+                                                             for (x in (ctx as Context.GroupContext).content) {
+                                                                 if (x == target) {
+                                                                     insertionPoint = indexof x;
+                                                                     break;
+                                                                 }
+                                                             }
+                                                         } 
+                                                         if (ctx is Context.GroupContext) {
+                                                             var g = ctx as Context.GroupContext;
+                                                             insert (Context.ClosureVarContext { varType: asset as TypeAsset, parent: g })
+                                                                 before g.content[insertionPoint];
+                                                         }
+                                                         println("TN ={tn.label} y={pt.y}");
+                                                         break;
+                                                     }
+                                                 }
+                                             }
 					     delete dragger from popupLayer.content;
 					     dragger = null;
 					 }
@@ -733,6 +777,36 @@ public function run from (args is String[]) to ()
                                                               deleteResource(toDelete);
                                                           } else super.onKeyDown(e);
                                                       }
+                                                      var dragger is TransformNode;
+                                                      var clip is Node;
+                                                      override function onMouseDrag from (e is MouseEvent) to () {
+                                                          if (dragger == null) {
+                                                              clip = (selectedTreenode as TransformHierarchy.Treenode).n;
+                                                              dragger = TransformNode {
+                                                                  pickable: false;
+                                                                  content: Group {
+                                                                      transform: translate(-e.sceneLocation.x, 0);
+                                                                      content: getDragCell();
+                                                                  }
+                                                              }
+                                                              insert dragger into popupLayer.content;
+                                                          }
+                                                          dragger.tx = editorScene.mousePosition.x;
+                                                          dragger.ty = editorScene.mousePosition.y;
+                                                      }
+                                                      
+                                                      override function onMouseUp from (e is MouseEvent) to () 
+                                                      {
+                                                          for (j in getUnderMouseInEditor()) {
+                                                              if (j.node is Expression.Canvas) {
+                                                                  (j.node as Expression.Canvas).onDrop(j, clip);
+                                                                  break;
+                                                              }
+                                                          }
+                                                          delete dragger from popupLayer.content;
+                                                          clip = null;
+                                                          dragger = null;
+                                                      }
                                                   }
                                               }
 					 }]
@@ -761,7 +835,16 @@ public function run from (args is String[]) to ()
                                                          Treeview {
                                                              model: TemporalHierarchy.Model {
                                                                  h: bind temporalHierarchy
-                                                                     }
+                                                             }
+                                                             override function onKeyDown from (e is KeyboardEvent) to ()
+                                                             {
+                                                                 if (e.keyCode == Keys.Delete or
+                                                                     e.keyCode == Keys.Backspace) {
+                                                                     const toDelete = temporalHierarchy.selectedTransform;
+                                                                     temporalHierarchy.deleteSelection();
+                                                                     deleteAnimResource(toDelete);
+                                                                 } else super.onKeyDown(e);
+                                                             }
                                                              var dragger is TransformNode;
                                                              var clip is TimeNode;
                                                              override function onMouseDrag from (e is MouseEvent) to () {
@@ -794,9 +877,9 @@ public function run from (args is String[]) to ()
                                                              }
                                                          }
                                                      }
-					 }]; 
-                                         }
-                                 },
+					     }]; 
+                                           }
+                                         },
                                          Tabview.Tab {
 				            title: "Other";
                                              content:
@@ -841,6 +924,7 @@ public function run from (args is String[]) to ()
 				[Tabview.Tab {
 				    title: "Timeline"
 				    content: Scrollpane {
+                                             canZoomVertical: false;
                                              content: trax = expr.timeline.Trax {
                                                  clips: bind currentAnimResource.resources;
                                                  loop: bind loop;
@@ -849,6 +933,7 @@ public function run from (args is String[]) to ()
                                                  temporalHierarchy: temporalHierarchy;
                                                  removeClip: function from (clip is TimeNode) to ()
                                                  {
+                                                     temporalHierarchy.deleteSelection();
                                                      deleteAnimResource(clip);
                                                  }
                                              }
@@ -858,20 +943,21 @@ public function run from (args is String[]) to ()
 				    title: bind "Event Handler: {contextModel.selectedContext.name}"
 				    content: expr.prog.Expression.Editor {
 					 //event: bind inspector1.inspecting[inspector1.selectedIndex].member;
-                                         event: bind contextModel.selectedMember;
+                                         eventContext: bind contextModel.selectedMemberContext;
 					 targetNode: bind currentTransform as ResourceNode;
 					 targetSpace: bind mainScene.root;
+                                         instanceSpace: bind instanceSpace;
 					 targetTime: bind mainTimeLayer;
+                                         targetTimeline: bind player;
 				    }
 				 }]
-
 			    }
-			      }
+                        }
 		    }]
-			},
-		    toolMenu, 
-                    popupLayer]
-                  }]
+		},
+	    toolMenu, 
+            popupLayer]
+         }]
     }
 
     function setCamera from (i is Integer) to ()
@@ -890,7 +976,9 @@ public function run from (args is String[]) to ()
 	println("camera={camera.tx}, {camera.ty}, {camera.tz}");
 	*/
     }
-    function deleteAnimResource from (n is TimeNode) to () {
+
+    function deleteAnimResource from (n is TimeNode) to () 
+    {
         var x = n;
         n.updateParent();
         while (x <> null) {
@@ -915,7 +1003,7 @@ public function run from (args is String[]) to ()
 	}
     }
 
-    const setClip = function from (i is Integer) to ()
+    function setClip from (i is Integer) to ()
     {
 	//currentResource.setClip(i);
     }
@@ -973,6 +1061,7 @@ public function run from (args is String[]) to ()
 		}
 	    }
 	});
+
     stage.addDnDInputHandler(DnDInputHandler {
 	    override function onDrop from (event is DropEvent) to () 
 	    {

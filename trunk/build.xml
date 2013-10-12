@@ -114,8 +114,8 @@
     <fileset dir="lib/macosxuniversal" includes="*.*"/>
     <fileset dir="build" includes="*.jar"/>
   </copy>
-  <copy file="run.sh" todir="demo.app/Contents/MacOS">
-  </copy>
+  <copy file="run.sh" todir="demo.app/Contents/MacOS"/>
+  <copy file=".expr.editorstate" todir="demo.app/Contents/MacOS"/>
   <chmod dir="demo.app/Contents/Frameworks/" perm="+x" includes="**"/>
   <chmod dir="demo.app/Contents/MacOS" perm="+x" includes="*.sh"/>
   <chmod dir="demo.app/Contents/MacOS/dist/bin" perm="+x" includes="*"/>
