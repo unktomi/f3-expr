@@ -41,7 +41,7 @@ public class SliderField is AbstractNode
 
     var textAreaEnabled = false;
 
-    const textArea is Text.Area = Text.Area {
+    const textArea is Text.Field = Text.Field {
 	foreground: FG;
         background: null;
 	width: bind width+4;

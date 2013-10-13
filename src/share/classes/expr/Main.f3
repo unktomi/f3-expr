@@ -142,7 +142,14 @@ function readTextFile from (url is String) to (String, Integer)
 
 }
 
-public class MainContext is Context.GroupContext {}
+public class MainContext is Context.MemberContext {
+    override var member = Expression.Member {
+        name: "Start";
+        t: Reflect.UNIT_TYPE;
+        rt: Reflect.UNIT_TYPE;
+        isObservable: true;
+    }
+}
 
 public function run from (args is String[]) to ()
 {
@@ -192,6 +199,7 @@ public function run from (args is String[]) to ()
 	root: bind currentResource;
     }
     const temporalHierarchy = TemporalHierarchy { root: bind currentAnimResource }
+    const otherHierarchy = VariableHierarchy { root: bind mainContext }
     var currentCamera is Camera;
     var TheWebBrowserFactory is AbstractWebBrowserFactory;
     try {
@@ -338,6 +346,7 @@ public function run from (args is String[]) to ()
     var trax is expr.timeline.Trax;
     var inspector1 is Inspector;
     var inspector2 is Inspector;
+    var inspector3 is Inspector;
     var currentTransform = bind transformHierarchy.selectedTransform;
     currentCamera = camera;
 
@@ -889,9 +898,9 @@ public function run from (args is String[]) to ()
                                                      title: "Inspector";
                                                      content: Scrollpane {
                                                         canZoomVertical: false;
-                                                             //content: inspector3 = Inspector {
-                                                             //      inspecting: bind Inspector.inspect(otherHierarchy.selectedObject);
-                                                             //}
+                                                             content: inspector3 = Inspector {
+                                                                   inspecting: bind Inspector.inspect(otherHierarchy.selectedVariable);
+                                                             }
                                                      }
                                                   },
                                                   Tabview.Tab {
@@ -899,10 +908,52 @@ public function run from (args is String[]) to ()
                                                       content:
                                                       Scrollpane {
                                                           canZoomVertical: false;
-                                                          //content:
-                                                          //Treeview {
-                                                          //}]
-                                                      }
+                                                         content:
+                                                         Treeview {
+                                                             model: VariableHierarchy.Model {
+                                                                 h: bind otherHierarchy
+                                                             }
+                                                             override function onKeyDown from (e is KeyboardEvent) to ()
+                                                             {
+                                                                 if (e.keyCode == Keys.Delete or
+                                                                     e.keyCode == Keys.Backspace) {
+                                                                     const toDelete = otherHierarchy.selectedVariable;
+                                                                     otherHierarchy.deleteSelection();
+                                                                     //deleteAnimResource(toDelete);
+                                                                 } else super.onKeyDown(e);
+                                                             }
+                                                             var dragger is TransformNode;
+                                                             var clip is Context;
+                                                             override function onMouseDrag from (e is MouseEvent) to () {
+                                                                 if (dragger == null) {
+                                                                     clip = (selectedTreenode as VariableHierarchy.Treenode).n;
+                                                                     dragger = TransformNode {
+                                                                         pickable: false;
+                                                                         content: Group {
+                                                                             transform: translate(-e.sceneLocation.x, 0);
+                                                                             content: getDragCell();
+                                                                         }
+                                                                     }
+                                                                     insert dragger into popupLayer.content;
+                                                                 }
+                                                                 dragger.tx = editorScene.mousePosition.x;
+                                                                 dragger.ty = editorScene.mousePosition.y;
+                                                             }
+                                                             
+                                                             override function onMouseUp from (e is MouseEvent) to () 
+                                                             {
+                                                                 for (j in getUnderMouseInEditor()) {
+                                                                     if (j.node is Expression.Canvas) {
+                                                                         (j.node as Expression.Canvas).onDrop(j, clip);
+                                                                         break;
+                                                                     }
+                                                                 }
+                                                                 delete dragger from popupLayer.content;
+                                                                 clip = null;
+                                                                 dragger = null;
+                                                             }
+                                                         }
+                                                     }
                                                   }];
                                              }
                                          }];

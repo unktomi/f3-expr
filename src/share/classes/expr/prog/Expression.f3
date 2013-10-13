@@ -1033,6 +1033,10 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         cy = ty * height - height/2.0;
     }
 
+    public function onDrop from (where is Pick, clip is Context) to ()
+    {
+    }
+
     public function onDrop from (where is Pick, clip is Node) to ()
     {
 	println("ON DROP {where.scenePoint}, {where.dragPoint1} {clip}");
