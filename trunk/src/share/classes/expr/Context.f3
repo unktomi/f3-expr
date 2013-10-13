@@ -10,7 +10,7 @@ import expr.Names.*;
 
 public class Context {
     public var parent is Context;
-    public var name is String;
+    public readonly var name is String;
     public var contextType is F3Type;
     public bound function getContent to Context[]  { [] }
     public function updateParent to () {

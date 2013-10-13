@@ -200,17 +200,17 @@ class StringField is ResizableNode {
     public var selected is Boolean;
     public var string is InspectedString;
     public var font is Text.Font;
-    const area is Text.Area = Text.Area {
+    const area is Text.Field = Text.Field {
         width: bind width;
         height: bind height;
         rightJustified: true;
         font: bind font;
         foreground: bind if (not selected) then FG_PAINT else SELECTED_FG_PAINT;
         //background: bind if (not selected) then TEXT_BG_PAINT else SELECTED_BG_PAINT;
-        background: null;
+        background: TRANSPARENT_PAINT;
     };
-    const d = area.observeText().subscribe(function from (t is String) to () {
-            try { string.set(t) } catch (e is org.f3.runtime.AssignToBoundException) { } // hack  
+    const d = area.observeCommit().subscribe(function from (_ is ()) to () {
+            try { string.set(area.text) } catch (e is org.f3.runtime.AssignToBoundException) { } // hack  
         });
     override var internalContent = bind area;
     postinit {
@@ -344,6 +344,7 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
 	    } else if (i is InspectedString) then
 	    TransformNode {
                     //tx: bind width * .33 / 2;
+                //tx: 80;
                 content: StringField {
                         string: bind i as InspectedString;
                         width: bind width;
