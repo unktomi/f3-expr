@@ -206,7 +206,7 @@ function getPackageAssets to PackageAsset {
                 const pack = findPackage(parentName);
                 // @TODO
             }
-        } else {
+        } else if (f.exists()) {
             const jar = new java.util.jar.JarFile(f.getAbsolutePath());
             const e = jar.entries();
             while (e.hasMoreElements()) {
