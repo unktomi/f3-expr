@@ -1,0 +1,68 @@
+package expr;
+import f3.media.scene.*;
+import f3.util.*;
+
+public class EventNode is Group {
+    public const timestamp is Duration;
+    public const event is Node;
+    override var content = bind event;
+}
+
+public class EventTimeNode is TimeGroup {
+    public const timestamp is Duration;
+    public const event is TimeNode;
+    override var content = bind event;
+}
+
+public class EventLayer {
+
+    var currentTime is Duration;
+
+    const spatialRoot is Group = Group {}
+    const temporalRoot is TimeGroup = TimeGroup {}
+
+    public function getSpatialRoot to Node { spatialRoot }
+
+    public function getTemporalRoot to TimeNode {  temporalRoot }
+
+    public const timeNodeObserver is Observer of TimeNode = Observer of TimeNode {
+        override function onNext from (n is TimeNode) to () 
+        {
+            const now = currentTime;
+            insert EventTimeNode {
+                timestamp: now;
+                event: n;
+            } into temporalRoot.content;
+        }
+        override function onCompleted to () {}
+        override function onError from (e is java.lang.Exception) to () {}
+    }
+
+    public const timeObserver is Observer of Duration = Observer of Duration 
+    {
+        override function onNext from (t is Duration) to () 
+        {
+            var prev = currentTime;
+            currentTime = t;
+            if (t < prev) {
+                spatialRoot.content = spatialRoot.content[x | (x as EventNode).timestamp <= t];
+                temporalRoot.content = temporalRoot.content [x | (x as EventTimeNode).timestamp <= t];
+            }
+        }
+        override function onCompleted to () {}
+        override function onError from (e is java.lang.Exception) to () {}
+    }
+
+    public const nodeObserver is Observer of Node = Observer of Node {
+        override function onNext from (n is Node) to () {
+            const now = currentTime;
+            insert EventNode {
+                timestamp: now;
+                event: n;
+            } into spatialRoot.content;
+        }
+        override function onCompleted to () {}
+        override function onError from (e is java.lang.Exception) to () {}
+    };
+}
+
