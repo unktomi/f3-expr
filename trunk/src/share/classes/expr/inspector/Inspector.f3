@@ -15,6 +15,7 @@ import expr.prog.Expression.*;
 import f3.math.*;
 import f3.math.LinearMath.*;
 import java.lang.Math;
+import expr.undo.*;
 
 public abstract class Inspected of a 
 {
@@ -133,6 +134,12 @@ class NumberField is SliderField {
         var n = min + (max - min)*t;
         i.set(n);
     }
+
+    override function onCommit from (text is String) to () {
+        onChange(java.lang.Float.parseFloat(text));
+        MasterUndoable.commit();
+    }
+
     override function onCommit to () {
         const n = i.get();
         if (n < min) {
@@ -142,6 +149,7 @@ class NumberField is SliderField {
             max = n;
         }
         onChange(n);
+        MasterUndoable.commit();
     }
     override function getText from (t is Number) to String
     {
@@ -152,6 +160,7 @@ class NumberField is SliderField {
 class BooleanField is SliderField {
     public var i is InspectedBoolean;
     var disp is Disposable;
+    override var textInputEnabled = false;
     override function setT from (t is Number) to ()
     {
 	this.t = if (t > 0.5) then 1.0 else 0.5;
@@ -193,6 +202,14 @@ class DurationField is SliderField {
     override function getText from (t is Number) to String
     {
 	"{%.04f t}s"
+    }
+    override function onCommit from () to () 
+    {
+        MasterUndoable.commit();
+    }
+    override function onCommit from (text is String) to () {
+        //onChange(Duration.valueOf(text));
+        MasterUndoable.commit();
     }
 }
 

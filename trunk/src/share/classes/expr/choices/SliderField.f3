@@ -39,6 +39,8 @@ public class SliderField is AbstractNode
 	textArea.setText(text);
     }
 
+    public var textInputEnabled = true;
+
     var textAreaEnabled = false;
 
     const textArea is Text.Field = Text.Field {
@@ -48,11 +50,13 @@ public class SliderField is AbstractNode
 	transform: translate(0, 1);
 	rightJustified: true;
         font: layoutEngine.createFont("font-size:10;font-family:Lucida Grande;font-weight:bold");
-        pickable: bind textAreaEnabled;
+        pickable: bind textAreaEnabled and textInputEnabled;
+        editable: bind textInputEnabled;
     };
 
     var textAreaCommit = textArea.observeCommit().subscribe(function from (_ is ()) to () {
             textAreaEnabled = false;
+            onCommit(textArea.text);
         });
 
     const dark = Color.color(0.77, 0.77, 0.77, 0.77);
@@ -105,8 +109,8 @@ public class SliderField is AbstractNode
         {
             if (event.clickCount > 1) {
                 textAreaEnabled = true;
-                event.scene.setFocus(textArea);
                 textArea.selectAll();
+                event.scene.setFocus(textArea);
             }
         }
     };
@@ -121,11 +125,16 @@ public class SliderField is AbstractNode
     const onUp = DefaultObserver of MouseEvent {
         override function onNext from (event is MouseEvent) to ()
         {     	       		
-            onCommit();
+            if (not textAreaEnabled) {
+                onCommit();
+            }
         }
     };
 
     public function onCommit to () {
+    }
+
+    public function onCommit from (text is String) to () {
     }
 
     var disp1 = lightRect.observeMouseDrag().subscribe(onDrag);

@@ -591,12 +591,12 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 
     override public function setX from (tx is Number, sx is Number) to ()
     {
-        println("Y {getTy()}, {getSy()} / {sy0} root bounds={root.bounds.height()} height={height}, scrollY={scrollY}");
-        println("tx={tx} sx={sx}");
+        //println("Y {getTy()}, {getSy()} / {sy0} root bounds={root.bounds.height()} height={height}, scrollY={scrollY}");
+        //println("tx={tx} sx={sx}");
         const cur = getSx();
-        println("cur={cur}");
-        println("pixelsPerFrame={pixelsPerFrame()}");
-        println("frameRateN={frameRateN}");
+       // println("cur={cur}");
+       // println("pixelsPerFrame={pixelsPerFrame()}");
+        //println("frameRateN={frameRateN}");
         scrollOffset = durationToFrame(dur * tx);
         if (sx <> 0) {
             frameRateN *= cur / sx;
@@ -658,7 +658,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
     }
 
     function drawLines from (w is Number, h is Number, viewHeight is Number, offset is Number) to AbstractMesh {
-	println("TIMELINE={target} pp={pixelsPerFrame()}");
+	//println("TIMELINE={target} pp={pixelsPerFrame()}");
 	const x0 = -w / 2 + 15;
 	const y0 = Math.round(h / 2 - viewHeight-5);
 	var x is Number = x0;
@@ -671,7 +671,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	var off = (offset - off0) * pp;
         var off1 = off0 * pp;
         x += off1;
-        println("OFF={offset}");
+        //println("OFF={offset}");
 	for (i in [0..(w+off) step pp]) {
 	    var n = if (mid) then 3 else 5;
 	    mid = not mid;
@@ -683,11 +683,11 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	    lineMesh.moveTo(x, y);
 	    lineMesh.lineTo(x + width, y);
 	    y -= viewHeight;
-	    println("y={y}");
+	    //println("y={y}");
 	}
 	const mesh = lineMesh.getMesh();
 	mesh.updateBounds();
-	println("draw lines: {mesh.bounds} {mesh.vertices.getVertexCount()}");
+	//println("draw lines: {mesh.bounds} {mesh.vertices.getVertexCount()}");
 	return mesh;
     }
 
