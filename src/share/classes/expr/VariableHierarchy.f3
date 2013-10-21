@@ -1,0 +1,103 @@
+package expr;
+import expr.undo.*;
+import expr.Context.*;
+import f3.media.scene.*;
+import f3.util.*;
+import f3.util.Observer.*;
+import expr.Names.*;
+
+public class Treenode is Treeview.Treenode {
+    public var n is Context;
+    override var label = bind n.name;
+    override var canOpen = bind { n.getContent().size() > 0 }
+    override var children = bind foreach (x in n.getContent()) Treenode { n: bind x };
+    override function open to () {
+	super.open();
+    }
+}
+
+public class Model is Treeview.Treemodel {
+    public const h is VariableHierarchy;
+    override var root = Treenode { n:  bind h.root };
+    public var selection is Treenode on replace {
+	if (h.selectedNode <> selection.n) {
+	    selectionObserver.onNext(selection);
+	}
+    }
+    const selectionListener = 
+	h.observeSelection().subscribe(function from (tn is ClosureVarContext) to () 
+				       {
+					   foldLeft((), 
+						    function from (_ is (), t is Treeview.Treenode) to () {
+							const ht = t as Treenode;
+							const n = ht.n;
+							if (n == tn) {
+							    selection = ht;
+							}
+						    })
+				       });
+    function onSelectionChange from (tn is Treeview.Treenode) to ()
+    {
+	h.selectedNode = (tn as Treenode).n
+    }
+    const disp = selectionObserver.subscribe(onSelectionChange);
+}
+
+public class VariableHierarchy 
+{
+    public var selectedNode is Context on replace {
+        selectedVariable = if (selectedNode is ClosureVarContext) then selectedNode as ClosureVarContext else null;
+    };
+
+    public function clearSelection {
+	selectedNode = null;
+    }
+
+    const undoList = UndoList {};
+
+    postinit {
+	undoList.addTarget("selectedNode", &selectedNode);
+    }
+
+    public var selectedVariable is ClosureVarContext;
+
+    public var root is Context;
+
+    public function selectNode from (n is Context) to ()
+    {
+	selectedNode = n;
+    }
+
+    public function deleteSelection {
+/*
+	var old = selectedVariable;
+	var prev is ResourceNode = null;
+	var next is ResourceNode = null;
+	var t is Node;
+	root.foldLeft((), 
+		      function from (_ is (), n is Node) to () {
+			  if (n == old) {
+			      if (prev == null) {
+				  prev = n as ResourceNode;
+			      } else t = prev;
+			  } else if (n is ResourceNode) {
+			      if (prev == t) {
+				  next = n as ResourceNode;
+			      }
+			      prev = n as ResourceNode;
+			  }
+		      });
+	if (t == null) {
+	    t = next;
+	}
+	selectNode(t);
+*/
+    }
+
+    const selection = Subject of ClosureVarContext {};
+
+    public function observeSelection to Observable of ClosureVarContext {
+	selection;
+    }
+	
+}
