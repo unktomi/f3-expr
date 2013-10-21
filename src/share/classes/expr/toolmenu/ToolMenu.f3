@@ -90,7 +90,7 @@ public class ToolMenu is ResizableNode {
 
     const fullScreen = Button {
         height: 18, width: 28;
-	baseURL: "{__DIR__}fullScreen"
+	baseURL: "{__DIR__}fullscreen"
 	onPress: bind toggleFullscreen
     };
 
@@ -117,7 +117,7 @@ public class ToolMenu is ResizableNode {
 	    fillPaint: ColorPaint(Color.color(.3, .3, .3));
 	    pickable: false;
 	},
-	Tools { width: bind width, height: bind height },
+        Tools { width: bind width, height: bind height }
         TransformNode {
 	    tx: bind width / 2 - (28 * buttons.size() + buttons.size()-1);
 	    content: bind box;

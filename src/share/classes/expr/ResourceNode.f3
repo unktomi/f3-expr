@@ -1,6 +1,12 @@
 package expr;
 import f3.media.scene.*;
+import f3.util.Observer.*;
+import f3.util.*;
 import expr.prog.Program;
+
+class InstanceNode extends TransformNode {
+    public var subs is Disposable[];
+}
 
 public class ResourceNode is TransformNode {
     public const webBrowserFactory is AbstractWebBrowserFactory = the AbstractWebBrowserFactory;
@@ -12,10 +18,23 @@ public class ResourceNode is TransformNode {
     override var id = bind url;
     public var temporal is ResourceTimeNode;
     public var programs is Program[];
-    public function instance from (id is String) to Node 
+
+    function subscribe of a from (ob is Observable of a, sourceCode is String, target is Node) to Disposable {
+        ob.subscribe(DefaultObserver of a {
+                override function onNext from (x is a) to ()
+                {
+                    println("on next {x} for {sourceCode} of {target}");
+                }
+            });
+    }
+    
+    public function instance from (id is String,
+                                   lookupVar is function from String to Object,
+                                   lookupSpatial is function from String to Node,
+                                   lookupTemporal is function from String to TimeNode) to Node 
     {
         const x = this;
-        TransformNode {
+        const target = InstanceNode {
             id: id;
             tx: x.tx;
             ty: x.ty;
@@ -33,6 +52,20 @@ public class ResourceNode is TransformNode {
                 url: x.url;
             }
         }
+        function localLookup from (name is String) to Node {
+            var n = target.lookup(name);
+            if (n == null) {
+                n = lookupSpatial(name);
+            }
+            return n;
+        }
+        for (prog in programs) {
+            if (prog.compiled <> null) {
+                const obs = prog.compiled(target, lookupVar, lookupSpatial, lookupTemporal);
+                insert subscribe(obs, prog.sourceCode, target) into target.subs;
+            }
+        }
+        return target;
     }
 }
 

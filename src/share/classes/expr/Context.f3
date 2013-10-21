@@ -69,6 +69,7 @@ public class AssetContext is Context {
 public class ClosureVarContext is Context {
     public var varType is TypeAsset;
     public var varName is String = "variable";
+    public var value is Object;
     override var name = bind "{varName} [{varType.name}]";
 }
 

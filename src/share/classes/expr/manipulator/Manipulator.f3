@@ -122,7 +122,7 @@ public class Manipulator is AbstractNode
     function doTranslateAll from (event is MouseEvent) to ()
     {
 	const worldTransform = target.toSceneTransform;
-        const pt = worldTransform.getTranslation();
+        const pt = (worldTransform * p).getTranslation();
         const ray = scene.camera.getPickRay(event.screenx, event.screeny);
         const plane = Plane {
             point: pt;

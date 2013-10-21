@@ -74,7 +74,7 @@ function makeResource from (n is ResourceNode) to SpatialResource {
 	pz: n.pz;
         programs: foreach (p in n.programs) ProgramResource {
             code: p.code;
-            compiled: p.compiled;
+            //compiled: p.compiled;
         }
     }
 }

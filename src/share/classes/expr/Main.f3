@@ -201,6 +201,15 @@ public function run from (args is String[]) to ()
     const temporalHierarchy = TemporalHierarchy { root: bind currentAnimResource }
     const otherHierarchy = VariableHierarchy { root: bind mainContext }
     var currentCamera is Camera;
+    var TheMovieLoader is MovieLoader;
+    try {
+	const clazz = 
+	    java.lang.Class.forName("org.f3.media.video.macos.MovieLoaderImpl") as java.lang.Class of MovieLoader;
+	TheMovieLoader = clazz.newInstance();
+    } catch (e is java.lang.Exception) {
+	println("NOTE: couldn't create corevideo movie loader");
+    }
+    
     var TheWebBrowserFactory is AbstractWebBrowserFactory;
     try {
 	const clazz = 
@@ -295,6 +304,21 @@ public function run from (args is String[]) to ()
 		rn.temporal = rtn;
 		addTimeResource(rtn);
 	    }
+	} else if (url.endsWith(".mp4")) {
+            const movie = Movie {
+                url: url;
+            }
+	    const rn = ResourceNode {
+                url: url;
+	        content: movie;
+	    }
+	    addResource(rn);
+	    const rtn = ResourceTimeNode {
+		url: url;
+		content: Movie.Clip { movie: movie };
+		spatial: rn;
+	    }
+            addTimeResource(rtn);
 	} else if (url.endsWith(".ma")) {
 	    const model = Ma.Model {
 		url: url;

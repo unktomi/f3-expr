@@ -28,7 +28,7 @@ public class UndoList
 
     public function undo 
     {
-    println("undo {history[now-1]}");
+//    println("undo {history[now-1]}");
 	if (now > 0) for (u in history[--now].todo) {
 	    u.apply();
 	}
@@ -36,7 +36,7 @@ public class UndoList
 
     public function redo 
     {
-    println("redo {history[now+1]}");
+//    println("redo {history[now+1]}");
 	if (now < history.size()-1) for (u in history[++now].todo) {
 	    u.apply();
 	}
@@ -83,7 +83,7 @@ public class UndoList
 	}
 	insert list into history;
 	now++;
-	println("commit {history[now]}");
+//	println("commit {history[now]}");
     }
 
     public function canUndo to Boolean {

@@ -1,4 +1,6 @@
 package expr.prog;
+import f3.media.scene.*;
+import f3.util.*;
 import Expression.Canvas;
 import Expression.Member;
 import Expression.ExprScene;
@@ -7,5 +9,6 @@ public class Program {
     public var event is Member;
     public var canvas is Canvas;
     public var code is ExprScene;
-    public var compiled is String;
+    public var sourceCode is String;
+    public var compiled is function from (Node, function from String to Object, function from String to Node, function from String to TimeNode) to Observable of ?;
 }
