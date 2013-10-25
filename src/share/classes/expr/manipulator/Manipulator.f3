@@ -17,39 +17,42 @@ public class Manipulator is AbstractNode
 
     public var target is TransformNode on replace old {
 
-        undoList.removeTarget(&old.tx);
-        undoList.removeTarget(&old.ty);
-        undoList.removeTarget(&old.tz);
+        if (old <> null) {
+            undoList.removeTarget(&old.tx);
+            undoList.removeTarget(&old.ty);
+            undoList.removeTarget(&old.tz);
+            
+            undoList.removeTarget(&old.rx);
+            undoList.removeTarget(&old.ry);
+            undoList.removeTarget(&old.rz);
+            
+            undoList.removeTarget(&old.sx);
+            undoList.removeTarget(&old.sy);
+            undoList.removeTarget(&old.sz);
 
-        undoList.removeTarget(&old.rx);
-        undoList.removeTarget(&old.ry);
-        undoList.removeTarget(&old.rz);
+            undoList.removeTarget(&old.px);
+            undoList.removeTarget(&old.py);
+            undoList.removeTarget(&old.pz);
+        } 
 
-        undoList.removeTarget(&old.sx);
-        undoList.removeTarget(&old.sy);
-        undoList.removeTarget(&old.sz);
+        if (target <> null) {
+            undoList.addTarget("tx", &target.tx);
+            undoList.addTarget("ty", &target.ty);
+            undoList.addTarget("tz", &target.tz);
 
-        undoList.removeTarget(&old.px);
-        undoList.removeTarget(&old.py);
-        undoList.removeTarget(&old.pz);
-
-        undoList.addTarget("tx", &target.tx);
-        undoList.addTarget("ty", &target.ty);
-        undoList.addTarget("tz", &target.tz);
-
-        undoList.addTarget("rx", &target.rx);
-        undoList.addTarget("ry", &target.ry);
-        undoList.addTarget("rz", &target.rz);
-
-        undoList.addTarget("sx", &target.sx);
-        undoList.addTarget("sy", &target.sy);
-        undoList.addTarget("sz", &target.sz);
-
-        undoList.addTarget("px", &target.px);
-        undoList.addTarget("py", &target.py);
-        undoList.addTarget("pz", &target.pz);
+            undoList.addTarget("rx", &target.rx);
+            undoList.addTarget("ry", &target.ry);
+            undoList.addTarget("rz", &target.rz);
+            
+            undoList.addTarget("sx", &target.sx);
+            undoList.addTarget("sy", &target.sy);
+            undoList.addTarget("sz", &target.sz);
+            
+            undoList.addTarget("px", &target.px);
+            undoList.addTarget("py", &target.py);
+            undoList.addTarget("pz", &target.pz);
+        }
     }
-
     public var viewer is ExaminerViewer; 
     
     public var scene is Scene;
