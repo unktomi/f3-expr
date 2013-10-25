@@ -10,7 +10,7 @@ public class Treenode is Treeview.Treenode {
     override var label = bind if (n.parent is ResourceNode) then "Main Scene" else if (n.id <> "") then formatName(n.id) else "{n}";
     function asGroup from (n is Node) to Group { if (n is Group) then n as Group else null }
     override var canOpen = bind { var g = asGroup(n); g.content.size() > 0 }
-    override var children = bind foreach (x in (n as Group).content) Treenode { n: bind x };
+    override var children = bind foreach (x in asGroup(n).content) Treenode { n: bind x };
     override function open to () {
 	super.open();
 	println("open {n} => {children.size()}");

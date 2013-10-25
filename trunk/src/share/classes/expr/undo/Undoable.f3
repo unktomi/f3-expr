@@ -8,6 +8,7 @@ public class Undoable of a
     public var tag is String;
     public function apply
     {
+        println("undo {tag} to {value}");
 	target.set(value);
     }
     public function isDirty to Boolean 
@@ -18,6 +19,9 @@ public class Undoable of a
 
 public function make of a from (tag is String, ptr is Ref of a) to Undoable of a 
 {
+    if (tag == "sx" and (ptr.get() as Number) == 0) {
+        throw new java.lang.Error("bad undo of sx");
+    }
     Undoable of a {
 	tag: tag;
 	target: ptr;

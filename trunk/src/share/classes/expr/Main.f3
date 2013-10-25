@@ -195,9 +195,11 @@ public function run from (args is String[]) to ()
     const currentAnimResource is ResourceTimeGroup = ResourceTimeGroup {
 	id: "Temporal Hierarchy";
     }
+
     const transformHierarchy = TransformHierarchy {
 	root: bind currentResource;
     }
+
     const temporalHierarchy = TemporalHierarchy { root: bind currentAnimResource }
     const otherHierarchy = VariableHierarchy { root: bind mainContext }
     var currentCamera is Camera;
@@ -242,7 +244,7 @@ public function run from (args is String[]) to ()
 	tz: 13;
 	near: 1;
 	far: 1000;
-	content: PointLight {}
+        content: PointLight {}
     }
 
     const viewer = DefaultExaminerViewer {
@@ -397,10 +399,29 @@ public function run from (args is String[]) to ()
     }
 
     var instanceSpace is Group = Group {id: "Instance Space"};
+    var currentModels = bind foreach (m in currentResource.resources) if (m is MaResourceNode) then m as MaResourceNode else null;
+    var currentCameras is Camera[];
 
+    function updateCams to () {
+        var cams is Camera[];
+        transformHierarchy.root.foldLeft((), function from (_ is (), n is Node) to () {
+                if (n is Camera and n <> camera) {
+                    if (not (n.id == "topShape" or n.id == "perspShape" or n.id == "frontShape" or n.id == "sideShape")) {
+                        insert n as Camera into cams;
+                    }
+                }
+            });
+        currentCameras = cams;
+    }
+    bound function getCamerasFromModel from (m is Ma.Model) to Camera[] {
+        foreach (c in m.getCameras()) {
+            if (c.id == "topShape" or c.id == "perspShape" or c.id == "frontShape" or c.id == "sideShape") then null else c;
+        }
+    }
     const mainScene = Scene {
-    	override function update { 
+    	override function update to () { 
 	    super.update();
+            updateCams();
 	    canUndo = MasterUndoable.canUndo();
 	    canRedo = MasterUndoable.canRedo();
             instanceSpace.content = instanceSpace.content[ x | { var y = x as EventLayer.EventNode; y.timestamp <= player.playhead }];
@@ -611,15 +632,31 @@ public function run from (args is String[]) to ()
 	
 	content: [cachedScene,
 		  Scene {
+                //visible: bind internalWindowsLayer.visible;
                       background: null;
                       camera: camera;
-		      override var content = manip = expr.manipulator.Manipulator 
+		      override var content = [manip = expr.manipulator.Manipulator 
 		      {
 			  visible: bind currentTransform <> null;
                           viewer: viewer;
 			  target: bind currentTransform;
 			  scene: this;
-		      }
+		      }, 
+                      Group {
+                          var viewScale = bind uniformScale(manip.viewScale*.5);
+                          content: bind foreach  (cam in currentCameras) {
+                              var cameraModel = Ma.Model {
+                                  url: "{__DIR__}camera.ma";
+                              }
+                              Group {
+                                  transform: bind cam.toSceneTransform;
+                                  content: Group {
+                                      transform: bind viewScale;
+                                      content: bind cameraModel.getSpatialRoot();
+                                  }
+                              }
+                          }
+                      }]
                   },
 		  editorScene = Scene {
                     var lastTime is Long;
@@ -647,7 +684,8 @@ public function run from (args is String[]) to ()
 		    	height: 400, width: 300;
                                     content: ResizableStageNode {
                                         content: Tabview {
-                                            tabs: Tabview.Tab {
+                                            tabs: 
+                                            [Tabview.Tab {
                                                 title: "Events";
                                                 content: Scrollpane {
                                                     canZoomVertical: false;
@@ -663,7 +701,46 @@ public function run from (args is String[]) to ()
                                                         }                                       
                                                     }
                                                 }
-                                            }
+                                            },
+                                            Tabview.Tab {
+                                                title: "Cameras";
+                                                content: Tabview {
+                                                    var sn = Scene {
+                                                        content: bind mainScene.root;
+                                                    }
+                                                    var st = StageNode {
+                                                        content: sn;
+                                                    }
+                                                tabs:
+                                                    bind foreach (m in currentModels) {
+                                                        var cams = bind foreach (cam in getCamerasFromModel(m.model)) cam;
+                                                        if (cams.size() == 0) then null else
+                                                        Tabview.Tab {
+                                                        title: m.id;
+
+                                                        content: Tabview {
+                                                            tabs:
+                                                             bind foreach ( cam in cams) 
+                                                                Tabview.Tab {
+                                                                title: cam.id;
+                                                                var g is Group = Group {};
+                                                                onSelect: function to () {
+                                                                    g.content = st;
+                                                                    sn.camera = cam;
+                                                                }
+                                                                content: ResizableNode {
+                                                                    override function resize from (w is Number, h is Number) to () 
+                                                                    {
+                                                                        st.resize(w as Integer, h as Integer);
+                                                                    }
+                                                                    override var internalContent = bind g;
+                                                                }
+                                                            }
+                                                        }
+                                                        }
+                                                    }
+                                                }
+                                            }]
                                         }
                                     }
                        },
@@ -1155,6 +1232,7 @@ public function run from (args is String[]) to ()
 	    //viewer.focusCamera(currentTransform);
             
 	});
+    MasterUndoable.commit();
 
 }
 

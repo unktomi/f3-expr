@@ -21,6 +21,7 @@ public class Tab {
     public var title is String;
     public var content is ResizableNode;
     protected var index is Integer;
+    public var onSelect is function from () to ();
 }
 
 class TabImpl is TransformNode, MouseInputHandler, Focuser {
@@ -79,6 +80,7 @@ public class Tabview is ResizableNode, Focuser {
 	if (lastSelected <> selectedTab) {
 	    lastSelected = selectedTab;
 	    selectedTab.content.resize(contentWidth, contentHeight);
+            selectedTab.onSelect();
 	}
 	minTabWidth = width / Math.max(tabs.size(), 1);
 	var maxLabelWidth = 0.0;

@@ -30,6 +30,10 @@ public class MaAsset is Asset {
 	 }];
 }
 
+public class SceneAsset is Asset {
+    public var scene is Scene;
+}
+
 public class CameraAsset is Asset {
     public const camera is Camera;
 }

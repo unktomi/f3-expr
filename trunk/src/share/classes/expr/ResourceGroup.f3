@@ -9,8 +9,8 @@ public class ResourceGroup is TransformNode {
     override var content = bind resources;
     public var currentClip is TimeNode;
     const undoList = UndoList {};
-    postinit {
-	undoList.addTarget("resourceNodes", &resources);
+    init {
+	undoList.addTarget("resources", &resources);
     }
 }
 

@@ -1444,7 +1444,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         const w = new java.io.StringWriter();
         println("root={rootExprView} => {serializationMap.get(rootExprView)}");
 
-        /*
+
         foreach (obj in views) {
             var x = serialize(obj);
             println("serialize {obj} => {x}");
@@ -1459,7 +1459,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         prog.code = todo;
 
         println("deserialized to {des}");
-        */
+
 	var terms is Expression[];
 	getTerminals(e, 
 		     function from (x is Expression) to ()
