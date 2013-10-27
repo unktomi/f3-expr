@@ -31,7 +31,26 @@ public class MaAsset is Asset {
 }
 
 public class SceneAsset is Asset {
-    public var scene is Scene;
+    override var name = "Scene";
+    protected var count = 1;
+    public function getScene to ResourceScene {
+	ResourceScene {
+            background: null;
+            camera: PerspectiveCamera {};
+	    id: "Scene {count++}";
+	}
+    }
+}
+
+public class Scene2DAsset is SceneAsset {
+    override var name = "2D Scene";
+    override public function getScene to ResourceScene {
+	ResourceScene {
+            background: null;
+            camera: Camera2D { near: 10000, far: -10000 };
+	    id: "2D Scene {count++}";
+	}
+    }
 }
 
 public class CameraAsset is Asset {
@@ -275,7 +294,8 @@ public class AssetModel is Treemodel {
 	asset: Asset {
 	    name: "Assets";
 	    containedAssets: bind 
-	    [getPackageAssets(), TransitionLayerAsset{}, foreach (r in resources.resources) makeAsset(r)]
+	    [getPackageAssets(), TransitionLayerAsset{}, 
+             Scene2DAsset {}, foreach (r in resources.resources) makeAsset(r)]
 	}
     }
 }

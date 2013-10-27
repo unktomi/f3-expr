@@ -4,6 +4,8 @@ import f3.jogl.awt.JoglStage.*;
 import f3.math.*;
 import f3.math.LinearMath.*;
 import f3.util.Bits;
+import f3.util.*;
+import f3.util.Observer.*;
 import f3.media.scene.*;
 import f3.media.input.*;
 import f3.media.svg.SVG;
@@ -151,6 +153,12 @@ public class MainContext is Context.MemberContext {
     }
 }
 
+var canUndo is Boolean;
+var canRedo is Boolean;
+var currentScenes is ResourceScene[] = [];
+var doUpdate is Observer of (());
+
+
 public function run from (args is String[]) to ()
 {
     var mainContext is Context = MainContext {
@@ -187,17 +195,18 @@ public function run from (args is String[]) to ()
             handleContextVisibility(lastContext, false);
             lastContext = ctx;
             handleContextVisibility(ctx, true);
-        }); 
+        });
 
-    const currentResource is ResourceGroup = ResourceGroup {
-	id: "Spatial Hierarchy";
-    }
+    var currentScene is ResourceScene = bind transformHierarchy.selectedScene;
+
+    var currentResource is ResourceGroup = bind currentScene.currentResource;
+
     const currentAnimResource is ResourceTimeGroup = ResourceTimeGroup {
 	id: "Temporal Hierarchy";
     }
 
-    const transformHierarchy = TransformHierarchy {
-	root: bind currentResource;
+    const transformHierarchy is TransformHierarchy = TransformHierarchy {
+	scenes: bind currentScenes;
     }
 
     const temporalHierarchy = TemporalHierarchy { root: bind currentAnimResource }
@@ -262,6 +271,7 @@ public function run from (args is String[]) to ()
     
     function addResource from (rn is ResourceNode) to ()
     {
+        println("ADDING {rn} to {currentResource} th.scenes={transformHierarchy.scenes}, th.selectedScene={transformHierarchy.selectedScene}");
 	insert rn into currentResource.resources;
 	transformHierarchy.selectNode(rn);
 	viewer.focusCamera(rn);
@@ -376,8 +386,6 @@ public function run from (args is String[]) to ()
     var currentTransform = bind transformHierarchy.selectedTransform;
     currentCamera = camera;
 
-    var canUndo is Boolean;
-    var canRedo is Boolean;
     var savePoint is Integer;
 
     var editorScene is Scene;
@@ -398,64 +406,24 @@ public function run from (args is String[]) to ()
 	return result;
     }
 
-    var instanceSpace is Group = Group {id: "Instance Space"};
-    var currentModels = bind foreach (m in currentResource.resources) if (m is MaResourceNode) then m as MaResourceNode else null;
-    var currentCameras is Camera[];
-
-    function updateCams to () {
-        var cams is Camera[];
-        transformHierarchy.root.foldLeft((), function from (_ is (), n is Node) to () {
-                if (n is Camera and n <> camera) {
-                    if (not (n.id == "topShape" or n.id == "perspShape" or n.id == "frontShape" or n.id == "sideShape")) {
-                        insert n as Camera into cams;
-                    }
-                }
-            });
-        currentCameras = cams;
+    const mainScene = ResourceScene {
+        id: "Main Scene";
+	background: Color.GRAY;
+        camera: camera;
     }
+
+/*
+    const cachedScene = CachedScene {
+        background: null;
+	scene: mainScene;
+    }
+*/
     bound function getCamerasFromModel from (m is Ma.Model) to Camera[] {
         foreach (c in m.getCameras()) {
             if (c.id == "topShape" or c.id == "perspShape" or c.id == "frontShape" or c.id == "sideShape") then null else c;
         }
     }
-    const mainScene = Scene {
-    	override function update to () { 
-	    super.update();
-            updateCams();
-	    canUndo = MasterUndoable.canUndo();
-	    canRedo = MasterUndoable.canRedo();
-            instanceSpace.content = instanceSpace.content[ x | { var y = x as EventLayer.EventNode; y.timestamp <= player.playhead }];
-	}
-	background: Color.GRAY;
-	override var camera = bind currentCamera on invalidate {
-	    println("scene camera invalidated {currentCamera}");
-	}
-	content: bind [transformHierarchy.root, Group {
-                content: bind instanceSpace;
-            }];
-	override function injectMouseDown from (event is MouseEvent) to ()
-	{
-	    super.injectMouseDown(event);
-	    for (i in underMouse) {
-		println("{i.node}");
-		if (i.node is MeshNode) {
-		    var p = i.node.parent;
-		    while (p <> null) {
-			if (p is ResourceNode) {
-			    transformHierarchy.selectNode(p);
-			    return;
-			}
-			p = p.parent;
-		    }
-		}
-	    }
-	}
-    }
 
-    const cachedScene = CachedScene {
-        background: null;
-	scene: mainScene;
-    }
 
     var loop is Boolean = true;
     var full is Boolean = false;
@@ -473,6 +441,18 @@ public function run from (args is String[]) to ()
 	toggleLoop: function { loop = not loop; () }
 	toggleFullscreen: function { full = not full; stage.setFullscreen(full) }
     };
+
+    const sceneMenu = Tabview {
+          height: 20; width: bind stage.width;
+          transform: bind translate(stage.width/2, stage.height-30);
+          tabs: bind foreach (scene in transformHierarchy.scenes) Tabview.Tab {
+                title: bind scene.id;
+                onSelect: function from () to () 
+                {
+                    transformHierarchy.selectedScene = scene;                        
+                }
+          }
+    }
     
     var manip is expr.manipulator.Manipulator;
 
@@ -545,96 +525,10 @@ public function run from (args is String[]) to ()
 	MasterUndoable.canUndo();
     }
 
-    var stage is JoglStage = JoglStage {
-        onClose: function from () to Boolean {
-            if (fileDirty()) {
-                save();
-            }
-            saveEditorState(editorScene);
-            return true;
-        }
-        title: bind "{currentResource.url} {if (savePoint <> MasterUndoable.now) then " (Unsaved)" else ""}";
-        menubar: Menu.Bar {
-	    menus: 
-	    [Menu 
-             { 
-		 label: "File";
-		 shortcut: Menu.Shortcut { keyCode: Keys.F }
-		 items:
-		 [MenuItem {
-		     shortcut: Menu.Shortcut { keyCode: Keys.O }
-		     label: "Open";
-		     action: function {
-			 const result = fileOpen.open();
-			 if (result <> null) {
-			     if (fileDirty()) {
-				 save();
-			     }
-			     open("file:{result}");
-			 }
-		     }
-		 },
-		 MenuItem {
-		     shortcut: Menu.Shortcut { keyCode: Keys.S }
-		     label: "Save";
-		     enabled: bind currentResource.url <> ""
-		     action: save;
-		 },
-		 MenuItem {
-		     shortcut: Menu.Shortcut { keyCode: Keys.A }
-		     label: "Save As";
-		     enabled: bind currentResource.url == ""
-		     action: function {
-			 fileSave.fileName = currentResource.url;
-			 const result = fileSave.open();
-			 if (result <> null) {
-			     currentResource.url = "file:{result}";
-			     save();
-			 }
-		     }
-		 }]
-	     },
-	     Menu 
-             { 
-		 shortcut: Menu.Shortcut { keyCode: Keys.E }
-		 label: "Edit"
-		 items:
-		 [MenuItem {
-		     shortcut: Menu.Shortcut { keyCode: Keys.X }
-		     label: "Cut"
-		 },
-		 MenuItem {
-		     shortcut: Menu.Shortcut { keyCode: Keys.C }
-		     label: "Copy"
-		 },
-		 MenuItem {
-		     shortcut: Menu.Shortcut { keyCode: Keys.V }
-		     label: "Paste"
-		 }
-                 Menu.Separator {},
-		 MenuItem {
-		     label: "Undo";
-		     enabled: bind canUndo;
-		     shortcut: Menu.Shortcut { keyCode: Keys.Z }
-		     action: MasterUndoable.undo
-		 },
-		 MenuItem {
-		     label: "Redo";
-		     enabled: bind canRedo;
-		     shortcut: Menu.Shortcut { keyCode: Keys.Z, shiftKey: true }
-		     action: MasterUndoable.redo
-		 }]
-	     }]
-	     
-	}
-
-	height: 800, width: 1020;
-	
-	content: [cachedScene,
-		  Scene {
+    var manipLayer = Scene {
                 //visible: bind internalWindowsLayer.visible;
                       background: null;
-                      camera: camera;
+                      camera: bind currentScene.camera;
 		      override var content = [manip = expr.manipulator.Manipulator 
 		      {
 			  visible: bind currentTransform <> null;
@@ -644,7 +538,7 @@ public function run from (args is String[]) to ()
 		      }, 
                       Group {
                           var viewScale = bind uniformScale(manip.viewScale*.5);
-                          content: bind foreach  (cam in currentCameras) {
+                          content: bind foreach  (cam in currentScene.currentCameras) {
                               var cameraModel = Ma.Model {
                                   url: "{__DIR__}camera.ma";
                               }
@@ -657,8 +551,9 @@ public function run from (args is String[]) to ()
                               }
                           }
                       }]
-                  },
-		  editorScene = Scene {
+        };
+        
+        var _ = editorScene = Scene {
                     var lastTime is Long;
                     override function update {
                         const now = java.lang.System.currentTimeMillis();
@@ -706,13 +601,13 @@ public function run from (args is String[]) to ()
                                                 title: "Cameras";
                                                 content: Tabview {
                                                     var sn = Scene {
-                                                        content: bind mainScene.root;
+                                                        content: bind currentScene.root;
                                                     }
                                                     var st = StageNode {
                                                         content: sn;
                                                     }
                                                 tabs:
-                                                    bind foreach (m in currentModels) {
+                                                    bind foreach (m in currentScene.currentModels) {
                                                         var cams = bind foreach (cam in getCamerasFromModel(m.model)) cam;
                                                         if (cams.size() == 0) then null else
                                                         Tabview.Tab {
@@ -820,6 +715,12 @@ public function run from (args is String[]) to ()
 						     }
 						 }
 					     }
+                                             if (asset is AssetTree.SceneAsset) {
+                                                 const picked = getUnderMouseInEditor();
+                                                 if (picked == []) {
+                                                     insert (asset as AssetTree.SceneAsset).getScene() into currentScenes;
+                                                 }
+                                             }
                                              if (asset is AssetTree.TypeAsset) {
                                                  const picked = getUnderMouseInEditor();
 						 for (j in picked) {
@@ -865,7 +766,7 @@ public function run from (args is String[]) to ()
                                                  content: Scrollpane {
                                                      canZoomVertical: false;
                                                      content: inspector1 = Inspector {
-                                                         inspecting: bind Inspector.inspect(currentTransform);
+                                                         inspecting: bind Inspector.inspect(if (currentTransform == null) then currentScene else currentTransform);
                                                      }
                                                  }
 					  },
@@ -1097,8 +998,8 @@ public function run from (args is String[]) to ()
 					 //event: bind inspector1.inspecting[inspector1.selectedIndex].member;
                                          eventContext: bind contextModel.selectedMemberContext;
 					 targetNode: bind currentTransform as ResourceNode;
-					 targetSpace: bind mainScene.root;
-                                         instanceSpace: bind instanceSpace;
+					 targetSpace: bind currentScene.root;
+                                         instanceSpace: bind currentScene.instanceSpace;
 					 targetTime: bind mainTimeLayer;
                                          targetTimeline: bind player;
 				    }
@@ -1106,10 +1007,100 @@ public function run from (args is String[]) to ()
 			    }
                         }
 		    }]
-		},
+                   },
 	    toolMenu, 
+            sceneMenu,
             popupLayer]
-         }]
+        };
+     
+    var stage is JoglStage = JoglStage {
+
+        override var content = bind [currentScenes, manipLayer, editorScene];
+	
+        onClose: function from () to Boolean {
+            if (fileDirty()) {
+                save();
+            }
+            saveEditorState(editorScene);
+            return true;
+        }
+        title: bind "{currentResource.url} {if (savePoint <> MasterUndoable.now) then " (Unsaved)" else ""}";
+        menubar: Menu.Bar {
+	    menus: 
+	    [Menu 
+             { 
+		 label: "File";
+		 shortcut: Menu.Shortcut { keyCode: Keys.F }
+		 items:
+		 [MenuItem {
+		     shortcut: Menu.Shortcut { keyCode: Keys.O }
+		     label: "Open";
+		     action: function {
+			 const result = fileOpen.open();
+			 if (result <> null) {
+			     if (fileDirty()) {
+				 save();
+			     }
+			     open("file:{result}");
+			 }
+		     }
+		 },
+		 MenuItem {
+		     shortcut: Menu.Shortcut { keyCode: Keys.S }
+		     label: "Save";
+		     enabled: bind currentResource.url <> ""
+		     action: save;
+		 },
+		 MenuItem {
+		     shortcut: Menu.Shortcut { keyCode: Keys.A }
+		     label: "Save As";
+		     enabled: bind currentResource.url == ""
+		     action: function {
+			 fileSave.fileName = currentResource.url;
+			 const result = fileSave.open();
+			 if (result <> null) {
+			     currentResource.url = "file:{result}";
+			     save();
+			 }
+		     }
+		 }]
+	     },
+	     Menu 
+             { 
+		 shortcut: Menu.Shortcut { keyCode: Keys.E }
+		 label: "Edit"
+		 items:
+		 [MenuItem {
+		     shortcut: Menu.Shortcut { keyCode: Keys.X }
+		     label: "Cut"
+		 },
+		 MenuItem {
+		     shortcut: Menu.Shortcut { keyCode: Keys.C }
+		     label: "Copy"
+		 },
+		 MenuItem {
+		     shortcut: Menu.Shortcut { keyCode: Keys.V }
+		     label: "Paste"
+		 }
+                 Menu.Separator {},
+		 MenuItem {
+		     label: "Undo";
+		     enabled: bind canUndo;
+		     shortcut: Menu.Shortcut { keyCode: Keys.Z }
+		     action: MasterUndoable.undo
+		 },
+		 MenuItem {
+		     label: "Redo";
+		     enabled: bind canRedo;
+		     shortcut: Menu.Shortcut { keyCode: Keys.Z, shiftKey: true }
+		     action: MasterUndoable.redo
+		 }]
+	     }]
+	     
+	}
+
+	height: 800, width: 1020;
+	
     }
 
     function setCamera from (i is Integer) to ()
@@ -1160,7 +1151,7 @@ public function run from (args is String[]) to ()
 	//currentResource.setClip(i);
     }
 
-    cachedScene.stageNode.addMouseInputHandler(viewer);
+    stage.addMouseInputHandler(viewer);
     stage.addKeyboardInputHandler(KeyboardInputHandler {
 
 	    override function onKeyInput from (event is KeyboardEvent) to () 
@@ -1227,11 +1218,23 @@ public function run from (args is String[]) to ()
 		}
 	    }
 	});
-
+    doUpdate = DefaultObserver of (()) {
+        override function onNext from (_ is ()) to () {
+            canUndo = MasterUndoable.canUndo();
+            canRedo = MasterUndoable.canRedo();
+            for (z in currentScenes) {
+                z.instanceSpace.content = z.instanceSpace.content[ x | { var y = x as EventLayer.EventNode; y.timestamp <= player.playhead }];
+            }
+        }
+    };
+    currentScenes = [mainScene];
+    transformHierarchy.selectedScene = mainScene;
+    println("SET MAIN SCENE {transformHierarchy.selectedScene}");
     stage.invoke(function {
 	    //viewer.focusCamera(currentTransform);
             
 	});
+    stage.observeUpdate().subscribe(doUpdate);
     MasterUndoable.commit();
 
 }

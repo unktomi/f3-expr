@@ -70,7 +70,7 @@ public class Manipulator is AbstractNode
     }
 
     public readonly var viewScale = bind {
-        var s = viewer.centerDistance / 100;
+        var s = if (scene.camera is Camera2D) then 10.0 else viewer.centerDistance / 100;
         if (s <> 0) then s*viewSize else 1.0;
     }
 
