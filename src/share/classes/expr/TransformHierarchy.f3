@@ -17,9 +17,27 @@ public class Treenode is Treeview.Treenode {
     }
 }
 
+public class SceneTreenode is Treenode {
+    public var scene is ResourceScene;
+    override var n = bind scene.currentResource;
+    override var label = bind scene.id;
+    override var canOpen = bind scene.content.size() > 0;
+}
+
 public class Model is Treeview.Treemodel {
-    public const h is TransformHierarchy;
-    override var root = Treenode { n:  bind h.root };
+
+    public var h is TransformHierarchy;
+
+    override var root = Treenode { 
+        label: "Spatial Hierarchy";
+        override var canOpen = true;
+        override var children = bind foreach (x in h.scenes) {
+            SceneTreenode {
+                scene: bind x;
+            }
+        }
+        
+    }
     public var selection is Treenode on replace {
 	if (h.selectedNode <> selection.n) {
 	    selectionObserver.onNext(selection);
@@ -39,13 +57,30 @@ public class Model is Treeview.Treemodel {
 				       });
     function onSelectionChange from (tn is Treeview.Treenode) to ()
     {
-	h.selectedNode = (tn as Treenode).n
+        println("SELECTION CHANGE scenes={h.scenes} sel={h.selectedScene}");
+        var x = tn;
+        if (x.parent == null) {
+            update();
+        }
+        while (x <> null and not (x is SceneTreenode)) {
+            x = x.parent;
+        }
+	h.selectedNode = (tn as Treenode).n;
+        if (x == null) {
+            println("ERROR scene is null");
+        } else {
+            h.selectedScene = (x as SceneTreenode).scene;
+        }
     }
     const disp = selectionObserver.subscribe(onSelectionChange);
 }
 
 public class TransformHierarchy 
 {
+    public var selectedScene is ResourceScene on replace {
+	sceneSelection.onNext(selectedScene);
+    }
+
     public var selectedNode is Node on replace {
 	var p = selectedNode;
 	while (p <> null and not (p is ResourceNode)) {
@@ -67,7 +102,15 @@ public class TransformHierarchy
 
     public var selectedTransform is TransformNode;
 
-    public var root is Node;
+    public var scenes is ResourceScene[] on replace {
+        disps;
+    }
+
+    var disps = bind foreach (scene in scenes) scene.observeSelection().subscribe(function from (n is ResourceNode) to () {
+            println("SCENE {scene.id} => {n.id}");
+            selectedScene = scene;
+            selectNode(n);
+    });
 
     public function selectNode from (n is Node) to ()
     {
@@ -79,23 +122,26 @@ public class TransformHierarchy
 	var prev is ResourceNode = null;
 	var next is ResourceNode = null;
 	var t is Node;
-	root.foldLeft((), 
-		      function from (_ is (), n is Node) to () {
-			  if (n == old) {
-			      if (prev == null) {
-				  prev = n as ResourceNode;
-			      } else t = prev;
-			  } else if (n is ResourceNode) {
-			      if (prev == t) {
-				  next = n as ResourceNode;
+        for (scene in scenes) {
+            var root = scene.root;
+            root.foldLeft((), 
+                          function from (_ is (), n is Node) to () {
+                              if (n == old) {
+                                  if (prev == null) {
+                                      prev = n as ResourceNode;
+                                  } else t = prev;
+                              } else if (n is ResourceNode) {
+                                  if (prev == t) {
+                                      next = n as ResourceNode;
 			      }
-			      prev = n as ResourceNode;
-			  }
+                                  prev = n as ResourceNode;
+                              }
 		      });
-	if (t == null) {
-	    t = next;
-	}
-	selectNode(t);
+        }
+        if (t == null) {
+            t = next;
+        }
+        selectNode(t);
     }
 
     public function move from (src is Node, target is Node) to ()
@@ -114,9 +160,14 @@ public class TransformHierarchy
     }
 
     const selection = Subject of TransformNode {};
+    const sceneSelection = Subject of ResourceScene {};
 
     public function observeSelection to Observable of TransformNode {
 	selection;
+    }
+
+    public function observeSceneSelection to Observable of ResourceScene {
+	sceneSelection;
     }
 	
 }
