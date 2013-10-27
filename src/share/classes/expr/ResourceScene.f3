@@ -1,0 +1,61 @@
+package expr;
+import f3.media.scene.*;
+import f3.media.input.*;
+import f3.util.*;
+import expr.ResourceNode.*;
+
+public class ResourceScene is Scene {
+
+    public const instanceSpace is Group = Group {id: "Instance Space"};
+
+    public var currentModels = bind foreach (m in currentResource.resources) if (m is MaResourceNode) then m as MaResourceNode else null;
+
+    public var currentCameras is Camera[];
+
+    override function update to () {
+        super.update();
+        updateCams();
+    }
+
+    function updateCams to () {
+        var cams is Camera[];
+        root.foldLeft((), function from (_ is (), n is Node) to () {
+                if (n is Camera and n <> camera) {
+                    if (not (n.id == "topShape" or n.id == "perspShape" or n.id == "frontShape" or n.id == "sideShape")) {
+                        insert n as Camera into cams;
+                    }
+                }
+            });
+        currentCameras = cams;
+    }
+    
+    public const currentResource is ResourceGroup = ResourceGroup { id: bind id };
+
+    override var content = bind [currentResource, instanceSpace];
+
+    override function injectMouseDown from (event is MouseEvent) to ()
+    {
+        super.injectMouseDown(event);
+        for (i in underMouse) {
+            if (i.node is MeshNode) {
+                var p = i.node.parent;
+                while (p <> null) {
+                    if (p is ResourceNode) {
+                        println("SELECTING: {p}");
+                        selection.onNext(p as ResourceNode);
+                        return;
+                    }
+                    p = p.parent;
+                }
+            }
+        }
+    }
+
+    const selection = Subject of ResourceNode {};
+
+    public function observeSelection to Observable of ResourceNode 
+    {
+        selection
+    }
+}
+
