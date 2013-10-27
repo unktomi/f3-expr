@@ -33,6 +33,8 @@ public class ResourceScene is Scene {
 
     override var content = bind [currentResource, instanceSpace];
 
+    public var selectedResource is ResourceNode;
+
     override function injectMouseDown from (event is MouseEvent) to ()
     {
         super.injectMouseDown(event);

@@ -10,7 +10,7 @@ public class Treenode is Treeview.Treenode {
     override var label = bind if (n.parent is ResourceNode) then "Main Scene" else if (n.id <> "") then formatName(n.id) else "{n}";
     function asGroup from (n is Node) to Group { if (n is Group) then n as Group else null }
     override var canOpen = bind { var g = asGroup(n); g.content.size() > 0 }
-    override var children = bind foreach (x in asGroup(n).content) Treenode { n: bind x };
+    override var children = bind foreach (x in asGroup(n).content) Treenode { n: bind x, parent: this };
     override function open to () {
 	super.open();
 	println("open {n} => {children.size()}");
@@ -21,7 +21,7 @@ public class SceneTreenode is Treenode {
     public var scene is ResourceScene;
     override var n = bind scene.currentResource;
     override var label = bind scene.id;
-    override var canOpen = bind scene.content.size() > 0;
+    override var canOpen = bind scene.currentResource.content.size() > 0;
 }
 
 public class Model is Treeview.Treemodel {
@@ -33,16 +33,18 @@ public class Model is Treeview.Treemodel {
         override var canOpen = true;
         override var children = bind foreach (x in h.scenes) {
             SceneTreenode {
+                parent: this;
                 scene: bind x;
             }
         }
-        
     }
+
     public var selection is Treenode on replace {
 	if (h.selectedNode <> selection.n) {
 	    selectionObserver.onNext(selection);
 	}
     }
+
     const selectionListener = 
 	h.observeSelection().subscribe(function from (tn is TransformNode) to () 
 				       {
@@ -50,11 +52,27 @@ public class Model is Treeview.Treemodel {
 						    function from (_ is (), t is Treeview.Treenode) to () {
 							const ht = t as Treenode;
 							const n = ht.n;
-							if (n == tn) {
+							if (n <> null and n == tn) {
 							    selection = ht;
 							}
 						    })
 				       });
+    const sceneSelectionListener = 
+    	h.observeSceneSelection().subscribe(function from (s is ResourceScene) to () {
+                foldLeft((), 
+                         function from (_ is (), t is Treeview.Treenode) to () {
+                             const ht = t as Treenode;
+                             if (t is SceneTreenode) {
+                                 const st = (t as SceneTreenode);
+                                 if (st.scene == s) {
+                                     if (selection == null) {
+                                         selection = ht;
+                                     }
+                                 }
+                             }
+                         })
+        });
+
     function onSelectionChange from (tn is Treeview.Treenode) to ()
     {
         println("SELECTION CHANGE scenes={h.scenes} sel={h.selectedScene}");
@@ -77,6 +95,15 @@ public class Model is Treeview.Treemodel {
 
 public class TransformHierarchy 
 {
+
+    public function selectScene from (scene is ResourceScene) to ()
+    {
+        if (selectedScene <> scene) {
+            selectedScene = scene;
+            selectNode(scene.selectedResource);
+        }
+    }
+
     public var selectedScene is ResourceScene on replace {
 	sceneSelection.onNext(selectedScene);
     }
@@ -86,7 +113,9 @@ public class TransformHierarchy
 	while (p <> null and not (p is ResourceNode)) {
 	    p = p.parent;
 	}
-	selectedTransform = p as ResourceNode;
+        const rn = p as ResourceNode;
+        selectedTransform = rn;
+        selectedScene.selectedResource = rn;
 	selection.onNext(selectedTransform);
     };
 
@@ -133,7 +162,7 @@ public class TransformHierarchy
                               } else if (n is ResourceNode) {
                                   if (prev == t) {
                                       next = n as ResourceNode;
-			      }
+                                  }
                                   prev = n as ResourceNode;
                               }
 		      });
