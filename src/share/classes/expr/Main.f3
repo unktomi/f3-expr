@@ -266,21 +266,25 @@ public function run from (args is String[]) to ()
 	//pathFactory: ThePath2DFactory;
     }
 
-    const disp = transformHierarchy.observeSelection().subscribe(function from (n is Node) to () {
-	});
     
-    function addResource from (rn is ResourceNode) to ()
+    function addResource from (rn is ResourceNode, pt is Point3) to ()
     {
         println("ADDING {rn} to {currentResource} th.scenes={transformHierarchy.scenes}, th.selectedScene={transformHierarchy.selectedScene}");
 	insert rn into currentResource.resources;
 	transformHierarchy.selectNode(rn);
-	viewer.focusCamera(rn);
+        if (currentScene == mainScene) {
+            viewer.focusCamera(rn);
+        }
         insert Context.ResourceNodeContext { 
             parent: contextModel.selectedGroupContext; 
             resource: rn;
         } 
         into contextModel.selectedGroupContext.content;
         println("added asset to context { contextModel.selectedContext }");
+        if (currentScene.camera is Camera2D) {
+            rn.tx = pt.x;
+            rn.ty = pt.y;
+        }
     }
 
     function addTimeResource from (rn is ResourceTimeNode) to ()
@@ -294,7 +298,7 @@ public function run from (args is String[]) to ()
         into contextModel.selectedGroupContext.content;
     }
 
-    function doDrop from (url is String) to () 
+    function doDrop from (url is String, pt is Point3) to () 
     {
 	playerUrl = url;
 	if (url.endsWith(".expr")) {
@@ -306,7 +310,7 @@ public function run from (args is String[]) to ()
                 url: url;
                 content: bind model.spatialRoot;
 	    }
-	    addResource(rn);
+	    addResource(rn, pt);
 	    const rtn = ResourceTimeNode {
 		url: url;
 		content: bind model.temporalRoot;
@@ -324,7 +328,7 @@ public function run from (args is String[]) to ()
                 url: url;
 	        content: movie;
 	    }
-	    addResource(rn);
+	    addResource(rn, pt);
 	    const rtn = ResourceTimeNode {
 		url: url;
 		content: Movie.Clip { movie: movie };
@@ -338,7 +342,7 @@ public function run from (args is String[]) to ()
 	    const rn = MaResourceNode {
 	        model: model;
 	    }
-	    addResource(rn);
+	    addResource(rn, pt);
 	    const rtn = ResourceTimeNode {
 		url: url;
 		content: bind model.getTemporalRoot();
@@ -356,7 +360,7 @@ public function run from (args is String[]) to ()
 		url: url;
 		content: bind svg.root;
 	    }	
-	    addResource(rn);
+	    addResource(rn, pt);
 	} else if (url.endsWith(".png") or url.endsWith(".jpg") or url.endsWith(".tif") or url.endsWith(".tiff") or url.endsWith(".tga")) {
 	    const image= Image { 
 		url: url;
@@ -365,7 +369,7 @@ public function run from (args is String[]) to ()
 		url: url;
 		content: image;
 	    }	
-	    addResource(rn);
+	    addResource(rn, pt);
 	} else {
 	    const browser = WebBrowser {
 		url: url
@@ -374,7 +378,7 @@ public function run from (args is String[]) to ()
 		url: url;
 		content: browser;
 	    }
-	    addResource(rn);
+	    addResource(rn, pt);
 	}
 	MasterUndoable.commit();
     }
@@ -449,10 +453,16 @@ public function run from (args is String[]) to ()
                 title: bind scene.id;
                 onSelect: function from () to () 
                 {
-                    transformHierarchy.selectedScene = scene;                        
+                    transformHierarchy.selectScene(scene);                        
                 }
           }
     }
+    
+    const MENU_HEIGHT = 40;
+
+    const disp = transformHierarchy.observeSceneSelection().subscribe(function from (n is ResourceScene) to () {        
+            sceneMenu.selectedIndex = Sequences.indexOf(transformHierarchy.scenes, n);
+	});
     
     var manip is expr.manipulator.Manipulator;
 
@@ -484,7 +494,7 @@ public function run from (args is String[]) to ()
 	currentResource.url = url;
 	const sceneRes = Resources.open(currentResource.url);
 	for (i in sceneRes.spatialResources) {
-	    doDrop(i.url);
+	    doDrop(i.url, new Point3(i.tx, i.ty, i.tz));
 	    currentTransform.tx = i.tx;
 	    currentTransform.ty = i.ty;
 	    currentTransform.tz = i.tz;
@@ -575,7 +585,7 @@ public function run from (args is String[]) to ()
 			containerBounds: bind Bounds.boundsFromRect(0, 
                                                                     0, 
                                                                     width,
-                                                                    height-toolMenu.bounds.height())
+                                                                    height-MENU_HEIGHT)
 		    	height: 400, width: 300;
                                     content: ResizableStageNode {
                                         content: Tabview {
@@ -644,7 +654,7 @@ public function run from (args is String[]) to ()
 			containerBounds: bind Bounds.boundsFromRect(0, 
                                                                     0, 
                                                                     width,
-                                                                    height-toolMenu.bounds.height())
+                                                                    height-MENU_HEIGHT)
 		    	height: 400, width: 300;
 			cx: 160, cy: 800-300;	   
 			    content: ResizableStageNode {
@@ -783,9 +793,16 @@ public function run from (args is String[]) to ()
                                                       {
                                                           if (e.keyCode == Keys.Delete or
                                                               e.keyCode == Keys.Backspace) {
-                                                              const toDelete = currentTransform;
-                                                              transformHierarchy.deleteSelection();
-                                                              deleteResource(toDelete);
+                                                              if (currentTransform <> null) {
+                                                                  const toDelete = currentTransform;
+                                                                  transformHierarchy.deleteSelection();
+                                                                  deleteResource(toDelete);
+                                                              } else {
+                                                                  if (transformHierarchy.selectedScene <> mainScene) {
+                                                                      delete transformHierarchy.selectedScene from
+                                                                          currentScenes;
+                                                                  }
+                                                              }
                                                           } else super.onKeyDown(e);
                                                       }
                                                       var dragger is TransformNode;
@@ -967,7 +984,7 @@ public function run from (args is String[]) to ()
 			containerBounds: bind Bounds.boundsFromRect(0, 
 								    0, 
 								    width,
-								    height-toolMenu.bounds.height())
+								    height-MENU_HEIGHT)
 		    	height: 305, width: 820;
 			cx: 520, cy: 160;	   
 			      //imageLoader: null;
@@ -1151,7 +1168,15 @@ public function run from (args is String[]) to ()
 	//currentResource.setClip(i);
     }
 
-    stage.addMouseInputHandler(viewer);
+    stage.addMouseInputHandler(MouseInputHandler.Delegate { 
+            delegate: viewer;
+            override function onMouseWheel from (event is MouseWheelEvent) to ()
+            {
+                if (editorScene.underMouse == []) {
+                    delegate.onMouseWheel(event);
+                }
+            }
+        });
     stage.addKeyboardInputHandler(KeyboardInputHandler {
 
 	    override function onKeyInput from (event is KeyboardEvent) to () 
@@ -1189,7 +1214,9 @@ public function run from (args is String[]) to ()
 			    MasterUndoable.undo();
 			    }*/
 		    } else if (event.keyCode == Keys.F) {
-			viewer.focusCamera(currentTransform);
+                        if (currentScene == mainScene) {
+                            viewer.focusCamera(currentTransform);
+                        }
 		    } else if (event.keyCode >= Keys._0 and event.keyCode <= Keys._9) {
 			const index = event.keyCode - Keys._0;
 			if (event.metaKey) {
@@ -1212,7 +1239,9 @@ public function run from (args is String[]) to ()
 		event.accept();
 		try {
 		    const checkProtocol = new java.net.URL(url);
-		    doDrop(url);
+                    const pt = currentScene.camera.toScene(event.screenx, event.screeny);
+                    println("DROP on SCENE {event.screenx}, {event.screeny} => {pt} ");
+		    doDrop(url, pt);
 		} catch (exception is java.lang.Exception) {
 		    exception.printStackTrace();
 		}
