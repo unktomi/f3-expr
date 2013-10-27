@@ -28,15 +28,15 @@ function makeFunMember from (name is String, params is F3Type[], ret is F3Type) 
     }
 }
 
-const NUM_MEMBERS = 
+public const NUM_MEMBERS = 
     foreach (op in ["+", "-", "*", "/", "remainder"]) {
 	makeFunMember(op, [NUMBER_TYPE, NUMBER_TYPE], NUMBER_TYPE)
     };
-const INT_MEMBERS = 
+public const INT_MEMBERS = 
     foreach (op in ["+", "-", "*", "/", "remainder"]) {
 	makeFunMember(op, [INTEGER_TYPE, INTEGER_TYPE], INTEGER_TYPE)
     };
-const BOOL_MEMBERS = 
+public const BOOL_MEMBERS = 
     [foreach (op in ["and", "or"]) {
 	makeFunMember(op, [BOOLEAN_TYPE, BOOLEAN_TYPE], BOOLEAN_TYPE)
 	}, makeFunMember("not", [BOOLEAN_TYPE], BOOLEAN_TYPE)];
@@ -222,7 +222,7 @@ public class Member {
 }
 
 public class FunctionMember is Member {
-    public const ft is F3FunctionType;
+    public var ft is F3FunctionType;
     override public function serialize to MemberNode {
         FunctionMemberNode {
             declaringClass: m.getDeclaringClass().getName();
@@ -345,14 +345,10 @@ public class SetVar is VarExpression, ObserverExpression {
 }
 
 public class Function is MemberExpression {
-    public const fun is F3FunctionMember;
-    const ft = fun.getType();
-    postinit {
-	member = Member {
-	    m: fun;
-	    t: ft;
-	}
-    }
+    public var funMember is FunctionMember;
+    override var member = bind funMember;
+    public var ft is F3FunctionType = bind funMember.ft;
+    public var fun is F3FunctionMember = bind member.m as F3FunctionMember;
     override function getType { ft }
     public var inputs is Parameter[] =
 	bind foreach (i in [0..<ft.minArgs()]) {
@@ -373,7 +369,7 @@ public class Function is MemberExpression {
 	    if (true or m.member.isObservable) {
 		const i = getIVar(inputs[0]);
 		if (fun.isStatic()) {
-		    "(foreach ({i} in {observable.toSource()}) {fun.getDeclaringClass().getName()}.{fun.getName()}({i}))";
+		    "(foreach ({i} in {observable.toSource()}) {fun.getName()}.{fun.getName()}({i}))";
 		} else {
 		    "(foreach ({i} in {observable.toSource()}) {i}.{fun.getName()}()";
 		}
@@ -487,7 +483,7 @@ class FunctionView is ExpressionView {
 	parameter: p;
 	cellWidth: bind cellWidth;
     };
-    var output = ResultView {
+    var output is ResultView = ResultView {
 	canvas: bind canvas;
 	result: bind fun.output;
     };
@@ -1037,6 +1033,19 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     override public function setY from (ty is Number, sy is Number) to ()
     {
         cy = ty * height - height/2.0;
+    }
+
+    public function onDrop from (where is Pick, m is Member) to ()
+    {
+        if (m.m is F3FunctionMember) {
+            const fun = Function {
+                fun: m.m as F3FunctionMember;
+            }
+            insert FunctionView { 
+                pos: toLocal * where.scenePoint;
+                fun: fun;
+            } into views;
+        }
     }
 
     public function onDrop from (where is Pick, clip is Context) to ()
