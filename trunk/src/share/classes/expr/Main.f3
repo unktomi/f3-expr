@@ -757,7 +757,17 @@ public function run from (args is String[]) to ()
                                                          }
                                                          println("TN ={tn.label} y={pt.y}");
                                                          break;
-                                                     }
+                                                     } 
+                                                 }
+                                             }
+                                             if (asset is AssetTree.MemberAsset) {
+                                                 const picked = getUnderMouseInEditor();
+						 for (j in picked) {
+                                                     if (j.node is Expression.Canvas) {
+                                                         const ma = asset as AssetTree.MemberAsset;
+                                                         (j.node as Expression.Canvas).onDrop(j, ma.member);
+                                                         break;
+                                                     } 
                                                  }
                                              }
 					     delete dragger from popupLayer.content;

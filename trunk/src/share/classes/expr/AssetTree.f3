@@ -143,14 +143,29 @@ public class RootPackageAsset is PackageAsset {
         [PrimitiveTypeAsset {
                 name: "Boolean";
                 t: Reflect.BOOLEAN_TYPE;
+                containedAssets: foreach (m in Expression.BOOL_MEMBERS) {
+                    MemberAsset {
+                        member: m;
+                    }
+                }
         },
         PrimitiveTypeAsset {
                 name: "Integer";
                 t: Reflect.INTEGER_TYPE;
+                containedAssets: foreach (m in Expression.INT_MEMBERS) {
+                    MemberAsset {
+                        member: m;
+                    }
+                }
         },
         PrimitiveTypeAsset {
                 name: "Number";
                 t: Reflect.NUMBER_TYPE;
+                containedAssets: foreach (m in Expression.NUM_MEMBERS) {
+                    MemberAsset {
+                        member: m;
+                    }
+                }
         },
         ClassAsset {
                 className: "String";
@@ -180,7 +195,7 @@ public class ClassAsset is TypeAsset {
 
 public class MemberAsset is Asset {
     public const member is Member;
-    override var name = bind Names.formatName(member.m.getName());
+    override var name = bind Names.formatName(member.name);
 }
 
 const packMap = new java.util.HashMap of (String, PackageAsset);
