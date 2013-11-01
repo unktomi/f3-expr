@@ -4,16 +4,17 @@ import f3.math.*;
 import f3.math.LinearMath.*;
 import expr.*;
 import expr.Treeview.*;
+import expr.Listview.*;
 import f3.reflect.*;
 import expr.Reflect.*;
 import f3.util.*;
 import f3.util.Observer.*;
+import f3.util.Observable.*;
 import f3.lang.*;
 import f3.media.input.*;
 import f3.media.scene.*;
 import f3.media.scene.Shape2D.*;
 import expr.Names.*;
-
 
 var exprMap = new java.util.HashMap of (F3ClassType, Member[]);
 
@@ -43,12 +44,17 @@ public const BOOL_MEMBERS =
 
 public function introspect from (t is F3Type) to Member[]
 {
+    introspect(t, false);
+}
+
+public function introspect from (t is F3Type, all is Boolean) to Member[]
+{
     if (t.getName() == "org.f3.runtime.F3Object" or
 	t.getName() == "org.f3.runtime.F3Base" or
 	t.getName() == "java.lang.Object") {
 	return []
     }
-    if (t is F3ClassType) then introspect(t as F3ClassType) else if (true) [] else {
+    if (t is F3ClassType) then introspect(t as F3ClassType, all) else if (not all) [] else {
 	    if (t == NUMBER_TYPE) 
 		then NUM_MEMBERS
 		else if (t == INTEGER_TYPE)
@@ -58,15 +64,31 @@ public function introspect from (t is F3Type) to Member[]
 			else []
     }
 }
-
 public function introspect from (clazz is F3ClassType) to Member[]
+{
+    introspect(clazz, false);
+}
+
+public function introspect from (clazz is F3ClassType, all is Boolean) to Member[]
 {
     if (clazz == null) return [];
     if (exprMap.containsKey(clazz)) {
 	return exprMap.get(clazz);
     }
     var result is Member[];
-    const funs = clazz.getFunctions(true);
+    const funs = clazz.getFunctions(not all);
+    if (all) {
+        return 
+            foreach (f in funs where f.isPublic() and not f.getName().contains("$") and 
+                     OBJECT_TYPE <> f.getDeclaringClass() 
+                     ) { 
+            FunctionMember {
+                m: f;
+                t: f.getType().getReturnType();
+                ft: f.getType();
+            }
+        };
+    }
     for (f in funs where f.isPublic() and not f.getName().contains("$") and 
 	     OBJECT_TYPE <> f.getDeclaringClass() 
 	 ) { 
@@ -180,6 +202,7 @@ public function introspect from (clazz is F3ClassType) to Member[]
     return result;
 }
 
+
 public class Member {
     public function serialize to MemberNode {
         MemberNode {
@@ -231,6 +254,12 @@ public class FunctionMember is Member {
             inputTypes: foreach (i in [0..<ft.minArgs()]) ft.getArgumentType(i).getName();
         }
     }
+}
+
+function formatClassName from (t is F3ClassType) to String {
+    const n = t.getName();
+    const dot = n.lastIndexOf(".");
+    return n.substring(dot+1);
 }
 
 function argName from (ft is F3FunctionType, i is Integer) to String {
@@ -327,14 +356,14 @@ public class GetVar is VarExpression, ObservableExpression, ObserverExpression {
 	const i = getIVar(this);
 	if (observable is MemberExpression and (observable as MemberExpression).member.isObservable) {
 
-	    "(foreach ({i} in {observable.toSource()}) {i}.{member.toApply()})";
+	    "(foreach ({i} in debugger.debug({observable.toSource()})) {i}.{member.toApply()})";
 	} else {
 	    if (observable == null) {
 		if (OBSERVABLE_TYPE.isAssignableFrom(member.rt)) 
 		    then "{i}.{member.toApply()}"
-		    else "f3.util.Observables.observe(&{i}.{member.toApply()})";
+		    else "debugger.debug(f3.util.Observables.observe(&{i}.{member.toApply()}))";
 	    } else {
-		"(foreach ({i} in {observable.toSource()}) {i}.{member.toApply()})";
+		"(foreach ({i} in debugger.debug({observable.toSource()})) {i}.{member.toApply()})";
 		//"{observable.toSource()}.{member.toApply()}";
 	    }
 	}
@@ -351,13 +380,20 @@ public class Function is MemberExpression {
     public var fun is F3FunctionMember = bind member.m as F3FunctionMember;
     override function getType { ft }
     public var inputs is Parameter[] =
-	bind foreach (i in [0..<ft.minArgs()]) {
-	Parameter {
-	    name: argName(ft, i);
-	    target: this;
-	    t: ft.getArgumentType(i)
-	}
-    }
+	bind 
+        [if (fun == null or fun.isStatic()) then null else 
+         Parameter {
+             name: formatClassName(fun.getDeclaringClass());
+             target: this;
+             t: fun.getDeclaringClass()
+         },           
+         foreach (i in [0..<ft.minArgs()]) {
+             Parameter {
+                 name: argName(ft, i);
+                 target: this;
+                 t: ft.getArgumentType(i);
+             }
+         }];
     public var output is Result = Result {
 	t: ft.getReturnType()
     }
@@ -369,9 +405,9 @@ public class Function is MemberExpression {
 	    if (true or m.member.isObservable) {
 		const i = getIVar(inputs[0]);
 		if (fun.isStatic()) {
-		    "(foreach ({i} in {observable.toSource()}) {fun.getName()}.{fun.getName()}({i}))";
+		    "(foreach ({i} in debugger.debug({observable.toSource()})) {fun.getName()}.{fun.getName()}({i}))";
 		} else {
-		    "(foreach ({i} in {observable.toSource()}) {i}.{fun.getName()}()";
+		    "(foreach ({i} in debugger.debug({observable.toSource()})) {i}.{fun.getName()}()";
 		}
 	    } else {
 		if (fun.isStatic()) {
@@ -520,17 +556,17 @@ public class InputMemberExpression is MemberExpression, ObserverExpression {
         println("INPUT MEMBER EXPR i={i}");
         var res = 
         if (member.m is F3FunctionMember and (member.m as F3FunctionMember).getType().minArgs() > 0) {
-            "(foreach ({i} in {observable.toSource()}) {target.toSource()}.{member.toApply(i)})";
+            "(foreach ({i} in debugger.debug({observable.toSource()})) {target.toSource()}.{member.toApply(i)})";
 	} else if (observable is MemberExpression and (observable as MemberExpression).member.isObservable) {
 	    
-	    "(foreach ({i} in {observable.toSource()}) {target.toSource()}.{member.toApply()})";
+	    "(foreach ({i} in debugger.debug({observable.toSource()})) {target.toSource()}.{member.toApply()})";
 	} else {
 	    if (observable == null) {
 		if (true or member.isObservable) 
 		    then "{target.toSource()}.{member.toApply()}"
-		    else "f3.util.Observables.observe(&{target.toSource()}.{member.toApply()})";
+		    else "debugger.debug(f3.util.Observables.observe(&{target.toSource()}.{member.toApply()}))";
 	    } else {
-		"(foreach ({i} in {observable.toSource()}) {target.toSource()}.{member.toApply()})";
+		"(foreach ({i} in debugger.debug({observable.toSource()})) {target.toSource()}.{member.toApply()})";
 		//"{observable.toSource()}.{member.toApply()}";
 	    }
 	}
@@ -959,21 +995,23 @@ class GetTreeview is ResizableNode {
 	    if (tmpLink == null) return;
 	    const tn = tv.selectedTreenode as MemberTreenode;
 	    const cell = tv.selectedTreecell as MemberTreecell;
-	    const found = canvas.pickInput(e, tn.m.t);
-	    arrowVis = false;
-	    tmpLink = null;
-	    link.unlink();
-	    delete canvas.targetArrow from canvas.arrows;
-	    if (found <> null) {
-		cell.link();
-		const newlink = LinkView { 
-		    canvas: canvas;
-		    source: cell.linkedView; 
-		    target: found;
-		};
-		newlink.link();
-	    } 
-	    canvas.dumpSrc();
+	    canvas.pickInput(e, tn.m.t, function from (found is LinkedView) to () {
+                    
+                    arrowVis = false;
+                    tmpLink = null;
+                    link.unlink();
+                    delete canvas.targetArrow from canvas.arrows;
+                    if (found <> null) {
+                        cell.link();
+                        const newlink = LinkView { 
+                            canvas: canvas;
+                            source: cell.linkedView; 
+                            target: found;
+                        };
+                        newlink.link();
+                    } 
+                    canvas.dumpSrc();
+                });
 	});
 
 }
@@ -1006,7 +1044,44 @@ public class LinkInfo {
 class Holder is Group, Scissored {
 }
 
+class MemberListview is Listview of Member {
+    public var members is Member[];
+    var cellHeight = 15;
+    override var model =  Listmodel of Member {
+        size: bind members.size();
+        override function getValue from (i is Integer) to Member {
+            members[i];
+        }
+    };
+    override function render from (m is Member) to Node {
+        Text.Label {
+            text: bind m.name;
+            foreground: bind this.foreground;
+            background: null;
+            height: bind cellHeight;
+            width: bind width;
+        }
+    }
+}
+
 public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollable, MouseInputHandler {
+
+    function getPopup from (e is MouseEvent, members is Member[], k is function from LinkedView to ()) to Node 
+    {
+        /*
+        MemberListview  {
+            transform: translate(toSceneTransform * e.location);
+            members: members;
+            height: 200;
+            width: 200; 
+        }
+        */
+        null;
+    }
+
+    public var interactive is function from () to Boolean;
+
+    public var popupLayer is Group;
 
     var prog is Program;
 
@@ -1037,11 +1112,12 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     public function onDrop from (where is Pick, m is Member) to ()
     {
-        if (m.m is F3FunctionMember) {
+        if (m is FunctionMember) {
             const fun = Function {
-                fun: m.m as F3FunctionMember;
+                funMember: m as FunctionMember;
             }
             insert FunctionView { 
+                canvas: this;
                 pos: toLocal * where.scenePoint;
                 fun: fun;
             } into views;
@@ -1362,6 +1438,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 	return mesh;
     }
 
+
     function pickOutput from (e is MouseEvent, t is F3Type) to ExpressionView 
     {
 	for (p in e.scene.underMouse) {
@@ -1378,21 +1455,27 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     function pickInput 
 	from (e is MouseEvent, 
-	      t is F3Type) 
-	to LinkedView 
+	      t is F3Type,
+              k is function from LinkedView to ()) 
+	to ()
     {
 	for (p in e.scene.underMouse) {
 	    const n = p.node;
 	    if (n is InputView) {
 		const pv = n as InputView;
 		if (pv.getInputType() == UNIT_TYPE or pv.getInputType().isConvertibleFrom(t)) {
-		    return pv;
+		    k(pv);
 		} else {
 		    println("NOT ASSIGNABLE {pv.getInputType()} <- {t}");
 		}
 	    }
 	}
-	null;
+        var members = introspect(t, true);
+        var popup is Node = getPopup(e, members, function (j is LinkedView) to () {
+                delete popup from popupLayer.content;
+                k(j)
+            });
+        insert popup into popupLayer.content;
     }
 
     function dumpSrc {
@@ -1478,7 +1561,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 		     });
 	var itype = (e as MemberExpression).member.m.getDeclaringClass();
         if (itype == null) return "";
-	var result = "var _ = function from (i is {itype.getName()}, getVar is function from String to Object, getNode is function from String to f3.media.scene.Node, getClip is function from String to f3.media.scene.TimeNode) to f3.util.Observable of ? \{";
+	var result = "var _ = function from (debugger is f3.util.ObservableDebugger, i is {itype.getName()}, getVar is function from String to Object, getNode is function from String to f3.media.scene.Node, getClip is function from String to f3.media.scene.TimeNode) to f3.util.Observable of ? \{ ";
         if (terms == []) {
             var rs = foreach (x in eventContext.content) {
                 if (x is Context.ResourceNodeContext) {
@@ -1501,9 +1584,10 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 		println("compiling: {toCompile}");
 		const r = evaluator.compileAndRun(toCompile);
 		println("{r.getClass()} => {r}");
-		const f = r as function from (Node, function from String to Object, function from String to Node, function from String to TimeNode) to Observable of ?;
+		const f = r as function from (ObservableDebugger, Node, function from String to Object, function from String to Node, function from String to TimeNode) to Observable of ?;
 		var obs is Observable of ?;
-		obs = f(targetNode, lookupVar, lookupSpatial, lookupTemporal);
+                var g = 
+		obs = f(debugger, targetNode, lookupVar, lookupSpatial, lookupTemporal);
 		subscribe(obs, toCompile);
                 prog.compiled = f;
                 prog.sourceCode = toCompile;
@@ -1518,6 +1602,8 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 	result;
     }
 
+    public const debugger is ObservableDebugger;
+    
     const evaluator = 
 	new org.f3.tools.script.ScriptShell(java.lang.Thread.currentThread().getContextClassLoader());
 
@@ -1648,6 +1734,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     {
 	println("SUBSCRIBE {obsvb}");
         var count = 0;
+        const f = interactive;
         var rs = foreach (x in eventContext.content) {
             if (x is Context.ResourceNodeContext) {
                 (x as Context.ResourceNodeContext).resource;
@@ -1656,16 +1743,18 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 	insert obsvb.subscribe(DefaultObserver of a {
 		override function onNext from (x is a) to ()
 		{
-                    for (r in rs) {
-                        var n = r.instance(r.id, lookupVar, lookupSpatial, lookupTemporal);
-                        println("INSERTING {n} into {instanceSpace} at {targetTimeline.playhead}");
-                        insert EventLayer.EventNode {
-                            timestamp: targetTimeline.playhead;
-                            event: n;
-                        } into instanceSpace.content;
+                    if (f()) {
+                        for (r in rs) {
+                            var n = r.instance(r.id, lookupVar, lookupSpatial, lookupTemporal);
+                            println("INSERTING {n} into {instanceSpace} at {targetTimeline.playhead}");
+                            insert EventLayer.EventNode {
+                                timestamp: targetTimeline.playhead;
+                                event: n;
+                            } into instanceSpace.content;
+                        }
+                        count++;
+                        println("on next {src} {x}");
                     }
-                    count++;
-		    println("on next {src} {x}");
 		}
 	}) into subs;	
     }
@@ -1749,6 +1838,8 @@ public class ResultNode is ExprNode {
 
 public class Editor is ResizableNode, Focuser {
 
+    public var popupLayer is Group;
+
     override public function getTargetOfFocus to Focusable { canvas }
 
     public var targetNode is ResourceNode;
@@ -1772,10 +1863,44 @@ public class Editor is ResizableNode, Focuser {
 
     override var internalContent = bind sp;
 
+    public const interactive is function from () to Boolean;
+
     const sp = Scrollpane {
         width: bind width;
         height: bind height;
         content: bind canvas;
+    }
+
+    const debugger = ObservableDebugger {
+        override public function debug from (xs is Observable of ?) to Observable of ? 
+        {
+            wrap(xs)
+        }
+    }
+
+    function wrap of a from (xs is Observable of a) to Observable of a 
+    {
+        DefaultObservable of a {
+            override function subscribe from (y is Observer of a) to Disposable 
+            {
+                xs.subscribe(DefaultObserver of a {
+                        override function onNext from (x is a) to ()
+                        {
+                            if (interactive()) {
+                                y.onNext(x);
+                            }
+                        }
+                        override function onError from (e is java.lang.Exception) to ()
+                        {
+                            y.onError(e);
+                        }
+                        override function onCompleted from () to ()
+                        {
+                            y.onCompleted();
+                        }
+                    });
+            }
+        }
     }
 
     function getCanvas from (target is ResourceNode, eventContext is Context.MemberContext) to Canvas
@@ -1788,12 +1913,14 @@ public class Editor is ResizableNode, Focuser {
 	    }
 	}
 	if (prog == null) {
-	    prog = Program {event: event};
+	    prog = Program {event: event, debugger: debugger};
 	    insert prog into target.programs;
 	}
 	if (prog.canvas == null) {
             println("creating canvas with {pathFactory}");
 	    prog.canvas = Canvas {
+                debugger: debugger;
+                popupLayer: popupLayer;
                 pathFactory: pathFactory;
                 width: width;
                 height: height;
