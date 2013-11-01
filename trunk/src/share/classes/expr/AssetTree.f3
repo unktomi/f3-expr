@@ -188,7 +188,7 @@ public class ClassAsset is TypeAsset {
     override var name = bind Names.formatClassName(className);
     public var clazz is F3ClassType = bind Reflect.getType(className.replace("/", ".")) as F3ClassType;
     override var t = bind clazz;
-    override var containedAssets = bind [classes, foreach (m in Expression.introspect(clazz)) MemberAsset {
+    override var containedAssets = bind [classes, foreach (m in Expression.introspect(clazz, true)) MemberAsset {
         member: m;
         }];
 }

@@ -177,7 +177,7 @@ public function run from (args is String[]) to ()
     {
         var c = ctx;
         while (c <> null) {
-            println("c={c.name} parent={c.parent.name} v={v}");
+            //println("c={c.name} parent={c.parent.name} v={v}");
             for (c1 in [c, c.getContent()]) {
                 if (c1 is Context.ResourceNodeContext) {
                     const rc = c1 as Context.ResourceNodeContext;
@@ -432,6 +432,8 @@ public function run from (args is String[]) to ()
     var loop is Boolean = true;
     var full is Boolean = false;
 
+    var interactive is Boolean;
+
     const toolMenu is expr.toolmenu.ToolMenu = expr.toolmenu.ToolMenu {
     	transform: bind translate(stage.width /2, stage.height - 10);
 	height: 20;
@@ -444,7 +446,15 @@ public function run from (args is String[]) to ()
 	}
 	toggleLoop: function { loop = not loop; () }
 	toggleFullscreen: function { full = not full; stage.setFullscreen(full) }
+        onSetSelecting: function from () to () {
+            interactive = false;
+        }
+        onSetScripting: function from () to () {
+            interactive = true;
+        }
     };
+
+    readonly var toolCursor is Cursor = bind if (interactive) then toolMenu.scriptingCursor else toolMenu.selectingCursor;
 
     const sceneMenu = Tabview {
           height: 20; width: bind stage.width;
@@ -579,7 +589,9 @@ public function run from (args is String[]) to ()
                     background: null;
                     camera: Camera2D {}; 
 		    override var content =
-		    [internalWindowsLayer = Group { content: 
+		    [internalWindowsLayer = Group { 
+
+                       content: 
                        [InternalWindow {
                                     id: "Editor3";
 			containerBounds: bind Bounds.boundsFromRect(0, 
@@ -1029,6 +1041,8 @@ public function run from (args is String[]) to ()
                                          instanceSpace: bind currentScene.instanceSpace;
 					 targetTime: bind mainTimeLayer;
                                          targetTimeline: bind player;
+                                         popupLayer: bind popupLayer;
+                                         interactive: function from () to Boolean { interactive } 
 				    }
 				 }]
 			    }
@@ -1041,6 +1055,8 @@ public function run from (args is String[]) to ()
         };
      
     var stage is JoglStage = JoglStage {
+
+        defaultCursor: bind toolCursor;
 
         override var content = bind [currentScenes, manipLayer, editorScene];
 	

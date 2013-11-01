@@ -266,7 +266,6 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
     {
         const offset = y - (height/2 + scrollOffset * cellHeight);
         const i = -(offset / cellHeight) as Integer;
-        println("offset={offset} i={i}");
         return cells[i].cell.tn;
     }
 

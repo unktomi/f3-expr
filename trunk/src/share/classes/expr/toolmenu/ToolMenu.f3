@@ -10,10 +10,22 @@ import f3.math.LinearMath.*;
 
 public class Tools is ResizableNode {
 
-    readonly var buttons is Button[] = bind foreach (i in ["scripting", "select", "rotate", "scale", "text", "pen", "prim", "hand", "magnify", "align"]) {
+    function setScripting from () to () {
+        onSetScripting();        
+    }
+
+    function setSelecting from () to () {
+        onSetSelecting();
+    }
+
+    const names = ["scripting", "select", "rotate", "scale", "text", "pen", "prim", "hand", "magnify", "align"];
+    const actions is (function from () to ())[] = [setScripting, setSelecting];
+
+    readonly var buttons is Button[] = bind foreach (i in [0..<sizeof names]) {
         Button {
 	    height: 18, width: 28;
-	    baseURL: "{__DIR__}{i}";
+	    baseURL: "{__DIR__}{names[i]}";
+            onPress: actions[i];
         }
     };
 
@@ -37,6 +49,10 @@ public class Tools is ResizableNode {
 	    content: bind box;
 	}]
     }
+
+    public var onSetScripting is function from () to ();
+    public var onSetSelecting is function from () to ();
+    
 }
 
 public class ToolMenu is ResizableNode {
@@ -103,12 +119,18 @@ public class ToolMenu is ResizableNode {
 	}
     }
     
+    public var scriptingCursor is Cursor = Cursor.CustomCursor { image: Image { url: "{__DIR__}pointer_interactive.png"} };
+    public var selectingCursor is Cursor = Cursor.CustomCursor { image: Image { url: "{__DIR__}pointer_default.png"} };
+
     var buttons = bind [floaters, fullScreen, record, rewind, play, loop, sound];
 
     const box = Group {
 	content: bind layout(buttons);
     };
 
+    public var onSetScripting is function from () to ();
+    public var onSetSelecting is function from () to ();
+    
     override var internalContent = Group {
 	content: bind
 	[Rectangle {
@@ -117,7 +139,11 @@ public class ToolMenu is ResizableNode {
 	    fillPaint: ColorPaint(Color.color(.3, .3, .3));
 	    pickable: false;
 	},
-        Tools { width: bind width, height: bind height }
+        Tools { 
+            width: bind width, height: bind height;
+            onSetScripting: bind onSetScripting;
+            onSetSelecting: bind onSetSelecting;
+        }
         TransformNode {
 	    tx: bind width / 2 - (28 * buttons.size() + buttons.size()-1);
 	    content: bind box;

@@ -1,6 +1,7 @@
 package expr;
 import f3.media.scene.*;
 import f3.util.Observer.*;
+import f3.util.Observable.*;
 import f3.util.*;
 import expr.prog.Program;
 
@@ -27,7 +28,7 @@ public class ResourceNode is TransformNode {
                 }
             });
     }
-    
+
     public function instance from (id is String,
                                    lookupVar is function from String to Object,
                                    lookupSpatial is function from String to Node,
@@ -61,7 +62,7 @@ public class ResourceNode is TransformNode {
         }
         for (prog in programs) {
             if (prog.compiled <> null) {
-                const obs = prog.compiled(target, lookupVar, lookupSpatial, lookupTemporal);
+                const obs = prog.compiled(prog.debugger, target, lookupVar, lookupSpatial, lookupTemporal);
                 insert subscribe(obs, prog.sourceCode, target) into target.subs;
             }
         }
