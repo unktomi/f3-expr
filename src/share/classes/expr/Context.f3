@@ -92,7 +92,7 @@ public class LocalVarContext is Context {
 
 public class MemberContext is GroupContext {
     public var member is Member;
-    override var name = bind member.name;
+    override var name = bind Names.formatName(member.name);
     /*
     public override bound function getContent to Context[] { 
         [foreach (x in member.getMembers()) MemberContext { member: x }, content]
