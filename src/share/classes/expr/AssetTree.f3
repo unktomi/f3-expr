@@ -195,7 +195,8 @@ public class ClassAsset is TypeAsset {
 
 public class MemberAsset is Asset {
     public const member is Member;
-    override var name = bind Names.formatName(member.name);
+    override var name = bind member.name;
+    //bind Names.formatName(member.name);
 }
 
 const packMap = new java.util.HashMap of (String, PackageAsset);

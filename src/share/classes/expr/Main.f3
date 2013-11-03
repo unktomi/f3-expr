@@ -1042,6 +1042,7 @@ public function run from (args is String[]) to ()
 					 targetTime: bind mainTimeLayer;
                                          targetTimeline: bind player;
                                          popupLayer: bind popupLayer;
+                                         popupScene: bind editorScene;
                                          interactive: function from () to Boolean { interactive } 
 				    }
 				 }]
