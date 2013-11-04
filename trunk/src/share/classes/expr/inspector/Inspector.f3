@@ -117,7 +117,7 @@ const SEMI_TRANSPARENT_PAINT = ColorPaint(Color.color(1, 1, 1, 0.1));
 
 const TEXT_BG_PAINT = ColorPaint(Color.color(.82, .82, .82));
 
-class NumberField is SliderField {
+public class NumberField is SliderField {
     public var i is InspectedNumber;
     public var min is Number = 0.0;
     public var max is Number = 1.0;
@@ -157,7 +157,7 @@ class NumberField is SliderField {
     }
 }
 
-class BooleanField is SliderField {
+public class BooleanField is SliderField {
     public var i is InspectedBoolean;
     var disp is Disposable;
     override var textInputEnabled = false;
@@ -183,7 +183,7 @@ class BooleanField is SliderField {
     }
 }
 
-class DurationField is SliderField {
+public class DurationField is SliderField {
     public var i is InspectedDuration;
     var disp is Disposable;
     function onChange from (n is Duration) to () 
