@@ -81,7 +81,7 @@ public class Handler is ContentHandler {
 
     override function startObject to Boolean 
     {
-	println("start object");
+	//println("start object");
 	valueStack.push(new java.util.HashMap of (String, Object));
 	true
     }
@@ -89,7 +89,7 @@ public class Handler is ContentHandler {
     override function endObject to Boolean 
     {
 	const top = valueStack.peek();
-	println("end object top={top}");
+	//println("end object top={top}");
 	const currentObject = valueStack.pop() as java.util.Map of (String, Object);
 	const className = currentObject.get("class").toString();
 	const clazz = Reflect.getType(className) as F3ClassType;
@@ -114,7 +114,7 @@ public class Handler is ContentHandler {
 
     override function startObjectEntry from (key is String) to Boolean 
     {
-	println("start entry {key}");
+	//println("start entry {key}");
 	keys.push(key);
 	true
     }
@@ -122,10 +122,10 @@ public class Handler is ContentHandler {
     override function endObjectEntry from () to Boolean 
     {
 	const key = keys.pop();
-	println("end entry {key}");
+	//println("end entry {key}");
 	const value = valueStack.pop();
 	var top = valueStack.peek();
-	println("end object entry top={top} value={value}");
+        //	println("end object entry top={top} value={value}");
 	if (top is Object[]) {
 	    var arr = valueStack.pop() as Object[];
 	    insert value into arr;
@@ -139,7 +139,7 @@ public class Handler is ContentHandler {
 
     override function startArray to Boolean 
     {
-	println("start array");
+	//println("start array");
 	valueStacks.push(valueStack);
 	valueStack = new java.util.Stack of Object;
 	true
@@ -154,13 +154,13 @@ public class Handler is ContentHandler {
 	    insert x into arr1;
 	}
 	valueStack.push(arr1);
-	println("end array");
+        //	println("end array");
 	true;
     }
 
     override function primitive from (value is Object) to Boolean
     {
-	println("primitive {value}");
+	//println("primitive {value}");
 	valueStack.push(value);
 	true
     }

@@ -3,27 +3,54 @@ import f3.reflect.*;
 
 public const ctx = F3Local.getContext();
 
-public const STRING_TYPE = ctx.findClass("java.lang.String");
-public const BOXED_NUMBER_TYPE = ctx.findClass("java.lang.Float");
+public const STRING_TYPE = Reflect.findClass("java.lang.String");
+public const BOXED_NUMBER_TYPE = Reflect.findClass("java.lang.Float");
 public const NUMBER_TYPE = ctx.getNumberType();
-public const BOXED_INTEGER_TYPE = ctx.findClass("java.lang.Integer");
+public const BOXED_INTEGER_TYPE = Reflect.findClass("java.lang.Integer");
 public const INTEGER_TYPE = ctx.getIntegerType();
-public const BOXED_BOOLEAN_TYPE = ctx.findClass("java.lang.Boolean");
+public const BOXED_BOOLEAN_TYPE = Reflect.findClass("java.lang.Boolean");
 public const BOOLEAN_TYPE = ctx.getBooleanType();
-public const DURATION_TYPE = ctx.findClass("f3.lang.Duration");
+public const DURATION_TYPE = Reflect.findClass("f3.lang.Duration");
 public const UNIT_TYPE = ctx.getVoidType();
-public const BOXED_UNIT_TYPE = ctx.findClass("java.lang.Void");
-public const OBJECT_TYPE = ctx.findClass("java.lang.Object");
-public const OBSERVER_TYPE = ctx.findClass("f3.util.Observer");
-public const OBSERVABLE_TYPE = ctx.findClass("f3.util.Observable");
-public const SUBJECT_TYPE = ctx.findClass("f3.util.Subject");
+public const BOXED_UNIT_TYPE = Reflect.findClass("java.lang.Void");
+public const OBJECT_TYPE = Reflect.findClass("java.lang.Object");
+public const OBSERVER_TYPE = Reflect.findClass("f3.util.Observer");
+public const OBSERVABLE_TYPE = Reflect.findClass("f3.util.Observable");
+public const SUBJECT_TYPE = Reflect.findClass("f3.util.Subject");
 
 public const classMap = new java.util.HashMap of (String, java.util.Map of (String, F3VarMember));
+public const funMap = new java.util.HashMap of (F3ClassType, F3FunctionMember[]);
+public const classes = new java.util.HashMap of (String, F3ClassType);
+
+public function findClass from (name is String) to F3ClassType
+{
+    if (name == null) return null;
+    var r = classes.get(name);
+    if (r == null) {
+        classes.put(name, r = ctx.findClass(name));
+    }
+    return r;
+}
+
+public function getFunctions from (clazz0 is F3ClassType, all is Boolean) to F3FunctionMember[] 
+{
+    var clazz = findClass(clazz0.getName());
+    if (clazz <> clazz0) {
+        println("HUH? {clazz0} {clazz}");
+    }
+    var funs is F3FunctionMember[];
+    if (not funMap.containsKey(clazz)) {
+        funMap.put(clazz, funs = foreach (c in clazz.getFunctions(true)) c);
+    } else {
+        funs = funMap.get(clazz);
+    }
+    if (not all) then funs[f | f.getDeclaringClass() == clazz] else funs;
+}
 
 public function getFunction(clas is String, name is String, params is String[]) to F3FunctionMember 
 {
     const c = getType(clas) as F3ClassType;
-    const fs = c.getFunctions(true);
+    const fs = getFunctions(c, true);
     const ps = foreach (p in params) getType(p);
     for (f in fs) {
 	if (f.getName() == name and f.getType().minArgs() == params.size()) {
@@ -68,7 +95,7 @@ public function getType from (name is String) to F3Type
 			else { 
                             var cls is F3ClassType; 
                             try { 
-                                cls = ctx.findClass(name); 
+                                cls = Reflect.findClass(name); 
                             } catch (e is java.lang.Throwable) {
                                 println(e);
                                 cls = null
@@ -108,8 +135,8 @@ public function getVars from (classType is F3ClassType) to F3VarMember[]
 }
 
 function run from (args is String[]) to () {
-    const clazz = ctx.findClass(args[0]);
-    const funs = clazz.getFunctions(true);
+    const clazz = Reflect.findClass(args[0]);
+    const funs = getFunctions(clazz, true);
     for (f in funs where not f.getName().contains("$") and 
 	     OBJECT_TYPE <> f.getDeclaringClass()
 	 ) { 
