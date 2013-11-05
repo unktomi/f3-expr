@@ -20,7 +20,7 @@ import expr.choices.*;
 var exprMap1 = new java.util.HashMap of (F3ClassType, Member[]);
 var exprMap2 = new java.util.HashMap of (F3ClassType, Member[]);
 
-const MAT4_TYPE = ctx.findClass("f3.math.Mat4");
+const MAT4_TYPE = Reflect.findClass("f3.math.Mat4");
 
 function makeFunMember from (name is String, params is F3Type[], ret is F3Type) to Member 
 {
@@ -99,7 +99,7 @@ public function introspect from (clazz is F3ClassType, all is Boolean) to Member
 	return exprMap.get(clazz);
     }
     var result is Member[];
-    const funs = clazz.getFunctions(not all);
+    const funs = Reflect.getFunctions(clazz, not all);
     if (all) {
         var r = 
             foreach (f in funs where f.isPublic() and not f.getName().contains("$") and 
@@ -229,6 +229,11 @@ public function introspect from (clazz is F3ClassType, all is Boolean) to Member
 
 
 public class Member {
+    override function equals from (obj is Object) to Boolean {
+        (obj is Member)  and {
+            (obj as Member).m == m or (obj as Member).m.toString() == m.toString(); // hack!!
+        }
+    }
     public function serialize to MemberNode {
         MemberNode {
             declaringClass: m.getDeclaringClass().getName();
@@ -523,6 +528,7 @@ class ControlArrow is MeshNode.Instance {
 }
 
 public abstract class ExpressionView is AbstractNode {
+    override var id = bind expression.id;
     public function unlink from () to () {}
     override function toString { "{super.toString()}: {expression}" }
     public const canvas is Canvas;
@@ -580,7 +586,9 @@ public abstract class ExpressionView is AbstractNode {
 	d3 = label.observeMouseDrag().subscribe(onDrag);
     }
 
-    public abstract function serialize to ExprNode; 
+    public function serialize to ExprNode {
+        throw new java.lang.RuntimeException("not implemented");
+    }
 }
 
 
@@ -595,13 +603,14 @@ class FunctionView is ExpressionView {
 
     public override function serialize to ExprNode {
         const n = FunNode {
+            id: "{id}";
             x: pos.x;
             y: pos.y;
             member: fun.member.serialize();
         }
         canvas.serializationMap.put(this, n);
-        n.inputs = foreach (i in inputs) canvas.serialize(i);
-        n.output = canvas.serialize(output);
+        n.inputs = foreach (i in inputs) TargetNode {targetId: "{id}", links: foreach (link in i.links) "{link.id}" };
+        n.output = SourceNode {sourceId: "{id}", links: foreach (link in output.links) "{link.id}"};
         return n;
     } 
     public var fun is Function;
@@ -741,13 +750,20 @@ public class ObjectView is ExpressionView {
     }
 
     public override function serialize to ExprNode {
-        const n = ObjNode {
-            x: pos.x;
-            y: pos.y;
+        var n is ObjNode;
+        if (objectExpr is NodeExpression) {
+            n = NodeObjNode {nodeId: (objectExpr as NodeExpression).node.id};
+        } else if (objectExpr is TimeNodeExpression) {
+            n = TimeNodeObjNode {timeNodeId: (objectExpr as TimeNodeExpression).timeNode.id};
+        } else {
+            // @Todo
         }
+        n.id = "{id}";
+        n.x = pos.x;
+        n.y = pos.y;
         canvas.serializationMap.put(this, n);
-        n.inputs = foreach (i in inputViews) canvas.serialize(i);
-        n.outputs = foreach (i in outputViews) canvas.serialize(i);
+        n.inputs = foreach (i in inputViews) TargetNode { targetId: "{id}", links: foreach (link in i.links) "{i.id}" };
+        n.outputs = foreach (i in outputViews) SourceNode { sourceId: "{id}", links: foreach (link in i.links) "{i.id}" };
         return n;
     }
 
@@ -817,16 +833,29 @@ public class ObjectView is ExpressionView {
     }
 }
 
+function getPath from (v is LinkView) to String {
+    if (v <> null) {
+        if (v.target is GetVarView) {
+            var g = v.target as GetVarView;
+            var p = getPath(v.source.links[u | u <> v][0]);
+            return "{p}{g.get.member.name}/";
+        }
+    }
+    return "/";
+}
 
-class GetVarView is OutputView {
+public class GetVarView is OutputView {
     public override function serialize to ExprNode {
         const n = GetNode {
+            id: "{id}";
             x: pos.x;
             y: pos.y;
             member: get.member.serialize();
         }
         canvas.serializationMap.put(this, n);
-        foreach (link in tv.getLinks()) canvas.serialize(link);
+        foreach (link in tv.getLinks()) {
+            println("GET VAR VIEW {get.member.name} => {getPath(link)}");
+        }
         return n;
     }
     override var resultType = bind get.getType();
@@ -845,7 +874,7 @@ class GetVarView is OutputView {
     override bound function getLinkPos to Point3 { getWorldPos() }
 }
 
-class LinkView is ExpressionView {
+public class LinkView is ExpressionView {
     public var sourceLinkId is Integer;
     public var targetLinkId is Integer;
     override public function serialize to ExprNode {
@@ -909,19 +938,6 @@ abstract class LinkedView is ExpressionView {
 }
 
 public class InputView is LinkedView {
-    public override function serialize to ExprNode {
-        const pt = getWorldPos();
-        var n = ParamNode {
-            index: index;
-            x: pt.x;
-            y: pt.y;
-        }
-        canvas.serializationMap.put(this, n);
-        for (link in links) {
-            canvas.serialize(link);
-        }
-        return n;
-    }
     var index is Integer;
     public function getInputType to F3Type { null };
     override var transform = bind translate(0, index * -cellHeight);
@@ -1033,19 +1049,6 @@ public class ParameterView is InputView {
 }
 
 public class OutputView is LinkedView {
-    public override function serialize to ExprNode {
-        const pt = getWorldPos();
-        const n = ResultNode {
-            index: index;
-            x: pt.x;
-            y: pt.y;
-        }
-        canvas.serializationMap.put(this, n);
-        for (link in links) {
-            canvas.serialize(link);
-        }
-        return n;
-    }
     public var resultType is F3Type;
     public var index is Integer;
     override var transform = bind translate(0, index * -cellHeight);
@@ -1644,7 +1647,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     var arrows is TransformNode[];
 
-    var links is LinkView[];
+    public var links is LinkView[];
 
     var lines = LineMesh {};
 
@@ -2078,6 +2081,9 @@ public class VarMemberNode is MemberNode {
 
 public class FunctionMemberNode is MemberNode {
     public var inputTypes is String[];
+    override public function deserialize to Member {
+        FunctionMember { m: Reflect.getFunction(declaringClass, name, inputTypes) }
+    }
 }
 
 public class ExprNode {
@@ -2096,21 +2102,82 @@ public class ExprScene {
 }
 
 public class FunNode is ExprNode {
-    public var inputs is ExprNode[];
-    public var output is ExprNode;
+    public var inputs is TargetNode[];
+    public var output is SourceNode;
+    public override function createView from (canvas is Canvas) to FunctionView {
+           null
+    }
 }
 
 public class LinkNode is ExprNode {
     public var source is ExprNode;
     public var target is ExprNode;
+    public override function createView from (canvas is Canvas) to LinkView {
+           null
+    }
 }
 
 public class ObjNode is ExprNode {
-    public var inputs is ExprNode[];
-    public var outputs is ExprNode[];
+    public var inputs is TargetNode[];
+    public var outputs is SourceNode[];
+}
+
+public class NodeObjNode is ObjNode {
+    public var nodeId is String;
+    public override function createView from (canvas is Canvas) to ObjectView {
+        const clip = canvas.lookupSpatial(nodeId);
+	const typ = Reflect.getType(clip.getClass().getName());
+        const names = new java.util.HashSet of String;
+	const members = foreach (m in introspect(typ) where not m.name.contains("pdate") and names.add(m.name)) m;
+        const objectExpr =  NodeExpression { 
+            node: clip, override function getType to F3Type { typ }
+            inputMembers: foreach (m in members where not m.isObservable and m.isObserver and m.rt == UNIT_TYPE) m;
+        }
+        var result = ObjectView {
+            pathFactory: canvas.pathFactory;
+            layoutEngine: canvas.layoutEngine;
+            imageLoader: canvas.imageLoader;
+            effectLoader: canvas.effectLoader;
+            canvas: canvas;
+            objectExpr: objectExpr;
+            pos: new Point3(x, y, 0);
+        }
+        return result;
+    }
+}
+
+public class TimeNodeObjNode is ObjNode {
+    public var timeNodeId is String;
+    public override function createView from (canvas is Canvas) to ObjectView {
+        const clip = canvas.lookupTemporal(timeNodeId);
+	const typ = Reflect.getType("f3.media.scene.TimeNode");
+        const names = new java.util.HashSet of String;
+	const members = foreach (m in introspect(typ) where not m.name.contains("pdate") and names.add(m.name)) m;
+        const objectExpr = TimeNodeExpression { 
+            timeNode: clip, override function getType to F3Type { typ }
+            inputMembers: foreach (m in members where not m.isObservable and m.isObserver and m.rt == UNIT_TYPE) m;
+        }
+        var result = ObjectView {
+            pathFactory: canvas.pathFactory;
+            layoutEngine: canvas.layoutEngine;
+            imageLoader: canvas.imageLoader;
+            effectLoader: canvas.effectLoader;
+            canvas: canvas;
+            objectExpr: objectExpr;
+            pos: new Point3(x, y, 0);
+        }
+        return result;
+    }
+}
+
+public class VarContextObjNode is ObjNode {
+    public override function createView from (canvas is Canvas) to ObjectView {
+        null
+    }
 }
 
 public class GetNode is ExprNode {
+    var outputs is SourceNode[];
     public override function createView from (canvas is Canvas) to GetVarView {
         GetVarView {
             pathFactory: canvas.pathFactory;
@@ -2126,12 +2193,14 @@ public class GetNode is ExprNode {
     }
 }
 
-public class ParamNode is ExprNode {
-    public var index is Integer;
+public class TargetNode is ExprNode {
+    public var targetId is String;
+    public var links is String[]
 }
 
-public class ResultNode is ExprNode {
-    public var index is Integer;
+public class SourceNode is ExprNode {
+    public var sourceId is String;
+    public var links is String[]
 }
 
 public class Editor is ResizableNode, Focuser {
@@ -2205,16 +2274,23 @@ public class Editor is ResizableNode, Focuser {
     function getCanvas from (target is ResourceNode, eventContext is Context.MemberContext) to Canvas
     {
 	var prog is Program;
+        println("TARGET: {target.id}, programs={target.programs.size()}");
 	for (x in target.programs) {
-	    if (x.event == eventContext.member) {
+            println("PROGRAM {x.event.m}, event={eventContext.member.m}");
+            println("PROGRAM {java.lang.System.identityHashCode(x.event.m)}, event={java.lang.System.identityHashCode(eventContext.member.m)}");
+	    if (x.event == eventContext.member) { // hack
+                println("FOUND IT");
 		prog = x;
 		break;
-	    }
+	    } else {
+                println("NO MATCH");
+            }
 	}
 	if (prog == null) {
-	    prog = Program {event: event, debugger: debugger};
+	    prog = Program {event: event};
 	    insert prog into target.programs;
 	}
+        prog.debugger = debugger;
 	if (prog.canvas == null) {
             println("creating canvas with {pathFactory}");
 	    prog.canvas = Canvas {
@@ -2239,6 +2315,7 @@ public class Editor is ResizableNode, Focuser {
                 }
             }
             prog.canvas.prog = prog;
+            prog.deserialize();
             prog.canvas.dumpSrc()
 	}
 	return prog.canvas;

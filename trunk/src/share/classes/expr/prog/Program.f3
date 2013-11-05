@@ -5,7 +5,10 @@ import f3.util.Observer.*;
 import f3.util.Observable.*;
 import Expression.Canvas;
 import Expression.Member;
+import Expression.MemberExpression;
 import Expression.ExprScene;
+import Expression.GetVarView;
+
 
 public class Program {
     public var event is Member;
@@ -14,4 +17,21 @@ public class Program {
     public var sourceCode is String;
     public var debugger is ObservableDebugger;
     public var compiled is function from (f3.util.ObservableDebugger, Node, function from String to Object, function from String to Node, function from String to TimeNode) to Observable of ?;
+    public function deserialize to () {
+        for (v in code.views) {
+            const view = v.createView(canvas);
+            println("DESERIALIZED {v} into {view}");
+            if (view is Expression.LinkView) {
+                insert (view as Expression.LinkView) into canvas.links;
+            } else {
+                if (view is GetVarView) {
+                    var m = view as GetVarView;
+                    if (m.get.member == event) {
+                        continue;
+                    }
+                }
+                insert view into canvas.views;
+            }
+        }
+    }
 }

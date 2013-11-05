@@ -3,6 +3,7 @@ import f3.media.scene.*;
 import f3.media.svg.SVG;
 import java.io.File;
 import expr.prog.Expression.ExprScene;
+import expr.prog.Expression.MemberNode;
 
 public class Resource {
     public var id is String;
@@ -73,6 +74,7 @@ function makeResource from (n is ResourceNode) to SpatialResource {
 	py: n.py;
 	pz: n.pz;
         programs: foreach (p in n.programs) ProgramResource {
+            event: p.event.serialize();
             code: p.code;
             compiled: p.sourceCode;
         }
@@ -97,6 +99,7 @@ public class SceneResource is Resource {
 }
 
 public class ProgramResource is Resource {
+    public var event is MemberNode;
     public var code is ExprScene;
     public var compiled is String;
 }

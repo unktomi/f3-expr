@@ -520,6 +520,15 @@ public function run from (args is String[]) to ()
 	    currentTransform.px = i.px;
 	    currentTransform.py = i.py;
 	    currentTransform.pz = i.pz;
+            (currentTransform as ResourceNode).programs = foreach (prog in i.programs) {
+                const p = Program {
+                    event: prog.event.deserialize();
+                    code: prog.code;
+                    sourceCode: prog.compiled;
+                }
+                println("CREATING PROGRAM**** {prog} => {p.sourceCode}");
+                p;
+            }
 	}
 	for (i in sceneRes.temporalResources, j in currentAnimResource.resources) {
 	    if (i.url == j.url) {
