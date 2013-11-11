@@ -9,6 +9,7 @@ import f3.util.Observer.*;
 import f3.media.scene.*;
 import f3.media.input.*;
 import f3.media.svg.SVG;
+import f3.media.xhtml.XHTML;
 import java.lang.Math;
 import expr.choices.SliderField;
 import expr.undo.*;
@@ -238,8 +239,8 @@ public function run from (args is String[]) to ()
     const mainTimeLayer = TimeGroup {
 	id: "Hierarchy";
 	content: bind currentAnimResource;
-	playRange: bind if (loop) then null else Interval { start: 0s, end: Duration.INDEFINITE };
-	playCount:  bind if (loop) then -1 else 1;
+	playRange: bind if (nonInteractiveLoop) then null else Interval { start: 0s, end: Duration.INDEFINITE };
+	playCount:  bind if (nonInteractiveLoop) then -1 else 1;
     }
 
     const player = Timeline {
@@ -252,7 +253,7 @@ public function run from (args is String[]) to ()
 	ty: 3.0;
 	tz: 13;
 	near: 1;
-	far: 1000;
+	far: 10000;
         content: PointLight {}
     }
 
@@ -316,10 +317,10 @@ public function run from (args is String[]) to ()
 		content: bind model.temporalRoot;
 		spatial: rn;
 	    }
-	    if (rtn.bounds.duration() > 0s) {
+	    //if (rtn.bounds.duration() > 0s) {
 		rn.temporal = rtn;
 		addTimeResource(rtn);
-	    }
+	    //}
 	} else if (url.endsWith(".mp4")) {
             const movie = Movie {
                 url: url;
@@ -352,6 +353,24 @@ public function run from (args is String[]) to ()
 		rn.temporal = rtn;
 		addTimeResource(rtn);
 	    }
+	} else if (url.endsWith(".xhtmli")) {
+	    const xhtml = XHTML.Text {
+		content: readTextFile(url).first;
+	    }
+	    const rn = ResourceNode {
+		url: url;
+		content: bind xhtml;
+	    }	
+	    addResource(rn, pt);
+	} else if (url.endsWith(".xhtml")) {
+	    const xhtml = XHTML.Document {
+		url: url;
+	    }
+	    const rn = ResourceNode {
+		url: url;
+		content: bind xhtml;
+	    }	
+	    addResource(rn, pt);
 	} else if (url.endsWith(".svg")) {
 	    const svg = SVG {
 		url: url;
@@ -430,6 +449,7 @@ public function run from (args is String[]) to ()
 
 
     var loop is Boolean = true;
+    var nonInteractiveLoop = bind not interactive and loop;
     var full is Boolean = false;
 
     var interactive is Boolean;
@@ -1028,7 +1048,7 @@ public function run from (args is String[]) to ()
                                              canZoomVertical: false;
                                              content: trax = expr.timeline.Trax {
                                                  clips: bind currentAnimResource.resources;
-                                                 loop: bind loop;
+                                                 loop: bind nonInteractiveLoop;
                                                  target: player;
                                                  targetNode: mainTimeLayer;
                                                  temporalHierarchy: temporalHierarchy;

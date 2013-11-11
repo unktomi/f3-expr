@@ -106,7 +106,14 @@ public class Handler is ContentHandler {
 		else if (value is F3Value) 
 			then value as F3Value 
 			else ctx.mirrorOf(value, f3type); 
-	    variable.setValue(inst, f3value);
+            try {
+                variable.setValue(inst, f3value);
+            } catch (exc is java.lang.Exception) {
+                println(exc);
+                println("inst={inst}");
+                println("variable={variable}");
+                println("value={value}");
+            }
 	}
 	currentObject.clear();
 	true

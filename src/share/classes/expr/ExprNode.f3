@@ -14,13 +14,14 @@ public class ExprNode is AbstractNode {
     public var spatialRoot is Node = bind modelContent.spatialRoot;
     public var temporalRoot is TimeNode = bind modelContent.temporalRoot;
     public var modelContent is ModelContent = bind loadResource(url);
+    /*
     var timeline = Timeline {
         content: TimeGroup {
             playCount: -1;
             content: bind temporalRoot;
         }
     }
-
+    */
     function loadResource from (url is String) to ModelContent 
     {
         if (url.endsWith(".ma")) {
@@ -33,8 +34,15 @@ public class ExprNode is AbstractNode {
             }
         } else if (url.endsWith(".expr")) {
             var r = Resources.open(url);
-            var spatialRoot = Group {
+            var ns = foreach (x in r.spatialResources) {
+                ExprNode {
+                    url: x.url
+                }
+            }
+            const spatialRoot = Group {
+                id: "Main Scene";
                 content: foreach (x in r.spatialResources) {
+                    var n = ns[indexof x];
                     TransformNode {
                         id: "transform"
                         tx: x.tx;
@@ -48,15 +56,17 @@ public class ExprNode is AbstractNode {
                         sz: x.sz;
                         px: x.px;
                         py: x.py;
-                        pz: x.pz
-                        content: ExprNode {
-                            url: x.url
-                        }
+                        pz: x.pz;
+                        content: bind n.spatialRoot;
                     }
                 }
             }
+            const temporalRoot = TimeGroup {
+                content: foreach (n in ns) n.temporalRoot;
+            }
             ModelContent {
-                spatialRoot: spatialRoot;
+                spatialRoot: if (spatialRoot.content.size() == 1) then spatialRoot.content[0] else spatialRoot;
+                temporalRoot: if (temporalRoot.content.size() == 1) then temporalRoot.content[0] else temporalRoot;
             }
 	} else if (url.endsWith(".png") or url.endsWith(".jpg") or url.endsWith(".tif") or url.endsWith(".tiff") or url.endsWith(".tga")) {
 	    const image = Image { 

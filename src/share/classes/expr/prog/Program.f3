@@ -4,11 +4,14 @@ import f3.util.*;
 import f3.util.Observer.*;
 import f3.util.Observable.*;
 import Expression.Canvas;
+import Expression.ExpressionView;
+import Expression.LinkedView;
+import Expression.LinkView;
 import Expression.Member;
 import Expression.MemberExpression;
 import Expression.ExprScene;
+import Expression.ExprNode;
 import Expression.GetVarView;
-
 
 public class Program {
     public var event is Member;
@@ -18,20 +21,43 @@ public class Program {
     public var debugger is ObservableDebugger;
     public var compiled is function from (f3.util.ObservableDebugger, Node, function from String to Object, function from String to Node, function from String to TimeNode) to Observable of ?;
     public function deserialize to () {
+        var idMap = new java.util.HashMap of (String, ExprNode);
+        for (v in code.views) {
+            idMap.put(v.id, v);
+        }
+        var viewMap = new java.util.HashMap of (String, ExpressionView);
         for (v in code.views) {
             const view = v.createView(canvas);
             println("DESERIALIZED {v} into {view}");
             if (view is Expression.LinkView) {
-                insert (view as Expression.LinkView) into canvas.links;
             } else {
                 if (view is GetVarView) {
                     var m = view as GetVarView;
                     if (m.get.member == event) {
+                        viewMap.put(v.id, canvas.rootExprView);
                         continue;
                     }
                 }
+                viewMap.put(v.id, view);
                 insert view into canvas.views;
             }
+        }
+        for (v in code.links) {
+            const src = idMap.get(v.source);
+            const targ = idMap.get(v.target);
+            const sourceView = viewMap.get(v.source);
+            const targetView = viewMap.get(v.target);
+            var lnk = LinkView {
+                pathFactory: canvas.pathFactory;
+                layoutEngine: canvas.layoutEngine;
+                imageLoader: canvas.imageLoader;
+                effectLoader: canvas.effectLoader;
+                canvas: canvas;
+                target: targetView as LinkedView;
+                source: sourceView as LinkedView;
+            }
+            lnk.link();
+            insert lnk into canvas.links;
         }
     }
 }

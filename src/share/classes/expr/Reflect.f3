@@ -35,6 +35,9 @@ public function findClass from (name is String) to F3ClassType
 public function getFunctions from (clazz0 is F3ClassType, all is Boolean) to F3FunctionMember[] 
 {
     var clazz = findClass(clazz0.getName());
+    if (clazz == null) {
+        return [];
+    }
     if (clazz <> clazz0) {
         println("HUH? {clazz0} {clazz}");
     }
