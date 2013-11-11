@@ -587,7 +587,7 @@ public abstract class ExpressionView is AbstractNode {
     }
 
     public function serialize to ExprNode {
-        throw new java.lang.RuntimeException("not implemented");
+        throw new java.lang.RuntimeException("not implemented {getClass()}");
     }
 }
 
@@ -609,8 +609,8 @@ class FunctionView is ExpressionView {
             member: fun.member.serialize();
         }
         canvas.serializationMap.put(this, n);
-        n.inputs = foreach (i in inputs) TargetNode {targetId: "{id}", links: foreach (link in i.links) "{link.id}" };
-        n.output = SourceNode {sourceId: "{id}", links: foreach (link in output.links) "{link.id}"};
+        n.inputs = foreach (i in inputs) TargetNode {targetId: "{i.id}", links: foreach (link in i.links) "{link.id}" };
+        n.output = SourceNode {sourceId: "{output.id}", links: foreach (link in output.links) "{link.id}"};
         return n;
     } 
     public var fun is Function;
@@ -762,8 +762,8 @@ public class ObjectView is ExpressionView {
         n.x = pos.x;
         n.y = pos.y;
         canvas.serializationMap.put(this, n);
-        n.inputs = foreach (i in inputViews) TargetNode { targetId: "{id}", links: foreach (link in i.links) "{i.id}" };
-        n.outputs = foreach (i in outputViews) SourceNode { sourceId: "{id}", links: foreach (link in i.links) "{i.id}" };
+        n.inputs = foreach (i in inputViews) TargetNode { targetId: "{i.id}", links: foreach (link in i.links) "{link.id}" };
+        n.outputs = foreach (i in outputViews) SourceNode { sourceId: "{i.id}", links: foreach (link in i.links) "{link.id}" };
         return n;
     }
 
@@ -837,7 +837,7 @@ function getPath from (v is LinkView) to String {
     if (v <> null) {
         if (v.target is GetVarView) {
             var g = v.target as GetVarView;
-            var p = getPath(v.source.links[u | u <> v][0]);
+            var p = getPath(v.source.links[u | u.target <> g][0]);
             return "{p}{g.get.member.name}/";
         }
     }
@@ -853,8 +853,14 @@ public class GetVarView is OutputView {
             member: get.member.serialize();
         }
         canvas.serializationMap.put(this, n);
+        n.outputs = 
         foreach (link in tv.getLinks()) {
+            var p = getPath(link);
             println("GET VAR VIEW {get.member.name} => {getPath(link)}");
+            SourceNode {
+                sourceId: p;
+                links: ["{link.id}"]
+            }
         }
         return n;
     }
@@ -877,16 +883,17 @@ public class GetVarView is OutputView {
 public class LinkView is ExpressionView {
     public var sourceLinkId is Integer;
     public var targetLinkId is Integer;
-    override public function serialize to ExprNode {
+    override var id = getNextId();
+    override public function serialize to LinkNode {
         const n = LinkNode {}
         canvas.serializationMap.put(this, n);
-        n.source = canvas.serialize(source);
-        n.target = canvas.serialize(target);
+        n.source = source.id;
+        n.target = target.id;
         return n;
     }
     public var target is LinkedView;
     public var source is LinkedView;
-    function link from () to () {
+    public function link from () to () {
 	insert this into target.links;
 	insert this into source.links;
 	insert this into canvas.links;
@@ -1171,9 +1178,8 @@ class GetTreeview is ResizableNode {
     };
     public function getLinks to LinkView[]
     {
-        foreach (x in cellMap.values() where x.parentLink.target.visible) {
-            x.parentLink
-        }
+        foreach (x in cellMap.values()) if x.parentLink.target.visible then x.parentLink else if (x.parentLink == null) then x.linkedView.links else null;
+
     }
     var treeHeight = bind Math.min(treeModel.rowCount, 8)*cellHeight;
     const self = this;
@@ -1538,7 +1544,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     var rootView is Node = TransformNode { tx: bind -width / 2.0 + 120, content: bind rootExprView };
 
-    var rootExprView is GetVarView = bind makeGetter(event);
+    public readonly var rootExprView is GetVarView = bind makeGetter(event);
 
     var varRoot is GetVar;
 
@@ -1844,10 +1850,20 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         }
         var todo = ExprScene {};
         foreach (j in serializationMap.values()) {
-            insert j into todo.views;
+            if (j is LinkNode) {
+                //insert j as LinkNode into todo.links;
+            } else {
+                insert j into todo.views;
+            }
+        }
+        for (link in links) {
+            insert link.serialize() into todo.links;
         }
         IO.writeObject(w, todo);
         println("serialize => {w}");
+        for (link in links) {
+            println("Link {link.id} {link.source.expression.getName()}: {link.source.id} => {link.target.expression.getName()}: {link.target.id}");
+        }
         var des = IO.readObject(new java.io.StringReader(w.toString()));
         prog.code = todo;
 
@@ -2024,9 +2040,8 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
 
     function unsubscribe {
-	const xs = subs;
-	subs = [];
-	for (x in xs) x.dispose();
+	for (x in subs) x.dispose();
+        subs = [];
     }
 
     var subs is Disposable[];
@@ -2099,6 +2114,7 @@ public class ExprNode {
 
 public class ExprScene {
     public var views is ExprNode[];
+    public var links is LinkNode[];
 }
 
 public class FunNode is ExprNode {
@@ -2110,11 +2126,8 @@ public class FunNode is ExprNode {
 }
 
 public class LinkNode is ExprNode {
-    public var source is ExprNode;
-    public var target is ExprNode;
-    public override function createView from (canvas is Canvas) to LinkView {
-           null
-    }
+    public var source is String;
+    public var target is String;
 }
 
 public class ObjNode is ExprNode {

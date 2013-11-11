@@ -15,6 +15,8 @@
     <copy todir="lib">
       <fileset dir="../form-follows-function/dist/lib/shared" includes="*.jar"/>
       <fileset dir="../form-follows-function/f3_svg_awt/build/" includes="*.jar"/>
+      <fileset dir="../form-follows-function/f3_xhtml/build/" includes="*.jar"/>
+      <fileset dir="../form-follows-function/f3_xhtml/lib/" includes="core-renderer.jar"/>
       <fileset dir="../form-follows-function/f3_cg_jogl_awt/build/" includes="*.jar"/>
       <fileset dir="../form-follows-function/f3_cg_jogl_awt/lib/" includes="*.jar"/>
       <fileset  erroronmissingdir="false" dir="../form-follows-function/f3_awesomium_jogl/build/" includes="*.jar"/>
@@ -55,6 +57,7 @@
                 <path path="lib/jogl-cg.jar"/>
                 <path path="lib/f3rt.jar"/>
 		<path path="lib/f3.svg.awt.jar"/>
+		<path path="lib/f3.xhtml.awt.jar"/>
 		<path path="lib/f3.cg.jogl.awt.jar"/>
             </classpath>
     </javac>
@@ -70,6 +73,7 @@
                 <path path="lib/gluegen-rt.jar"/>
                 <path path="lib/jogl-cg.jar"/>
 		<path path="lib/f3.svg.awt.jar"/>
+		<path path="lib/f3.xhtml.awt.jar"/>
 		<path path="lib/f3.awesomium.jogl.jar"/>
 		<path path="lib/f3.cg.jogl.awt.jar"/>
 		<path path="lib/json-simple-1.1.1.jar"/>
