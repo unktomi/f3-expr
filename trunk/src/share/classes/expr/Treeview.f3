@@ -2,6 +2,7 @@ package expr;
 import f3.util.*;
 import f3.media.input.*;
 import f3.media.scene.*;
+import f3.media.xhtml.*;
 import f3.media.scene.Shape2D.*;
 import f3.math.*;
 import f3.math.LinearMath.*;
@@ -164,6 +165,12 @@ public class Treecell is AbstractNode {
     var bg is Paint = bind tv.getBg(tn.row, tn.column);
     override var transform = bind translate(0, -tn.row * tv.cellHeight);
     override var visible = bind tv.isVisible(tn);
+    bound function css from (p is Paint) to String
+    {
+        var color = (p as ColorPaint).color;
+        var str = color.toCss();
+        return str;
+    }
     override var internalContent = Group {
 	content: 
 	[Rectangle {
@@ -180,14 +187,22 @@ public class Treecell is AbstractNode {
 	     },
 	     Text.Label {
 		 transform: bind translate(if (tn.canOpen) then 6 else 0, 0);
-					   
 		 font: bind tv.font;
 		 foreground: bind fg;
 		 background: null;
 		 height: bind tv.cellHeight;
 		 width: bind tv.cellWidth;
 		 text: bind tn.label;
-	     }];
+	     }
+             /*
+             XHTML.Text {
+		 style: bind "color:{css(fg)};background-color:{css(bg)}; font-weight:bold; font-family:Lucida Grande; font-size:10pt";
+		 height: bind tv.cellHeight;
+		 width: bind tv.cellWidth;
+                 content: bind tn.label
+             }
+             */
+             ];
 	 }]
     };
     const onClick = 
