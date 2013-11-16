@@ -670,13 +670,16 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
         var off0 = offset mod pp;
 	var off = (offset - off0) * pp;
         var off1 = off0 * pp;
-        x += off1;
+        //x += off1;
         //println("OFF={offset}");
 	for (i in [0..(w+off) step pp]) {
 	    var n = if (mid) then 3 else 5;
 	    mid = not mid;
-	    lineMesh.moveTo(x+i, y);
-	    lineMesh.lineTo(x+i, y+n);
+            const x1 = -off1+x+i;
+            if (x1 >= x) {
+                lineMesh.moveTo(x1, y);
+                lineMesh.lineTo(x1, y+n);
+            }
 	}
         x = x0;
 	for (i in [0..<h step pp]) {

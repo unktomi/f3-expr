@@ -7,6 +7,7 @@ import f3.reflect.*;
 import expr.AssetTree.*;
 import expr.Context.*;
 import expr.Names.*;
+import expr.undo.*;
 
 public class Context {
     public var parent is Context;
@@ -23,7 +24,12 @@ public class Context {
 
 public abstract class GroupContext is Context {
     public var content is Context[];
+    const undoList = UndoList {};
+    init {
+        undoList.addTarget("content", &content);
+    }
     public override bound function getContent to Context[]  { content }
+
 }
 
 public class CallContext is Context {
@@ -103,29 +109,32 @@ public class MemberContext is GroupContext {
 public class ContextTreemodel is Treemodel {
     public var rootContext is Context;
     public var selectedContext is Context;
+    var tn is Treenode on replace {
+        selectedContext = (tn as ContextTreenode).context;
+        var p = tn;
+        while (p <> null and not ((p as ContextTreenode).context is GroupContext)) {
+            p = p.parent;
+        }
+        selectedGroupContext = (p as ContextTreenode).context as GroupContext;
+        p = tn;
+        var m is MemberContext = null;
+        while (p <> null) {
+            var j = (p as ContextTreenode).context;
+            m = if (j is MemberContext) then (j as MemberContext) else null;
+            if (m <> null) {
+                break;
+            }
+            p = p.parent;
+        }
+        selectedMemberContext = m;
+        println("selected context => {selectedContext}");
+    }
     public var selectedGroupContext is GroupContext;
     public var selectedMember is Member = bind selectedMemberContext.member;
     public var selectedMemberContext is MemberContext;
     override var root = ContextTreenode { context: bind rootContext };
     const disp = selectionObserver.subscribe(function from (tn is Treenode) to () {
-            selectedContext = (tn as ContextTreenode).context;
-            var p = tn;
-            while (p <> null and not ((p as ContextTreenode).context is GroupContext)) {
-                p = p.parent;
-            }
-            selectedGroupContext = (p as ContextTreenode).context as GroupContext;
-            p = tn;
-            var m is MemberContext = null;
-            while (p <> null) {
-                var j = (p as ContextTreenode).context;
-                m = if (j is MemberContext) then (j as MemberContext) else null;
-                if (m <> null) {
-                    break;
-                }
-                p = p.parent;
-            }
-            selectedMemberContext = m;
-            println("selected context => {selectedContext}");
+            this.tn = tn;
         });
 }
 

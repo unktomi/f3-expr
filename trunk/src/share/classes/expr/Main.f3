@@ -324,6 +324,7 @@ public function run from (args is String[]) to ()
 	} else if (url.endsWith(".mp4")) {
             const movie = Movie {
                 url: url;
+                paused: true
             }
 	    const rn = ResourceNode {
                 url: url;
@@ -769,7 +770,10 @@ public function run from (args is String[]) to ()
                                              if (asset is AssetTree.SceneAsset) {
                                                  const picked = getUnderMouseInEditor();
                                                  if (picked == []) {
-                                                     insert (asset as AssetTree.SceneAsset).getScene() into currentScenes;
+                                                     const scene = (asset as AssetTree.SceneAsset).getScene();
+                                                     insert scene into currentScenes;
+                                                     transformHierarchy.selectScene(scene);
+                                                     MasterUndoable.commit();
                                                  }
                                              }
                                              if (asset is AssetTree.TypeAsset) {
@@ -1313,15 +1317,14 @@ public function run from (args is String[]) to ()
         }
     };
     currentScenes = [mainScene];
+    undoList.addTarget("currentScenes", &currentScenes);
     transformHierarchy.selectedScene = mainScene;
     println("SET MAIN SCENE {transformHierarchy.selectedScene}");
     stage.invoke(function {
 	    //viewer.focusCamera(currentTransform);
-            
 	});
     stage.observeUpdate().subscribe(doUpdate);
     MasterUndoable.commit();
-
 }
 
 
