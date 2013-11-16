@@ -111,6 +111,7 @@ public class SliderField is AbstractNode
                 textAreaEnabled = true;
                 textArea.selectAll();
                 event.scene.setFocus(textArea);
+                event.stopPropagation();
             }
         }
     };

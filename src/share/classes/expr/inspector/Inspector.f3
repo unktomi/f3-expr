@@ -30,12 +30,12 @@ public abstract class Inspected of a
 public class InspectedRange of a is Inspected of a {
     public function getAsString from (t is Number) to String
     {
-	"{get(t)}";
+	"{getFromT(t)}";
     }
-    public function get from (t is Number) to a { null }
-    public function set from (t is Number) to () 
+    public function getFromT from (t is Number) to a { null }
+    public function setFromT from (t is Number) to () 
     { 
-	set(get(t)); 
+	set(getFromT(t)); 
     }
 }
 
@@ -43,7 +43,7 @@ public class InspectedNumber is InspectedRange of Number
 {
     public const low is Number;
     public const hi is Number;
-    override function get from (t is Number) to Number 
+    override function getFromT from (t is Number) to Number 
     { 
 	if (hi > low) then low + (hi - low)*t else t;
     }
@@ -53,7 +53,7 @@ public class InspectedDuration is InspectedRange of Duration
 {
     public const low is Duration;
     public const hi is Duration;
-    override function get from (t is Number) to Duration
+    override function getFromT from (t is Number) to Duration
     { 
 	if (hi > low) then low + (hi - low)*t else 1ms*t;
     }
@@ -74,7 +74,7 @@ public class InspectedChoice of a is InspectedRange of a
 	labels[getIndex(t)];
     }
 
-    override function get from (t is Number) to a
+    override function getFromT from (t is Number) to a
     { 
 	choices[getIndex(t)];
     }
@@ -84,10 +84,10 @@ public class InspectedBoolean is InspectedRange of Boolean
 {
     override public function getAsString from (t is Number) to String
     {
-	if (get(t)) then "Yes" else "No"
+	if (getFromT(t)) then "Yes" else "No"
     }
 
-    override public function get from (t is Number) to Boolean
+    override public function getFromT from (t is Number) to Boolean
     {
 	t == 0.0
     }
@@ -136,7 +136,12 @@ public class NumberField is SliderField {
     }
 
     override function onCommit from (text is String) to () {
-        onChange(java.lang.Float.parseFloat(text));
+        var num is Number = i.get();
+        try {
+            num = java.lang.Float.parseFloat(text);
+        } catch (e is java.lang.Exception) {
+        }
+        onChange(num);
         MasterUndoable.commit();
     }
 
@@ -268,6 +273,23 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
     public var fieldWidth is Number = 64;
     public var font is Text.Font = bind layoutEngine.createFont("font-size:10;font-family:Lucida Grande;font-weight:bold");
     public var border is Number = 0;
+    function drag from (i is Inspected, e is MouseEvent) to ()
+    {
+        if (i is InspectedNumber) {
+            var sx = 0.1;
+            if (e.shiftKey) {
+                sx *= 10.0;
+            }
+            if (e.ctrlKey) {
+                sx *= 0.1;
+            }
+            const j = i as InspectedNumber;
+            var n = j.get();
+            n += (e.picked.dragPoint1 - e.picked.dragPoint0).x  * sx;
+            j.set(n);
+        }
+    }
+
     override function onKeyDown from (e is KeyboardEvent) to ()
     {
 	if (e.keyCode == Keys.Down) {
@@ -307,8 +329,11 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
 	     override function onMouseDown from (e is MouseEvent) to ()
 	     {
 		 selectedIndex = low+(-e.location.y + height / 2) / (border+cellHeight) as Integer;
-		 println("e={e}, selectedIndex=>{selectedIndex}");
 	     }
+             override function onMouseDrag from (e is MouseEvent) to ()
+             {
+                 drag(inspecting[selectedIndex], e)
+             }
 	},
 	Group {
           transform: bind translate(0, height/2-cellHeight/2);
@@ -403,7 +428,10 @@ public function inspect from (obj is Object) to (Inspected of ?)[]
 			    label: m.m.getName();
 			    observable: Observables.observe(ptr);
 			    override function get to Number { ptr.get() }
-			    override function set from (x is Number) to () { ptr.set(x) }
+			    override function set from (x is Number) to () { 
+                                ptr.set(x);
+                                println("set {m.m.getName()} => {x} => {ptr.get()}");
+                            }
 			}
 		    } else if (m.m is F3VarMember and m.t == BOOLEAN_TYPE) {
 			const ptr = (m.m as F3Local.VarMember).getPointer(obj as F3Object) as ObservableRef of Boolean;
