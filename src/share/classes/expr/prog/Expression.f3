@@ -1063,19 +1063,24 @@ public class OutputView is LinkedView {
     public var resultType is F3Type;
     public var index is Integer;
     override var transform = bind translate(0, index * -cellHeight);
+    var getter = GetVar {
+        member: bind Member {
+            m: null;
+            t: resultType;
+            name: expression.getName();
+        }
+    };
+    init {
+        insert getter into (expression as ObservableExpression).observers;
+        getter.observable = (expression as ObservableExpression);
+    }
     override var internalContent = Group 
     {
 	content: GetTreeview {
 	    canvas: bind canvas;
 	    width: 150;
 	    height: 200;
-	    get: GetVar {
-		member: bind Member {
-		    m: null;
-		    t: resultType;
-		    name: expression.getName();
-		}
-	    }
+	    get: bind getter;
 	}
 
     }
@@ -1820,7 +1825,11 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     {
         var result = 
 	if (e is Parameter) 
-	    then (e as Parameter).target.output.observers 
+	    then { 
+                const obsvs = (e as Parameter).target.output.observers;
+                //println("parameter target = {(e as Parameter).target} obsvs={obsvs}");
+                obsvs
+            }
             else if (e is InputMemberExpression) then {
                const outs = (e as InputMemberExpression).target.outputs;
                foreach (x in outs) {
@@ -1831,22 +1840,49 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 	    else if (e is ObservableExpression) 
 		then (e as ObservableExpression).observers 
 		else [];
-        println("GET PARAMETERS {e} => {result}");
+        //        println("GET PARAMETERS {e} => {result}");
         return result;
     }
     
     function getTerminals from (e is Expression, 
 				result is function from Expression to ()) to ()
     {
+        getTerminals(null, e, result);
+    }
+
+    function getTerminals from (p is Expression,
+                                e0 is Expression, 
+				result is function from Expression to ()) to ()
+    {
+        var e = e0;
 	const obsvrs = getObservers(e);
-	println("observers for {e} => {obsvrs}");
+	println("observers for {p} / {e} => {obsvrs}");
 	if (obsvrs == []) {
-	    if (not (e is GetVar)) {
+            if (e is GetVar) {
+                if (p <> null) result(p);
+                /*
+                println("is getvar: {e}");
+                while (true) {
+                    if (e is Result) {
+                        result((e as Result).source);
+                        break;
+                    } else if (e is OutputMemberExpression) {
+                        result(e);
+                        break;
+                    }
+                    if (e is ObserverExpression) {
+                        e = (e as ObserverExpression).observable;
+                        println("e=>{e}");
+                    } else break;
+                }
+                */
+            } else {
 		result(e);
 	    }
 	} else {
 	    for (x in obsvrs) {
-		getTerminals(x, result)
+                const p1 = if (e is Result) then (e as Result).source else if (e is InputMemberExpression) then e else p;
+		getTerminals(p1, x, result)
 	    }
 	}
     }
@@ -2123,7 +2159,34 @@ public class FunNode is ExprNode {
     public var inputs is TargetNode[];
     public var output is SourceNode;
     public override function createView from (canvas is Canvas) to FunctionView {
-           null
+        var m = member.deserialize();
+        const v = FunctionView {
+            canvas: canvas;
+            pathFactory: canvas.pathFactory;
+            layoutEngine: canvas.layoutEngine;
+            imageLoader: canvas.imageLoader;
+            effectLoader: canvas.effectLoader;
+            fun: Function {
+                funMember: m as FunctionMember;
+            }
+        }
+        for (n in inputs) {
+            if (n.links.size() > 0) {
+                for (link in n.links) {
+                    const lnk = canvas.getLink(link);
+                    lnk.target = v.inputs[indexof n];
+                }
+            }
+        }
+        if (output.links.size() > 0) {
+            for (link in output.links) {
+                const lnk = canvas.getLink(link);
+                lnk.source = v.output;
+            }
+        }
+        v.pos = new Point3(x, y, 0);
+        insert v into canvas.views;
+        return v;
     }
 }
 

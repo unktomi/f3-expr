@@ -107,8 +107,13 @@ public class MemberContext is GroupContext {
 }
 
 public class ContextTreemodel is Treemodel {
-    public var rootContext is Context;
+    public var rootContext is GroupContext;
     public var selectedContext is Context;
+    public function reset to () 
+    {
+        rootContext.content = [];
+        tn = root;
+    }
     var tn is Treenode on replace {
         selectedContext = (tn as ContextTreenode).context;
         var p = tn;

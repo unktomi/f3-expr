@@ -190,7 +190,7 @@ var doUpdate is Observer of (());
 
 public function run from (args is String[]) to ()
 {
-    var mainContext is Context = MainContext {
+    var mainContext is MainContext = MainContext {
         name: "Start";
     }
 
@@ -591,8 +591,10 @@ public function run from (args is String[]) to ()
     
     function close from () to () {
 	savePoint = 0;
+        currentScenes = [mainScene];
 	currentResource.resources = [];
 	currentAnimResource.resources = [];
+        contextModel.reset();
 	transformHierarchy.clearSelection();
 	MasterUndoable.reset();
     }
