@@ -8,6 +8,8 @@ public class ModelContent {
 }
 
 public class ExprNode is AbstractNode {
+    public const soundLoader is SoundLoader = the SoundLoader;
+    public const movieLoader is MovieLoader = the MovieLoader;
     public const webBrowserFactory is AbstractWebBrowserFactory = the AbstractWebBrowserFactory;
     public var url is String;
     override var id = bind url;
@@ -31,6 +33,48 @@ public class ExprNode is AbstractNode {
             ModelContent {
                 spatialRoot: bind model.getSpatialRoot();
                 temporalRoot: bind model.getTemporalRoot();
+            }
+	} else if (url.endsWith(".mp4") or 
+                   url.endsWith(".mov")) {
+            const movie = Movie {
+                url: url;
+                paused: true
+            }
+            const clip = Movie.Clip { movie: movie };
+            ModelContent {
+                spatialRoot: movie;
+                temporalRoot: clip;
+            }
+	} else if (url.endsWith(".aiff") or 
+                   url.endsWith(".asf") or 
+                   url.endsWith(".asx") or
+                   url.endsWith(".dls") or
+                   url.endsWith(".flac") or
+                   url.endsWith(".fsb") or
+                   url.endsWith(".it") or
+                   url.endsWith(".m3u") or
+                   url.endsWith(".mid") or
+                   url.endsWith(".midi") or
+                   url.endsWith(".mod") or
+                   url.endsWith(".mp2") or
+                   url.endsWith(".mp3") or
+                   url.endsWith(".pls") or
+                   url.endsWith(".pls") or
+                   url.endsWith(".s3m") or
+                   url.endsWith(".vag") or
+                   url.endsWith(".wav") or
+                   url.endsWith(".wax") or
+                   url.endsWith(".wma") or
+                   url.endsWith(".xm") or
+                   url.endsWith(".xma")){
+            const sound = Sound.Sample {
+                url: url;
+                paused: true
+            }
+            const clip = Sound.Clip { sound: sound };
+            ModelContent {
+                spatialRoot: sound;
+                temporalRoot: clip;
             }
         } else if (url.endsWith(".expr")) {
             var r = Resources.open(url);

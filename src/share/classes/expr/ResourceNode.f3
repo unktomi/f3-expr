@@ -14,6 +14,7 @@ public class ResourceNode is TransformNode {
     public const pathFactory is Shape2D.Path2DFactory = the Shape2D.Path2DFactory;
     public const layoutEngine is Text.LayoutEngine = the Text.LayoutEngine;
     public const effectLoader is CGEffectLoader = the CGEffectLoader;
+    public const soundLoader is SoundLoader = the SoundLoader;
     public const imageLoader is ImageLoader = the ImageLoader;
     public var url is String;
     override var id = bind url;

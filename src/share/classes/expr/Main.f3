@@ -232,6 +232,16 @@ public function run from (args is String[]) to ()
 	println("NOTE: couldn't load awesomium web browser factory");
     }
 
+    var TheSoundLoader is SoundLoader;
+    try {
+	const clazz = 
+	    java.lang.Class.forName("org.f3.media.audio.impl.fmod.SoundLoaderImpl") as java.lang.Class of SoundLoader;
+	TheSoundLoader = clazz.newInstance();
+	    
+    } catch (e is java.lang.Exception) {
+	println("NOTE: couldn't load fmod sound factory");
+    }
+
     println("args={args}");
 
     var playerUrl is String;
@@ -334,6 +344,43 @@ public function run from (args is String[]) to ()
 	    const rtn = ResourceTimeNode {
 		url: url;
 		content: Movie.Clip { movie: movie };
+		spatial: rn;
+	    }
+            addTimeResource(rtn);
+	} else if (url.endsWith(".aiff") or 
+                   url.endsWith(".asf") or 
+                   url.endsWith(".asx") or
+                   url.endsWith(".dls") or
+                   url.endsWith(".flac") or
+                   url.endsWith(".fsb") or
+                   url.endsWith(".it") or
+                   url.endsWith(".m3u") or
+                   url.endsWith(".mid") or
+                   url.endsWith(".midi") or
+                   url.endsWith(".mod") or
+                   url.endsWith(".mp2") or
+                   url.endsWith(".mp3") or
+                   url.endsWith(".pls") or
+                   url.endsWith(".pls") or
+                   url.endsWith(".s3m") or
+                   url.endsWith(".vag") or
+                   url.endsWith(".wav") or
+                   url.endsWith(".wax") or
+                   url.endsWith(".wma") or
+                   url.endsWith(".xm") or
+                   url.endsWith(".xma")){
+            const sound = Sound.Sample {
+                url: url;
+                paused: true
+            }
+	    const rn = ResourceNode {
+                url: url;
+	        content: sound;
+	    }
+	    addResource(rn, pt);
+	    const rtn = ResourceTimeNode {
+		url: url;
+		content: Sound.Clip { sound: sound };
 		spatial: rn;
 	    }
             addTimeResource(rtn);
@@ -1309,6 +1356,7 @@ public function run from (args is String[]) to ()
 	});
     doUpdate = DefaultObserver of (()) {
         override function onNext from (_ is ()) to () {
+            (the SoundLoader).update();
             canUndo = MasterUndoable.canUndo();
             canRedo = MasterUndoable.canRedo();
             for (z in currentScenes) {
