@@ -48,6 +48,7 @@ public class HScrollbar is ResizableNode {
             const thumbx2 = thumbx1 + sx * width;
             dragType = 0;
             println("PRESS {x}, thumb: {thumbx1}..{thumbx2}");
+            var canZoom = self.canZoom and sx == sx1;
             if (not canZoom) {
                 dragType = PAN;
             } else if (x > thumbx1 and x < thumbx2) {
@@ -65,7 +66,7 @@ public class HScrollbar is ResizableNode {
             dx = 0.0;
             tx0 = self.tx;
             x0 = tx0 * width;
-            w0 = self.sx * width;
+            w0 = self.sx1 * width;
         }
 
         override function onMouseDrag from (e is MouseEvent) to ()
@@ -91,6 +92,8 @@ public class HScrollbar is ResizableNode {
     var thumbWidth = bind runWidth-5;
     var thumbHeight = bind height-4;
 
+    var w = bind sx * thumbWidth;
+    var sx1 = bind Math.max(w, 20.0) / thumbWidth;
 
     const thumbMesh = {
         Rectangle {
@@ -119,21 +122,21 @@ public class HScrollbar is ResizableNode {
         [run, 
          TransformNode {
                 visible: bind sx <> 1.0 or tx <> 0
-                tx: bind tx * runWidth - runWidth / 2.0 + (sx * runWidth) / 2.0;
+                tx: bind tx * runWidth - runWidth / 2.0 + (sx1 * runWidth) / 2.0;
                 content:
                 [TransformNode {
                      ty: 0.5;
-                     sx: bind sx;
+                     sx: bind sx1;
                      content: bind thumbMesh;
                  },
                  TransformNode {
                      visible: bind canZoom;
-                     tx: bind -sx*thumbWidth/2 + 6;
+                     tx: bind -sx1*thumbWidth/2 + 6;
                      content: bind line1;
                  },
                  TransformNode {
                      visible: bind canZoom;
-                     tx: bind sx*thumbWidth/2 - 6;
+                     tx: bind sx1*thumbWidth/2 - 6;
                      content: bind line2;
                  }]
             }]
