@@ -19,6 +19,34 @@ import expr.ResourceNode.*;
 import expr.AssetTree.*;
 import expr.timeline.*;
 import expr.prog.*;
+import f3.util.*;
+import f3.util.Observer.*;
+import f3.util.Observable.*;
+
+function wrap of a from (xs is Observable of a, interactive is function from () to Boolean) to Observable of a 
+{
+    DefaultObservable of a {
+        override function subscribe from (y is Observer of a) to Disposable 
+        {
+            xs.subscribe(DefaultObserver of a {
+                    override function onNext from (x is a) to ()
+                    {
+                        if (interactive()) {
+                            y.onNext(x);
+                        }
+                    }
+                    override function onError from (e is java.lang.Exception) to ()
+                    {
+                        y.onError(e);
+                    }
+                    override function onCompleted from () to ()
+                    {
+                        y.onCompleted();
+                    }
+                });
+        }
+    }
+}
 
 public class InternalWindowState {
     public var id is String;
@@ -502,6 +530,15 @@ public function run from (args is String[]) to ()
 
     var interactive is Boolean;
 
+    const debugger = ObservableDebugger {
+        override public function debug of a from (xs is Observable of a, id is Object) to Observable of a 
+        {
+            wrap(xs, function to Boolean {
+                    interactive
+                })
+        }
+    };
+    
     const toolMenu is expr.toolmenu.ToolMenu = expr.toolmenu.ToolMenu {
     	transform: bind translate(stage.width /2, stage.height - 10);
 	height: 20;
@@ -571,6 +608,7 @@ public function run from (args is String[]) to ()
 	close();
 	currentResource.url = url;
 	const sceneRes = Resources.open(currentResource.url);
+        var allPrograms is Program[];
 	for (i in sceneRes.spatialResources) {
 	    doDrop(i.url, new Point3(i.tx, i.ty, i.tz));
 	    currentTransform.tx = i.tx;
@@ -593,8 +631,18 @@ public function run from (args is String[]) to ()
                     event: prog.event.deserialize();
                     code: prog.code;
                     sourceCode: prog.compiled;
+                    evalContext: Program.EvalContext {
+                        interactive: function from () to Boolean { interactive } 
+                        targetNode: currentTransform;
+                        debugger: debugger;
+                        instanceSpace: currentScene.instanceSpace;
+                        lookupSpatial: currentScene.root.lookup;
+                        targetTimeline: player;
+                        lookupTemporal: mainTimeLayer.lookup;
+                    }
                 }
                 println("CREATING PROGRAM**** {prog} => {p.sourceCode}");
+                insert p into allPrograms;
                 p;
             }
 	}
@@ -606,6 +654,7 @@ public function run from (args is String[]) to ()
 	    }
 	}
 	//trax.setClips(currentAnimResource.resources);
+        for (p in allPrograms) p.evaluate();
 	MasterUndoable.reset();
 	MasterUndoable.commit();
 	savePoint = MasterUndoable.now;
@@ -1115,6 +1164,7 @@ public function run from (args is String[]) to ()
 				    title: bind "Event Handler: {contextModel.selectedContext.name}"
 				    content: expr.prog.Expression.Editor {
 					 //event: bind inspector1.inspecting[inspector1.selectedIndex].member;
+                                         debugger: bind debugger;
                                          eventContext: bind contextModel.selectedMemberContext;
 					 targetNode: bind currentTransform as ResourceNode;
 					 targetSpace: bind currentScene.root;
