@@ -91,6 +91,7 @@ public class Program {
 
     public function evaluate from (sourceCode is String) to () {
         this.sourceCode = sourceCode;
+        evaluate();
     }
 
     public function reset to ()
