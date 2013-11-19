@@ -225,7 +225,7 @@ function findPackage from (str is String) to PackageAsset {
     return r;
 }
 
-const excluded = ["jogamp", "com/sun", "com/jogamp", "org.antlr", "org/antlr", "org/json", "org/f3", "jogl", "f3/jogl", "f3/animation", "f3/date", "f3/reflect", "f3/f3unit", "f3/lang", "javax"];
+const excluded = ["jogamp", "com/sun", "com/jogamp", "org/", "jogl", "f3/jogl", "f3/animation", "f3/date", "f3/reflect", "f3/f3unit", "f3/lang", "javax"];
 
 function getPackageAssets to PackageAsset {
     const bcp = java.lang.System.getProperty("boot.class.path");

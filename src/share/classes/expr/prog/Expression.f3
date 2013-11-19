@@ -111,7 +111,14 @@ public function introspect from (clazz is F3ClassType, all is Boolean) to Member
                 ft: f.getType();
             }
         };
-        exprMap.put(clazz, r);
+        const classVars = foreach (v in Reflect.getVars(clazz) where v.isStatic()) {
+            Member {
+                m: v;
+                rt: v.getType();
+                t: v.getType();
+            }
+        }
+        exprMap.put(clazz, [r, classVars]);
         return r;
     }
     for (f in funs where f.isPublic() and not f.getName().contains("$") and 
@@ -485,20 +492,43 @@ public class Function is MemberExpression {
 	const observable = inputs[0].observable;
 	if (observable is MemberExpression) {
 	    const m = observable as MemberExpression;
-	    if (true or m.member.isObservable) {
-		const i = getIVar(inputs[0]);
-		if (fun.isStatic()) {
-		    "(foreach ({i} in debugger.debug({observable.toSource()}, \"{id}\")) {fun.getDeclaringClass().getName()}.{fun.getName()}({i}))";
-		} else {
-		    "(foreach ({i} in debugger.debug({observable.toSource()}, \"{id}\")) {i}.{fun.getName()}())";
-		}
-	    } else {
-		if (fun.isStatic()) {
-		    "{fun.getName()}({observable.toSource()})";
-		} else {
-		    "{observable.toSource()}.{fun.getName()}()";
-		}
-	    }
+            if (inputs.size() == 1) {
+                if (inputs[0].observable <> null) {
+                    const i = getIVar(inputs[0]);
+                    if (fun.isStatic()) {
+                        "(foreach ({i} in debugger.debug({observable.toSource()}, \"{id}\")) {fun.getDeclaringClass().getName()}.{fun.getName()}({i}))";
+                    } else {
+                        "(foreach ({i} in debugger.debug({observable.toSource()}, \"{id}\")) {i}.{fun.getName()}())";
+                    }
+                } else {
+                    if (fun.isStatic()) {
+                        "{fun.getName()}({observable.toSource()})";
+                    } else {
+                        "{observable.toSource()}.{fun.getName()}()";
+                    }
+                }
+            } else {
+                if (not fun.isStatic()) {
+                    const i = getIVar(inputs[0]);
+                    var sep = "";
+                    var args is String;
+                    for (j in [0..<ft.minArgs()]) {
+                        const p = inputs[j+1];
+                        args = "{args}{sep}{p.toSource()}";
+                        sep = ", ";
+                    }
+                    "(foreach ({i} in debugger.debug({observable.toSource()}, \"{id}\")) {i}.{fun.getName()}({args}))";
+                } else {
+                    const i = getIVar(inputs[0]);
+                    var args is String = i;
+                    var sep = ", ";
+                    for (j in [1..<ft.minArgs()]) {
+                        const p = inputs[j];
+                        args = "{args}{sep}{p.toSource()}";
+                    }
+                    "(foreach ({i} in debugger.debug({observable.toSource()}, \"{id}\")) {fun.getDeclaringClass().getName()}.{fun.getName()}({args}))";
+                }
+            }
 	} else "";
     }
 }
@@ -511,6 +541,11 @@ public class Parameter is ObserverExpression {
     override function getType to F3Type { t }
     public function isTypeVariable to Boolean {
         t.isTypeVariable();
+    }
+    public var constantValue is Object = "null";
+    override public function toSource to String 
+    {
+        if (observable == null) then "{constantValue}" else observable.toSource();
     }
 }
 
@@ -571,7 +606,7 @@ public abstract class ExpressionView is AbstractNode {
     }
     function onDrag from (e is MouseEvent) to () 
     {
-	println("dragging {label.text}");
+
 	pos += e.picked.dragPoint1 - e.picked.dragPoint0;
     }
     function onUp from (e is MouseEvent) to () 
@@ -611,9 +646,9 @@ class FunctionView is ExpressionView {
         }
         canvas.serializationMap.put(this, n);
         n.inputs = foreach (i in inputs) TargetNode {targetId: "{i.id}", links: foreach (link in i.links) "{link.id}" };
-        n.output = SourceNode {sourceId: "{output.id}", links: foreach (link in output.links) "{link.id}"};
         return n;
     } 
+
     public var fun is Function;
     override var transform = bind translate(pos);
     override var expression = bind fun;
@@ -788,7 +823,7 @@ public class ObjectView is ExpressionView {
 	canvas: bind canvas;
 	cellWidth: bind cellWidth;
 	expression: p;
-	override function getInputType to F3Type { this.expression.getType() }
+	//override bound function getInputType to F3Type { p.getType() }
         override function assignLinkIds to () {
             self.assignLinkIds();
         }
@@ -835,12 +870,10 @@ public class ObjectView is ExpressionView {
 }
 
 function getPath from (v is LinkView) to String {
-    if (v <> null) {
-        if (v.target is GetVarView) {
-            var g = v.target as GetVarView;
-            var p = getPath(v.source.links[u | u.target <> g][0]);
-            return "{p}{g.get.member.name}/";
-        }
+    if (v.source instanceof TreecellGetVarView) {
+        var g = v.source as TreecellGetVarView;
+        var p = getPath(g.parentLink);
+        return "{p}{g.get.member.name}/";
     }
     return "/";
 }
@@ -855,14 +888,15 @@ public class GetVarView is OutputView {
         }
         canvas.serializationMap.put(this, n);
         n.outputs = 
-        foreach (link in tv.getLinks()) {
-            var p = getPath(link);
-            println("GET VAR VIEW {get.member.name} => {getPath(link)}");
-            SourceNode {
-                sourceId: p;
-                links: ["{link.id}"]
+            foreach (link in tv.getLinks() where not (link.target is TreecellGetVarView)) 
+            {
+                var p = getPath(link);
+                println("GET VAR VIEW {get.member.name} => {getPath(link)}");
+                SourceNode {
+                    sourceId: p;
+                    links: ["{link.id}"];
+                }
             }
-        }
         return n;
     }
     override var resultType = bind get.getType();
@@ -950,7 +984,7 @@ abstract class LinkedView is ExpressionView {
 
 public class InputView is LinkedView {
     var index is Integer;
-    public function getInputType to F3Type { null };
+    public bound function getInputType to F3Type { expression.getType() };
     override var transform = bind translate(0, index * -cellHeight);
     override var internalContent = bind label;
 
@@ -994,6 +1028,31 @@ public class InputView is LinkedView {
     override bound function getLinkPos to Point3 { getWorldPos() - new Vec3(cellWidth/2, 0, 0) }
 }
 
+
+abstract class Constant is ObservableExpression {
+}
+
+class NumberConstant is Constant {
+    public var value is Number;
+    override function getType to F3Type { Reflect.NUMBER_TYPE }
+    override function toSource to String { "{value}" }
+    override bound function getName to String { "{value}" }
+}
+
+class IntegerConstant is Constant {
+    public var value is Integer;
+    override function getType to F3Type { Reflect.INTEGER_TYPE }
+    override function toSource to String { "{value}" }
+    override bound function getName to String { "{value}" }
+}
+
+class BooleanConstant is Constant {
+    public var value is Boolean;
+    override function getType to F3Type { Reflect.BOOLEAN_TYPE }
+    override function toSource to String { "{value}" }
+    override bound function getName to String { "{value}" }
+}
+
 public class ParameterView is InputView {
     const parameter is Parameter;
     public var targetView is FunctionView;
@@ -1002,8 +1061,7 @@ public class ParameterView is InputView {
     override bound function getLabel to String {
         formatClassName(if (inputType <> null) then inputType else parameter.t)
     }
-    override public function getInputType to F3Type {
-        println("ASSIGN inputType={inputType}, parameter.t={parameter.t}");
+    override public bound function getInputType to F3Type {
         return if inputType <> null then inputType else parameter.t;
     }
     override public function assignLinkIds to () {
@@ -1014,6 +1072,10 @@ public class ParameterView is InputView {
         height: bind cellHeight;
         width: bind cellWidth-100;
         transform: translate(50, 0, 0);
+        override var t on replace {
+            parameter.constantValue = t;
+            canvas.dumpSrc();
+        }
     };
     
     var intSlider is SliderField = bind SliderField {     
@@ -1025,6 +1087,8 @@ public class ParameterView is InputView {
             this.t = t;
         }
         override var t on replace {
+            parameter.constantValue = (t * 100) as Integer;
+            canvas.dumpSrc();
         }
         override function getText from (t is Number) to String
         {
@@ -1045,14 +1109,16 @@ public class ParameterView is InputView {
             if (t <= 0.5) then "No" else "Yes";
         }
         override var t = 0.5 on replace {
+            parameter.constantValue = (t > 0.5);
+            canvas.dumpSrc();
         }
     }; 
     
-    override var internalContent = Group { content: bind [label, if links.size() == 0 then (if (Reflect.NUMBER_TYPE.isConvertibleFrom(parameter.t)) 
+    override var internalContent = Group { content: bind [label, if links.size() == 0 then (if (Reflect.NUMBER_TYPE.isConvertibleFrom(getInputType())) 
         then numSlider 
-        else if (Reflect.INTEGER_TYPE.isConvertibleFrom(parameter.t))
+        else if (Reflect.INTEGER_TYPE.isConvertibleFrom(getInputType()))
             then intSlider
-            else if (Reflect.BOOLEAN_TYPE.isConvertibleFrom(parameter.t)) 
+            else if (Reflect.BOOLEAN_TYPE.isConvertibleFrom(getInputType())) 
                 then boolSlider
                 else null) else null] };
     
@@ -1070,18 +1136,22 @@ public class OutputView is LinkedView {
             name: expression.getName();
         }
     };
+
+    const getTree is GetTreeview = GetTreeview {
+        canvas: bind canvas;
+        width: 150;
+        height: 200;
+        get: bind getter;
+    };
+
     init {
         insert getter into (expression as ObservableExpression).observers;
         getter.observable = (expression as ObservableExpression);
     }
+
     override var internalContent = Group 
     {
-	content: GetTreeview {
-	    canvas: bind canvas;
-	    width: 150;
-	    height: 200;
-	    get: bind getter;
-	}
+	content: bind getTree
 
     }
     override function onDrag from (e is MouseEvent) to () 
@@ -1113,11 +1183,18 @@ class MemberTreenode is Treenode {
     override var canOpen = bind { var n = members.size(); n > 0 };
     override var children = bind foreach (x in members) makeTreeNode(x);
 
+    override function toString to String 
+    {
+        "MemberTreenode {m}"
+    }
+
     function resolvePath from (path is String) to MemberTreenode {
         if (path == "") return this;
         const slash = path.indexOf("/");
         const name = if slash > 0 then path.substring(0, slash) else path;
         const remainder = if slash > 0 then path.substring(slash+1) else "";
+        println("name={name}");
+        println("remainder={remainder}");
         for (j in children) {
             const x = j as MemberTreenode;
             if (x.m.name == name) {
@@ -1129,6 +1206,7 @@ class MemberTreenode is Treenode {
 
     function makeTreeNode from (x is Member) to MemberTreenode {
 	const m = MemberTreenode {
+            parent: this;
 	    m: x;
 	}
 	insert m.get into get.observers;
@@ -1142,14 +1220,40 @@ class MemberTreenode is Treenode {
 }
 
 public class MemberTreemodel is Treemodel {
-    public var member is Member;
-    override var root = MemberTreenode { m: bind member };
 
-    public function resolvePath from (path is String) to MemberTreenode {
-        const result = (root as MemberTreenode).resolvePath(path.substring(1));
-        println("resolve path {path} => {result}");
-        return result;
+    function getMember to Member 
+    {
+        (root as MemberTreenode).m
     }
+
+    public function resolvePath from (path00 is String) to MemberTreenode {
+        var path0 = path00;
+        const rootName = getMember().name;
+        if (not (path0.startsWith("/{rootName}"))) {
+            println("path0 is {path0}");
+            java.lang.Thread.currentThread().dumpStack();
+            path0 = "/{rootName}{path0}";
+        }
+        const end = if path0.endsWith("/") then path0.length()-1 else path0.length();
+        try {
+            const path = path0.substring(getMember().name.length()+2, end);
+            println("path0: {path0}");
+            println("path: {path}");
+            const result = (root as MemberTreenode).resolvePath(path);
+            println("resolve path {path} => {result}");
+            return result;
+        } catch (exc is java.lang.StringIndexOutOfBoundsException) {
+            println("failed on: {path0}");
+        }
+        return null;
+    }
+}
+
+public class ParentLinkView is LinkView {
+}
+
+class TreecellGetVarView is GetVarView {
+    public var parentLink is LinkView;
 }
 
 public class MemberTreecell is Treeview.Treecell 
@@ -1166,7 +1270,7 @@ public class MemberTreecell is Treeview.Treecell
 	const pv = tv.getView(p) as MemberTreecell;
 	if (pv <> null) {
 	    if (parentLink == null) {
-		parentLink = LinkView {
+		parentLink = ParentLinkView {
 		    visible: false;
 		    canvas: canvas;
 		    source: pv.linkedView;
@@ -1182,7 +1286,8 @@ public class MemberTreecell is Treeview.Treecell
 	parentLink.unlink();
     }
 
-    const linkedView is GetVarView = GetVarView {
+    const linkedView is GetVarView = TreecellGetVarView {
+        parentLink: bind parentLink;
 	get: bind (tn as MemberTreenode).get;
 	override bound function getLinkPos to Point3 
 	{
@@ -1200,6 +1305,9 @@ class GetTreeview is ResizableNode {
     public var canvas is Canvas;
     public var cellHeight = bind canvas.cellHeight;
     public var get is GetVar;
+    function open to () {
+        treeModel.root.open();
+    }
     const treeModel = MemberTreemodel {
 	root: MemberTreenode {
 	    get: bind get;
@@ -1208,8 +1316,11 @@ class GetTreeview is ResizableNode {
     };
     public function getLinks to LinkView[]
     {
-        foreach (x in cellMap.values()) if x.parentLink.target.visible then x.parentLink else if (x.parentLink == null) then x.linkedView.links else null;
+        foreach (x in cellMap.values()) x.linkedView.links;
 
+    }
+    function getRootLinkedView to LinkedView {
+        getCell(treeModel.root as MemberTreenode).linkedView;
     }
     var treeHeight = bind Math.min(treeModel.rowCount, 8)*cellHeight;
     const self = this;
@@ -1594,7 +1705,18 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     var prevLinkInfo is LinkInfo[];
 
+    var sourceUpdate = 0;
+    var sourceVersion = 0;
+    var sourceUpdateTime is Long = 0;
+
     override function preupdate {
+        if (sourceVersion > sourceUpdate) {
+            const now = java.lang.System.currentTimeMillis();
+            if (sourceUpdateTime < now) {
+                genSource();
+                sourceUpdate = sourceVersion;
+            }
+        }
 	const curLinkInfo = getLinkInfo();
 	if (curLinkInfo <> prevLinkInfo) {
 	    prevLinkInfo = curLinkInfo;
@@ -1755,7 +1877,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 	    lines.lineTo(p6);
 	    arrows[indexof i].tx = p6.x;
 	    arrows[indexof i].ty = p6.y;
-	    println("gen lines {p0} {p1} {p2} {p3} {p4} {p5}");
+	    //println("gen lines {p0} {p1} {p2} {p3} {p4} {p5}");
 	}
 	const mesh = lines.getMesh();
 	mesh.updateBounds();
@@ -1794,7 +1916,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 		    k(pv);
                     return;
 		} else {
-		    println("NOT ASSIGNABLE {pv.getInputType()} <- {t}");
+		    println("NOT ASSIGNABLE {pv} {pv.getInputType()} <- {t}");
 		}
 	    }
 	}
@@ -1816,6 +1938,11 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     }
 
     function dumpSrc to () {
+        sourceVersion++;
+        sourceUpdateTime = java.lang.System.currentTimeMillis()+1000;
+    }
+
+    function genSource to () {
 	println("DUMP SRC:");
 	unsubscribe();
 	println(visit(varRoot));
@@ -1881,7 +2008,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 	    }
 	} else {
 	    for (x in obsvrs) {
-                const p1 = if (e is Result) then (e as Result).source else if (e is InputMemberExpression) then e else p;
+                const p1 = if (e is Result) then (e as Result).source else if (e is InputMemberExpression) then e else if (e is Parameter) then e else p;
 		getTerminals(p1, x, result)
 	    }
 	}
@@ -1895,8 +2022,13 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         println(deserializationMap);
         delete links;
         for (j in deserializationMap.values()) {
-            j.link();
-            insert j into links;
+            if (j.source <> null and j.target <> null) {
+                j.link();
+                println("linked {j.source} to {j.target}");
+                insert j into links;
+            } else {
+                println("bad link: {j}");
+            }
         }
         deserializationMap.clear();
     }
@@ -2170,9 +2302,11 @@ public class FunNode is ExprNode {
                 funMember: m as FunctionMember;
             }
         }
+        println("creating function {m}");
         for (n in inputs) {
             if (n.links.size() > 0) {
                 for (link in n.links) {
+                    println("linking parameter {indexof n} linkId={link}");
                     const lnk = canvas.getLink(link);
                     lnk.target = v.inputs[indexof n];
                 }
@@ -2180,6 +2314,7 @@ public class FunNode is ExprNode {
         }
         if (output.links.size() > 0) {
             for (link in output.links) {
+                println("linking result linkId={link}");
                 const lnk = canvas.getLink(link);
                 lnk.source = v.output;
             }
@@ -2274,6 +2409,7 @@ public class VarContextObjNode is ObjNode {
 
 public class GetNode is ExprNode {
     public var outputs is SourceNode[];
+    public var isOpen is Boolean;
     public override function createView from (canvas is Canvas) to GetVarView {
         const m = member.deserialize();
         var v is GetVarView;
@@ -2293,23 +2429,30 @@ public class GetNode is ExprNode {
             }
             insert v into canvas.views;
         }
+        if (isOpen) {
+            v.tv.open();
+        }
         println("GetNode outputs: {outputs.size()}");
         for (p in outputs) {
             println("output: {p}");
             if (p.links.size() > 0) {
                 const path = p.sourceId;
                 const tn = v.tv.treeModel.resolvePath(path);
+                tn.open();
                 println("path={path} tn={tn}");
                 println("v={v}, tv={v.tv}, treeModel={v.tv.treeModel}");
                 for (link in p.links) {
                     const lnk = canvas.getLink(link);
-                    lnk.source = v.tv.getCell(tn).linkedView;
+                    const t = v.tv.getCell(tn).linkedView;
+                    println("t={t}");
+                    lnk.source = t;
                 }
             }
         }
         return v;
     }
 }
+
 
 public class TargetNode is ExprNode {
     public var targetId is String;
