@@ -647,12 +647,17 @@ class FunctionView is ExpressionView {
             member: fun.member.serialize();
         }
         canvas.serializationMap.put(this, n);
-        n.inputs = foreach (i in inputs) TargetNode {targetId: "{i.id}", links: foreach (link in i.links) "{link.id}" };
+        n.inputs = foreach (i in inputs) TargetNode {
+            targetId: "{i.id}", links: foreach (link in i.links) "{link.id}";
+            intValue: if (i.parameter.constantValue is Integer) then i.parameter.constantValue as Integer else 0;
+            numberValue: if (i.parameter.constantValue is Number) then i.parameter.constantValue as Number else 0.0;
+            booleanValue: if (i.parameter.constantValue is Boolean) then i.parameter.constantValue as Boolean else false;
+        };
         n.outputs = 
             foreach (link in output.getTree.getLinks() where not (link.target is TreecellGetVarView)) 
             {
                 var p = getPath(link);
-                                SourceNode {
+                SourceNode {
                     sourceId: p;
                     links: ["{link.id}"];
                 }
@@ -1080,7 +1085,7 @@ public class ParameterView is InputView {
         targetView.assignLinkIds();
     }
 
-    var numSlider = bind SliderField {
+    var numSlider = SliderField {
         height: bind cellHeight;
         width: bind cellWidth-100;
         transform: translate(50, 0, 0);
@@ -1090,7 +1095,7 @@ public class ParameterView is InputView {
         }
     };
     
-    var intSlider is SliderField = bind SliderField {     
+    var intSlider is SliderField = SliderField {     
         height: bind cellHeight;
         width: bind cellWidth-100;
         transform: translate(50, 0, 0);
@@ -1120,7 +1125,7 @@ public class ParameterView is InputView {
         {
             if (t <= 0.5) then "No" else "Yes";
         }
-        override var t = 0.5 on replace {
+        override var t on replace {
             parameter.constantValue = (t > 0.5);
             canvas.dumpSrc();
         }
@@ -1239,8 +1244,11 @@ public class MemberTreemodel is Treemodel {
     }
 
     public function resolvePath from (path00 is String) to MemberTreenode {
-        var path0 = path00;
         const rootName = getMember().name;
+        if (path00 == "/" or path00 == "/{rootName}" or path00 == "/{rootName}/") {
+            return root as MemberTreenode;
+        }
+        var path0 = path00;
         if (not (path0.startsWith("/{rootName}"))) {
             println("path0 is {path0}");
             java.lang.Thread.currentThread().dumpStack();
@@ -1255,6 +1263,7 @@ public class MemberTreemodel is Treemodel {
             println("resolve path {path} => {result}");
             return result;
         } catch (exc is java.lang.StringIndexOutOfBoundsException) {
+            println(exc);
             println("failed on: {path0}");
         }
         return null;
@@ -1277,30 +1286,43 @@ public class MemberTreecell is Treeview.Treecell
 
     function link from () to ()
     {
-	var n = (tn as MemberTreenode);
-	var p = (n.parent as MemberTreenode);
-	const pv = if p == null then null else tv.getView(p) as MemberTreecell;
-	if (pv <> null) {
-	    if (parentLink == null) {
-		parentLink = ParentLinkView {
-		    visible: false;
-		    canvas: canvas;
-		    source: pv.linkedView;
-		    target: linkedView;
-		}
-	    }
-	    parentLink.link();
-	}
+        if (parentLink == null) {
+            var n = (tn as MemberTreenode);
+            var p = (n.parent as MemberTreenode);
+            const pv = if p == null then null else tv.getView(p) as MemberTreecell;
+            if (pv <> null) {
+                if (parentLink == null) {
+                    parentLink = ParentLinkView {
+                        visible: false;
+                        canvas: canvas;
+                        source: pv.linkedView;
+                        target: linkedView;
+                    }
+                }
+                parentLink.link();
+            }
+        }
     }
 
     function unlink from () to ()
     {
-	parentLink.unlink();
+        var p = parentLink;
+	parentLink = null;
+        p.unlink();
     }
 
     const linkedView is GetVarView = TreecellGetVarView {
         parentLink: bind parentLink;
 	get: bind (tn as MemberTreenode).get;
+        override function assignLinkIds to ()
+        {
+            if (links.size() > 0) {
+                self.link();
+            } else {
+                self.unlink();
+            }
+            super.assignLinkIds();
+        }
 	override bound function getLinkPos to Point3 
 	{
 	    var me = self.canvas.toLocal * self.boundsInScene;
@@ -1328,7 +1350,7 @@ class GetTreeview is ResizableNode {
     };
     public function getLinks to LinkView[]
     {
-        foreach (x in cellMap.values()) x.linkedView.links;
+        foreach (x in cellMap.values()) foreach (y in x.linkedView.links where not (y is ParentLinkView)) y;
 
     }
     function getRootLinkedView to LinkedView {
@@ -1434,7 +1456,7 @@ class TreeLinker {
                 delete canvas.targetArrow from canvas.arrows;
                 link.unlink();
                 if (found <> null) {
-                    cell.link();
+                    //cell.link();
                     const newlink = LinkView { 
                         canvas: canvas;
                         source: cell.linkedView; 
@@ -1904,6 +1926,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     function genLines from (links is LinkInfo[]) to AbstractMesh {
 	lines.reset();
+        println("links={links.size()}");
 	delete arrows[links.size()..];
 	while (arrows.size() < links.size()) {
 	    insert TransformNode { content: makeArrow(ARROW_COLOR) } into arrows; 
@@ -2075,7 +2098,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         for (j in deserializationMap.values()) {
             if (j.source <> null and j.target <> null) {
                 j.link();
-                println("linked {j.source} to {j.target}");
+                println("linked {j.id} {j.source} to {j.target}");
                 insert j into links;
             } else {
                 println("bad link: {j}");
@@ -2355,12 +2378,25 @@ public class FunNode is ExprNode {
         }
         println("creating function {m}");
         for (n in inputs) {
+            var i = indexof n;
+            const p = v.inputs[i];
             if (n.links.size() > 0) {
                 for (link in n.links) {
                     println("linking parameter {indexof n} linkId={link}");
                     const lnk = canvas.getLink(link);
-                    lnk.target = v.inputs[indexof n];
+                    lnk.target = p;
                 }
+            } 
+            println("parameter {i} type is {p.parameter.getType()}");
+            if (Reflect.INTEGER_TYPE == p.parameter.getType()) {
+                println("int value is {n.intValue}");
+                p.intSlider.t = n.intValue / 100.0; // hack
+            } else if (Reflect.NUMBER_TYPE == p.parameter.getType()) {
+                println("num value is {n.numberValue}");
+                p.numSlider.t = n.numberValue;
+             } else if (Reflect.BOOLEAN_TYPE == p.parameter.getType()) {
+                println("bool value is {n.booleanValue}");
+                p.boolSlider.t = if n.booleanValue then 1.0 else 0.5;
             }
         }
         for (p in outputs) {
@@ -2372,7 +2408,8 @@ public class FunNode is ExprNode {
                 println("path={path} tn={tn}");
                 for (link in p.links) {
                     const lnk = canvas.getLink(link);
-                    const t = v.output.getTree.getCell(tn).linkedView;
+                    const cell = v.output.getTree.getCell(tn);
+                    const t = cell.linkedView;
                     println("t={t}");
                     lnk.source = t;
                 }
@@ -2512,11 +2549,12 @@ public class GetNode is ExprNode {
     }
 }
 
-
-
 public class TargetNode is ExprNode {
     public var targetId is String;
-    public var links is String[]
+    public var links is String[];
+    public var intValue is Integer;
+    public var numberValue is Number;
+    public var booleanValue is Boolean;
 }
 
 public class SourceNode is ExprNode {
