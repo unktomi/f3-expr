@@ -634,7 +634,9 @@ class FunctionView is ExpressionView {
         for (x in inputs) {
             x.unlink();
         }
-        output.unlink();
+        foreach (link in output.getTree.getLinks()) {
+            link.unlink();
+        }
     }
 
     public override function serialize to ExprNode {
@@ -646,6 +648,15 @@ class FunctionView is ExpressionView {
         }
         canvas.serializationMap.put(this, n);
         n.inputs = foreach (i in inputs) TargetNode {targetId: "{i.id}", links: foreach (link in i.links) "{link.id}" };
+        n.outputs = 
+            foreach (link in output.getTree.getLinks() where not (link.target is TreecellGetVarView)) 
+            {
+                var p = getPath(link);
+                                SourceNode {
+                    sourceId: p;
+                    links: ["{link.id}"];
+                }
+            };
         return n;
     } 
 
@@ -968,6 +979,7 @@ public class LinkView is ExpressionView {
 abstract class LinkedView is ExpressionView {
     var links is LinkView[];
     override function unlink from () to () {
+        const links = this.links;
 	for (link in links) {
 	    link.unlink();
 	}
@@ -1267,7 +1279,7 @@ public class MemberTreecell is Treeview.Treecell
     {
 	var n = (tn as MemberTreenode);
 	var p = (n.parent as MemberTreenode);
-	const pv = tv.getView(p) as MemberTreecell;
+	const pv = if p == null then null else tv.getView(p) as MemberTreecell;
 	if (pv <> null) {
 	    if (parentLink == null) {
 		parentLink = ParentLinkView {
@@ -1350,9 +1362,94 @@ class GetTreeview is ResizableNode {
 	    self.getCell(tn as MemberTreenode)
 	}      
     };
+
     override var internalContent = bind tv;
 
     // fix me: move this stuff to canvas
+
+    const onDown = tv.observeMouseDown().subscribe(function from (e is MouseEvent) to () {
+            canvas.treeLinker.onDown(tv, e);
+	} );
+    const onDrag = tv.observeMouseDrag().subscribe(function from (e is MouseEvent) to () {
+            canvas.treeLinker.onDrag(e);
+	});
+    const onUp = tv.observeMouseUp().subscribe(function from (e is MouseEvent) to () {
+            canvas.treeLinker.onUp(e);
+	});
+
+}
+
+class TreeLinker {
+    var canvas is Canvas;
+    var tv is Treeview;
+    var pathFactory = bind canvas.pathFactory;
+    var layoutEngine = bind canvas.layoutEngine;
+    var imageLoader = bind canvas.imageLoader;
+    var effectLoader = bind canvas.effectLoader;
+
+    function onDown from (tv is Treeview, e is MouseEvent) to () 
+    {
+        if (e.location.x >= 0) {
+            this.tv = tv;
+            const cell = tv.selectedTreecell as MemberTreecell;
+            linkTmpLink();
+            dx = 0; dy = 0;
+            cell.linkedView.unlink();
+            startPos = canvas.toLocal * e.sceneLocation;
+            insert canvas.targetArrow into canvas.arrows;
+            arrowVis = true;
+            updateArrow();
+        }
+    }
+
+    function onDrag from (e is MouseEvent) to ()
+    {
+        if (tv == null) return;
+        dx += e.screenDrag.x;
+        dy += e.screenDrag.y;
+        updateArrow();
+    }
+
+    function updateArrow to () 
+    {
+        const cell = tv.selectedTreecell as MemberTreecell;
+        const tn = tv.selectedTreenode as MemberTreenode;
+        const toLocal = canvas.toLocal;
+        const sourcePos = toLocal * cell.toSceneTransform.getTranslation();
+        linkStart.pos = sourcePos + new Vec3(cell.bounds.extent.x, 0, 0);
+        linkEnd.pos = startPos + new Vec3(dx-3.5, dy, 0);
+        canvas.targetArrow.tx = linkEnd.pos.x;
+        canvas.targetArrow.ty = linkEnd.pos.y;
+    }
+
+    function onUp from (e is MouseEvent) to ()
+    {
+        if (tv == null) return;
+        const tn = tv.selectedTreenode as MemberTreenode;
+        const cell = tv.selectedTreecell as MemberTreecell;
+        arrowVis = false;
+        canvas.pickInput(e, tn.m.t, function from (found is LinkedView) to () {
+                tmpLink = null;
+                tv = null;
+                delete canvas.targetArrow from canvas.arrows;
+                link.unlink();
+                if (found <> null) {
+                    cell.link();
+                    const newlink = LinkView { 
+                        canvas: canvas;
+                        source: cell.linkedView; 
+                        target: found;
+                    };
+                    newlink.link();
+                } 
+                canvas.dumpSrc();
+            });
+    }
+    var tmpLink is LinkView = null;
+    var dx = 0.0;
+    var dy = 0.0;
+    var arrowVis is Boolean;
+    var startPos is Point3;
 
     const linkStart is LinkedView = LinkedView {
         override function serialize to ExprNode { null }
@@ -1362,67 +1459,18 @@ class GetTreeview is ResizableNode {
         override function serialize to ExprNode { null }
 	override var toSceneTransform = bind translate(pos);
     };
+
     const link is LinkView = LinkView {
 	canvas: bind canvas;
-	source: linkStart;
-	target: linkEnd;
     };
-    var tmpLink is LinkView = null;
-    var dx = 0.0;
-    var dy = 0.0;
-    var arrowVis is Boolean;
-    var startPos is Point3;
-    const onDown = tv.observeMouseDown().subscribe(function from (e is MouseEvent) to () {
-	    if (e.location.x >= 0) {
-		const cell = tv.selectedTreecell as MemberTreecell;
-		const tn = tv.selectedTreenode as MemberTreenode;
-		const toLocal = canvas.toLocal;
-		tmpLink = link;
-		println("CREATING LINK {e} ");
-		dx = 0; dy = 0;
-	    }
-	} );
-    const onDrag = tv.observeMouseDrag().subscribe(function from (e is MouseEvent) to () {
-	    if (tmpLink == null) return;
-	    const cell = tv.selectedTreecell as MemberTreecell;
-	    if (not arrowVis) {
-		cell.linkedView.unlink();
-		startPos = canvas.toLocal * e.picked.dragPoint0;
-		insert canvas.targetArrow into canvas.arrows;
-		arrowVis = true;
-		link.link();
-	    }
-	    const tn = tv.selectedTreenode as MemberTreenode;
-	    const toLocal = canvas.toLocal;
-	    const sourcePos = toLocal * cell.toSceneTransform.getTranslation();
-	    dx += e.screenDrag.x;
-	    dy += e.screenDrag.y;
-	    linkStart.pos = sourcePos + new Vec3(cell.bounds.extent.x, 0, 0);
-	    linkEnd.pos = startPos + new Vec3(dx-3.5, dy, 0);
-	    canvas.targetArrow.tx = linkEnd.pos.x;
-	    canvas.targetArrow.ty = linkEnd.pos.y;
-	});
-    const onUp = tv.observeMouseUp().subscribe(function from (e is MouseEvent) to () {
-	    if (tmpLink == null) return;
-	    const tn = tv.selectedTreenode as MemberTreenode;
-	    const cell = tv.selectedTreecell as MemberTreecell;
-	    canvas.pickInput(e, tn.m.t, function from (found is LinkedView) to () {
-                    arrowVis = false;
-                    tmpLink = null;
-                    link.unlink();
-                    delete canvas.targetArrow from canvas.arrows;
-                    if (found <> null) {
-                        cell.link();
-                        const newlink = LinkView { 
-                            canvas: canvas;
-                            source: cell.linkedView; 
-                            target: found;
-                        };
-                        newlink.link();
-                    } 
-                    canvas.dumpSrc();
-                });
-	});
+
+    function linkTmpLink to () 
+    {
+        link.source = linkStart;
+        link.target = linkEnd;
+        link.link();
+        tmpLink = link;
+    }
 
 }
 
@@ -1489,6 +1537,9 @@ class MemberListview is Listview of Member {
 
 public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollable, MouseInputHandler {
 
+    const treeLinker is TreeLinker = TreeLinker {
+        canvas: this;
+    }
     function getPopup from (e is MouseEvent, members is Member[], k is function from LinkedView to ()) to Node 
     {
         var r = MemberListview  {
@@ -2289,7 +2340,7 @@ public class ExprScene {
 
 public class FunNode is ExprNode {
     public var inputs is TargetNode[];
-    public var output is SourceNode;
+    public var outputs is SourceNode[];
     public override function createView from (canvas is Canvas) to FunctionView {
         var m = member.deserialize();
         const v = FunctionView {
@@ -2312,11 +2363,19 @@ public class FunNode is ExprNode {
                 }
             }
         }
-        if (output.links.size() > 0) {
-            for (link in output.links) {
-                println("linking result linkId={link}");
-                const lnk = canvas.getLink(link);
-                lnk.source = v.output;
+        for (p in outputs) {
+            println("output: {p}");
+            if (p.links.size() > 0) {
+                const path = p.sourceId;
+                const tn = v.output.getTree.treeModel.resolvePath(path);
+                tn.open();
+                println("path={path} tn={tn}");
+                for (link in p.links) {
+                    const lnk = canvas.getLink(link);
+                    const t = v.output.getTree.getCell(tn).linkedView;
+                    println("t={t}");
+                    lnk.source = t;
+                }
             }
         }
         v.pos = new Point3(x, y, 0);
@@ -2452,6 +2511,7 @@ public class GetNode is ExprNode {
         return v;
     }
 }
+
 
 
 public class TargetNode is ExprNode {
