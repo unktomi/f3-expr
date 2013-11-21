@@ -583,10 +583,11 @@ public function run from (args is String[]) to ()
 
     function save {
 	savePoint = MasterUndoable.now;
-	Resources.save(currentResource.url,
+	Resources.save(mainScene.currentResource.url,
 		       mainScene,
-		       currentResource,
-		       currentAnimResource);
+		       mainScene.currentResource,
+		       currentAnimResource,
+                       currentScenes[x | x <> mainScene]);
     }
     
     function close from () to () {
@@ -655,6 +656,59 @@ public function run from (args is String[]) to ()
 		j.playCount = i.playCount;
 	    }
 	}
+        for (j in sceneRes.layers) {
+            var scene = ResourceScene {
+                background: null;
+                id: j.name;
+                camera: Camera2D {
+                     near: -10000, far: 10000 
+                };
+            }
+            insert scene into currentScenes;
+            transformHierarchy.selectScene(scene);
+            foreach (i in j.spatialResources) {
+                doDrop(i.url, new Point3(i.tx, i.ty, i.tz));
+                currentTransform.tx = i.tx;
+                currentTransform.ty = i.ty;
+                currentTransform.tz = i.tz;
+                
+                currentTransform.sx = i.sx;
+                currentTransform.sy = i.sy;
+                currentTransform.sz = i.sz;
+                
+                currentTransform.rx = i.rx;
+                currentTransform.ry = i.ry;
+                currentTransform.rz = i.rz;
+                
+                currentTransform.px = i.px;
+                currentTransform.py = i.py;
+                currentTransform.pz = i.pz;
+                (currentTransform as ResourceNode).programs = foreach (prog in i.programs) {
+                    const p = Program {
+                        event: prog.event.deserialize();
+                        code: prog.code;
+                        sourceCode: prog.compiled;
+                        evalContext: Program.EvalContext {
+                            interactive: function from () to Boolean { interactive } 
+                            targetNode: currentTransform;
+                            debugger: debugger;
+                            instanceSpace: currentScene.instanceSpace;
+                            lookupSpatial: currentScene.root.lookup;
+                            targetTimeline: player;
+                            lookupTemporal: mainTimeLayer.lookup;
+                        }
+                    }
+                    println("CREATING PROGRAM**** {prog} => {p.sourceCode}");
+                    insert p into allPrograms;
+                    p;
+                }
+            }
+        }
+        for (i in sceneRes.temporalResources) {
+            if (i.url.startsWith("timenode://TransitionLayer")) {
+            }
+        }
+        transformHierarchy.selectScene(mainScene);
 	//trax.setClips(currentAnimResource.resources);
         for (p in allPrograms) p.evaluate();
 	MasterUndoable.reset();
@@ -710,6 +764,9 @@ public function run from (args is String[]) to ()
                             lastTime = now;
                         } else if (now - lastTime > 2000) {
                             saveEditorState(this);
+                            if (savePoint <> MasterUndoable.now) {
+                                save();
+                            }
                             lastTime = now;
                         }
                         super.update();
@@ -1219,18 +1276,12 @@ public function run from (args is String[]) to ()
 			     }
 			     open("file:{result}");
 			 }
-		     }
-		 },
+                     }
+                 },
 		 MenuItem {
 		     shortcut: Menu.Shortcut { keyCode: Keys.S }
-		     label: "Save";
-		     enabled: bind currentResource.url <> ""
-		     action: save;
-		 },
-		 MenuItem {
-		     shortcut: Menu.Shortcut { keyCode: Keys.A }
 		     label: "Save As";
-		     enabled: bind currentResource.url == ""
+		     enabled: true;//bind mainScene.currentResource.url == ""
 		     action: function {
 			 fileSave.fileName = currentResource.url;
 			 const result = fileSave.open();
@@ -1240,7 +1291,7 @@ public function run from (args is String[]) to ()
 			 }
 		     }
 		 }]
-	     },
+             },
 	     Menu 
              { 
 		 shortcut: Menu.Shortcut { keyCode: Keys.E }
