@@ -31,10 +31,10 @@ public class EvalContext {
 
     public function evaluate from (prog is Program) to ()
     {
-        unsubscribe();
         const f = evaluator.compileAndRun(prog.sourceCode) 
             as function from (ObservableDebugger, Node, 
                               function from String to Object, function from String to Node, function from String to TimeNode) to Observable of ?;
+        unsubscribe();
         const obs = f(debugger, targetNode, lookupVar, lookupSpatial, lookupTemporal);
         subscribe(obs, prog.sourceCode);
     }
