@@ -48,7 +48,7 @@ public const INT_MEMBERS =
         }
     },
     FunctionMember {
-            m: Reflect.getFunction("f3.lang.Builtins$NumberOperators", "negate", ["Number"]);
+            m: Reflect.getFunction("f3.lang.Builtins$IntegerOperators", "negate", ["Number"]);
     }];
 
 public const BOOL_MEMBERS = 
@@ -546,6 +546,16 @@ public class Parameter is ObserverExpression {
     override public function toSource to String 
     {
         if (observable == null) then "{constantValue}" else observable.toSource();
+    }
+    override function toString to String {
+        var i = 0;
+        for (p in target.inputs) {
+            if (p == this) {
+                break;
+            }
+            i++;
+        }
+        "Parameter {i} {getName()} of {target}"
     }
 }
 
@@ -2110,7 +2120,9 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     function getLink from (id is String) to LinkView {
         var result = deserializationMap.get(id);
         if (result == null) {
-            result = LinkView {}
+            result = LinkView {
+                canvas: this;
+            }
             deserializationMap.put(id, result);
         }
         return result;
