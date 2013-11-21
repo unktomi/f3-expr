@@ -6,6 +6,11 @@ import expr.ResourceNode.*;
 
 public class ResourceScene is Scene {
 
+    public override function toString to String 
+    {
+        "ResourceScene {id}";
+    }   
+
     public const instanceSpace is Group = Group {id: "Instance Space"};
 
     public var currentModels = bind foreach (m in currentResource.resources) if (m is MaResourceNode) then m as MaResourceNode else null;

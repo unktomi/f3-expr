@@ -16,6 +16,7 @@ import f3.media.scene.*;
 import f3.media.scene.Shape2D.*;
 import expr.Names.*;
 import expr.choices.*;
+import expr.undo.*;
 
 var exprMap1 = new java.util.HashMap of (F3ClassType, Member[]);
 var exprMap2 = new java.util.HashMap of (F3ClassType, Member[]);
@@ -2163,6 +2164,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         }
         var des = IO.readObject(new java.io.StringReader(w.toString()));
         prog.code = todo;
+        MasterUndoable.commit();
     }
     
     function visit from (e is Expression) to String

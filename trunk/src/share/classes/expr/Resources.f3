@@ -46,6 +46,9 @@ public class MaResource is SpatialResource {
 public class MaClipLibrary is TemporalResource {
 }
 
+public class TranstitionLayerResource is TemporalResource {
+}
+
 public class SVGResource is SpatialResource {
 }
 
@@ -90,12 +93,18 @@ function makeResource from (n is ResourceTimeNode) to TemporalResource {
     }
 }
 
+public class SceneLayer {
+    public var name is String;
+    public var spatialResources is SpatialResource[];
+}
+
 public class SceneResource is Resource {
     public var width is Number;
     public var height is Number;
     public var name is String;
     public var spatialResources is SpatialResource[];
     public var temporalResources is TemporalResource[];
+    public var layers is SceneLayer[];
 }
 
 public class ProgramResource is Resource {
@@ -104,13 +113,16 @@ public class ProgramResource is Resource {
     public var compiled is String;
 }
 
+
 public function save 
     from (url is String,
-	  scene is Scene,
+	  mainScene is Scene,
 	  spatial is ResourceGroup,
-	  temporal is ResourceTimeGroup)
+	  temporal is ResourceTimeGroup,
+          scenes is ResourceScene[])
     to ()
 {
+    var scene = mainScene;
     if (url.startsWith("file:")) {
 	const file = new java.io.File(url.substring(5));
 	const sceneRes = SceneResource {
@@ -125,6 +137,11 @@ public function save
 	    foreach (i in temporal.resources) {
 		makeResource(i)
 	    }
+            layers: foreach (i in scenes) SceneLayer {
+                name: i.id;
+                spatialResources: foreach (j in i.currentResource.resources) makeResource(j)
+            }
+
 	}
 	const w = new java.io.BufferedWriter(new java.io.FileWriter(file));
 	IO.writeObject(w, sceneRes);

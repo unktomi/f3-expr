@@ -47,7 +47,7 @@ public class Scene2DAsset is SceneAsset {
     override public function getScene to ResourceScene {
 	ResourceScene {
             background: null;
-            camera: Camera2D { near: 10000, far: -10000 };
+            camera: Camera2D { near: -10000, far: 10000 };
 	    id: "2D Scene {count++}";
 	}
     }
@@ -75,7 +75,7 @@ public class ClipLibraryAsset is Asset {
 
 public class TransitionLayerAsset is ClipAsset {
     override var name = "Transition Layer";
-    override var url = "node://TransitionLayer";
+    override var url = "timenode://TransitionLayer";
     var count = 1;
     override public function getClip to TimeNode {
 	TransitionLayer {
