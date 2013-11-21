@@ -428,7 +428,8 @@ function getIVar from (ob is ObserverExpression) to String {
     while (true) {
 	var b = obs.observable;
 	if (b is Result) {
-	    b = (b as Result).source.inputs[0].observable;
+            const br = b as Result;
+	    b = if br.source.inputs == null then null else br.source.inputs[0].observable;
 	} 
 	if (b is ObserverExpression) {
 	    obs = b as ObserverExpression;
@@ -442,14 +443,18 @@ function getIVar from (ob is ObserverExpression) to String {
 
 public class GetVar is VarExpression, ObservableExpression, ObserverExpression {
     override public function toSource to String {
+        println ("get var to source {this} observable={observable}");
+        if (observable is Result) {
+            return observable.toSource();
+	} 
 	if (observers == []) {
 	    return "";
 	}
 	const i = getIVar(this);
-	if (observable is MemberExpression and (observable as MemberExpression).member.isObservable) {
+	if (observable is MemberExpression and { const mexp = observable as MemberExpression; mexp.member.isObservable }) {
 
 	    "(foreach ({i} in debugger.debug({observable.toSource()}, \"{id}\")) {i}.{member.toApply()})";
-	} else {
+        } else {
 	    if (observable == null) {
 		if (OBSERVABLE_TYPE.isAssignableFrom(member.rt)) 
 		    then "{i}.{member.toApply()}"
@@ -486,25 +491,32 @@ public class Function is MemberExpression {
              }
          }];
     public var output is Result = Result {
+        source: this;
 	t: ft.getReturnType()
     }
 
     override public function toSource to String {
 	const observable = inputs[0].observable;
-	if (observable is MemberExpression) {
+        println("Function to source observable={observable}");
+	const result = if (observable is MemberExpression and { const mexp = observable as MemberExpression; mexp.member.isObservable } ) {
 	    const m = observable as MemberExpression;
             if (inputs.size() == 1) {
                 if (inputs[0].observable <> null) {
                     const i = getIVar(inputs[0]);
                     if (fun.isStatic()) {
+                        println("static case 1");
                         "(foreach ({i} in debugger.debug({observable.toSource()}, \"{id}\")) {fun.getDeclaringClass().getName()}.{fun.getName()}({i}))";
                     } else {
+                        println("non static case 1");
                         "(foreach ({i} in debugger.debug({observable.toSource()}, \"{id}\")) {i}.{fun.getName()}())";
+
                     }
                 } else {
                     if (fun.isStatic()) {
+                        println("static case 2");
                         "{fun.getName()}({observable.toSource()})";
                     } else {
+                        println("non static case 2");
                         "{observable.toSource()}.{fun.getName()}()";
                     }
                 }
@@ -515,9 +527,12 @@ public class Function is MemberExpression {
                     var args is String;
                     for (j in [0..<ft.minArgs()]) {
                         const p = inputs[j+1];
+                        println("p={p}");
                         args = "{args}{sep}{p.toSource()}";
                         sep = ", ";
+                        println("args => {args}");
                     }
+                    println("non static case 3");
                     "(foreach ({i} in debugger.debug({observable.toSource()}, \"{id}\")) {i}.{fun.getName()}({args}))";
                 } else {
                     const i = getIVar(inputs[0]);
@@ -527,10 +542,36 @@ public class Function is MemberExpression {
                         const p = inputs[j];
                         args = "{args}{sep}{p.toSource()}";
                     }
+                    println("static case 3");
                     "(foreach ({i} in debugger.debug({observable.toSource()}, \"{id}\")) {fun.getDeclaringClass().getName()}.{fun.getName()}({args}))";
                 }
             }
-	} else "";
+	} else {
+            if (not fun.isStatic()) {
+                const i = inputs[0].toSource();
+                var sep = "";
+                var args is String;
+                for (j in [0..<ft.minArgs()]) {
+                    const p = inputs[j+1];
+                    args = "{args}{sep}{p.toSource()}";
+                    sep = ", ";
+                }
+                println("non static case 4");
+                "{i}.{fun.getName()}({args})";
+            } else {
+                var args is String = "";
+                var sep = "";
+                for (j in [0..<ft.minArgs()]) {
+                    const p = inputs[j];
+                    args = "{args}{sep}{p.toSource()}";
+                    sep = ", ";
+                }
+                println("static case 4");
+                "{fun.getDeclaringClass().getName()}.{fun.getName()}({args})";
+            }
+        }
+        println("gen source {this} => {result}");
+        return result;
     }
 }
 
@@ -556,7 +597,7 @@ public class Parameter is ObserverExpression {
             }
             i++;
         }
-        "Parameter {i} {getName()} of {target}"
+        "Parameter {i} {getName()} of {target} with observable: {observable}"
     }
 }
 
@@ -565,6 +606,13 @@ public class Result is ObservableExpression {
     public var t is F3Type;
     public var source is Function;
     override function getType to F3Type { t }
+    public override function toSource to String 
+    {
+        const result = source.toSource();
+        println("source={source}");
+        println("gen source {this} => {result}");
+        return result;
+    }
 }
 
 class DataArrow is MeshNode.Instance {
@@ -1937,7 +1985,6 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     function genLines from (links is LinkInfo[]) to AbstractMesh {
 	lines.reset();
-        println("links={links.size()}");
 	delete arrows[links.size()..];
 	while (arrows.size() < links.size()) {
 	    insert TransformNode { content: makeArrow(ARROW_COLOR) } into arrows; 
