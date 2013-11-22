@@ -15,6 +15,7 @@ public class ResourceNode is TransformNode {
     public const layoutEngine is Text.LayoutEngine = the Text.LayoutEngine;
     public const effectLoader is CGEffectLoader = the CGEffectLoader;
     public const soundLoader is SoundLoader = the SoundLoader;
+    public const movieLoader is MovieLoader = the MovieLoader;
     public const imageLoader is ImageLoader = the ImageLoader;
     public var url is String;
     override var id = bind url;
@@ -36,6 +37,9 @@ public class ResourceNode is TransformNode {
                                    lookupTemporal is function from String to TimeNode) to Node 
     {
         const x = this;
+        const exprNode = ExprNode {
+            url: x.url;
+        };
         const target = InstanceNode {
             id: id;
             tx: x.tx;
@@ -50,22 +54,23 @@ public class ResourceNode is TransformNode {
             px: x.px;
             py: x.py;
             pz: x.pz;
-            content: ExprNode {
-                url: x.url;
-            }
+            content: exprNode;
         }
         function localLookup from (name is String) to Node {
-            var n = target.lookup(name);
+            var n = exprNode.spatialRoot.lookup(name);
             if (n == null) {
                 n = lookupSpatial(name);
             }
             return n;
         }
-        for (prog in programs) {
-            if (prog.compiled <> null) {
-                const obs = prog.compiled(prog.debugger, target, lookupVar, lookupSpatial, lookupTemporal);
-                insert subscribe(obs, prog.sourceCode, target) into target.subs;
+        function localTemporalLookup from (name is String) to TimeNode {
+            var n = exprNode.temporalRoot.lookup(name);
+            if (n == null) {
+                n = lookupTemporal(name);
             }
+            return n;
+        }
+        for (prog in programs) { // @TODO
         }
         return target;
     }
