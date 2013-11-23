@@ -22,6 +22,7 @@ public class HScrollbar is ResizableNode {
 
     public function setRect from (tx is Number, sx is Number) to ()
     {
+        println("set rect {tx}, {sx}");
         this.tx = tx;
         this.sx = sx;
     }
@@ -83,8 +84,11 @@ public class HScrollbar is ResizableNode {
                 sx = self.sx;
                 tx /= width;
             }
-            tx = Math.min(Math.max(tx, 0.0), 1.0-sx);
-            setRect(tx, sx);
+            if (sx > 0) {
+                sx = Math.max(sx * thumbWidth, 20.0) / thumbWidth;
+                tx = Math.min(Math.max(tx, 0.0), 1.0-sx);
+                setRect(tx, sx);
+            }
         }
     }
 
@@ -93,7 +97,7 @@ public class HScrollbar is ResizableNode {
     var thumbHeight = bind height-4;
 
     var w = bind sx * thumbWidth;
-    var sx1 = bind Math.max(w, 20.0) / thumbWidth;
+    var sx1 = bind sx;
 
     const thumbMesh = {
         Rectangle {

@@ -544,7 +544,13 @@ public function run from (args is String[]) to ()
 	height: 20;
 	width: bind stage.width;
 	pause: &player.paused;
-	onRewind: player.setPlayhead.apply(0s);
+	onRewind: function to () { 
+            var paused = player.paused;
+            player.paused = true;
+            player.setPlayhead(0.5s);
+            player.setPlayhead(0s);
+            player.paused = paused;
+        }
 	onHideFloating: function from (b is Boolean) to ()
 	{
 	    internalWindowsLayer.visible = b;
