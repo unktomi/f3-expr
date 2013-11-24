@@ -369,10 +369,16 @@ public function run from (args is String[]) to ()
 	        content: movie;
 	    }
 	    addResource(rn, pt);
+            const clip = Movie.Clip { movie: movie };
 	    const rtn = ResourceTimeNode {
 		url: url;
-		content: Movie.Clip { movie: movie };
+		content: clip
 		spatial: rn;
+                override function playFromStart to ()
+                {
+                    super.playFromStart();
+                    clip.playMovieFromStart();
+                }
 	    }
             addTimeResource(rtn);
 	} else if (url.endsWith(".aiff") or 
