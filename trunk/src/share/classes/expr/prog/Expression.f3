@@ -122,9 +122,16 @@ public function introspect from (clazz is F3ClassType, all is Boolean) to Member
         exprMap.put(clazz, [r, classVars]);
         return r;
     }
+    for (f in funs) {
+        println("f={f}");
+    }
+    for (f in Reflect.getFunctions(clazz, yes)) {
+        println("f'={f}");
+    }
     for (f in funs where f.isPublic() and not f.getName().contains("$") and 
 	     OBJECT_TYPE <> f.getDeclaringClass() 
 	 ) { 
+
 	const ft = f.getType();
 	var rt = ft.getReturnType();
 	var toInsert is Member;
@@ -202,6 +209,7 @@ public function introspect from (clazz is F3ClassType, all is Boolean) to Member
     }
     const vars = clazz.getVariables(true);
     for (v in vars where not v.getName().contains("$") and not v.getName().startsWith("bnds") and not v.isStatic()) {
+        println("v={v}");
 	var toInsert is Member;
 	if (true or not v.isPublicInit() and not v.isDef()) {
 	    var rt = v.getType();
@@ -330,6 +338,9 @@ function formatName from (f is F3FunctionMember) to String
 
 function formatClassName from (t is F3Type) to String 
 {
+    if (t is F3FunctionType) {
+        return formatFunctionType(null, t as F3FunctionType)
+    }
     if (not (t is F3ClassType)) {
         return t.getName();
     }
@@ -1712,14 +1723,17 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     public function onDrop from (where is Pick, clip is Node) to ()
     {
 	println("ON DROP {where.scenePoint}, {where.dragPoint1} {clip}");
-	const typ = Reflect.getType(clip.getClass().getName());
+	const typ = if (clip is SceneAPI) then Reflect.getType("expr.SceneAPI") else Reflect.getType(clip.getClass().getName());
         var names = new java.util.HashSet of String;
 	const members = foreach (m in introspect(typ) where not m.name.contains("pdate") and names.add(m.name)) m;
+        for (m in members) {
+            println(m);
+        }
 	insert ObjectView {
 	    pos: toLocal * where.scenePoint;
 	    objectExpr: NodeExpression { 
                 node: clip, override function getType to F3Type { typ }
-                inputMembers: foreach (m in members where not m.isObservable and m.isObserver and m.rt == UNIT_TYPE) m;
+                inputMembers: foreach (m in members where m.isObserver) m;
                 //outputMembers: foreach (m in members where m.isObservable and m.m is F3FunctionMember) m;
             }
 	    canvas: this;
