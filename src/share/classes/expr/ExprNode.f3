@@ -51,7 +51,7 @@ public class ExprNode is AbstractNode {
                     sourceCode: prog.compiled;
                     evalContext: Program.EvalContext {
                         interactive: function from () to Boolean { true } 
-                        targetNode: currentTransform;
+                        targetNode: bind currentTransform.spatialRoot;
                         instanceSpace: instanceSpace;
                         lookupSpatial: function from (n is String) to Node { 
                             const r = currentTransform.spatialRoot.lookup(n);
@@ -77,7 +77,7 @@ public class ExprNode is AbstractNode {
                 var n = ns[indexof x];
                 TransformNode {
                     id: "transform"
-                        tx: x.tx;
+                    tx: x.tx;
                     ty: x.ty;
                     tz: x.tz;
                     rx: x.rx;
@@ -89,7 +89,7 @@ public class ExprNode is AbstractNode {
                     px: x.px;
                     py: x.py;
                     pz: x.pz;
-                    content: bind n.spatialRoot;
+                    content: bind n;
                 }
             }
         }
