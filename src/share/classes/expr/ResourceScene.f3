@@ -34,7 +34,7 @@ public class ResourceScene is Scene {
         currentCameras = cams;
     }
     
-    public const currentResource is ResourceGroup = ResourceGroup { id: bind id };
+    public const currentResource is ResourceGroup = ResourceGroup { id: bind id, scene: this };
 
     override var content = bind [currentResource, instanceSpace];
 

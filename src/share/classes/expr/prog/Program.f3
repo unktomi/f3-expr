@@ -20,7 +20,9 @@ public class EvalContext {
     public const eventContext is Context.MemberContext;
     public const interactive is function from () to Boolean;
     public const targetNode is Node;
-    public const debugger is ObservableDebugger;
+    public const debugger is ObservableDebugger = ObservableDebugger {
+        override function debug of a from (xs is Observable of a, obj is Object) to Observable of a { xs }
+    };
     public const instanceSpace is Group;
     public const targetTimeline is Timeline;
     const lookupVar is function from String to Object;

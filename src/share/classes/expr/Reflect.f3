@@ -29,6 +29,9 @@ public function findClass from (name is String) to F3ClassType
     if (r == null) {
         classes.put(name, r = ctx.findClass(name));
     }
+    if (r == null) {
+        println("CLASS NOT FOUND: {name}");
+    }
     return r;
 }
 
@@ -41,9 +44,10 @@ public function getFunctions from (clazz0 is F3ClassType, all is Boolean) to F3F
     if (clazz <> clazz0) {
         println("HUH? {clazz0} {clazz}");
     }
-    var funs is F3FunctionMember[];
+    var funs is F3FunctionMember[] = foreach (c in clazz.getFunctions(true)) c;
+    println("FUNS={funs}");
     if (not funMap.containsKey(clazz)) {
-        funMap.put(clazz, funs = foreach (c in clazz.getFunctions(true)) c);
+        funMap.put(clazz, funs);
     } else {
         funs = funMap.get(clazz);
     }
@@ -137,58 +141,11 @@ public function getVars from (classType is F3ClassType) to F3VarMember[]
     foreach (k in varMap.values()) k
 }
 
-function run from (args is String[]) to () {
-    const clazz = Reflect.findClass(args[0]);
-    const funs = getFunctions(clazz, true);
-    for (f in funs where not f.getName().contains("$") and 
-	     OBJECT_TYPE <> f.getDeclaringClass()
-	 ) { 
-	const ft = f.getType();
-	var rt = ft.getReturnType();
-	if (ft.minArgs() == 0) {
-	    if (SUBJECT_TYPE.isAssignableFrom(rt) or OBSERVABLE_TYPE.isAssignableFrom(rt) or OBSERVER_TYPE.isAssignableFrom(rt)) {
-		rt = getTypeArguments(rt)[0];
-	    } else {
-		continue;
-	    }	
-	    if (SUBJECT_TYPE.isAssignableFrom(rt)) {
-		println("Subject of ({getTypeArguments(rt)})");
-		continue;
-	    }	
-	    if (OBSERVABLE_TYPE.isAssignableFrom(rt)) {
-		println("Observable of ({getTypeArguments(rt)})");
-		continue;
-	    }	
-	    if (OBSERVER_TYPE.isAssignableFrom(rt)) {
-		println("Observer of ({getTypeArguments(rt)})");
-		continue;
-	    }	
-	}
-	if (UNIT_TYPE <> rt) {
-	    continue
-	}
-	if (ft.minArgs() == 0) {
-	    // observer of ()
-	    println("{f.getName()} => Observer of (())");
-	} else if (ft.minArgs() == 1) {
-	    // observer of ft.getArgumentType(0)
-	    println("{f.getName()} => Observer of ({ft.getArgumentType(0)})");
-	} else if (ft.minArgs() == 1) {
-	    // observer of (ft.getArgumentType(0), ft.getArgumentType(1))
-	}
-    }
-    const vars = clazz.getVariables(true);
-    for (v in vars where not v.getName().contains("$") and not v.isStatic()) {
-	if (not v.isPublicInit() and not v.isDef()) {
-	    var rt = v.getType();
-	    if (SUBJECT_TYPE.isAssignableFrom(rt) or OBSERVABLE_TYPE.isAssignableFrom(rt) or OBSERVER_TYPE.isAssignableFrom(rt)) {
-		rt = getTypeArguments(rt)[0];
-	    }	
-	    if (not v.isPublicRead()) {
-		println("{v.getName()} => Subject of ({rt})");
-	    } else if (v.isPublic()) {
-		println("{v.getName()} => Observable of ({rt})");
-	    }
-	}
+public function run from (args is String[]) to () {
+    for (clazz in args) {
+        println(clazz);
+        for (f in getFunctions(findClass(clazz), yes)) {
+            println(f);
+        }
     }
 }

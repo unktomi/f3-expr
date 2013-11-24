@@ -1,5 +1,6 @@
 package expr;
 import expr.Resources.*;
+import expr.prog.Program;
 import f3.media.scene.*;
 
 public class ModelContent {
@@ -15,7 +16,17 @@ public class ExprNode is AbstractNode {
     override var id = bind url;
     public var spatialRoot is Node = bind modelContent.spatialRoot;
     public var temporalRoot is TimeNode = bind modelContent.temporalRoot;
-    public var modelContent is ModelContent = bind loadResource(url);
+    public var modelContent is ModelContent = bind if url.endsWith(".expr") then loadExpr(url) else loadResource(url);
+    var instanceSpace is Group = Group {};
+    public var programs is Program[];
+    var firstTime = true;
+    override function update to () {
+        super.update();
+        if (firstTime) {
+            firstTime = false;
+            for (prog in programs) prog.evaluate();
+        }
+    }
     /*
     var timeline = Timeline {
         content: TimeGroup {
@@ -24,6 +35,73 @@ public class ExprNode is AbstractNode {
         }
     }
     */
+
+    function loadExpr from (url is String) to ModelContent {
+        var r is SceneResource = Resources.open(url);
+        var allPrograms is Program[];
+        var ns is ExprNode[] = foreach (x in r.spatialResources) {
+            const currentTransform = ExprNode {
+                url: x.url
+            }
+            currentTransform.programs = 
+            foreach (prog in x.programs) {
+                const p = Program {
+                    event: prog.event.deserialize();
+                    code: prog.code;
+                    sourceCode: prog.compiled;
+                    evalContext: Program.EvalContext {
+                        interactive: function from () to Boolean { true } 
+                        targetNode: currentTransform;
+                        instanceSpace: instanceSpace;
+                        lookupSpatial: function from (n is String) to Node { 
+                            const r = currentTransform.spatialRoot.lookup(n);
+                            println("lookupSpatial in {url} {n} => {r}");
+                            return r;
+                        }
+                        //targetTimeline: player;
+                        lookupTemporal: function from (n is String) to TimeNode { 
+                            const r = currentTransform.temporalRoot.lookup(n);
+                            println("lookupTemporal in {url} {n} => {r}");
+                            return r;
+                        }
+                    }
+                }
+                println("creating program in {x.url} on {p.event} as {p.sourceCode}");
+                p;
+            }
+            currentTransform;
+        }
+        const spatialRoot = Group {
+            id: "Main Scene";
+            content: foreach (x in r.spatialResources) {
+                var n = ns[indexof x];
+                TransformNode {
+                    id: "transform"
+                        tx: x.tx;
+                    ty: x.ty;
+                    tz: x.tz;
+                    rx: x.rx;
+                    ry: x.ry;
+                    rz: x.rz;
+                    sx: x.sx;
+                    sy: x.sy;
+                    sz: x.sz;
+                    px: x.px;
+                    py: x.py;
+                    pz: x.pz;
+                    content: bind n.spatialRoot;
+                }
+            }
+        }
+        const temporalRoot = TimeGroup {
+            content: foreach (n in ns) n.temporalRoot;
+        }
+        ModelContent {
+            spatialRoot: if (spatialRoot.content.size() == 1) then spatialRoot.content[0] else spatialRoot;
+            temporalRoot: if (temporalRoot.content.size() == 1) then temporalRoot.content[0] else temporalRoot;
+        }
+    }
+
     function loadResource from (url is String) to ModelContent 
     {
         if (url.endsWith(".ma")) {
@@ -77,41 +155,7 @@ public class ExprNode is AbstractNode {
                 temporalRoot: clip;
             }
         } else if (url.endsWith(".expr")) {
-            var r = Resources.open(url);
-            var ns = foreach (x in r.spatialResources) {
-                ExprNode {
-                    url: x.url
-                }
-            }
-            const spatialRoot = Group {
-                id: "Main Scene";
-                content: foreach (x in r.spatialResources) {
-                    var n = ns[indexof x];
-                    TransformNode {
-                        id: "transform"
-                        tx: x.tx;
-                        ty: x.ty;
-                        tz: x.tz;
-                        rx: x.rx;
-                        ry: x.ry;
-                        rz: x.rz;
-                        sx: x.sx;
-                        sy: x.sy;
-                        sz: x.sz;
-                        px: x.px;
-                        py: x.py;
-                        pz: x.pz;
-                        content: bind n.spatialRoot;
-                    }
-                }
-            }
-            const temporalRoot = TimeGroup {
-                content: foreach (n in ns) n.temporalRoot;
-            }
-            ModelContent {
-                spatialRoot: if (spatialRoot.content.size() == 1) then spatialRoot.content[0] else spatialRoot;
-                temporalRoot: if (temporalRoot.content.size() == 1) then temporalRoot.content[0] else temporalRoot;
-            }
+            loadExpr(url);
 	} else if (url.endsWith(".png") or url.endsWith(".jpg") or url.endsWith(".tif") or url.endsWith(".tiff") or url.endsWith(".tga")) {
 	    const image = Image { 
 		url: url;
@@ -127,7 +171,9 @@ public class ExprNode is AbstractNode {
             }
         }
     }
-    override var internalContent = bind spatialRoot;
+    override var internalContent = Group {
+        content: bind [instanceSpace, spatialRoot]
+    }
 }
 
 
