@@ -1,0 +1,34 @@
+package expr;
+import f3.media.scene.*;
+import f3.math.*;
+import java.lang.Math;
+import f3.util.*;
+
+public interface SceneAPI {
+
+    public const scene is Scene;
+
+    public function setCamera from (camera is Camera) to () {
+        scene.camera = camera;
+    }
+
+    public function setWidth from (w is Number) to () {
+        scene.stage.width = Math.round(w) as Integer;
+    }
+
+    public function setHeight from (h is Number) to () {
+        scene.stage.height = Math.round(h) as Integer;
+    }
+
+    public function setSize from (w is Number, h is Number) to () {
+        scene.stage.width = Math.round(w) as Integer;
+        scene.stage.height = Math.round(h) as Integer;
+    }
+
+    public function setSize from (d is Tuple2) to () {
+        scene.stage.width = Math.round(d.x) as Integer;
+        scene.stage.height = Math.round(d.y) as Integer;
+    }
+
+    public readonly var camera is Subject of Camera = bind Observables.observe(&scene.camera);
+}

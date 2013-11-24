@@ -51,7 +51,7 @@ public class EvalContext {
 
     public function subscribe of a from (obsvb is Observable of a, src is String) to ()
     {
-	println("SUBSCRIBE {obsvb}");
+	println("SUBSCRIBE {obsvb} / {src}");
         var count = 0;
         const f = interactive;
         var rs = foreach (x in eventContext.content) {
