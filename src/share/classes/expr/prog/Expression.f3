@@ -23,6 +23,30 @@ var exprMap2 = new java.util.HashMap of (F3ClassType, Member[]);
 
 const MAT4_TYPE = Reflect.findClass("f3.math.Mat4");
 
+function typeApply(target is F3Type, 
+                   srcType is F3Type,
+                   subst is F3Type) 
+    to F3Type 
+{
+    if (target == srcType) return subst;
+    if (target is F3FunctionType) {
+        const funType = target as F3FunctionType;
+        const retType = typeApply(funType.getReturnType(), srcType, subst);
+        var matches = retType <> funType.getReturnType();
+        const parms = 
+            foreach (i in [0..<funType.minArgs()]) 
+            {
+                const pt = typeApply(funType.getArgumentType(i), srcType, subst);
+                if (not matches) matches = pt <> funType.getArgumentType(i);
+                pt
+            };
+        if (matches) {
+            return ctx.makeFunctionType(parms, retType);
+        }
+    }
+    return target;
+}
+
 function makeFunMember from (name is String, params is F3Type[], ret is F3Type) to Member 
 {
     FunctionMember {
@@ -641,7 +665,7 @@ public abstract class ExpressionView is AbstractNode {
     public bound function getPos to Point3 { getWorldPos() }
     bound function getWorldPos to Point3 { (toSceneTransform * canvas.toLocal).getTranslation() }
     public var pos is Point3;
-    public var cellWidth is Number = 150;
+    public var cellWidth is Number = 180;
     public var cellHeight is Number = bind canvas.cellHeight;
     public var font is Text.Font = bind canvas.font;
     var selected is Boolean = bind canvas.selectedExpr == this;
@@ -747,6 +771,7 @@ class FunctionView is ExpressionView {
         }
         unify();
     }
+
     function unify {
         for (x in inputs) {
             var t = x.parameter.t;
@@ -760,30 +785,35 @@ class FunctionView is ExpressionView {
                         x.inputType = infer;
                         for (j in inputs) {
                             if (j <> x and j.links.size() == 0) {
-                                if (j.parameter.t.isTypeVariable() and j.parameter.t.getTypeVariable() == t.getTypeVariable()) {
-                                    j.inputType = infer;
+                                const t1 = typeApply(j.parameter.t, x.parameter.t, x.inputType);
+                                if (t1 <> j.parameter.t) {
+                                    j.inputType = t1;
+                                    insert x into j.inferred;
                                 }
                             }
                         }
-                    }
-                } else {
-                    var isSet = false;
-                    for (j in inputs) {
-                        if (j <> x and j.links.size() == 0) {
-                            if (j.parameter.t.isTypeVariable() and j.parameter.t.getTypeVariable() == t.getTypeVariable()) {
-                                j.inputType = null;
-                            }
-                        } else {
-                            isSet = true;
+                        if (output.result.getType().isTypeVariable() and
+                            output.result.getType().getTypeVariable() == t.getTypeVariable()) {
+                            output.unifiedType = x.inputType;
                         }
                     }
-                    if (not isSet) {
+                } else {
+                    if (x.inputType <> null) {
                         x.inputType = null;
+                        for (j in inputs) {
+                            for (y in j.inferred) {
+                                if (y == x) {
+                                    delete y from j.inferred;
+                                    j.inputType = null;
+                                    break;
+                                }
+                            }
+                        }
+                        if (output.result.getType().isTypeVariable() and
+                            output.result.getType().getTypeVariable() == t.getTypeVariable()) {
+                            output.unifiedType = null;
+                        } 
                     }
-                }
-                if (output.result.getType().isTypeVariable() and
-                    output.result.getType().getTypeVariable() == t.getTypeVariable()) {
-                    output.unifiedType = x.inputType;
                 }
             }
         }
@@ -989,7 +1019,7 @@ public class GetVarView is OutputView {
     public var get is GetVar;
     const tv is GetTreeview = GetTreeview {
         canvas: bind canvas;
-        width: 150;
+        width: 180;
         height: 200;
         get: bind get;
     }
@@ -1145,6 +1175,7 @@ public class ParameterView is InputView {
     public var targetView is FunctionView;
     override var expression = bind parameter;    
     public var inputType is F3Type;
+    public var inferred is ParameterView[];
     override bound function getLabel to String {
         formatClassName(if (inputType <> null) then inputType else parameter.t)
     }
@@ -1226,7 +1257,7 @@ public class OutputView is LinkedView {
 
     const getTree is GetTreeview = GetTreeview {
         canvas: bind canvas;
-        width: 150;
+        width: 180;
         height: 200;
         get: bind getter;
     };
@@ -1260,6 +1291,7 @@ class ResultView is OutputView {
     override var expression = bind result;
     override var resultType = bind if (unifiedType <> null) then unifiedType else result.getType();
     public var unifiedType is F3Type;
+    public var inferred is ParameterView[];
 }
 
 class MemberTreenode is Treenode {
