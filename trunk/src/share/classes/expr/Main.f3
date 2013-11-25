@@ -339,30 +339,37 @@ public function run from (args is String[]) to ()
 
     function doDrop from (url is String, pt is Point3) to () 
     {
+        if (url == playerUrl) {
+            return;
+        }
 	playerUrl = url;
 	if (url.endsWith(".expr")) {
 	    const model = ExprNode {
                 webBrowserFactory: TheWebBrowserFactory
 		url: url;
+                isInteractive: bind interactive;
+                debugger: debugger;
 	    }
 	    const rn = ResourceNode {
                 url: url;
-                content: bind model.spatialRoot;
+                content: bind model;
 	    }
 	    addResource(rn, pt);
-	    const rtn = ResourceTimeNode {
-		url: url;
-		content: bind model.temporalRoot;
-		spatial: rn;
-	    }
-	    //if (rtn.bounds.duration() > 0s) {
+            if (false) {
+                const rtn = ResourceTimeNode {
+                    url: url;
+                    content: bind model.temporalRoot;
+                    spatial: rn;
+                }
+                //if (rtn.bounds.duration() > 0s) {
 		rn.temporal = rtn;
 		addTimeResource(rtn);
-	    //}
+                //}
+            }
 	} else if (url.endsWith(".mp4")) {
             const movie = Movie {
                 url: url;
-                paused: true
+                paused: true;
             }
 	    const rn = ResourceNode {
                 url: url;
@@ -381,7 +388,8 @@ public function run from (args is String[]) to ()
                 }
 	    }
             addTimeResource(rtn);
-	} else if (url.endsWith(".aiff") or 
+	} else if (url.endsWith(".aif") or 
+                   url.endsWith(".aiff") or 
                    url.endsWith(".asf") or 
                    url.endsWith(".asx") or
                    url.endsWith(".dls") or
