@@ -10,10 +10,11 @@ public class MaResourceTimeNode is ResourceTimeNode {
         println("Ma Resource Time Node {url} lookup: {n} => {r}");
         if (r == null) {
             const sharp2 = n.lastIndexOf("#");
+            var clipName = n;
             if (sharp2 > 0) {
                 const sharp1 = n.lastIndexOf("#", sharp2-1);
                 if (sharp1 > 0) {
-                    const clipName = n.substring(sharp2+1);
+                    clipName = n.substring(sharp2+1);
                     const libName = n.substring(sharp1+1, sharp2);
                     println("clipLibs: {model.getClipLibraries()}");
                     for (clipLib in model.getClipLibraries() where clipLib.id == libName) {
@@ -22,6 +23,14 @@ public class MaResourceTimeNode is ResourceTimeNode {
                             r = j;
                             break;
                         }
+                    }
+                } 
+            } else { // hack...
+                for (clipLib in model.getClipLibraries()) {
+                    var j = clipLib.lookup(clipName);
+                    if (j <> null) {
+                        r = j;
+                        break;
                     }
                 }
             }

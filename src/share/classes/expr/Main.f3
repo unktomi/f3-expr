@@ -342,9 +342,6 @@ public function run from (args is String[]) to ()
 
     function doDrop from (url is String, pt is Point3) to () 
     {
-        if (url == playerUrl) {
-            return;
-        }
 	playerUrl = url;
 	if (url.endsWith(".expr")) {
 	    const model = ExprNode {
