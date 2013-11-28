@@ -10,7 +10,7 @@ public function formatName from (str is String) to String
 {
     for (ch in ["$", "#", "/"]) {
         const slash = str.lastIndexOf(ch);
-        if (slash > 0) return str.substring(slash+1);
+        if (slash > 0) return formatName(str.substring(slash+1));
     }
     return uncamelCase(str);
 }

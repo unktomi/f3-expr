@@ -1,8 +1,43 @@
 package expr;
 import f3.media.scene.*;
 
-public class ResourceTimeNode is TimeGroup {
+public class MaResourceTimeNode is ResourceTimeNode {
+    override var url = bind model.url;
+    public var model is Ma.Model;
+    override var content = bind model.getTemporalRoot();
+    override function lookup from (n is String) to TimeNode {
+        var r = super.lookup(n);
+        println("Ma Resource Time Node {url} lookup: {n} => {r}");
+        if (r == null) {
+            const sharp2 = n.lastIndexOf("#");
+            if (sharp2 > 0) {
+                const sharp1 = n.lastIndexOf("#", sharp2-1);
+                if (sharp1 > 0) {
+                    const clipName = n.substring(sharp2+1);
+                    const libName = n.substring(sharp1+1, sharp2);
+                    println("clipLibs: {model.getClipLibraries()}");
+                    for (clipLib in model.getClipLibraries() where clipLib.id == libName) {
+                        var j = clipLib.lookup(clipName);
+                        if (j <> null) {
+                            r = j;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        return r;
+    }
+}
+
+public class ResourceTimeNode is TimeGroup, ResourceTarget {
     public const url is String;
     override var id = bind url;
     public var spatial is ResourceNode;
+
+    public function unwrapContent to TimeNode[] {
+         content
+    }
 }
+
+

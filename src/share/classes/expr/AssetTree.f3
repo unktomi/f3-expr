@@ -4,6 +4,7 @@ import f3.media.scene.*;
 import expr.ResourceNode.*;
 import expr.prog.Expression;
 import expr.prog.Expression.Member;
+import expr.prog.Expression.FunctionMember;
 import expr.inspector.Inspector;
 import f3.math.*;
 import f3.reflect.*;
@@ -139,7 +140,11 @@ public class PackageAsset is Asset {
 }
 
 public class RootPackageAsset is PackageAsset {
-    public var primitives is TypeAsset[] = 
+    const println = MemberAsset {
+          name: "Print Line"
+          member: FunctionMember {m: Reflect.getFunction("f3.lang.Builtins", "printLine", ["Object"]) }
+    };
+    public const primitives is TypeAsset[] = 
         [PrimitiveTypeAsset {
                 name: "Boolean";
                 t: Reflect.BOOLEAN_TYPE;
@@ -171,7 +176,7 @@ public class RootPackageAsset is PackageAsset {
                 className: "String";
                 clazz: Reflect.STRING_TYPE;
         }];
-    override var containedAssets = bind [primitives, packages, classes]
+    override var containedAssets = bind [println, primitives, packages, classes]
 }
 
 public class TypeAsset is Asset {

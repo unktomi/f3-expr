@@ -48,7 +48,12 @@ public class CallContext is Context {
     }
 }
 
-public class ResourceNodeContext is Context {
+public abstract class ResourceObjectContext is Context {
+    public bound function getTarget to Object;
+}
+
+public class ResourceNodeContext is ResourceObjectContext {
+    override bound function getTarget to Object { resource }
     public var resource is ResourceNode;
     override var name = bind "{formatName(resource.id)} [Scene]";
     var members = bind Expression.introspect(Reflect.getType("f3.media.scene.TransformNode") as F3ClassType);
@@ -57,7 +62,8 @@ public class ResourceNodeContext is Context {
     }
 }
 
-public class ResourceTimeNodeContext is Context {
+public class ResourceTimeNodeContext is ResourceObjectContext {
+    override bound function getTarget to Object { resource }
     public var resource is ResourceTimeNode;
     override var name = bind "{formatName(resource.id)} [Timeline]";
     var members = bind Expression.introspect(Reflect.getType("f3.media.scene.TimeNode") as F3ClassType);
@@ -133,7 +139,19 @@ public class ContextTreemodel is Treemodel {
         }
         selectedMemberContext = m;
         println("selected context => {selectedContext}");
+        p = tn;
+        var o is ResourceObjectContext;
+        while (p <> null) {
+            var j = (p as ContextTreenode).context;
+            o = if (j is ResourceObjectContext) then (j as ResourceObjectContext) else null;
+            if (m <> null) {
+                break;
+            }
+            p = p.parent;
+        }
+        selectedObjectContext = o;
     }
+    public var selectedObjectContext is ResourceObjectContext;
     public var selectedGroupContext is GroupContext;
     public var selectedMember is Member = bind selectedMemberContext.member;
     public var selectedMemberContext is MemberContext;

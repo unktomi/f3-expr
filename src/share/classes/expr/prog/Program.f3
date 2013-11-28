@@ -19,9 +19,10 @@ import expr.EventLayer;
 public class EvalContext {
     public const eventContext is Context.MemberContext;
     public var interactive is function from () to Boolean;
-    public const targetNode is Node;
+    public const targetNode is Object;
     public const debugger is ObservableDebugger = ObservableDebugger {
         override function debug of a from (xs is Observable of a, obj is Object) to Observable of a { 
+            println("debugger: {xs}");
             xs
         }
     };
@@ -30,16 +31,35 @@ public class EvalContext {
     const lookupVar is function from String to Object;
     const lookupSpatial is function from String to Node;
     const lookupTemporal is function from String to TimeNode;
+
+    function lookupVarDebug from (name is String) to Object {
+        const r = lookupVar(name);
+        println("lookup var {name} => {r}");
+        return r;
+    }
+
+    function lookupSpatialDebug from (name is String) to Node {
+        const r = lookupSpatial(name);
+        println("lookup spatial {name} => {r}");
+        return r;
+    }
+
+    function lookupTemporalDebug from (name is String) to TimeNode {
+        const r = lookupTemporal(name);
+        println("lookup temporal {name} => {r}");
+        return r;
+    }
+    
     public const evaluator = 
         new org.f3.tools.script.ScriptShell(java.lang.Thread.currentThread().getContextClassLoader());
 
     public function evaluate from (prog is Program) to ()
     {
         const f = evaluator.compileAndRun(prog.sourceCode) 
-            as function from (ObservableDebugger, Node, 
+            as function from (ObservableDebugger, Object, 
                               function from String to Object, function from String to Node, function from String to TimeNode) to Observable of ?;
         unsubscribe();
-        const obs = f(debugger, targetNode, lookupVar, lookupSpatial, lookupTemporal);
+        const obs = f(debugger, targetNode, lookupVarDebug, lookupSpatialDebug, lookupTemporalDebug);
         subscribe(obs, prog.sourceCode);
     }
 
@@ -63,6 +83,7 @@ public class EvalContext {
 	insert obsvb.subscribe(DefaultObserver of a {
 		override function onNext from (x is a) to ()
 		{
+                    println("ON NEXT...{x} interactive={interactive()}");
                     if (interactive()) {
                         for (r in rs) {
                             var n = r.instance(r.id, lookupVar, lookupSpatial, lookupTemporal);

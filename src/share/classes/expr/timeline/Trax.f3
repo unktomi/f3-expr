@@ -171,7 +171,7 @@ class TimeNodeView is AbstractNode
     {
         println("target: {target.id} <= {target.getClass()}");
         println("parent: {target.parent.id} <= {target.parent.getClass()}");
-        if ((target.parent is ResourceTimeNode) and target.parent.id == target.id) then "Main Timeline" else formatName(target.id);
+        if ((target.parent is ResourceTimeNode and not (target.parent is ResourceTimeNodeWrapper)) and target.parent.id == target.id) then "Main Timeline" else formatName(target.id);
     }   
     override var internalContent = Group {
 	content:

@@ -16,6 +16,7 @@ import expr.undo.*;
 import expr.inspector.*;
 import expr.inspector.Inspector.*;
 import expr.ResourceNode.*;
+import expr.ResourceTimeNode.*;
 import expr.AssetTree.*;
 import expr.timeline.*;
 import expr.prog.*;
@@ -31,6 +32,7 @@ function wrap of a from (xs is Observable of a, interactive is function from () 
             xs.subscribe(DefaultObserver of a {
                     override function onNext from (x is a) to ()
                     {
+                        println("debugger: on next {x} ({interactive()}");
                         if (interactive()) {
                             y.onNext(x);
                         }
@@ -328,6 +330,7 @@ public function run from (args is String[]) to ()
 
     function addTimeResource from (rn is ResourceTimeNode) to ()
     {
+        println("ADDING TIME RESOURCE { rn }");
         rn.updateParent();
 	insert rn into currentAnimResource.resources;
         insert Context.ResourceTimeNodeContext { 
@@ -366,7 +369,7 @@ public function run from (args is String[]) to ()
 		addTimeResource(rtn);
                 //}
             }
-	} else if (url.endsWith(".mp4")) {
+	} else if (url.endsWith(".mp4") or url.endsWith(".mov")) {
             const movie = Movie {
                 url: url;
                 paused: true;
@@ -434,12 +437,11 @@ public function run from (args is String[]) to ()
 	        model: model;
 	    }
 	    addResource(rn, pt);
-	    const rtn = ResourceTimeNode {
-		url: url;
-		content: bind model.getTemporalRoot();
+	    const rtn = MaResourceTimeNode {
+                model: model;
 		spatial: rn;
 	    }
-	    if (rtn.bounds.duration() > 0s) {
+	    if (true or rtn.bounds.duration() > 0s) {
 		rn.temporal = rtn;
 		addTimeResource(rtn);
 	    }
@@ -610,36 +612,51 @@ public function run from (args is String[]) to ()
     
     var manip is expr.manipulator.Manipulator;
 
-    function save {
+    function save to Boolean {
+        if (mainScene.currentResource.url == "") {
+            var result = fileSave.open();
+            if (result <> null) {
+                if (not result.endsWith(".expr")) {
+                    result = "{result}.expr";
+                }
+                mainScene.currentResource.url = "file:{result}";
+            } else {
+                return false;
+            }
+        }
+        doSave();
+    }
+
+    function doSave to Boolean {
 	savePoint = MasterUndoable.now;
 	Resources.save(mainScene.currentResource.url,
 		       mainScene,
 		       mainScene.currentResource,
 		       currentAnimResource,
                        currentScenes[x | x <> mainScene]);
+        return true;
     }
     
     function close from () to () {
 	savePoint = 0;
+        mainScene.currentResource.url = "";
         currentScenes = [mainScene];
-	currentResource.resources = [];
+	mainScene.currentResource.resources = [];
 	currentAnimResource.resources = [];
         contextModel.reset();
 	transformHierarchy.clearSelection();
+        playerUrl = "";
 	MasterUndoable.reset();
     }
 
     const undoList = expr.undo.UndoList {} on replace {
-	undoList.addTarget("nodes", &currentResource.resources);
 	undoList.addTarget("timenodes", &currentAnimResource.resources);
     }
-
 
     function open from (url is String) to ()
     {
 	close();
-	currentResource.url = url;
-	const sceneRes = Resources.open(currentResource.url);
+	const sceneRes = Resources.open(url);
         var allPrograms is Program[];
 	for (i in sceneRes.spatialResources) {
 	    doDrop(i.url, new Point3(i.tx, i.ty, i.tz));
@@ -733,9 +750,32 @@ public function run from (args is String[]) to ()
                 }
             }
         }
-        for (i in sceneRes.temporalResources) {
+        function convertTimeResource from (i is Resources.TemporalResource) to TimeNode {
+            var t is TimeNode;
             if (i.url.startsWith("timenode://TransitionLayer")) {
+                t = TransitionLayer {
+                    id: i.url;
+                    playTime: i.playTime;
+                    playRate: i.playRate;
+                    playCount: i.playCount;
+                    content: foreach (j in i.content) {
+                        convertTimeResource(j)
+                    }
+                }
+                const rtn = ResourceTimeNodeWrapper {
+                    url: i.url;
+                    wrapped: t as TimeGroup;
+                };
+                t = rtn;
+                addTimeResource(rtn);
+            } else {
+                t = mainTimeLayer.lookup(i.url);
             }
+            println("CONVERT TIME RESOURCE : {i.url} => {t}");
+            t;
+        }
+        for (i in sceneRes.temporalResources) {
+            convertTimeResource(i);
         }
         transformHierarchy.selectScene(mainScene);
 	//trax.setClips(currentAnimResource.resources);
@@ -743,6 +783,7 @@ public function run from (args is String[]) to ()
 	MasterUndoable.reset();
 	MasterUndoable.commit();
 	savePoint = MasterUndoable.now;
+	mainScene.currentResource.url = url;
     }
 
     const fileSave = FileDialog.FileSave {
@@ -794,7 +835,7 @@ public function run from (args is String[]) to ()
                         } else if (now - lastTime > 2000) {
                             saveEditorState(this);
                             if (savePoint <> MasterUndoable.now) {
-                                save();
+                                doSave();
                             }
                             lastTime = now;
                         }
@@ -894,7 +935,7 @@ public function run from (args is String[]) to ()
                                          canZoomVertical: false;
                                          content: Treeview {
 					 model: AssetTree.AssetModel {
-					     resources: bind currentResource;
+					     resources: bind mainScene.currentResource;
 					 }
 
 					 var dragger is TransformNode;
@@ -935,16 +976,17 @@ public function run from (args is String[]) to ()
 						 for (j in picked) {
 						     println("j={j.node}");
 						     if (j.node is Trax) { 
-							 (j.node as Trax).onDrop(j, clip, 
+                                                         const rtn = 
+                                                             if (clip is ResourceTimeNode) 
+                                                                 then clip as ResourceTimeNode 
+                                                                 else ResourceTimeNodeWrapper {
+                                                                         url: asset.url;
+                                                                         wrapped: clip as TimeGroup;
+                                                                     };
+							 (j.node as Trax).onDrop(j, rtn, 
                                                                                  function from (t is TimeNode) to ()
                                                                                  {
-                                                                                     const rtn = 
-                                                                                         if (t is ResourceTimeNode) 
-                                                                                             then t as ResourceTimeNode 
-                                                                                             else ResourceTimeNode {
-                                                                                                     url: asset.url;
-                                                                                                     content: t;
-                                                                                                 };
+                                                                                     const rtn = t as ResourceTimeNode;
                                                                                      addTimeResource(rtn);
                                                                                  });
 							 break;
@@ -1254,7 +1296,7 @@ public function run from (args is String[]) to ()
 					 //event: bind inspector1.inspecting[inspector1.selectedIndex].member;
                                          debugger: bind debugger;
                                          eventContext: bind contextModel.selectedMemberContext;
-					 targetNode: bind currentTransform as ResourceNode;
+                                         targetObject: bind contextModel.selectedObjectContext.getTarget();
 					 targetSpace: bind currentScene.root;
                                          instanceSpace: bind currentScene.instanceSpace;
 					 targetTime: bind mainTimeLayer;
@@ -1286,7 +1328,7 @@ public function run from (args is String[]) to ()
             saveEditorState(editorScene);
             return true;
         }
-        title: bind "{currentResource.url} {if (savePoint <> MasterUndoable.now) then " (Unsaved)" else ""}";
+        title: bind "{mainScene.currentResource.url} {if (savePoint <> MasterUndoable.now) then " (Unsaved)" else ""}";
         menubar: Menu.Bar {
 	    menus: 
 	    [Menu 
@@ -1297,6 +1339,7 @@ public function run from (args is String[]) to ()
 		 [MenuItem {
 		     shortcut: Menu.Shortcut { keyCode: Keys.O }
 		     label: "Open";
+                     enabled: bind player.paused;
 		     action: function {
 			 const result = fileOpen.open();
 			 if (result <> null) {
@@ -1312,14 +1355,33 @@ public function run from (args is String[]) to ()
 		     label: "Save As";
 		     enabled: true;//bind mainScene.currentResource.url == ""
 		     action: function {
-			 fileSave.fileName = currentResource.url;
-			 const result = fileSave.open();
+                         if (mainScene.currentResource.url <> "") {
+                             const u = new java.net.URL(mainScene.currentResource.url);
+                             fileSave.fileName = new java.io.File(u.getFile()).getName();
+                         } else {
+                             fileSave.fileName = "";
+                         }
+			 var result = fileSave.open();
 			 if (result <> null) {
-			     currentResource.url = "file:{result}";
+                             if (not result.endsWith(".expr")) {
+                                 result = "{result}.expr";
+                             }
+			     mainScene.currentResource.url = "file:{result}";
 			     save();
 			 }
 		     }
-		 }]
+		 },
+                 MenuItem {
+		     shortcut: Menu.Shortcut { keyCode: Keys.W }
+		     label: "Close";
+                     enabled: bind player.paused;
+		     action: function {
+                             if (fileDirty()) {
+                                 save()
+                             }
+                             close();
+                     }
+                 }]
              },
 	     Menu 
              { 
