@@ -104,8 +104,37 @@ public class ExprNode is AbstractNode {
                 }
             }
         }
+
         const temporalRoot = TimeGroup {
             content: foreach (n in ns) n.temporalRoot;
+        }
+
+        function convertTimeResource from (i is Resources.TemporalResource) to TimeNode {
+            var t is TimeNode;
+            if (i.url.startsWith("timenode://TransitionLayer")) {
+                t = TransitionLayer {
+                    id: i.url;
+                    playTime: i.playTime;
+                    playRate: i.playRate;
+                    playCount: i.playCount;
+                    content: foreach (j in i.content) {
+                        convertTimeResource(j)
+                    }
+                }
+                const rtn = ResourceTimeNodeWrapper {
+                    url: i.url;
+                    wrapped: t as TimeGroup;
+                };
+                t = rtn;
+                insert t into temporalRoot.content;
+            } else {
+                t = temporalRoot.lookup(i.url);
+            }
+            println("CONVERT TIME RESOURCE : {i.url} => {t}");
+            t;
+        }
+        for (x in r.temporalResources) {
+            convertTimeResource(x)
         }
         ModelContent {
             spatialRoot: if (spatialRoot.content.size() == 1) then spatialRoot.content[0] else spatialRoot;
@@ -121,7 +150,9 @@ public class ExprNode is AbstractNode {
 	    }
             ModelContent {
                 spatialRoot: bind model.getSpatialRoot();
-                temporalRoot: bind model.getTemporalRoot();
+                temporalRoot: ResourceTimeNode.MaResourceTimeNode { 
+                    model: model;
+                }
             }
 	} else if (url.endsWith(".mp4") or 
                    url.endsWith(".mov")) {
