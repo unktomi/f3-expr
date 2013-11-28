@@ -18,6 +18,7 @@ public abstract class Asset {
 public class MaAsset is Asset {
     public const model is Ma.Model;
     override var url = bind model.url;
+    public var temporalRoot is TimeNode;
     override var containedAssets = bind 
 	[foreach (cam in model.getCameras()) CameraAsset { 
 		url: "{url}#{cam.id}";
@@ -28,6 +29,7 @@ public class MaAsset is Asset {
 	     url: "{url}#{clipLib.id}";
 	     name: clipLib.id;
 	     clipLibrary: clipLib;
+             temporalRoot: bind temporalRoot;
 	 }];
 }
 
@@ -65,11 +67,12 @@ public class ClipAsset is Asset {
 public class ClipLibraryAsset is Asset {
     public const clipLibrary is TimeGroup;
     override var containedAssets = bind foreach (c in clipLibrary.content) makeClipAsset(c);
+    public var temporalRoot is TimeNode;
     function makeClipAsset from (c is TimeNode) to ClipAsset {
 	ClipAsset { 
 	    url: "{url}#{c.id}";
 	    name: c.id; 
-	    override function getClip to TimeNode { c } 
+	    override function getClip to TimeNode { temporalRoot.lookup(url) } 
 	}
     }
 }
@@ -117,6 +120,7 @@ public function makeAsset from (r is ResourceNode) to Asset {
     if (r is MaResourceNode) {
 	MaAsset {
 	    model: (r as MaResourceNode).model;
+            temporalRoot: r.temporal;
 	}
     } else if (r.url.endsWith(".svg")) {
 	SVGAsset {

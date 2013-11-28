@@ -135,9 +135,13 @@ class TimeNodeView is AbstractNode
 
     var selected1 = bind selected and trax.focused;
 
+    bound function blendColor from (c is Color, a is Number) to ColorPaint {
+        ColorPaint(if (a == 1.0) then c else Color.color(c.red, c.green, c.blue, c.opacity * a));
+    }
+
     bound function getFill from (target is TimeNode) to Paint 
     {
-	if (selected) then CLIP_SELECTED_PAINT else CLIP_PAINT;
+	if (selected) then blendColor(CLIP_SELECTED_COLOR, target.sceneBlendWeight) else blendColor(CLIP_COLOR, target.sceneBlendWeight);
     }
 
     bound function getContent from (target is TimeNode) to TransformNode[]
@@ -825,7 +829,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 
     function selectTimeNodeView from (x is TimeNodeView) to () {
 	if (x <> null) {
-            //    temporalHierarchy.selectTimeNode(x.target);
+            temporalHierarchy.selectTimeNode(x.target);
 	}
 	selectedTimeNodeView = x;
     }

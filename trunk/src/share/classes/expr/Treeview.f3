@@ -350,6 +350,10 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
     var visibleRows = bind Math.max(1, (Math.round(height / cellHeight - 0.5) as Integer));
 
     var selectionListener is Disposable;
+
+    postinit {
+        selectionListener = model.selectionObserver.subscribe(select);
+    }
     
     bound function isVisible from (t is Treenode) to Boolean
     {
@@ -358,14 +362,13 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
     
     function select from (t is Treenode) to ()
     {
-        println("SELECTING TREE NODE {t.label}");
-	nextSelection = t;
+        if (selectedTreenode <> t) {
+            println("SELECTING TREE NODE {t.label}");
+            nextSelection = t;
+        }
     }
 
-    public var model is Treemodel on replace {
-	selectionListener.dispose();
-	selectionListener = model.selectionObserver.subscribe(select);
-    }
+    public var model is Treemodel;
 
     var rows is Treenode[];
 
