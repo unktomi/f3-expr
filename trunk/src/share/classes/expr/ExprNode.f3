@@ -23,6 +23,7 @@ public class ExprNode is AbstractNode {
     public var isInteractive is Boolean = true;
     public var debugger is ObservableDebugger = ObservableDebugger {
         override function debug of a from (xs is Observable of a, obj is Object) to Observable of a { 
+            println("debugger: {xs}");
             xs
         }
     }

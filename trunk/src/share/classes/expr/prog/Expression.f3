@@ -7,6 +7,7 @@ import expr.Treeview.*;
 import expr.Listview.*;
 import f3.reflect.*;
 import expr.Reflect.*;
+import expr.Reflect.getTypeArguments;
 import f3.util.*;
 import f3.util.Observer.*;
 import f3.util.Observable.*;
@@ -2272,7 +2273,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 		     });
 	var itype = (e as MemberExpression).member.m.getDeclaringClass();
         if (itype == null) return "";
-	var result = "var _ = function from (debugger is f3.util.ObservableDebugger, i is {itype.getName()}, getVar is function from String to Object, getNode is function from String to f3.media.scene.Node, getClip is function from String to f3.media.scene.TimeNode) to f3.util.Observable of ? \{ ";
+	var result = "var _ = function from (debugger is f3.util.ObservableDebugger, i$ is Object, getVar is function from String to Object, getNode is function from String to f3.media.scene.Node, getClip is function from String to f3.media.scene.TimeNode) to f3.util.Observable of ? \{ var i = i$ as {itype.getName()}; ";
         if (terms == []) {
             var rs = foreach (x in eventContext.content) {
                 if (x is Context.ResourceNodeContext) {
@@ -2307,120 +2308,6 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     public const debugger is ObservableDebugger;
     
-    function visit1 from (e is Expression) to String 
-    {
-	// Observable of a -> function from a to b; // map 
-	// Observable of a -> read var member // map 
-	// Observable of a -> Observer of a; // subscribe
-	// Observable of a -> Observer of a; // subscribe
-	// Observable of a -> write var member; // subscribe
-	// function from a to b -> function from b to c; // compose
-	println("VISIT {e} -> {e.getName()} is {e.getType()}");
-	var result = "_";
-	if (e is Function) {
-	    const f = e as Function;
-	    println(f.inputs.size());
-	    if (f.fun.isStatic()) {
-		"{f.fun.getName()}()";
-	    } else {
-		"{f.fun.getName()}()";
-	    }
-	} else if (e is GetVar) {
-	    const g = e as GetVar;
-	    const m = g.member;
-	    for (x in g.observers) {
-		var y is Expression = x;
-		if (x is Parameter) {
-		    var qg is GetVar = g;
-		    var prefix2 is String;
-		    while (qg <> null) {
-			const qm = qg.member;
-			prefix2 = 
-			    if (qm.m is F3FunctionMember) then {
-				    "{qm.name}()";
-				} else {
-				"{qm.name}";
-			    };
-			if (qm.isObservable) {
-			    prefix2 = "foreach (i in {prefix2}) i";
-			} 
-			if (result <> "") {
-			    result = "{result}.";
-			}
-			prefix2 = "{result}{prefix2}";
-			if (qg.observable is GetVar) {
-			    qg = qg.observable as GetVar;
-			} else {
-			    break;
-			}
-		    }
-		    var prefix = prefix2;
-		    const f is Function = (x as Parameter).target;
-		    if (f.fun.isStatic()) {
-			result = "\{ foreach (i in {result}) {f.getName()}(i{prefix}) \}";
-		    } else {
-			result = "\{ foreach (i in {result}) i{prefix}{f.getName()}() \}";
-		    }
-		} else {
-		    var huh = visit(y);
-		    println("huh? {huh}");
-		    if (huh <> "_") {
-			result = huh;
-		    }
-		}
-	    }
-	    return result;
-	} else if (e is ObservableExpression) {
-	} else {
-	}
-	"";
-    }
-
-    /*
-    function genReflect from (e is Expression) to function from (function from F3Value to F3Value) to F3Value;
-    {
-	// Observable of a -> function from a to b; // map 
-	// Observable of a -> read var member // map 
-	// Observable of a -> Observer of a; // subscribe
-	// Observable of a -> Observer of a; // subscribe
-	// Observable of a -> write var member; // subscribe
-	// function from a to b -> function from b to c; // compose
-	if (e is Function) {
-	    const f = e as Function;
-	    var isMap = f.inputs.size() == 1 and f.inputs[0].observable is ObservableExpression;
-	    if (isMap) {
-		const mapFun = getFunction(f.inputs[0].observable.getType(), "map");
-		const k0 = genReflect(f.inputs[0].observable);
-		function from (k is function from F3Value to F3Value) to F3Value 
-		{
-		    k0(function from (target is F3Value) to F3Value {
-			    const obj = target as F3ObjectValue;
-			    k1(function from (arg is F3Value) to F3Value {
-				    k(fun.asFunction(obj).invoke())
-				});
-			});
-		}
-	    } else {
-		const k0 = genReflect(f.inputs[0].observable);
-		const k1 = genReflect(f.inputs[1].observable);
-		function from (k is function from F3Value to F3Value) to F3Value 
-		{
-		    k0(function from (target is F3Value) to F3Value {
-			    const obj = target as F3ObjectValue;
-			    k1(function from (arg is F3Value) to F3Value {
-				    k(fun.asFunction(obj).invoke())
-				});
-			});
-		}
-	    }
-	} else if (e is ObservableExpression) {
-	    const o = e as ObservableExpression;
-	    for (x in o.observers) {
-	    }
-	}
-    }
-    */
-
     function unsubscribe {
         prog.reset();
     }
@@ -2675,8 +2562,11 @@ public class Editor is ResizableNode, Focuser {
     public var popupScene is Scene;
 
     override public function getTargetOfFocus to Focusable { canvas }
-
-    public var targetNode is ResourceNode;
+    public var targetObject is Object;
+    public var targetNode is ResourceNode = bind getAsNode(targetObject);
+    public var targetTimeNode is ResourceTimeNode = bind getAsTimeNode(targetObject);
+    function getAsNode from (obj is Object) to ResourceNode { if (obj is ResourceNode) then obj as ResourceNode else null }
+    function getAsTimeNode from (obj is Object) to ResourceTimeNode { if (obj is ResourceTimeNode) then obj as ResourceTimeNode else null }
     public var eventContext is Context.MemberContext;
     public var event is Member = bind eventContext.member;
 
