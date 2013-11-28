@@ -5,7 +5,10 @@ public class MaResourceTimeNode is ResourceTimeNode {
     override var url = bind model.url;
     public var model is Ma.Model;
     override var content = bind model.getTemporalRoot();
+    var mapped = new java.util.HashMap of (String, TimeNode);
     override function lookup from (n is String) to TimeNode {
+        var rtn = mapped.get(n);
+        if (rtn <> null) return rtn;
         var r = super.lookup(n);
         println("Ma Resource Time Node {url} lookup: {n} => {r}");
         if (r == null) {
@@ -18,9 +21,19 @@ public class MaResourceTimeNode is ResourceTimeNode {
                     const libName = n.substring(sharp1+1, sharp2);
                     println("clipLibs: {model.getClipLibraries()}");
                     for (clipLib in model.getClipLibraries() where clipLib.id == libName) {
-                        var j = clipLib.lookup(clipName);
-                        if (j <> null) {
-                            r = j;
+                        const clip = clipLib.lookup(clipName);
+                        if (clip <> null) {
+                            if (rtn == null) {
+                                rtn = 
+                                    if (clip is ResourceTimeNode) 
+                                        then clip as ResourceTimeNode 
+                                        else ResourceTimeNodeWrapper {
+                                                url: n;
+                                                wrapped: clip as TimeGroup;
+                                            };
+                                mapped.put(n, rtn);
+                            }
+                            r = rtn;
                             break;
                         }
                     }

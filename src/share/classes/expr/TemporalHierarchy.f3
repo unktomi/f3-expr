@@ -11,7 +11,7 @@ public class Treenode is Treeview.Treenode {
     override var label = bind label0;
     function asTimeGroup from (n is TimeNode) to TimeGroup { if (n is TimeGroup) then n as TimeGroup else null }
     override var canOpen = bind { var g = asTimeGroup(n); g.content.size() > 0 }
-    override var children = bind foreach (x in getChildren(n)) Treenode { n: bind x };
+    override var children = bind foreach (x in getChildren(n)) Treenode { n: bind x, parent: this};
 
     bound function getChildren from (t is TimeNode) to TimeNode[]
     {
@@ -30,26 +30,29 @@ public class Model is Treeview.Treemodel {
     public const h is TemporalHierarchy;
     override var root = Treenode { n:  bind h.root };
     public var selection is Treenode on replace {
-	if (h.selectedTimeNode <> selection.n) {
-	    selectionObserver.onNext(selection);
-	}
+        selectionObserver.onNext(selection);
     }
+
     const selectionListener = 
 	h.observeSelection().subscribe(function from (tn is TimeNode) to () 
 				       {
+                                           println("selection change => {tn}");
 					   foldLeft((), 
 						    function from (_ is (), t is Treeview.Treenode) to () {
 							const ht = t as Treenode;
 							const n = ht.n;
 							if (n == tn) {
+                                                            println("t={t} n={n}");
 							    selection = ht;
 							}
 						    })
 				       });
+
     function onSelectionChange from (tn is Treeview.Treenode) to ()
     {
 	h.selectedTimeNode = (tn as Treenode).n
     }
+
     const disp = selectionObserver.subscribe(onSelectionChange);
 }
 
@@ -60,8 +63,11 @@ public class TemporalHierarchy
 	while (p <> null and not (p is ResourceTimeNode)) {
 	    p = p.parent;
 	}
-	selectedTransform = p as ResourceTimeNode;
-	selection.onNext(selectedTransform);
+        if (selectedTransform <> p) {
+            println("SELECTION => {p}");
+            selectedTransform = p as ResourceTimeNode;
+        }
+        selection.onNext(selectedTimeNode);
     };
 
     public function clearSelection {
@@ -122,7 +128,7 @@ public class TemporalHierarchy
 	}
     }
 
-    const selection = Subject of TimeNode {};
+    const selection = Subject of TimeNode {}
 
     public function observeSelection to Observable of TimeNode {
 	selection;

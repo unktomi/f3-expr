@@ -426,8 +426,20 @@ abstract class VarContextExpression is ObjectExpression {
 
 abstract class TimeNodeExpression is ObjectExpression {
     public var timeNode is TimeNode;
+    function getId from (t is TimeNode) to String {
+        var p = t.parent;
+        var id = "{t.id}";
+        while (p <> null) {
+            p = p.parent;
+            id = "{p.id}#{t.id}";
+            if (p is ResourceTimeNode) {
+                return id;
+            }
+        }
+        return t.id;
+    }
     override bound function getName to String { timeNode.id }
-    override function toSource { "(getClip(\"{timeNode.id}\") as {getType().getName()})" }
+    override function toSource { "(getClip(\"{getId(timeNode)}\") as {getType().getName()})" }
 }
 
 abstract class NodeExpression is ObjectExpression {
