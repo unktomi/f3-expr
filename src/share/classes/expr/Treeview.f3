@@ -158,13 +158,25 @@ public abstract class Treenode is Foldable of Treenode {
     }
 }
 
+function checkVisible from (row is Integer, scrollOffset is Integer, visibleRows is Integer) to Boolean {
+    println("check visible {row} {scrollOffset} {visibleRows}");
+    row >= scrollOffset and row < scrollOffset + visibleRows;
+}
+
 public class Treecell is AbstractNode {
-    public const tv is Treeview;
+    public var tv is Treeview;
     public var tn is Treenode; 
-    var fg is Paint = bind tv.getFg(tn.row);
-    var bg is Paint = bind tv.getBg(tn.row, tn.column);
     override var transform = bind translate(0, -tn.row * tv.cellHeight);
-    override var visible = bind tv.isVisible(tn);
+    var cellIsVisible = bind getCellIsVisible();
+    override var visible = bind cellIsVisible; 
+    protected var fg is Paint = bind getFg();
+    protected var bg is Paint = bind if (tv.selectionRow == tn.row) then tv.selectionBackground else getBg();
+
+    public bound function getFg to Paint { tv.getFg(tn.row) }
+    public bound function getBg to Paint { tv.getBg(tn.row, tn.column) }
+    public bound function getCellIsVisible to Boolean {
+        tv.isRowVisible(tn.row);
+    }
     bound function css from (p is Paint) to String
     {
         var color = (p as ColorPaint).color;
@@ -205,9 +217,16 @@ public class Treecell is AbstractNode {
              ];
 	 }]
     };
+    function dumpCells to () {
+        for (cell in tv.cells) {
+            println("tn={cell.n}");
+            println("cell={cell.cell} visibleInScene={cell.cell.visibleInScene}, parent={cell.cell.parent}");
+        }
+    }
     const onClick = 
 	internalContent.observeMouseDown().subscribe(function from (e is MouseEvent) to () {
-
+                println("row={tn.row} fg={fg}");
+                dumpCells();
 		const limit = -tv.cellWidth/2+tv.indent*(tn.column+1)+6;
 		if (tn.canOpen and e.location.x < limit) {
 		    if (not tn.isOpen) tn.open() else tn.close();
@@ -355,11 +374,11 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
         selectionListener = model.selectionObserver.subscribe(select);
     }
     
-    bound function isVisible from (t is Treenode) to Boolean
+    public bound function isRowVisible from (row is Integer) to Boolean
     {
-	t.row >= scrollOffset and t.row < scrollOffset + visibleRows
+        checkVisible(row, scrollOffset, visibleRows);
     }
-    
+
     function select from (t is Treenode) to ()
     {
         if (selectedTreenode <> t) {
@@ -374,8 +393,8 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
 
     var cells is Holder[] = bind foreach (i in [0..<rows.size()]) 
 	Holder { 
-	  var tn = bind rows[i];
-	  cell: bind createCell(tn);
+          n: bind rows[i];
+	  override var cell = bind createCell(n);
         }
 
     public readonly var selectedTreecell is Treecell = bind cells[selectionRow].cell;
@@ -384,9 +403,9 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
 	Treecell { tv: this, tn: selectedTreenode, transform: Mat4.<<1>> };
     }
       
-    protected bound function createCell from (tn is Treenode) to Treecell
+    protected function createCell from (tn is Treenode) to Treecell
     {
-	Treecell { tv: bind this, tn: bind tn };
+	Treecell { tv: this, tn: tn };
     }
 
     public function getView from (tn is Treenode) to Treecell {
