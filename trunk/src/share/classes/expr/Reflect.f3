@@ -22,6 +22,26 @@ public const classMap = new java.util.HashMap of (String, java.util.Map of (Stri
 public const funMap = new java.util.HashMap of (F3ClassType, F3FunctionMember[]);
 public const classes = new java.util.HashMap of (String, F3ClassType);
 
+public function isObservableType from (t is F3Type) to Boolean {
+    return OBSERVABLE_TYPE.isAssignableFrom(t);
+}
+
+public function getTypeParameters from (t is F3ClassType) to F3Type[] {
+    const parms is F3Type[] = t.getTypeParameters();
+    foreach (x in parms) {
+        const y = classes.get(x.getName());
+        if y == null then { if x is F3ClassType then classes.put(x.getName(), x as F3ClassType) else x } else y;
+    }
+}
+/*
+public function getTypeArguments from (t is F3ClassType) to F3Type[] {
+    const parms is F3Type[] = t.getTypeArguments();
+    foreach (x in parms) {
+        const y = classes.get(x.getName());
+        if y == null then { if x is F3ClassType then classes.put(x.getName(), x as F3ClassType) else x } else y;
+    }
+}
+*/
 public function findClass from (name is String) to F3ClassType
 {
     if (name == null) return null;
@@ -44,7 +64,12 @@ public function getFunctions from (clazz0 is F3ClassType, all is Boolean) to F3F
     if (clazz <> clazz0) {
         println("HUH? {clazz0} {clazz}");
     }
-    var funs is F3FunctionMember[] = foreach (c in clazz.getFunctions(true)) c;
+    var funs is F3FunctionMember[];
+    try {
+        funs = foreach (c in clazz.getFunctions(true)) c;
+    } catch (exc is java.lang.Exception) {
+        exc.printStackTrace();
+    }
     println("FUNS={funs}");
     if (not funMap.containsKey(clazz)) {
         funMap.put(clazz, funs);

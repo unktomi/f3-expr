@@ -57,10 +57,12 @@ public class EvalContext {
     {
         const f = evaluator.compileAndRun(prog.sourceCode) 
             as function from (ObservableDebugger, Object, 
-                              function from String to Object, function from String to Node, function from String to TimeNode) to Observable of ?;
+                              function from String to Object, function from String to Node, function from String to TimeNode) to (Observable of ?)[];
         unsubscribe();
         const obs = f(debugger, targetNode, lookupVarDebug, lookupSpatialDebug, lookupTemporalDebug);
-        subscribe(obs, prog.sourceCode);
+        for (o in obs) {
+            subscribe(o, prog.sourceCode);
+        }
     }
 
     public function unsubscribe to () 
@@ -80,9 +82,9 @@ public class EvalContext {
                 (x as Context.ResourceNodeContext).resource;
             } else null;
         }
-	insert obsvb.subscribe(DefaultObserver of a {
-		override function onNext from (x is a) to ()
-		{
+        insert obsvb.subscribe(DefaultObserver of a {
+                override function onNext from (x is a) to ()
+                {
                     println("ON NEXT...{x} interactive={interactive()}");
                     if (interactive()) {
                         for (r in rs) {
@@ -96,8 +98,8 @@ public class EvalContext {
                         count++;
                         println("on next {src} {x}");
                     }
-		}
-	}) into subs;	
+                }
+            }) into subs;
     }
 }
 
