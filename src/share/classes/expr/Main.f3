@@ -809,6 +809,9 @@ public function run from (args is String[]) to ()
 	mainScene.currentResource.url = url;
     }
 
+    const yesNo = Dialog.YesNoCancel {
+    }
+
     const fileSave = FileDialog.FileSave {
     }
 
@@ -1338,6 +1341,29 @@ public function run from (args is String[]) to ()
             sceneMenu,
             popupLayer]
         };
+
+     function saveChangesIfNecessary to Boolean 
+     {
+         if (fileDirty()) {
+             var doSave = true;
+             if (mainScene.currentResource.url == "") {
+                 yesNo.title = "Tool";
+                 yesNo.message = "Save Changes?";
+                 var cancel is Boolean = false;
+                 yesNo.onCancel = function to () { cancel = true }
+                 yesNo.onNo = function to () { doSave = false } 
+                 yesNo.onYes = function to () { }
+                 yesNo.open();
+                 if (cancel) return false;
+             }
+             if (doSave) {
+                 if (not save()) {
+                     return false;
+                 }
+             }
+         }
+         return true;
+     }
      
     var stage is JoglStage = JoglStage {
 
@@ -1365,13 +1391,12 @@ public function run from (args is String[]) to ()
 		     label: "Open...";
                      enabled: bind player.paused;
 		     action: function {
-			 const result = fileOpen.open();
-			 if (result <> null) {
-			     if (fileDirty()) {
-				 save();
-			     }
-			     open("file:{result}");
-			 }
+                             if (saveChangesIfNecessary()) {
+                                 const result = fileOpen.open();
+                                 if (result <> null) {
+                                     open("file:{result}");
+                                 }
+                             }
                      }
                  },
 		 MenuItem {
@@ -1401,10 +1426,9 @@ public function run from (args is String[]) to ()
 		     label: "Close";
                      enabled: bind player.paused;
 		     action: function {
-                             if (fileDirty()) {
-                                 save()
-                             }
+                         if (saveChangesIfNecessary()) {
                              close();
+                         }
                      }
                  },
                  MenuItem {
