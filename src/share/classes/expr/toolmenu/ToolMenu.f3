@@ -67,6 +67,7 @@ public class ToolMenu is ResizableNode {
     public var onRewind is function from () to ();
     public var toggleFullscreen is function from () to ();
     public var toggleLoop is function from () to ();
+    public var toggleStepping is function from () to ();
 
     public var onHideFloating is function from Boolean to ();
 
@@ -85,6 +86,7 @@ public class ToolMenu is ResizableNode {
     const record is Button = Button {
         height: 18, width: 28;
 	baseURL: "{__DIR__}record"
+        onPress: bind toggleStepping;
     };
 
     const loop is Button = Button {

@@ -24,6 +24,7 @@ import f3.util.*;
 import f3.util.Observer.*;
 import f3.util.Observable.*;
 
+
 function wrap of a from (xs is Observable of a, interactive is function from () to Boolean) to Observable of a 
 {
     DefaultObservable of a {
@@ -154,7 +155,8 @@ class ResizableStageNode is ResizableNode, Focuser {
     }
     override var internalContent = Group { content: bind stage };
     public var content is ResizableNode;
-    override public function getTargetOfFocus to Focusable {
+    override public function getTargetOfFocus to Focusable 
+    {
 	return stage;
     }
 }
@@ -163,7 +165,7 @@ function readTextFile from (url is String) to (String, Integer)
 {
     const u = new java.net.URL(url);
     const reader = new java.io.BufferedReader(new java.io.InputStreamReader(u.openStream()));
-    var line is Object;
+    var line is Object; // sic!
     var buf = new java.lang.StringBuffer;
     var lineCount = 0;
     while ((line = reader.readLine()) <> null) {
@@ -180,7 +182,7 @@ public class MainContext is Context.MemberContext {
         name: "Start";
         t: Reflect.UNIT_TYPE;
         rt: Reflect.UNIT_TYPE;
-        isObservable: true;
+        isObservable: yes;
     }
 }
 
@@ -220,13 +222,14 @@ public function run from (args is String[]) to ()
         }
     }
 
-    var selectionHandler = contextModel.selectionObserver.subscribe(function from (tn is Treeview.Treenode) to () {
-            mainContext.updateParent();
-            const ctx = (tn as Context.ContextTreenode).context;
-            handleContextVisibility(lastContext, false);
-            lastContext = ctx;
-            handleContextVisibility(ctx, true);
-        });
+    var selectionHandler = contextModel.selectionObserver.subscribe(function from (tn is Treeview.Treenode) to () 
+                                                                    {
+                                                                        mainContext.updateParent();
+                                                                        const ctx = (tn as Context.ContextTreenode).context;
+                                                                        handleContextVisibility(lastContext, false);
+                                                                        lastContext = ctx;
+                                                                        handleContextVisibility(ctx, true);
+                                                                    });
 
     var currentScene is ResourceScene = bind transformHierarchy.selectedScene;
 
@@ -545,7 +548,7 @@ public function run from (args is String[]) to ()
         }
     }
 
-
+    var stepping is Boolean = false;
     var loop is Boolean = true;
     var nonInteractiveLoop = bind not interactive and loop;
     var full is Boolean = false;
@@ -578,6 +581,7 @@ public function run from (args is String[]) to ()
 	    internalWindowsLayer.visible = b;
 	}
 	toggleLoop: function { loop = not loop; () }
+        toggleStepping: function { stepping = not stepping; () } 
 	toggleFullscreen: function { full = not full; stage.setFullscreen(full) }
         onSetSelecting: function from () to () {
             interactive = false;
@@ -633,6 +637,24 @@ public function run from (args is String[]) to ()
                        currentScenes[x | x <> mainScene]);
         return true;
     }
+
+    function doExport to () {
+        save();
+        const u = new java.net.URL(mainScene.currentResource.url);
+        fileSave.fileName = "{new java.io.File(u.getFile()).getName()}.zip";
+        fileSave.title = "Export";
+        var result = fileSave.open();
+        if (result <> null) {
+            Resources.export(result,
+                             mainScene.currentResource.url,
+                             mainScene,
+                             mainScene.currentResource,
+                             currentAnimResource,
+                             currentScenes[x | x <> mainScene]);
+        }
+        return true;
+    }
+
     
     function close from () to () {
 	savePoint = 0;
@@ -655,8 +677,12 @@ public function run from (args is String[]) to ()
 	close();
 	const sceneRes = Resources.open(url);
         var allPrograms is Program[];
+        var baseURL = new java.net.URL(url);
+        function rebaseURL from (u is String) to String {
+            if (u.startsWith("timenode://") or u.contains("#")) then u else new java.net.URL(baseURL, u).toString();
+        }
 	for (i in sceneRes.spatialResources) {
-	    doDrop(i.url, new Point3(i.tx, i.ty, i.tz));
+	    doDrop(rebaseURL(i.url), new Point3(i.tx, i.ty, i.tz));
 	    currentTransform.tx = i.tx;
 	    currentTransform.ty = i.ty;
 	    currentTransform.tz = i.tz;
@@ -693,7 +719,7 @@ public function run from (args is String[]) to ()
             }
 	}
 	for (i in sceneRes.temporalResources, j in currentAnimResource.resources) {
-	    if (i.url == j.url) {
+	    if (rebaseURL(i.url) == j.url) {
 		j.playTime = i.playTime;
 		j.playRate = i.playRate;
 		j.playCount = i.playCount;
@@ -710,7 +736,7 @@ public function run from (args is String[]) to ()
             insert scene into currentScenes;
             transformHierarchy.selectScene(scene);
             foreach (i in j.spatialResources) {
-                doDrop(i.url, new Point3(i.tx, i.ty, i.tz));
+                doDrop(rebaseURL(i.url), new Point3(i.tx, i.ty, i.tz));
                 currentTransform.tx = i.tx;
                 currentTransform.ty = i.ty;
                 currentTransform.tz = i.tz;
@@ -766,7 +792,7 @@ public function run from (args is String[]) to ()
                 t = rtn;
                 addTimeResource(rtn);
             } else {
-                t = mainTimeLayer.lookup(i.url);
+                t = mainTimeLayer.lookup(rebaseURL(i.url));
             }
             println("CONVERT TIME RESOURCE : {i.url} => {t}");
             t;
@@ -1291,6 +1317,7 @@ public function run from (args is String[]) to ()
 				    title: bind "Event Handler: {contextModel.selectedContext.name}"
 				    content: expr.prog.Expression.Editor {
 					 //event: bind inspector1.inspecting[inspector1.selectedIndex].member;
+                                         stepping: bind stepping;
                                          debugger: bind debugger;
                                          eventContext: bind contextModel.selectedMemberContext;
                                          targetObject: bind contextModel.selectedObjectContext.getTarget();
@@ -1335,7 +1362,7 @@ public function run from (args is String[]) to ()
 		 items:
 		 [MenuItem {
 		     shortcut: Menu.Shortcut { keyCode: Keys.O }
-		     label: "Open";
+		     label: "Open...";
                      enabled: bind player.paused;
 		     action: function {
 			 const result = fileOpen.open();
@@ -1349,7 +1376,7 @@ public function run from (args is String[]) to ()
                  },
 		 MenuItem {
 		     shortcut: Menu.Shortcut { keyCode: Keys.S }
-		     label: "Save As";
+		     label: "Save As...";
 		     enabled: true;//bind mainScene.currentResource.url == ""
 		     action: function {
                          if (mainScene.currentResource.url <> "") {
@@ -1358,6 +1385,7 @@ public function run from (args is String[]) to ()
                          } else {
                              fileSave.fileName = "";
                          }
+                         fileSave.title = "Save As";
 			 var result = fileSave.open();
 			 if (result <> null) {
                              if (not result.endsWith(".expr")) {
@@ -1378,6 +1406,11 @@ public function run from (args is String[]) to ()
                              }
                              close();
                      }
+                 },
+                 MenuItem {
+		     label: "Export...";
+                     enabled: bind player.paused and mainScene.currentResource.url <> "";
+		     action: doExport;
                  }]
              },
 	     Menu 
@@ -1407,7 +1440,7 @@ public function run from (args is String[]) to ()
 		 MenuItem {
 		     label: "Redo";
 		     enabled: bind canRedo;
-		     shortcut: Menu.Shortcut { keyCode: Keys.Z, shiftKey: true }
+		     shortcut: Menu.Shortcut { keyCode: Keys.Z, shiftKey: yes }
 		     action: MasterUndoable.redo
 		 }]
 	     }]

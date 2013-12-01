@@ -18,6 +18,7 @@ import f3.media.scene.Shape2D.*;
 import expr.Names.*;
 import expr.choices.*;
 import expr.undo.*;
+import expr.inspector.*;
 
 var exprMap1 = new java.util.HashMap of (F3ClassType, Member[]);
 var exprMap2 = new java.util.HashMap of (F3ClassType, Member[]);
@@ -722,7 +723,11 @@ public abstract class ExpressionView is AbstractNode {
     public var cellWidth is Number = 180;
     public var cellHeight is Number = bind canvas.cellHeight;
     public var font is Text.Font = bind canvas.font;
-    var selected is Boolean = bind canvas.selectedExpr == this;
+    public readonly var selected is Boolean = bind canvas.selectedExpr == this;
+    public function select to ()
+    {
+        canvas.selectedExpr = this;
+    }
     public bound function getLabel to String {
         Names.formatName(expression.getName());
     }
@@ -911,8 +916,6 @@ public class InputMemberExpression is MemberExpression, ObserverExpression {
     public var target is ObjectExpression;
     override public function toSource to String {
 	const i = getIVar(this);
-        println("INPUT MEMBER EXPR {this}");
-        println("INPUT MEMBER EXPR i={i}");
         var res = 
         if (member.m is F3FunctionMember and (member.m as F3FunctionMember).getType().minArgs() > 0) {
             "(foreach ({i} in debugger.debug({observable.toSource()}, \"{id}\")) {target.toSource()}.{member.toApply(i)})";
@@ -929,7 +932,6 @@ public class InputMemberExpression is MemberExpression, ObserverExpression {
 		//"{observable.toSource()}.{member.toApply()}";
 	    }
 	}
-        println("INPUT MEMBER EXPR res={res}");
         return res;
     }
 }
@@ -1359,6 +1361,30 @@ class MemberTreenode is Treenode {
     override var canOpen = bind { var n = members.size(); n > 0 };
     override var children = bind foreach (x in members) makeTreeNode(x);
 
+    public var value is F3Value = bind (parent as MemberTreenode).getValue(m.m);
+
+    public function setValue from (value is F3Value) to ()
+    {
+        (parent as MemberTreenode).setValue(m.m, value);
+    }
+
+    public function setValue from (m is F3Member, value is F3Value) to () {
+        var myValue = value;
+        if (m is F3VarMember) {
+            var v = m as F3VarMember;
+            if (v.isStatic()) then v.setValue(null, value) else v.setValue(myValue as F3ObjectValue, value);
+        } 
+    }
+
+    bound function getValue from (m is F3Member) to F3Value 
+    {
+        var myValue = value;
+        if (m is F3VarMember) {
+            var v = m as F3VarMember;
+            if (v.isStatic()) then v.getValue(null) else v.getValue(myValue as F3ObjectValue);
+        } else null
+    }
+
     override function toString to String 
     {
         "MemberTreenode row={row} label={label} {m}"
@@ -1496,6 +1522,41 @@ public class MemberTreecell is Treeview.Treecell
 		       0);
 	}
     };
+
+    const indent = 2;
+
+    function showValue from (mtn is MemberTreenode) to Node {
+        var value = mtn.value;
+        if (value == null) then null else {
+                var m = mtn.m;
+                if (NUMBER_TYPE.isAssignableFrom(value.getType())) {
+                    var fieldWidth = 64;
+                    var width = tv.cellWidth;
+                    TransformNode {
+                        tx: bind width / 2 - fieldWidth / 2-indent;
+                        content: Inspector.NumberField {
+                            height: bind tv.cellHeight;
+                            width: bind fieldWidth;
+                            i: Inspector.InspectedNumber {
+                                member: m;
+                                override function get to java.lang.Float {
+                                    (mtn.value as f3.reflect.F3Local.Value).asObject() as Integer;
+                                }
+                                override function set from (n is java.lang.Float) to () 
+                                {
+                                    mtn.setValue(Reflect.ctx.mirrorOf(n));
+                                }
+                            }
+                        }
+                    }
+                } else null
+            }
+    }
+
+    override bound function getValueContent to Node {
+        var mtn = tn as MemberTreenode;
+        showValue(mtn);
+    }
 }
 
 class GetTreeview is ResizableNode {
@@ -1721,7 +1782,53 @@ class MemberListview is Listview of Member {
         });
 }
 
+// hack...
+var debugCanvas is Canvas;
+var debugPC is ExpressionView;
+
+public class ExprDebugger is DebuggerEngine {
+
+    public var canvas is Canvas;
+
+    var todo is (function from () to ())[];
+
+    public function update to () {
+        if (not (canvas.stepping and canvas.targetTimeline.paused) and todo.size() > 0) {
+            var xs = todo;
+            todo = [];
+            for (x in xs) {
+                x();
+            }
+        }
+    }
+
+    public override function step of a from (location is Object, x is a, k is Observer of a) to ()
+    {
+        if (canvas.stepping) {
+            //canvas.makeVisible();
+            const view = canvas.lookup(location.toString());
+            debugCanvas.clearSelection();
+            debugCanvas = canvas;
+            const pc = view as ExpressionView;
+            debugPC = pc;
+            pc.select();
+            println("STEP {location} => {view} event={x}");
+            canvas.targetTimeline.paused = true;
+            insert function from () to () { k.onNext(x) } into todo;
+        } else {
+            update();
+            k.onNext(x);
+        }
+    }
+}
+
 public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollable, MouseInputHandler {
+
+    public var stepping is Boolean;
+
+    public const debuggerEngine is ExprDebugger = ExprDebugger {
+        canvas: this;
+    }
 
     const treeLinker is TreeLinker = TreeLinker {
         canvas: this;
@@ -1949,6 +2056,11 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     var sourceVersion = 0;
     var sourceUpdateTime is Long = 0;
 
+    override function update to () {
+        super.update();
+        debuggerEngine.update();
+    }
+
     override function preupdate {
         if (sourceVersion > sourceUpdate) {
             const now = java.lang.System.currentTimeMillis();
@@ -2009,7 +2121,12 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     var zoomx = 1.0;
     var zoomy = 1.0;
 
-    function deleteSelection to () {
+    public function clearSelection to ()
+    {
+        selectedExpr = null;
+    }
+
+    public function deleteSelection to () {
         var n = selectedExpr;
         selectedExpr = null;
         n.unlink();
@@ -2626,6 +2743,8 @@ public class Editor is ResizableNode, Focuser {
     public var popupLayer is Group;
     public var popupScene is Scene;
 
+    public var stepping is Boolean;
+
     override public function getTargetOfFocus to Focusable { canvas }
     public var targetObject is Object;
     public var targetNode is ResourceNode = bind getAsNode(targetObject);
@@ -2694,6 +2813,7 @@ public class Editor is ResizableNode, Focuser {
 	if (prog.canvas == null) {
             println("creating canvas with {pathFactory}");
 	    prog.canvas = Canvas {
+                stepping: bind stepping;
                 debugger: debugger;
                 popupLayer: popupLayer;
                 popupScene: popupScene;

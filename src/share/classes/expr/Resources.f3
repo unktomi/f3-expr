@@ -1,7 +1,8 @@
 package expr;
 import f3.media.scene.*;
 import f3.media.svg.SVG;
-import java.io.File;
+import java.io.*;
+import java.util.zip.*;
 import expr.prog.Expression.ExprScene;
 import expr.prog.Expression.MemberNode;
 
@@ -59,44 +60,52 @@ public class ImageResource is SpatialResource {
 public class WebResource is SpatialResource {
 }
 
-function makeResource from (n is ResourceNode) to SpatialResource {
-    SpatialResource {
-	url: n.url;
-	tx: n.tx;
-	ty: n.ty;
-	tz: n.tz;
+class ResourceBuilder {
 
-	sx: n.sx;
-	sy: n.sy;
-	sz: n.sz;
+    function convertUrl from (url is String) to String 
+    {
+        url
+    }
 
-	rx: n.rx;
-	ry: n.ry;
-	rz: n.rz;
-
-	px: n.px;
-	py: n.py;
-	pz: n.pz;
-        programs: foreach (p in n.programs) ProgramResource {
-            event: p.event.serialize();
-            code: p.code;
-            compiled: p.sourceCode;
+    function makeResource from (n is ResourceNode) to SpatialResource {
+        SpatialResource {
+            url: convertUrl(n.url);
+            tx: n.tx;
+            ty: n.ty;
+            tz: n.tz;
+            
+            sx: n.sx;
+            sy: n.sy;
+            sz: n.sz;
+            
+            rx: n.rx;
+            ry: n.ry;
+            rz: n.rz;
+            
+            px: n.px;
+            py: n.py;
+            pz: n.pz;
+            programs: foreach (p in n.programs) ProgramResource {
+                event: p.event.serialize();
+                code: p.code;
+                compiled: p.sourceCode;
+            }
         }
     }
-}
-
-function makeResource from (n is ResourceTimeNode) to TemporalResource {
-    println("unwrapped content of {n.url} => {n.unwrapContent()}");
-    TemporalResource {
-	url: n.url;
-	playTime: n.playTime;
-	playRate: n.playRate;
-	playCount: n.playCount;
-        content: foreach (j in n.unwrapContent()) if (j is ResourceTimeNode) then makeResource(j as ResourceTimeNode) else null;
-        programs: foreach (p in n.programs) ProgramResource {
-            event: p.event.serialize();
-            code: p.code;
-            compiled: p.sourceCode;
+    
+    function makeResource from (n is ResourceTimeNode) to TemporalResource {
+        println("unwrapped content of {n.url} => {n.unwrapContent()}");
+        TemporalResource {
+            url: convertUrl(n.url);
+            playTime: n.playTime;
+            playRate: n.playRate;
+            playCount: n.playCount;
+            content: foreach (j in n.unwrapContent()) if (j is ResourceTimeNode) then makeResource(j as ResourceTimeNode) else null;
+            programs: foreach (p in n.programs) ProgramResource {
+                event: p.event.serialize();
+                code: p.code;
+                compiled: p.sourceCode;
+            }
         }
     }
 }
@@ -121,6 +130,86 @@ public class ProgramResource is Resource {
     public var compiled is String;
 }
 
+class ExportingBuilder is ResourceBuilder {
+    const resourcesToCopy = new java.util.HashSet of String();
+    override override function convertUrl from (url is String) to String {
+        if (url.startsWith("timenode://") or url.contains("#")) {
+            return url;
+        } 
+        resourcesToCopy.add(url);
+        return "file:./{new java.net.URL(url).getPath()}";
+    }
+    override function makeResource from (n is ResourceNode) to SpatialResource {
+        super.makeResource(n);
+    }
+    override function makeResource from (n is ResourceTimeNode) to TemporalResource {
+        super.makeResource(n);
+    }
+}
+
+public function export
+    from (fileName is String,
+          url is String,
+	  mainScene is Scene,
+	  spatial is ResourceGroup,
+	  temporal is ResourceTimeGroup,
+          scenes is ResourceScene[])
+    to ()
+{
+    const zip = new java.util.zip.ZipOutputStream(new BufferedOutputStream(new FileOutputStream(fileName)));
+    var scene = mainScene;
+    const builder = ExportingBuilder {};
+    if (url.startsWith("file:")) {
+	const file = new java.io.File(url.substring(5));
+	const sceneRes = SceneResource {
+            url: url;
+	    width: scene.width;
+	    height: scene.height;
+	    name: scene.id;
+	    spatialResources:
+	    foreach (i in spatial.resources) {
+		builder.makeResource(i)
+	    }
+	    temporalResources:
+	    foreach (i in temporal.resources) {
+		builder.makeResource(i)
+	    }
+            layers: foreach (i in scenes) SceneLayer {
+                name: i.id;
+                spatialResources: foreach (j in i.currentResource.resources) builder.makeResource(j)
+            }
+	}
+        zip.putNextEntry(new ZipEntry(file.getName()));
+	const w = new java.io.BufferedWriter(new OutputStreamWriter(zip));
+	IO.writeObject(w, sceneRes);
+	w.flush();
+        zip.closeEntry();
+        const copied = new java.util.HashSet of String;
+        for (uu in builder.resourcesToCopy) {
+            const u = new java.net.URL(uu);
+            const entryName = u.getPath().substring(1);
+            if (copied.add(entryName)) {
+                zip.putNextEntry(new ZipEntry(entryName));
+                const s = u.openStream();
+                copyStream(s, zip);
+                zip.closeEntry();
+            }
+        }
+    }
+    zip.close();
+}
+
+function copyStream from (input is java.io.InputStream, output is java.io.OutputStream) to ()
+{
+    const buffer = java.lang.reflect.Array.newInstance(java.lang.Byte.TYPE, 4096) as nativearray of Byte;
+    var count is Integer;
+    while ((count = input.read(buffer, 0, buffer.length)) > 0) {
+        output.write(buffer, 0, count);
+    }
+}
+    
+
+
 public function save 
     from (url is String,
 	  mainScene is Scene,
@@ -128,25 +217,28 @@ public function save
 	  temporal is ResourceTimeGroup,
           scenes is ResourceScene[])
     to ()
+
 {
     var scene = mainScene;
     if (url.startsWith("file:")) {
 	const file = new java.io.File(url.substring(5));
+        const builder = ResourceBuilder {};
 	const sceneRes = SceneResource {
+            url: url;
 	    width: scene.width;
 	    height: scene.height;
 	    name: scene.id;
 	    spatialResources:
 	    foreach (i in spatial.resources) {
-		makeResource(i)
+		builder.makeResource(i)
 	    }
 	    temporalResources:
 	    foreach (i in temporal.resources) {
-		makeResource(i)
+		builder.makeResource(i)
 	    }
             layers: foreach (i in scenes) SceneLayer {
                 name: i.id;
-                spatialResources: foreach (j in i.currentResource.resources) makeResource(j)
+                spatialResources: foreach (j in i.currentResource.resources) builder.makeResource(j)
             }
 
 	}
