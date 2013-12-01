@@ -250,6 +250,21 @@ class TimeNodeView is AbstractNode
                      }
                  }]
               },
+              Group {
+                  content: bind if (target is Channel of ?) then {
+                          var ch = target as Channel of Object;
+                          foreach (k in ch.keys) {
+                              Image {
+                                  url: "{__DIR__}keybubblemarker.png";
+                                  transform: bind translate(trax.durationToX(k.position), 0);
+                              }
+                          }
+                      } else null;
+              },
+              Group {
+                  transform: bind translate(-w/2, 0);
+                  content: bind if (target is Channel of Number) then makeCurve(target as Channel of Number) else null;
+              },
               Group { 
                   transform: bind translate(-w/2, 0);
                   content: bind if (expanded) then content else [] 
@@ -834,4 +849,91 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	selectedTimeNodeView = x;
     }
 
+    function makeTangent from (ch is Channel, k is KeyFrame.Key of Number, 
+                               interp is KeyFrame.Interpolator of Number, 
+                               valueBounds is Vec2,
+                               viewHeight is Number) to TangentTool 
+    {
+        const ty = valueBounds.x;
+        var dy = (valueBounds.y - valueBounds.x);
+        const sy = if (dy == 0) then 1.0 else viewHeight / dy;
+        println("VALUE BOUNDS {valueBounds}");
+        println("ty={ty}, sy={sy}");
+        var x1 is Number;
+        var y1 is Number;
+        var x2 is Number;
+        var y2 is Number;
+        if (interp is KeyFrame.Tangent) {
+            const t = interp as KeyFrame.Tangent;
+            const kix = t.kix;
+            const kiy = t.kiy;
+            const kox = t.kox;
+            const koy = t.koy;
+            const value1 = k.prev.value;
+            const value2 =  k.value;
+            const p0 = value1;
+            const p3 = value2;
+            const frame1 = (k.prev.position / (1s/24))  as Integer;
+            const frame2 = (k.position / (1s/24))  as Integer;
+            const outTan = if (kox == 0) then 0 else koy / (kox * 24.0);
+            const inTan = if (kix == 0) then 0 else  kiy / (kix * 24.0);
+            const oneThirdDelta = (frame2 - frame1) / 3.0;
+            const p1Delta = outTan * oneThirdDelta;
+            const p2Delta = -inTan * oneThirdDelta;
+            x1 = oneThirdDelta;
+            y1 = p1Delta;
+            x2 = oneThirdDelta;
+            y2 = -p2Delta;
+        } else {
+            const frame1 = (k.prev.position / (1s/24))  as Integer;
+            const frame2 = (k.position / (1s/24))  as Integer;
+            x1 = frame1;
+            x2 = frame2;
+            y1 = k.prev.value;
+            y2 = k.value;
+        }
+
+        y1 -= ty;
+        y2 -= ty;
+
+        y1 *= sy;
+        y2 *= sy;
+
+        const outAngle = Math.atan2(y1, x1);
+        const inAngle = Math.atan2(y2, x2);
+        const outLength = Math.sqrt(x1*x1+y1*y1);
+        const inLength = Math.sqrt(x2*x2+y2*y2);
+
+        TangentTool {
+            editable: false;
+            transform: bind translate(durationToX(k.prev.position), -viewHeight/2.0);
+            p1: bind new Vec2(0, (k.prev.value - ty)*sy);
+            p2: bind new Vec2(durationToX(k.position-k.prev.position) / ch.toSceneTransform.rate,
+                              (k.value - ty)*sy);
+            inAngle: inAngle;
+            inLength: inLength;
+            outAngle: outAngle;
+            outLength: outLength;
+            isPointOnly: k.prev == null and k.next == null;
+        }
+    }
+
+    function getValueBounds from (ch is Channel of Number) to Vec2 {
+        var min = Number.MAX_VALUE;
+        var max = Number.MIN_VALUE;
+        for (k in ch.keys) {
+            const n is Number = k.value;
+            if (n > max) max = n;
+            if (n < min) min = n;
+        }
+        return new Vec2(min, max);
+    }
+
+    function makeCurve from (ch is Channel of Number) to Node {
+        Group {
+            content: bind foreach (k in ch.keys) {
+                makeTangent(ch as Channel of Number, k, k.interpolator, getValueBounds(ch), getViewHeight());
+            }
+        }
+    }
 }
