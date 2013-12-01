@@ -183,6 +183,7 @@ public class Treecell is AbstractNode {
         var str = color.toCss();
         return str;
     }
+    protected bound function getValueContent to Node { null }
     override var internalContent = Group {
 	content: 
 	[Rectangle {
@@ -205,16 +206,10 @@ public class Treecell is AbstractNode {
 		 height: bind tv.cellHeight;
 		 width: bind tv.cellWidth;
 		 text: bind tn.label;
-	     }
-             /*
-             XHTML.Text {
-		 style: bind "color:{css(fg)};background-color:{css(bg)}; font-weight:bold; font-family:Lucida Grande; font-size:10pt";
-		 height: bind tv.cellHeight;
-		 width: bind tv.cellWidth;
-                 content: bind tn.label
-             }
-             */
-             ];
+	     },
+             Group {
+                 content: bind getValueContent();
+             }];
 	 }]
     };
     function dumpCells to () {
@@ -265,8 +260,8 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
     
     const bgs = foreach (i in [0..<MAX_DEPTH]) ColorPaint(Color.gray(getBackgroundGray(i)));
 
-    var cellHeight is Number = 16;
-    var cellWidth = bind width;
+    public var cellHeight is Number = 16;
+    public readonly var cellWidth = bind width;
 
     public var indent = 6;
 
