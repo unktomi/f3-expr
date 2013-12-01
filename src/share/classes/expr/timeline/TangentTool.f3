@@ -1,0 +1,203 @@
+package expr.timeline;
+import f3.media.scene.*;
+import f3.media.input.*;
+import f3.media.scene.Shape2D.*;
+import f3.math.*;
+import f3.math.LinearMath.*;
+import java.lang.Math;
+
+public class TangentLine is AbstractNode {
+    var setTangent1 is function from (Number, Number) to ();
+    var setTangent2 is function from (Number, Number) to ();
+    public var angle is Number;
+    public var length is Number = 20;
+    public var lengthScale is Tuple2 = Tuple2.<<1>>;
+    override var visible = false;
+    readonly var p1 is Vec2 = bind  c - (dir * lengthScale) * length;
+    readonly var p2 is Vec2 = bind  c + (dir * lengthScale) * length;
+    public var c is Vec2;
+    public var lineColor is Paint = ColorPaint(Color.RED);
+    public var handleColor is Paint = ColorPaint(Color.RED);
+    readonly var handleStroke is Paint = bind lineColor;
+    public var handleRadius is Number = 4;
+    readonly var dir = bind new Vec2(Math.cos(angle), Math.sin(angle));
+    public var commit is function from () to ();
+    public var right is Boolean;
+    const handle1 is Rectangle = Rectangle { 
+        visible: bind right;
+        cx: bind p1.x;
+        cy: bind p1.y;
+        //radius: bind  handleRadius; 
+        width: bind handleRadius;
+        height: bind handleRadius*3;
+        blocksPointer: true;
+        override function onMouseDrag from (e is MouseEvent) to ()
+        {
+            const p0 = p1 + new Tuple2(0, e.drag.y);
+            var dir = c - p0;
+            dir /= lengthScale;
+            const length = dir.length();
+            const angle = Math.atan2(dir.y, dir.x);
+            setTangent1(angle, length);
+        }
+        override function onMouseUp from (e is MouseEvent) to () { commit() }
+        fillPaint: bind handleColor;
+        strokePaint: bind handleStroke;
+    }
+    const handle2 is Rectangle = Rectangle { 
+        visible: bind not right;
+        width: bind handleRadius;
+        height: bind handleRadius*3;
+        cx: bind p2.x; 
+        cy: bind p2.y;
+        blocksPointer: true;
+        override function onMouseDrag from (e is MouseEvent) to () {
+            var p0 = p2 + new Tuple2(0, e.drag.y);
+            var dir = p0 - c;
+            dir /= lengthScale;
+            var length = dir.length();
+            var angle = Math.atan2(dir.y, dir.x);
+            setTangent2(angle, length);
+        }
+        override function onMouseUp from (e is MouseEvent) to () { commit() }
+        fillPaint: bind handleColor;
+        strokePaint: bind handleStroke;
+    };
+    const tangentLine: Path = Path {
+        content: bind if (not right) [moveTo(c), lineTo(p2)] else [moveTo(p1), lineTo(c)];
+        strokePaint: bind lineColor;
+    };
+    override var internalContent = Group { content: bind [tangentLine, handle1, handle2] }
+}
+
+public class TangentTool is AbstractNode {
+    public var p1 is Vec2;
+    readonly var cp1 is Vec2 = bind outTangent.p2;
+    readonly var cp2 is Vec2 = bind inTangent.p1;
+    public var p2 is Vec2;
+    public var selected1 is Boolean;
+    public var selected2 is Boolean;
+    public var select1 is function from () to ();
+    public var select2 is function from () to ();
+    readonly var spanX is Number = bind (p2 - p1).x;
+    readonly var spanY is Number = bind spanX / 3;
+    public var curveColor is Paint = ColorPaint(Color.GREEN);
+    readonly var curve is Path = bind if (isPointOnly) null else Path {
+        content: bind [moveTo(p1), cubicTo(cp1, cp2, p2)];
+        strokePaint: bind curveColor;
+        blocksPointer: true;
+        override function onMouseDown from (e is MouseEvent) to ()
+        {
+        //            outTangent.visible = true;
+        }
+    }
+
+    public var editable is Boolean = true;
+
+    public var label1 is String;
+    public var label2 is String;
+    public var setInTangent is function from (Number, Number) to ();
+    public var setOutTangent is function from (Number, Number) to ();
+    public var inAngle is Number;
+    public var inLength is Number = 0;
+    public var outLength is Number= 0;
+    public var outAngle is Number;
+    public var valueScale is Vec2 = Vec2.<<1>>;
+
+    const inTangent is TangentLine = TangentLine {
+        c: bind p2;
+        handleColor: ColorPaint(Color.WHITE);
+        lineColor: ColorPaint(Color.BLUE);
+        angle: bind inAngle;
+        length: bind inLength;
+//        commit: function() { undoable.commit() }
+//        visible: bind not right;
+        lengthScale: bind valueScale;
+        visible: bind selected2;
+        right: true;
+        setTangent1: setInTangent;
+    }
+
+    const outTangent is TangentLine = TangentLine {
+        c: bind p1;
+        handleColor: ColorPaint(Color.WHITE);
+        angle: bind outAngle;
+        length: bind outLength;
+        lengthScale: bind valueScale;
+        right: false;
+        visible: bind selected1;
+//        commit: function() { undoable.commit() }
+        setTangent2: setOutTangent;
+    }
+
+    const pt1 is Circle = Circle { 
+        visible: bind editable and not isPointOnly;
+        transform: bind translate(p2.x, p2.y);
+        radius: 4;
+        fillPaint: bind curveColor;
+        strokePaint: ColorPaint(Color.WHITE);
+        //        visible: bind not right;
+        blocksPointer: false;
+        var moving is Boolean;
+        override function onMouseDown from (e is MouseEvent) to () 
+        {
+            clickPt1();
+        }
+        override function onMouseUp from (e is MouseEvent) to ()
+        {
+            if (not moving) {
+                selected1 = true;
+                select1();
+            }
+            releasePt1();
+            moving = false;
+        }
+
+        override function onMouseDrag from (e is MouseEvent) to ()
+        {
+            moving = true;
+            movePt1(e.drag.x, e.drag.y);
+        }
+    }
+
+    public var isPointOnly is Boolean = false;
+
+    const pt2 is Circle = Circle { 
+        visible: bind editable;
+        transform: bind translate(p2.x, p2.y);
+        radius: 4
+        fillPaint: bind curveColor;
+        strokePaint: ColorPaint(Color.WHITE);
+        blocksPointer: false;
+        var moving is Boolean;
+        override function onMouseDown from (e is MouseEvent) to () 
+        {
+            clickPt2();
+        }
+        override function onMouseUp from (e is MouseEvent) to ()
+        {
+            if (not moving) {
+                selected2 = true;
+                select2();
+            }
+            releasePt2();
+            moving = false;
+        }
+
+        override function onMouseDrag from (e is MouseEvent) to ()
+        {
+            moving = true;
+            movePt2(e.drag.x, e.drag.y);
+        }
+    };
+
+    public var movePt1 is function from (Number, Number) to ();
+    public var movePt2 is function from (Number, Number) to ();
+    public var clickPt1 is function from () to ();
+    public var clickPt2 is function from () to ();
+    public var releasePt1 is function from () to ();
+    public var releasePt2 is function from () to ();
+    override var internalContent = Group { content: bind [curve, pt1, pt2, inTangent, outTangent] }
+    public var right is Boolean;
+}
+
