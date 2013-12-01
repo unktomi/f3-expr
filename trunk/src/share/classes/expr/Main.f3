@@ -1372,8 +1372,8 @@ public function run from (args is String[]) to ()
         override var content = bind [currentScenes, manipLayer, editorScene];
 	
         onClose: function from () to Boolean {
-            if (fileDirty()) {
-                save();
+            if (not saveChangesIfNecessary()) {
+                return false;
             }
             saveEditorState(editorScene);
             return true;
