@@ -1,0 +1,54 @@
+package expr;
+import f3.util.*;
+import f3.util.Observer.*;
+import f3.util.Observable.*;
+
+public class DebuggerEngine is ObservableDebugger {
+
+    public function step of a from (location is Object, x is a, k is Observer of a) to ()
+    {
+        k.onNext(x);
+    }
+
+    public function onError of a from (location is Object, e is java.lang.Exception, k is Observer of a) to ()
+    {
+        k.onError(e);
+    }
+
+    public function onCompleted of a from (location is Object, k is Observer of a) to ()
+    {
+        k.onCompleted()
+    }
+
+    override public function debug of a from (xs is Observable of a, id is Object) to Observable of a
+    {
+        DebugTarget of a {
+            debugger: this;
+            target: xs;
+            id: id;
+        }
+    }
+}
+
+public class DebugTarget of a is DefaultObservable of a {
+    public const debugger is DebuggerEngine;
+    public const target is Observable of a;
+    public const id is Object;
+    override function subscribe from (obs is Observer of a) to Disposable {
+        target.subscribe(DefaultObserver of a {
+                override function onNext from (x is a) to ()
+                {
+                    debugger.step(id, x, obs);
+                }
+                override function onError from (e is java.lang.Exception) to ()
+                {
+                    debugger.onError(id, e, obs);
+                }
+                override function onCompleted to ()
+                {
+                    debugger.onCompleted(id, obs);
+                }
+            });
+            
+    }
+}
