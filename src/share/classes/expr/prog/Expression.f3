@@ -1381,7 +1381,7 @@ class MemberTreenode is Treenode {
         var myValue = value;
         if (m is F3VarMember) {
             var v = m as F3VarMember;
-            if (v.isStatic()) then v.getValue(null) else v.getValue(myValue as F3ObjectValue);
+            if (v.isStatic()) then v.getValue(null) else if myValue == null then null else v.getValue(myValue as F3ObjectValue);
         } else null
     }
 
