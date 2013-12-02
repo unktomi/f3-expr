@@ -629,13 +629,16 @@ public function run from (args is String[]) to ()
     }
 
     function doSave to Boolean {
-	savePoint = MasterUndoable.now;
-	Resources.save(mainScene.currentResource.url,
-		       mainScene,
-		       mainScene.currentResource,
-		       currentAnimResource,
-                       currentScenes[x | x <> mainScene]);
-        return true;
+        if (mainScene.currentResource.url <> "") {
+            savePoint = MasterUndoable.now;
+            Resources.save(mainScene.currentResource.url,
+                           mainScene,
+                           mainScene.currentResource,
+                           currentAnimResource,
+                           currentScenes[x | x <> mainScene]);
+            return true;
+        }
+        return false;
     }
 
     function doExport to () {
@@ -1568,6 +1571,9 @@ public function run from (args is String[]) to ()
 			} else {
 			    MasterUndoable.undo();
 			    }*/
+		    } else if (event.keyCode == Keys.G) {
+                        java.lang.System.gc();
+                        println("{java.lang.Runtime.getRuntime().freeMemory()} / {java.lang.Runtime.getRuntime().totalMemory()}");
 		    } else if (event.keyCode == Keys.F) {
                         if (currentScene == mainScene) {
                             viewer.focusCamera(currentTransform);

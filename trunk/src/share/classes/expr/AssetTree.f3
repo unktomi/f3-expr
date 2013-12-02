@@ -72,7 +72,7 @@ public class ClipLibraryAsset is Asset {
 	ClipAsset { 
 	    url: "{url}#{c.id}";
 	    name: c.id; 
-	    override function getClip to TimeNode { temporalRoot.lookup(url) } 
+	    override function getClip to TimeNode { const j = temporalRoot.lookup(c.id); if (j == null) then c else j }
 	}
     }
 }

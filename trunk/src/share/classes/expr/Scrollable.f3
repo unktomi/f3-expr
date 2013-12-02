@@ -7,4 +7,6 @@ public interface Scrollable {
     public bound function getSy to Number { 1.0 }
     public abstract function setX from (tx is Number, sx is Number) to ();
     public abstract function setY from (ty is Number, sy is Number) to ();
+    public function onScrollVertically from (value is Boolean) to () {}
+    public function onScrollHorizontally from (value is Boolean) to () {}
 }
