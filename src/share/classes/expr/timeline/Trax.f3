@@ -251,6 +251,7 @@ class TimeNodeView is AbstractNode
                  }]
               },
               Group {
+                  transform: bind translate(-w/2, 0);
                   content: bind if (target is Channel of ?) then {
                           var ch = target as Channel of Object;
                           foreach (k in ch.keys) {
@@ -261,10 +262,12 @@ class TimeNodeView is AbstractNode
                           }
                       } else null;
               },
+                /*
               Group {
                   transform: bind translate(-w/2, 0);
                   content: bind if (target is Channel of Number) then makeCurve(target as Channel of Number) else null;
               },
+                */
               Group { 
                   transform: bind translate(-w/2, 0);
                   content: bind if (expanded) then content else [] 
@@ -471,7 +474,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 
     function refreshPlayhead from () to () 
     {
-	if (not playhead.dragging and not backgroundDragging) {
+	if (not playhead.dragging and not backgroundDragging and not horizontalScrolling) {
 	    if (currentFrame < scrollOffset) {
 		scrollOffset = currentFrame;
 	    } else if (currentFrame > scrollOffset + visibleFrameCount) {
@@ -610,19 +613,19 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 
     override public function setX from (tx is Number, sx is Number) to ()
     {
-        //println("Y {getTy()}, {getSy()} / {sy0} root bounds={root.bounds.height()} height={height}, scrollY={scrollY}");
         //println("tx={tx} sx={sx}");
         const cur = getSx();
-       // println("cur={cur}");
-       // println("pixelsPerFrame={pixelsPerFrame()}");
+        // println("cur={cur}");
+        // println("pixelsPerFrame={pixelsPerFrame()}");
         //println("frameRateN={frameRateN}");
-        scrollOffset = durationToFrame(dur * tx);
         if (sx <> 0) {
             frameRateN *= cur / sx;
             //println("tx=>{getTx()} sx=>{getSx()}");
-            println("pixelsPerFrame={pixelsPerFrame()}");
-            println("frameRateN={frameRateN}");
+            //println("pixelsPerFrame={pixelsPerFrame()}");
+            //println("frameRateN={frameRateN}");
         }
+        scrollOffset = durationToFrame(dur * tx);
+        //println("scrollOffset => {scrollOffset}");
     }
 
     const playhead is Playhead = Playhead {
@@ -631,7 +634,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	override var height = bind getSelf().height;
     }
     var scrollY is Integer;
-    var scrollOffset is Number;
+    public var scrollOffset is Number;
     var visibleDuration is Duration = bind visibleInterval.duration();
     var labels is Node[] = bind drawLabels(width, height, scrollOffset, frameRate);
     var font = bind layoutEngine.createFont("font-size:8;font-family:Lucida Grande");
@@ -721,6 +724,16 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 		break;
 	    }
 	}
+    }
+
+    var horizontalScrolling = false;
+    
+    override function onScrollHorizontally from (b is Boolean) to ()
+    {
+        horizontalScrolling = b;
+        if (not b) {
+            frameRateN = Math.round(frameRateN);
+        }
     }
 
     var backgroundDragging = false;
@@ -935,5 +948,11 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
                 makeTangent(ch as Channel of Number, k, k.interpolator, getValueBounds(ch), getViewHeight());
             }
         }
+    }
+
+    public function setKey of a from (ch is Channel of a) to ()
+    {
+        if (not ch.pickable) { return }
+        ch.setKey();
     }
 }

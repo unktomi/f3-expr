@@ -82,6 +82,10 @@ public class Scrollpane is ResizableNode, Focuser {
                     println("SET RECT  {ty} {sy}");
                     currentScrollable.setY(ty, sy);
                 }
+                override function onScroll from (value is Boolean) to ()
+                {
+                    currentScrollable.onScrollVertically(value);
+                }
             }
         },
         TransformNode {
@@ -98,6 +102,10 @@ public class Scrollpane is ResizableNode, Focuser {
                     to ()
                 {
                     currentScrollable.setX(tx, sx);
+                }
+                override function onScroll from (value is Boolean) to ()
+                {
+                    currentScrollable.onScrollHorizontally(value);
                 }
             }
         }]

@@ -31,6 +31,9 @@ public class HScrollbar is ResizableNode {
 
     const self = this;
 
+    public readonly var scrolling is Boolean;
+    public function onScroll from (b is Boolean) to () {}
+
     const run is Rectangle = Rectangle is MouseInputHandler {
         height: bind height;
         width: bind width;
@@ -64,6 +67,7 @@ public class HScrollbar is ResizableNode {
                     dragType = PAN;
                 }
             }
+            startScroll();
             dx = 0.0;
             tx0 = self.tx;
             x0 = tx0 * width;
@@ -90,6 +94,20 @@ public class HScrollbar is ResizableNode {
                 setRect(tx, sx);
             }
         }
+
+        override function onMouseUp from (e is MouseEvent) to () {
+            endScroll();
+        }
+    };
+
+    function startScroll to () 
+    {
+        onScroll(true);
+    }
+
+    function endScroll to () 
+    {
+        onScroll(false);
     }
 
     var runWidth = bind width - 4;
