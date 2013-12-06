@@ -1804,7 +1804,8 @@ class MemberListview is Listview of Member {
                 k(null);
             } else {
                 const f = canvas.createMemberView(targetPosition, m, 0) as FunctionView; // hack
-                k(f.inputs[0]);
+                const i = if (f.fun.funMember.m.isStatic()) then 1 else 0;
+                k(f.inputs[i]);
             }
         });
 }
