@@ -571,6 +571,22 @@ public class GetVar is VarExpression, ObservableExpression, ObserverExpression {
 public class SetVar is VarExpression, ObserverExpression {
 }
 
+function descendsFromObservableRoot from (p is Expression) to Boolean {
+    if (p is ObserverExpression) {
+        const ob = p as ObserverExpression;
+        if (ob.observable <> null) {
+            return descendsFromObservableRoot(ob.observable);
+        }
+    }
+    if (p is MemberExpression) {
+        const m = p as MemberExpression;
+        if (m.isObservable()) {
+            return true;
+        }
+    }
+    return false;
+}
+
 public class Function is MemberExpression {
     public var funMember is FunctionMember;
     override var member = bind funMember;
@@ -598,9 +614,20 @@ public class Function is MemberExpression {
     }
 
     override public function toSource to String {
-	const observable = inputs[0].observable;
+	var observable is Expression;
+        var j is Integer = -1;
+        for (i in inputs) {
+            if (descendsFromObservableRoot(i.observable)) {
+                if (observable == null) {
+                    observable = i.observable;
+                    j = indexof i;
+                } else {
+                    println("multiple roots: {observable}, {i.observable}");
+                }
+            }
+        }
         println("Function to source observable={observable}");
-	const result = if (not isObservableType(inputs[0].t) and observable is MemberExpression and { const mexp = observable as MemberExpression; mexp.isObservable() } ) {
+	const result = if (not isObservableType(inputs[j].t) and observable is MemberExpression and { const mexp = observable as MemberExpression; mexp.isObservable() } ) {
 	    const m = observable as MemberExpression;
             if (inputs.size() == 1) {
                 if (inputs[0].observable <> null) {
@@ -624,25 +651,25 @@ public class Function is MemberExpression {
                 }
             } else {
                 if (not fun.isStatic()) {
-                    const i = getIVar(inputs[0]);
+                    const i = getIVar(inputs[j]);
                     var sep = "";
                     var args is String;
-                    for (j in [0..<ft.minArgs()]) {
-                        const p = inputs[j+1];
-                        println("p={p}");
-                        args = "{args}{sep}{p.toSource()}";
+                    var targ is String = if (j == 0) then i else inputs[0].toSource();
+                    for (k in [0..<ft.minArgs()]) {
+                        const p = if (k+1 == j) then i else inputs[k+1].toSource();
+                        args = "{args}{sep}{p}";
                         sep = ", ";
-                        println("args => {args}");
                     }
                     println("non static case 3");
-                    "(foreach ({i} in debugger.debug({observable.toSource()}, \"{id}\")) {i}.{fun.getName()}({args}))";
+                    "(foreach ({i} in debugger.debug({observable.toSource()}, \"{id}\")) {targ}.{fun.getName()}({args}))";
                 } else {
-                    const i = getIVar(inputs[0]);
+                    const i = getIVar(inputs[j]);
                     var args is String = "";
                     var sep = "";
-                    for (j in [0..<ft.minArgs()]) {
-                        const p = inputs[j+1];
-                        args = "{args}{sep}{p.toSource()}";
+                    for (k in [0..<ft.minArgs()]) {
+                        const p = if (k+1 == j) then i else inputs[k+1].toSource();
+                        args = "{args}{sep}{p}";
+                        sep = ", ";
                     }
                     println("static case 3");
                     "(foreach ({i} in debugger.debug({observable.toSource()}, \"{id}\")) {sourceFunName(fun)}({args}))";
@@ -650,21 +677,22 @@ public class Function is MemberExpression {
             }
 	} else {
             if (not fun.isStatic()) {
-                const i = inputs[0].toSource();
+                const i = inputs[j].toSource();
                 var sep = "";
                 var args is String;
-                for (j in [0..<ft.minArgs()]) {
-                    const p = inputs[j+1];
-                    args = "{args}{sep}{p.toSource()}";
+                var targ is String = if (j == 0) then i else inputs[0].toSource();;
+                for (k in [0..<ft.minArgs()]) {
+                    const p = if (k+1 == j) then i else inputs[k+1].toSource();
+                    args = "{args}{sep}{p}";
                     sep = ", ";
                 }
                 println("non static case 4");
-                "{i}.{fun.getName()}({args})";
+                "{targ}.{fun.getName()}({args})";
             } else {
                 var args is String = "";
                 var sep = "";
-                for (j in [0..<ft.minArgs()]) {
-                    const p = inputs[j+1];
+                for (k in [0..<ft.minArgs()]) {
+                    const p = inputs[k+1];
                     args = "{args}{sep}{p.toSource()}";
                     sep = ", ";
                 }
