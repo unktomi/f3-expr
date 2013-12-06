@@ -25,6 +25,18 @@ var exprMap2 = new java.util.HashMap of (F3ClassType, Member[]);
 
 const MAT4_TYPE = Reflect.findClass("f3.math.Mat4");
 
+function sourceFunName from (fun is F3FunctionMember) to String {
+    if (fun.isStatic()) {
+        if (fun.getName().startsWith("new")) {
+            fun.getName();
+        } else {
+            "{fun.getDeclaringClass().getName()}.{fun.getName()}";
+        }
+    } else {
+        fun.getName();
+    }
+}
+
 function typeApply(target is F3Type, 
                    srcType is F3Type,
                    subst is F3Type) 
@@ -567,11 +579,11 @@ public class Function is MemberExpression {
     override function getType { ft }
     public var inputs is Parameter[] =
 	bind 
-        [if (fun == null or fun.isStatic()) then null else 
+        [if (fun == null) then null else 
          Parameter {
-             name: formatClassName(fun.getDeclaringClass());
+             name: if (fun.isStatic()) then "()" else formatClassName(fun.getDeclaringClass());
              target: this;
-             t: fun.getDeclaringClass()
+             t: if (fun.isStatic()) then UNIT_TYPE else fun.getDeclaringClass()
          },           
          foreach (i in [0..<ft.minArgs()]) {
              Parameter {
@@ -595,7 +607,7 @@ public class Function is MemberExpression {
                     const i = getIVar(inputs[0]);
                     if (fun.isStatic()) {
                         println("static case 1");
-                        "(foreach ({i} in debugger.debug({observable.toSource()}, \"{id}\")) {fun.getDeclaringClass().getName()}.{fun.getName()}({i}))";
+                        "(foreach ({i} in debugger.debug({observable.toSource()}, \"{id}\")) {sourceFunName(fun)}())";
                     } else {
                         println("non static case 1");
                         "(foreach ({i} in debugger.debug({observable.toSource()}, \"{id}\")) {i}.{fun.getName()}())";
@@ -626,14 +638,14 @@ public class Function is MemberExpression {
                     "(foreach ({i} in debugger.debug({observable.toSource()}, \"{id}\")) {i}.{fun.getName()}({args}))";
                 } else {
                     const i = getIVar(inputs[0]);
-                    var args is String = i;
-                    var sep = ", ";
-                    for (j in [1..<ft.minArgs()]) {
-                        const p = inputs[j];
+                    var args is String = "";
+                    var sep = "";
+                    for (j in [0..<ft.minArgs()]) {
+                        const p = inputs[j+1];
                         args = "{args}{sep}{p.toSource()}";
                     }
                     println("static case 3");
-                    "(foreach ({i} in debugger.debug({observable.toSource()}, \"{id}\")) {fun.getDeclaringClass().getName()}.{fun.getName()}({args}))";
+                    "(foreach ({i} in debugger.debug({observable.toSource()}, \"{id}\")) {sourceFunName(fun)}({args}))";
                 }
             }
 	} else {
@@ -652,7 +664,7 @@ public class Function is MemberExpression {
                 var args is String = "";
                 var sep = "";
                 for (j in [0..<ft.minArgs()]) {
-                    const p = inputs[j];
+                    const p = inputs[j+1];
                     args = "{args}{sep}{p.toSource()}";
                     sep = ", ";
                 }
@@ -1232,69 +1244,84 @@ public class ParameterView is InputView {
     override var expression = bind parameter;    
     public var inputType is F3Type;
     public var inferred is ParameterView[];
-    override bound function getLabel to String {
+
+    override bound function getLabel to String 
+    {
         formatClassName(if (inputType <> null) then inputType else parameter.t)
     }
-    override public bound function getInputType to F3Type {
+
+    override public bound function getInputType to F3Type 
+    {
         return if inputType <> null then inputType else parameter.t;
     }
-    override public function assignLinkIds to () {
+
+    override public function assignLinkIds to () 
+    {
         targetView.assignLinkIds();
     }
 
-    var numSlider = SliderField {
-        height: bind cellHeight;
-        width: bind cellWidth-100;
-        transform: translate(50, 0, 0);
-        override var t on replace {
-            parameter.constantValue = t;
-            canvas.dumpSrc();
+    function numSlider to SliderField 
+    {
+        SliderField {
+            height: bind cellHeight;
+            width: bind cellWidth-100;
+            transform: translate(50, 0, 0);
+            override var t on replace {
+                parameter.constantValue = t;
+                canvas.dumpSrc();
+            }
         }
-    };
+    }
     
-    var intSlider is SliderField = SliderField {     
-        height: bind cellHeight;
-        width: bind cellWidth-100;
-        transform: translate(50, 0, 0);
-        override function setT from (t is Number) to ()
-        {       
-            this.t = t;
+    function intSlider to SliderField 
+    {
+        SliderField {     
+            height: bind cellHeight;
+            width: bind cellWidth-100;
+            transform: translate(50, 0, 0);
+            override function setT from (t is Number) to ()
+            {       
+                this.t = t;
+            }
+            override var t on replace {
+                parameter.constantValue = (t * 100) as Integer;
+                canvas.dumpSrc();
+            }
+            override function getText from (t is Number) to String
+            {
+                "{Math.round(t * 100) as Integer}";
+            }
         }
-        override var t on replace {
-            parameter.constantValue = (t * 100) as Integer;
-            canvas.dumpSrc();
-        }
-        override function getText from (t is Number) to String
-        {
-            "{Math.round(t * 100) as Integer}";
-        }
-    };
+    }
 
-    var boolSlider = bind SliderField {     
-        height: bind cellHeight;
-        width: bind cellWidth-100;
-        transform: translate(50, 0, 0);
-        override function setT from (t is Number) to ()
-        {       
-            this.t = if (t > 0.5) then 1.0 else 0.5;
+    function boolSlider to SliderField 
+    {
+        SliderField {     
+            height: bind cellHeight;
+            width: bind cellWidth-100;
+            transform: translate(50, 0, 0);
+            override function setT from (t is Number) to ()
+            {       
+                this.t = if (t > 0.5) then 1.0 else 0.5;
+            }
+            override function getText from (t is Number) to String
+            {
+                if (t <= 0.5) then "No" else "Yes";
+            }
+            override var t on replace {
+                parameter.constantValue = (t > 0.5);
+                canvas.dumpSrc();
+            }
         }
-        override function getText from (t is Number) to String
-        {
-            if (t <= 0.5) then "No" else "Yes";
-        }
-        override var t on replace {
-            parameter.constantValue = (t > 0.5);
-            canvas.dumpSrc();
-        }
-    }; 
-    
-    override var internalContent = Group { content: bind [label, if links.size() == 0 then (if (Reflect.NUMBER_TYPE.isConvertibleFrom(getInputType())) 
-        then numSlider 
-        else if (Reflect.INTEGER_TYPE.isConvertibleFrom(getInputType()))
-            then intSlider
-            else if (Reflect.BOOLEAN_TYPE.isConvertibleFrom(getInputType())) 
-                then boolSlider
-                else null) else null] };
+    } 
+    readonly var sliderField = bind 
+        if (Reflect.NUMBER_TYPE.isConvertibleFrom(getInputType())) 
+            then numSlider() 
+            else if (Reflect.INTEGER_TYPE.isConvertibleFrom(getInputType()))
+                then intSlider()
+                else if (Reflect.BOOLEAN_TYPE.isConvertibleFrom(getInputType())) 
+                    then boolSlider() else null;
+    override var internalContent = Group { content: bind [label, if links.size() == 0 then sliderField else null] };
     
     
 }
@@ -2566,14 +2593,17 @@ public class FunNode is ExprNode {
             println("parameter {i} type is {p.parameter.getType()}");
             if (Reflect.INTEGER_TYPE == p.parameter.getType()) {
                 println("int value is {n.intValue}");
-                p.intSlider.t = n.intValue / 100.0; // hack
+                p.sliderField.t = n.intValue / 100.0; // hack
             } else if (Reflect.NUMBER_TYPE == p.parameter.getType()) {
                 println("num value is {n.numberValue}");
-                p.numSlider.t = n.numberValue;
+                p.sliderField.t = n.numberValue;
              } else if (Reflect.BOOLEAN_TYPE == p.parameter.getType()) {
                 println("bool value is {n.booleanValue}");
-                p.boolSlider.t = if n.booleanValue then 1.0 else 0.5;
+                p.sliderField.t = if n.booleanValue then 1.0 else 0.5;
+            } else if (Reflect.STRING_TYPE == p.parameter.getType()) {
+                p.parameter.constantValue = "\"\"";
             }
+            
         }
         for (p in outputs) {
             println("output: {p}");
