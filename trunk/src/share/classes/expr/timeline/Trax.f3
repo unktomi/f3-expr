@@ -567,7 +567,10 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
     }
 
     function updatePlayhead {
+        const value = target.paused;
+        target.paused = true;
 	target.setPlayhead(target.playhead);
+        target.paused = value;
     }
 
     function advancePlayhead from (frames is Number) to ()

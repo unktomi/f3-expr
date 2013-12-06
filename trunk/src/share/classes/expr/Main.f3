@@ -63,6 +63,9 @@ public class EditorState {
     public var windowWidth is Integer;
     public var windowHeight is Integer;
     public var internalWindows: InternalWindowState[];
+    public var cameraX is Number;
+    public var cameraY is Number;
+    public var cameraZ is Number;
 }
 
 function saveEditorState from (scene is Scene) to () 
@@ -721,12 +724,25 @@ public function run from (args is String[]) to ()
                 p;
             }
 	}
-	for (i in sceneRes.temporalResources, j in currentAnimResource.resources) {
-	    if (rebaseURL(i.url) == j.url) {
-		j.playTime = i.playTime;
-		j.playRate = i.playRate;
-		j.playCount = i.playCount;
-	    }
+        var tempResources = currentAnimResource.resources;
+        currentAnimResource.resources = [];
+	for (i in sceneRes.temporalResources) {
+            for (j in tempResources) {
+                var q is TimeNode;
+                if (i.url == j.url) {
+                    q = j;
+                } else if (i.url.contains("#")) { // clip from library
+                    if (j is MaResourceTimeNode) {
+                        q = j.lookup(i.url);
+                    }
+                } 
+                if (q <> null) {
+                    q.playTime = i.playTime;
+                    q.playRate = i.playRate;
+                    q.playCount = i.playCount;
+                    insert q as ResourceTimeNode into currentAnimResource.resources;
+                }
+            }
 	}
         for (j in sceneRes.layers) {
             var scene = ResourceScene {
