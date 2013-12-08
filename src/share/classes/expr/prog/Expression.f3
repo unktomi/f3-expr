@@ -1,4 +1,5 @@
 package expr.prog;
+import f3.media.xhtml.XHTML;
 import java.lang.Math;
 import f3.math.*;
 import f3.math.LinearMath.*;
@@ -35,6 +36,10 @@ function sourceFunName from (fun is F3FunctionMember) to String {
     } else {
         fun.getName();
     }
+}
+
+function formatEnglishName from (name is String) to String {
+    "<i>{Names.formatName(name)}</i>";
 }
 
 function typeApply (target is F3Type, 
@@ -361,6 +366,16 @@ public class Member {
         return "f3.util.Observables.observe(&{app})";
     }
 
+    function toEnglish to String 
+    {
+        toEnglish("");
+    }
+
+    function toEnglish from (arg is String) to String 
+    {
+	if (m is F3FunctionMember) then "{formatEnglishName(if (m.isStatic()) then m.getName() else name)} {arg}" else "{formatEnglishName(name)}";
+    }
+
     function toApply to String 
     {
         toApply("");
@@ -483,7 +498,7 @@ public interface Expression {
     override function toString { "{getClass()}: {getName()} / {getType()}" }
     public function toSource to String { "" }
     public function isObservable to Boolean { false }
-    public function toEnglish to String { "" }
+    public function toEnglish to String { formatEnglishName(getName()) }
 }
 /*
 class ObserveIfType of a {
@@ -520,6 +535,7 @@ abstract class VarContextExpression is ObjectExpression {
     public var varContext is Context.ClosureVarContext;
     override bound function getName to String { varContext.varName }
     override function toSource { "(getVar(\"{varContext.varName}\") as {getType().getName()})" }
+    override function toEnglish { varContext.varName }
 }
 
 abstract class TimeNodeExpression is ObjectExpression {
@@ -617,7 +633,28 @@ public class GetVar is VarExpression, ObservableExpression, ObserverExpression {
 	    }
 	}
     }
-}
+
+    override public function toEnglish to String {
+        println ("get var to source {this} observable={observable}");
+        if (observable is Result) {
+            return observable.toEnglish();
+	} 
+	if (observers == []) {
+	    return "";
+	}
+	const i = getIVar(this);
+	if (observable is MemberExpression and { const mexp = observable as MemberExpression; mexp.isObservable() }) {
+            "the {member.toEnglish()} of {observable.toEnglish()}";
+        } else {
+	    if (observable == null) {
+		if (OBSERVABLE_TYPE.isAssignableFrom(member.rt)) 
+		    then "the {member.toEnglish()} event"
+		    else "{member.toEnglish()}"
+	    } else {
+                "the {member.toEnglish()} of {observable.toEnglish()}";
+	    }
+	}
+    }}
 
 public class SetVar is VarExpression, ObserverExpression {
 }
@@ -662,6 +699,95 @@ public class Function is MemberExpression {
     public var output is Result = Result {
         source: this;
 	t: ft.getReturnType()
+    }
+
+    override public function toEnglish to String {
+	var observable is Expression;
+        var j is Integer = -1;
+        for (i in inputs) {
+            if (descendsFromObservableRoot(i.observable)) {
+                if (observable == null) {
+                    observable = i.observable;
+                    j = indexof i;
+                } else {
+                    println("multiple roots: {observable}, {i.observable}");
+                }
+            }
+        }
+        println("Function to source observable={observable}");
+	const result = if (not isObservableType(inputs[j].t) and observable is MemberExpression and { const mexp = observable as MemberExpression; mexp.isObservable() } ) {
+	    const m = observable as MemberExpression;
+            if (inputs.size() == 1) {
+                if (inputs[0].observable <> null) {
+                    const i = getIVar(inputs[0]);
+                    if (fun.isStatic()) {
+                        println("static case 1");
+                        "when you {formatEnglishName(sourceFunName(fun))} {observable.toEnglish()}";
+                    } else {
+                        println("non static case 1");
+                        "when you {formatEnglishName(fun.getName())} {observable.toEnglish()}";
+                    }
+                } else {
+                    if (fun.isStatic()) {
+                        println("static case 2");
+                        "{fun.getName()} {observable.toEnglish()}";
+                    } else {
+                        println("non static case 2");
+                        "{fun.getName()} {observable.toEnglish()}";
+                    }
+                }
+            } else {
+                if (not fun.isStatic()) {
+                    const i = "event"; //getIVar(inputs[j]);
+                    var sep = "";
+                    var args is String;
+                    var targ is String = if (j == 0) then i else inputs[0].toEnglish();
+                    for (k in [0..<ft.minArgs()]) {
+                        const p = inputs[k].toEnglish();
+                        args = "{args}{sep}{p}";
+                        sep = " and ";
+                    }
+                    println("non static case 3");
+                    "{formatEnglishName(fun.getName())} {args}{sep}{targ}";
+                } else {
+                    const i = "event"; getIVar(inputs[j]);
+                    var args is String = "";
+                    var sep = "";
+                    for (k in [0..<ft.minArgs()]) {
+                        const p = inputs[k+1].toEnglish();
+                        args = "{args}{sep}{p}";
+                        sep = " and ";
+                    }
+                    println("static case 3");
+                    "{formatEnglishName(sourceFunName(fun))} {args}";
+                }
+            }
+	} else {
+            if (not fun.isStatic()) {
+                var targ is String = inputs[0].toEnglish();
+                var args is String = targ;
+                var sep = " and ";
+                for (k in [0..<ft.minArgs()]) {
+                    const p = inputs[k+1].toEnglish();
+                    args = "{args}{sep}{p}";
+                    sep = " and ";
+                }
+                println("non static case 4");
+                "{formatEnglishName(fun.getName())} {args}";
+            } else {
+                var args is String = "";
+                var sep = "";
+                for (k in [0..<ft.minArgs()]) {
+                    const p = inputs[k+1];
+                    args = "{args}{sep}{p.toEnglish()}";
+                    sep = " and ";
+                }
+                println("static case 4");
+                "{formatEnglishName(fun.getName())} {args}";
+            }
+        }
+        println("gen english {this} => {result}");
+        return result;
     }
 
     override public function toSource to String {
@@ -766,6 +892,10 @@ public class Parameter is ObserverExpression {
         t.isTypeVariable();
     }
     public var constantValue is Object = "null";
+    override public function toEnglish to String 
+    {
+        if (observable == null) then "{constantValue}" else observable.toEnglish();
+    }
     override public function toSource to String 
     {
         if (observable == null) then "{constantValue}" else observable.toSource();
@@ -787,6 +917,10 @@ public class Result is ObservableExpression {
     public var t is F3Type;
     public var source is Function;
     override function getType to F3Type { if isObservableType(t) then getTypeArguments(t)[0] else t }
+    public override function toEnglish to String 
+    {
+        source.toEnglish();
+    }
     public override function toSource to String 
     {
         const result = source.toSource();
@@ -1039,12 +1173,36 @@ public class InputMemberExpression is MemberExpression, ObserverExpression {
 	}
         return res;
     }
-}
+
+    override public function toEnglish to String {
+	const i = getIVar(this);
+        var res = 
+        if (member.m is F3FunctionMember and (member.m as F3FunctionMember).getType().minArgs() > 0) {
+	    "{member.toEnglish()} {target.toEnglish()} when you {observable.toEnglish()}";
+            //            "for each event in {observable.toEnglish()}, {target.toSource()}.{member.toEnglish("event")})";
+	} else if (observable is MemberExpression and (observable as MemberExpression).member.isObservable) {
+	    
+	    "{member.toEnglish()} {target.toEnglish()} for {observable.toEnglish()}";
+	} else {
+	    if (observable == null) {
+		if (true or member.isObservable) 
+		    then "the {member.toEnglish()} of {target.toEnglish()}"
+		    else "the {member.toEnglish()} of {target.toEnglish()}"
+	    } else {
+		"{member.toEnglish()} {target.toEnglish()} for {observable.toEnglish()}";
+		//"{observable.toSource()}.{member.toApply()}";
+	    }
+	}
+        return res;
+    }}
 
 public class OutputMemberExpression is MemberExpression, ObservableExpression {
     override function getType to F3Type { member.t }
     public var source is ObjectExpression;
     override public function toSource to String {
+	""
+    }
+    override public function toEnglish to String {
 	""
     }
 }
@@ -2232,12 +2390,29 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         } 	
     };
 
+    var showSource is Boolean;
+
+    const sourceCode = XHTML.Text {
+        width: bind width;
+        style: "font-family:Lucida Grande; font-size: 11px;";
+        transform: bind translate(-width/2, -height/2);
+        content: bind if not showSource then "<a href='source://'>Source Code</a>" else "<a href='graph://'>Hide</a><p/><div>{englishOutput}</div>";
+    };
+
+    const linkHandler = sourceCode.observeLinkClicked().subscribe(function from (u is String) to () {
+            println("link clicked: {u}");
+            println("prog={prog}");
+            println("prog.sourceCode={prog.sourceCode}");
+            showSource = (u == "source://");
+        });
+    
+
     override var internalContent = Holder { 
 	scissorBounds: bind Bounds.boundsFromRect(width, height);
 	content:
 	Group {
 	    content:
-           [Group { content: bind bgRect },
+           [Group { content: bind [bgRect, sourceCode] },
 	   localSpace = Group 
            { 
 	       transform: bind translate(cx, cy) * scale(zoomx, zoomy);
@@ -2572,6 +2747,8 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         prog.code = todo;
         MasterUndoable.commit();
     }
+
+    var englishOutput is String;
     
     function visit from (e is Expression) to String
     {
@@ -2597,20 +2774,28 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 terms = [varRoot];
             }
         }
+        var english = "";
         var ret = " return [";
         var sep = "";
+        var sep2 = "";
         for (x in terms) {
 	    var src is String;
+            var eng is String;
 	    if (x is Parameter) {
 		src = (x as Parameter).target.toSource();
+                eng = (x as Parameter).target.toEnglish();
 	    } else {
 		src = x.toSource();
+                eng = x.toEnglish();
 	    }
             var varName = "obs{indexof x}";
             result = "{result} const {varName} = {src};";
             ret = "{ret}{sep}{varName}";
             sep = ", ";
+            english = "{english}{sep2}{eng}";
+            sep2 = ". ";
         }
+        englishOutput = english;
         result = "{result}{ret}];\}";
         try {
             const toCompile = result;
