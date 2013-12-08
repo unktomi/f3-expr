@@ -740,7 +740,27 @@ public function run from (args is String[]) to ()
                     q.playTime = i.playTime;
                     q.playRate = i.playRate;
                     q.playCount = i.playCount;
-                    insert q as ResourceTimeNode into currentAnimResource.resources;
+                    const qt = q as ResourceTimeNode;
+                    insert qt into currentAnimResource.resources;
+                    qt.programs = foreach (prog in i.programs) {
+                        const p = Program {
+                            event: prog.event.deserialize();
+                            code: prog.code;
+                            sourceCode: prog.compiled;
+                            evalContext: Program.EvalContext {
+                                interactive: function from () to Boolean { interactive } 
+                                targetNode: qt;
+                                debugger: debugger;
+                                instanceSpace: currentScene.instanceSpace;
+                                lookupSpatial: currentScene.root.lookup;
+                                targetTimeline: player;
+                                lookupTemporal: mainTimeLayer.lookup;
+                            }
+                        }
+                        println("CREATING PROGRAM**** {prog} => {p.sourceCode}");
+                        insert p into allPrograms;
+                        p;
+                    }
                 }
             }
 	}
