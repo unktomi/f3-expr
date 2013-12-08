@@ -37,7 +37,7 @@ function sourceFunName from (fun is F3FunctionMember) to String {
     }
 }
 
-function typeApply(target is F3Type, 
+function typeApply (target is F3Type, 
                    srcType is F3Type,
                    subst is F3Type) 
     to F3Type 
@@ -56,6 +56,24 @@ function typeApply(target is F3Type,
             };
         if (matches) {
             return ctx.makeFunctionType(parms, retType);
+        }
+    } else if (target is F3ClassType) {
+        const clsType = target as F3ClassType;
+        const targs is F3Type[] = clsType.getTypeArguments();
+        var matches = false;
+        const parms = 
+            foreach (x in targs) 
+            {
+                const pt = typeApply(x, srcType, subst);
+                println("checking type arg {srcType} against {x}, {subst} => {pt}");
+                if (not matches) matches = pt <> x;
+                pt;
+            };
+        if (matches) {
+            println("instantiating {clsType} with {parms}");
+            const rt = ctx.instantiateType(clsType, parms);
+            println("result={formatClassName(rt)}");
+            return rt;
         }
     }
     return target;
@@ -140,6 +158,23 @@ public function introspect from (clazz is F3ClassType) to Member[]
     introspect(clazz, false);
 }
 
+class Instantiator {
+
+    public const clazz is F3ClassType;
+
+    public function G of (T is F3Type) from (t is T) to T 
+    {
+        if (clazz.isGenericInstance()) 
+            then 
+                {
+                    const r = typeApply(t, clazz.getGenericBase(), clazz) as T;
+                    println("G {t}, {clazz.getGenericBase()}, {clazz} => {r}");
+                    r;
+                } 
+        else t;
+    }
+}
+
 public function introspect from (clazz is F3ClassType, all is Boolean) to Member[]
 {
     if (clazz == null) return [];
@@ -147,6 +182,7 @@ public function introspect from (clazz is F3ClassType, all is Boolean) to Member
     if (exprMap.containsKey(clazz)) {
 	return exprMap.get(clazz);
     }
+    const I = Instantiator {clazz: clazz};
     var result is Member[];
     const funs = Reflect.getFunctions(clazz, not all);
     if (all) {
@@ -156,15 +192,15 @@ public function introspect from (clazz is F3ClassType, all is Boolean) to Member
                      ) { 
             FunctionMember {
                 m: f;
-                t: f.getType().getReturnType();
-                ft: f.getType();
+                t: I.G(f.getType().getReturnType());
+                ft: I.G(f.getType());
             }
         };
         const classVars = foreach (v in Reflect.getVars(clazz) where v.isStatic()) {
             Member {
                 m: v;
-                rt: v.getType();
-                t: v.getType();
+                rt: I.G(v.getType());
+                t: I.G(v.getType());
             }
         }
         exprMap.put(clazz, [r, classVars]);
@@ -180,8 +216,8 @@ public function introspect from (clazz is F3ClassType, all is Boolean) to Member
 	     OBJECT_TYPE <> f.getDeclaringClass() 
 	 ) { 
 
-	const ft = f.getType();
-	var rt = ft.getReturnType();
+	const ft = I.G(f.getType());
+	var rt = I.G(ft.getReturnType());
 	var toInsert is Member;
 	if (ft.minArgs() == 0) {
 	    var rt_t = rt;
@@ -241,7 +277,7 @@ public function introspect from (clazz is F3ClassType, all is Boolean) to Member
 		//println("{f.getName()} => Observer of ({ft.getArgumentType(0)})");
 		toInsert = Member {
 		    m: f;
-		    t: ft.getArgumentType(0);
+		    t: I.G(ft.getArgumentType(0));
                     rt: rt;
 		    isObserver: true;
                     isObservable: false;
@@ -260,7 +296,7 @@ public function introspect from (clazz is F3ClassType, all is Boolean) to Member
         println("v={v}");
 	var toInsert is Member;
 	if (true or not v.isPublicInit() and not v.isDef()) {
-	    var rt = v.getType();
+	    var rt = I.G(v.getType());
 	    var isObs = SUBJECT_TYPE.isAssignableFrom(rt) or OBSERVABLE_TYPE.isAssignableFrom(rt);
 	    if (isObs or OBSERVER_TYPE.isAssignableFrom(rt)) {
 		rt = getTypeArguments(rt)[0];
@@ -402,7 +438,21 @@ function formatClassName from (t is F3Type) to String
     }
     const n = if (t.isTypeVariable()) then "Any" else t.getName();
     const dot = n.lastIndexOf(".");
-    n.substring(dot+1);
+    const base = n.substring(dot+1);
+    const parms is F3Type[] = (t as F3ClassType).getTypeParameters();
+    if (parms.size() == 0) {
+        return base;
+    }  else if (parms.size() == 1) {
+        return "{base} of {formatClassName(parms[0])}";
+    } else {
+        var result = "{base} of (";
+        var sep = "";
+        for (x in parms) {
+            result = "{result}{sep}{formatClassName(x)}";
+            sep = ", ";
+        }
+        return "{result})";
+    }
 }
 
 function argName from (ft is F3FunctionType, i is Integer) to String 
@@ -433,6 +483,7 @@ public interface Expression {
     override function toString { "{getClass()}: {getName()} / {getType()}" }
     public function toSource to String { "" }
     public function isObservable to Boolean { false }
+    public function toEnglish to String { "" }
 }
 /*
 class ObserveIfType of a {
@@ -874,7 +925,7 @@ class FunctionView is ExpressionView {
     function unify {
         for (x in inputs) {
             var t = x.parameter.t;
-            if (t.isTypeVariable()) {
+            if (true or t.isTypeVariable()) {
                 if (x.links.size() > 0) {
                     var infer is F3Type = null;
                     for (link in x.links) {
@@ -891,10 +942,11 @@ class FunctionView is ExpressionView {
                                 }
                             }
                         }
-                        if (output.result.getType().isTypeVariable() and
-                            output.result.getType().getTypeVariable() == t.getTypeVariable()) {
-                            output.unifiedType = x.inputType;
-                        }
+                        const t0 = typeApply(output.result.getType(), x.parameter.t, x.inputType);
+                        println("t0={formatClassName(t0)} for {formatClassName(output.result.getType())}");
+                        if (t0 <> output.result.getType()) {
+                            output.unifiedType = t0;
+                        } 
                     }
                 } else {
                     if (x.inputType <> null) {
@@ -917,6 +969,19 @@ class FunctionView is ExpressionView {
             }
         }
     }
+
+    const funOutput = OutputView {
+        canvas: bind canvas;
+        cellWidth: 16;
+        expression: bind fun;
+        resultType: bind fun.getType();
+        transform: bind translate(cellWidth/2-8, 0);
+        override bound function getLabel to String { "" }
+        override var outputName = "";
+        override function assignLinkIds to () {
+        }
+    }
+
     var inputs is ParameterView[] = bind foreach (p in fun.inputs) ParameterView {
         targetView: this;
 	canvas: bind canvas;
@@ -940,7 +1005,7 @@ class FunctionView is ExpressionView {
 	 }]
     };
     override var internalContent = Group {
-	content: bind [title, io];
+	content: bind [title, funOutput, io];
     }
 
     override function update {
@@ -1295,8 +1360,16 @@ public class ParameterView is InputView {
             width: bind cellWidth-100;
             transform: translate(50, 0, 0);
             override var t on replace {
-                parameter.constantValue = t;
+                parameter.constantValue = t * 100.0;
                 canvas.dumpSrc();
+            }
+            override function onCommit from (text is String) to ()
+            {
+                t = Number.parseFloat(text) / 100.0;
+            }
+            override function getText from (t is Number) to String
+            {
+                "{t * 100.0}";
             }
         }
     }
@@ -1314,6 +1387,10 @@ public class ParameterView is InputView {
             override var t on replace {
                 parameter.constantValue = (t * 100) as Integer;
                 canvas.dumpSrc();
+            }
+            override function onCommit from (text is String) to ()
+            {
+                t = Integer.parseInt(text) / 100.0;
             }
             override function getText from (t is Number) to String
             {
@@ -1350,8 +1427,6 @@ public class ParameterView is InputView {
                 else if (Reflect.BOOLEAN_TYPE.isConvertibleFrom(getInputType())) 
                     then boolSlider() else null;
     override var internalContent = Group { content: bind [label, if links.size() == 0 then sliderField else null] };
-    
-    
 }
 
 public class GetVarResult is GetVar {
@@ -1360,25 +1435,28 @@ public class GetVarResult is GetVar {
 public class OutputView is LinkedView {
     public var resultType is F3Type;
     public var index is Integer;
-    override var transform = bind translate(0, index * -cellHeight);
+    override readonly var transform = bind translate(0, index * -cellHeight);
+    public readonly var outputName = bind expression.getName();
     var getter = GetVarResult {
         member: bind Member {
             m: null;
             t: resultType;
-            name: expression.getName();
+            name: bind outputName;
         }
     };
 
     const getTree is GetTreeview = GetTreeview {
         canvas: bind canvas;
-        width: 180;
+        width: bind cellWidth;
         height: 200;
         get: bind getter;
     };
 
     init {
-        insert getter into (expression as ObservableExpression).observers;
-        getter.observable = (expression as ObservableExpression);
+        if (expression is ObservableExpression) {
+            insert getter into (expression as ObservableExpression).observers;
+            getter.observable = (expression as ObservableExpression);
+        }
     }
 
     override var internalContent = Group 
@@ -2016,7 +2094,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 	} into views;
     }
 
-    readonly var font = bind layoutEngine.createFont("font-size:10;font-family:Lucida Grande;font-weight:bold");
+    readonly var font = bind layoutEngine.createFont("font-size:10;font-family:Lucida Grande;font-weight:bold;");
 
     var portPaint is Paint;
 
@@ -2330,7 +2408,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 		    k(pv);
                     return;
 		} else {
-		    println("NOT ASSIGNABLE {pv} {pv.getInputType()} <- {t}");
+		    println("NOT ASSIGNABLE {pv.getInputType()} <- {t}");
 		}
 	    }
 	}
@@ -2338,6 +2416,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             k(null);
             return;
         }
+        println("introspecting: {t}");
         var members = introspect(t, true);
         if (members <> []) {
             var popup is Node = getPopup(e, members, function (j is LinkedView) to () {
@@ -2625,7 +2704,7 @@ public class FunNode is ExprNode {
                 p.sliderField.t = n.intValue / 100.0; // hack
             } else if (Reflect.NUMBER_TYPE == p.parameter.getType()) {
                 println("num value is {n.numberValue}");
-                p.sliderField.t = n.numberValue;
+                p.sliderField.t = n.numberValue / 100.0;
              } else if (Reflect.BOOLEAN_TYPE == p.parameter.getType()) {
                 println("bool value is {n.booleanValue}");
                 p.sliderField.t = if n.booleanValue then 1.0 else 0.5;
