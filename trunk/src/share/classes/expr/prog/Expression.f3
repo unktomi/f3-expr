@@ -2047,8 +2047,8 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 pos: toLocal * where.scenePoint;
                 objectExpr: VarContextExpression { 
                     varContext: c, override function getType to F3Type { typ }
-                    inputMembers: foreach (m in members where not m.isObservable and m.isObserver and m.rt == UNIT_TYPE) m;
-                    //outputMembers: foreach (m in members where m.isObservable and m.m is F3FunctionMember) m;
+                    inputMembers: foreach (m in members where  m.isObserver) m;
+                    outputMembers: foreach (m in members where m.isObservable and m.m is F3FunctionMember) m;
                 }
                 canvas: this;
             } into views;
@@ -2133,7 +2133,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     public var event is Member;
     public var eventContext is Context.MemberContext;
 
-    public var targetNode is ResourceNode;
+    public var targetNode is ResourceTarget;
 
     public var targetSpace is Node;
     public var targetTime is TimeNode;
@@ -2569,7 +2569,6 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         for (link in links) {
             println("Link {link.id} {link.source.expression.getName()}: {link.source.id} => {link.target.expression.getName()}: {link.target.id}");
         }
-        var des = IO.readObject(new java.io.StringReader(w.toString()));
         prog.code = todo;
         MasterUndoable.commit();
     }
@@ -2884,7 +2883,7 @@ public class Editor is ResizableNode, Focuser {
     public var stepping is Boolean;
 
     override public function getTargetOfFocus to Focusable { canvas }
-    public var targetObject is Object;
+    public var targetObject is ResourceTarget;
     public var targetNode is ResourceNode = bind getAsNode(targetObject);
     public var targetTimeNode is ResourceTimeNode = bind getAsTimeNode(targetObject);
     function getAsNode from (obj is Object) to ResourceNode { if (obj is ResourceNode) then obj as ResourceNode else null }
@@ -2906,7 +2905,7 @@ public class Editor is ResizableNode, Focuser {
         return (ctx as Context.ResourceNodeContext).resource;
     }
 
-    var canvas is Canvas = bind getCanvas(getTargetNode(eventContext), eventContext);
+    var canvas is Canvas = bind getCanvas(targetObject, eventContext);
 
     override var internalContent = bind sp;
 
@@ -2918,10 +2917,10 @@ public class Editor is ResizableNode, Focuser {
         content: bind canvas;
     }
 
-    function getCanvas from (target is ResourceNode, eventContext is Context.MemberContext) to Canvas
+    function getCanvas from (target is ResourceTarget, eventContext is Context.MemberContext) to Canvas
     {
 	var prog is Program;
-        println("TARGET: {target.id}, programs={target.programs.size()}");
+        println("TARGET: {target}, programs={target.programs.size()}");
 	for (x in target.programs) {
             println("PROGRAM {x.event.m}, event={eventContext.member.m}");
             println("PROGRAM {java.lang.System.identityHashCode(x.event.m)}, event={java.lang.System.identityHashCode(eventContext.member.m)}");

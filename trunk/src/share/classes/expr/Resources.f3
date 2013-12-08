@@ -95,6 +95,7 @@ class ResourceBuilder {
     
     function makeResource from (n is ResourceTimeNode) to TemporalResource {
         println("unwrapped content of {n.url} => {n.unwrapContent()}");
+        println("programs={n.programs}");
         TemporalResource {
             url: convertUrl(n.url);
             playTime: n.playTime;
