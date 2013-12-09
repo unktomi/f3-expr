@@ -24,6 +24,37 @@ import expr.inspector.*;
 var exprMap1 = new java.util.HashMap of (F3ClassType, Member[]);
 var exprMap2 = new java.util.HashMap of (F3ClassType, Member[]);
 
+const operatorSet = {
+    const set = new java.util.HashSet of (String);
+    set.add("add");
+    set.add("+");
+    set.add("sub");
+    set.add("-");
+    set.add("mul");
+    set.add("*");
+    set.add("div");
+    set.add("/");
+    set;
+}
+
+const operatorMap = {
+    const map = new java.util.HashMap of (String, String);
+    map.put("Add", "+");
+    map.put("Subtract", "-");
+    map.put("Sub", "-");
+    map.put("Mul", "*");
+    map.put("Multiply", "*");
+    map.put("Div", "/");
+    map.put("Divide", "/");
+    map.put("Greater Or Equal", "&gt;=");
+    map.put("Less Or Equal", "&lt;=");
+    map.put("Greater Than", "&gt;");
+    map.put("Less Than", "&lt;");
+    map.put("Equal", "==");
+    map.put("Not Equal", "&lt;&gt;");
+    map;
+}
+
 const MAT4_TYPE = Reflect.findClass("f3.math.Mat4");
 
 function sourceFunName from (fun is F3FunctionMember) to String {
@@ -39,7 +70,9 @@ function sourceFunName from (fun is F3FunctionMember) to String {
 }
 
 function formatEnglishName from (name is String) to String {
-    "<i>{Names.formatName(name)}</i>";
+    const n = Names.formatName(name);
+    const m = if operatorMap.containsKey(n) then operatorMap.get(n) else n;
+    "<i>{m}</i>";
 }
 
 function typeApply (target is F3Type, 
@@ -96,6 +129,7 @@ function makeFunMember from (name is String, params is F3Type[], ret is F3Type) 
 public const NUM_MEMBERS = 
     [foreach (op in ["add", "subtract", "multiply", "divide", "remainder", "lessThan", "lessOrEqual", "greaterThan", "greaterOrEqual", "equal", "notEqual"]) {
         FunctionMember {
+            isInfix: true;
             m: Reflect.getFunction("f3.lang.Builtins$NumberOperators", op, ["Number", "Number"]);
         }
     },
@@ -106,6 +140,7 @@ public const NUM_MEMBERS =
 public const INT_MEMBERS = 
     [foreach (op in ["add", "subtract", "multiply", "divide", "remainder","lessThan", "lessOrEqual", "greaterThan", "greaterOrEqual", "equal", "notEqual"]) {
         FunctionMember {
+            isInfix: true;
             m: Reflect.getFunction("f3.lang.Builtins$IntegerOperators", op, ["Integer", "Integer"]);
         }
     },
@@ -113,9 +148,12 @@ public const INT_MEMBERS =
             m: Reflect.getFunction("f3.lang.Builtins$IntegerOperators", "negate", ["Number"]);
     }];
 
+const IF_EXPR = Reflect.getFunction("f3.lang.Builtins$BooleanOperators", "If", ["Boolean", "Object", "Object"]);
+
 public const BOOL_MEMBERS = 
     [foreach (op in ["and", "or", "equal", "notEqual"]) {
         FunctionMember {
+            isInfix: true;
             m: Reflect.getFunction("f3.lang.Builtins$BooleanOperators", op, ["Boolean", "Boolean"]);
         }
     },
@@ -133,7 +171,7 @@ public const BOOL_MEMBERS =
         name: "If/Then/Else";
     }
     FunctionMember {
-         m: Reflect.getFunction("f3.lang.Builtins$BooleanOperators", "If", ["Boolean", "Object", "Object"]);
+        m: IF_EXPR;
     }];
 
 public function introspect from (t is F3Type) to Member[]
@@ -199,6 +237,7 @@ public function introspect from (clazz is F3ClassType, all is Boolean) to Member
                 m: f;
                 t: I.G(f.getType().getReturnType());
                 ft: I.G(f.getType());
+                isInfix: ((f.isStatic() and f.getType().minArgs() == 2) or f.getType().minArgs() == 1) and operatorSet.contains(f.getName())
             }
         };
         const classVars = foreach (v in Reflect.getVars(clazz) where v.isStatic()) {
@@ -393,10 +432,12 @@ public class Member {
 }
 
 public class FunctionMember is Member {
+    public var isInfix is Boolean;
     public var ft is F3FunctionType = bind (m as F3FunctionMember).getType();
     override public function serialize to MemberNode 
     {
         FunctionMemberNode {
+            isInfix: isInfix;
             declaringClass: m.getDeclaringClass().getName();
             name: m.getName();
             outputType: t.getName();
@@ -714,6 +755,10 @@ public class Function is MemberExpression {
                 }
             }
         }
+        if (funMember.m == IF_EXPR) {
+            return "if {inputs[1].toEnglish()} then {inputs[2].toEnglish()} else {inputs[3].toEnglish()}";
+        }
+        const infix = funMember.isInfix;
         println("Function to source observable={observable}");
 	const result = if (not isObservableType(inputs[j].t) and observable is MemberExpression and { const mexp = observable as MemberExpression; mexp.isObservable() } ) {
 	    const m = observable as MemberExpression;
@@ -736,6 +781,12 @@ public class Function is MemberExpression {
                         "{fun.getName()} {observable.toEnglish()}";
                     }
                 }
+            } else if (infix) {
+                if (not fun.isStatic()) {
+                    "({inputs[0].toEnglish()} {formatEnglishName(fun.getName())} {inputs[1].toEnglish()})";
+                } else {
+                    "({inputs[1].toEnglish()} {formatEnglishName(fun.getName())} {inputs[2].toEnglish()})";
+                }
             } else {
                 if (not fun.isStatic()) {
                     const i = "event"; //getIVar(inputs[j]);
@@ -748,7 +799,7 @@ public class Function is MemberExpression {
                         sep = " and ";
                     }
                     println("non static case 3");
-                    "{formatEnglishName(fun.getName())} {args}{sep}{targ}";
+                    "({formatEnglishName(fun.getName())} {args}{sep}{targ})";
                 } else {
                     const i = "event"; getIVar(inputs[j]);
                     var args is String = "";
@@ -759,10 +810,16 @@ public class Function is MemberExpression {
                         sep = " and ";
                     }
                     println("static case 3");
-                    "{formatEnglishName(sourceFunName(fun))} {args}";
+                    "({formatEnglishName(sourceFunName(fun))} {args})";
                 }
             }
-	} else {
+        } else if (infix) {
+            if (not fun.isStatic()) {
+                "({inputs[0].toEnglish()} {formatEnglishName(fun.getName())} {inputs[1].toEnglish()})";
+            } else {
+                "({inputs[1].toEnglish()} {formatEnglishName(fun.getName())} {inputs[2].toEnglish()})";
+            }
+        } else {
             if (not fun.isStatic()) {
                 var targ is String = inputs[0].toEnglish();
                 var args is String = targ;
@@ -773,7 +830,7 @@ public class Function is MemberExpression {
                     sep = " and ";
                 }
                 println("non static case 4");
-                "{formatEnglishName(fun.getName())} {args}";
+                "({formatEnglishName(fun.getName())} {args})";
             } else {
                 var args is String = "";
                 var sep = "";
@@ -783,7 +840,7 @@ public class Function is MemberExpression {
                     sep = " and ";
                 }
                 println("static case 4");
-                "{formatEnglishName(fun.getName())} {args}";
+                "({formatEnglishName(fun.getName())} {args})";
             }
         }
         println("gen english {this} => {result}");
@@ -894,7 +951,7 @@ public class Parameter is ObserverExpression {
     public var constantValue is Object = "null";
     override public function toEnglish to String 
     {
-        if (observable == null) then "{constantValue}" else observable.toEnglish();
+        if (observable == null) then { const v = "{constantValue}"; if (v == "true") then "Yes" else if v == "false" then "No" else v } else observable.toEnglish();
     }
     override public function toSource to String 
     {
@@ -1182,14 +1239,14 @@ public class InputMemberExpression is MemberExpression, ObserverExpression {
             //            "for each event in {observable.toEnglish()}, {target.toSource()}.{member.toEnglish("event")})";
 	} else if (observable is MemberExpression and (observable as MemberExpression).member.isObservable) {
 	    
-	    "{member.toEnglish()} {target.toEnglish()} for {observable.toEnglish()}";
+	    "{member.toEnglish()} {target.toEnglish()} after {observable.toEnglish()}";
 	} else {
 	    if (observable == null) {
 		if (true or member.isObservable) 
 		    then "the {member.toEnglish()} of {target.toEnglish()}"
 		    else "the {member.toEnglish()} of {target.toEnglish()}"
 	    } else {
-		"{member.toEnglish()} {target.toEnglish()} for {observable.toEnglish()}";
+		"{member.toEnglish()} {target.toEnglish()} after {observable.toEnglish()}";
 		//"{observable.toSource()}.{member.toApply()}";
 	    }
 	}
@@ -2835,8 +2892,9 @@ public class VarMemberNode is MemberNode {
 
 public class FunctionMemberNode is MemberNode {
     public var inputTypes is String[];
+    public var isInfix is Boolean;
     override public function deserialize to Member {
-        FunctionMember { m: Reflect.getFunction(declaringClass, name, inputTypes) }
+        FunctionMember { m: Reflect.getFunction(declaringClass, name, inputTypes), isInfix: isInfix }
     }
 }
 

@@ -460,7 +460,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
     var frameRateN is Number = 24.0;
 
     const lineMesh = LineMesh {};
-    const backgroundColor is Color = Color.color(0.90, 0.90, 0.90);
+    const backgroundColor is Color = Color.color(0.6, 0.6, 0.6);//Color.color(0.90, 0.90, 0.90);
     const backgroundPaint is Paint = ColorPaint(backgroundColor);
     const foregroundPaint is Paint = ColorPaint(Color.color(0.2, 0.2, 0.2));
 
@@ -786,7 +786,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	     id: "lines"
 	     pickable: false;
 	     override var mesh = bind getSelf().drawLines(getSelf().width, getSelf().height, getViewHeight(), scrollOffset);
-	     shader: effectLoader.loadPaintShader(ColorPaint(Color.color(.75, .75, .75)));
+	     shader: bind effectLoader.loadPaintShader(foregroundPaint);
 	 },
 	 TransformNode { 
 	     tx: bind -getSelf().width/2+15-frameToX(scrollOffset);

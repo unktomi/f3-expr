@@ -18,7 +18,7 @@ public class Tools is ResizableNode {
         onSetSelecting();
     }
 
-    const names = ["scripting", "select", "rotate", "scale", "text", "pen", "prim", "hand", "magnify", "align"];
+    const names = ["scripting", "select"];//, "rotate", "scale", "text", "pen", "prim", "hand", "magnify", "align"];
     const actions is (function from () to ())[] = [setScripting, setSelecting];
 
     readonly var buttons is Button[] = bind foreach (i in [0..<sizeof names]) {
@@ -124,7 +124,7 @@ public class ToolMenu is ResizableNode {
     public var scriptingCursor is Cursor = Cursor.CustomCursor { image: Image { url: "{__DIR__}pointer_interactive.png"} };
     public var selectingCursor is Cursor = Cursor.CustomCursor { image: Image { url: "{__DIR__}pointer_default.png"} };
 
-    var buttons = bind [floaters, fullScreen, record, rewind, play, loop, sound];
+    var buttons = bind [rewind, play]; //[floaters, fullScreen, record, rewind, play, loop, sound];
 
     const box = Group {
 	content: bind layout(buttons);
