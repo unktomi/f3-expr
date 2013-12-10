@@ -5,6 +5,10 @@ import f3.util.Observable.*;
 import f3.util.*;
 import expr.prog.Program;
 
+class ResourceChannel {
+     public var channel is Channel of Number;
+}
+
 class InstanceNode extends TransformNode {
     public var subs is Disposable[];
 }
