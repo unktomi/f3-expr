@@ -262,12 +262,10 @@ class TimeNodeView is AbstractNode
                           }
                       } else null;
               },
-                /*
               Group {
                   transform: bind translate(-w/2, 0);
                   content: bind if (target is Channel of Number) then makeCurve(target as Channel of Number) else null;
               },
-                */
               Group { 
                   transform: bind translate(-w/2, 0);
                   content: bind if (expanded) then content else [] 
@@ -945,11 +943,23 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
         return new Vec2(min, max);
     }
 
+    function makeCurveContent from (ch is Channel, k is KeyFrame.Key of Number, 
+                                    interp is KeyFrame.Interpolator of Number, 
+                                    valueBounds is Vec2,
+                                    viewHeight is Number) to PathElement[]
+    {
+        makeCurve(makeTangent(ch, k, interp, valueBounds, viewHeight));
+    }
+
+    function makeCurve from (t is TangentTool) to PathElement[]
+    {
+        [moveTo(t.p1), cubicTo(t.cp1, t.cp2, t.p2)];
+    }
+
     function makeCurve from (ch is Channel of Number) to Node {
-        Group {
-            content: bind foreach (k in ch.keys) {
-                makeTangent(ch as Channel of Number, k, k.interpolator, getValueBounds(ch), getViewHeight());
-            }
+        Path {
+            strokePaint: ColorPaint(Color.GREEN);
+            content: foreach (k in ch.keys) makeCurveContent(ch, k, k.interpolator, getValueBounds(ch), getViewHeight());
         }
     }
 

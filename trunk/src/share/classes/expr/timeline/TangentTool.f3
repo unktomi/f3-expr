@@ -72,8 +72,8 @@ public class TangentLine is AbstractNode {
 
 public class TangentTool is AbstractNode {
     public var p1 is Vec2;
-    readonly var cp1 is Vec2 = bind outTangent.p2;
-    readonly var cp2 is Vec2 = bind inTangent.p1;
+    public readonly var cp1 is Vec2 = bind outTangent.p2;
+    public readonly var cp2 is Vec2 = bind inTangent.p1;
     public var p2 is Vec2;
     public var selected1 is Boolean;
     public var selected2 is Boolean;
