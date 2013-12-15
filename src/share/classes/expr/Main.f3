@@ -86,7 +86,8 @@ function saveEditorState from (scene is Scene) to ()
             }
         };
     scene.root.foldLeft((), f);
-    const w = new java.io.BufferedWriter(new java.io.FileWriter(".expr.editorstate"));
+    const file = new java.io.File(".expr.editorstate.tmp");
+    const w = new java.io.BufferedWriter(new java.io.FileWriter(file));
     IO.writeObject(w, EditorState {
             windowHeight: scene.stage.height+21;
             windowWidth: scene.stage.width;
@@ -94,6 +95,7 @@ function saveEditorState from (scene is Scene) to ()
         });
     w.flush();
     w.close();
+    file.renameTo(new java.io.File(".expr.editorstate"));
 }
 
 function loadEditorState from (stage is JoglStage, scene is Scene) to () 
@@ -729,41 +731,50 @@ public function run from (args is String[]) to ()
         var tempResources = currentAnimResource.resources;
         currentAnimResource.resources = [];
 	for (i in sceneRes.temporalResources) {
-            for (j in tempResources) {
-                var q is TimeNode;
-                if (i.url == j.url) {
-                    q = j;
-                } else if (i.url.contains("#")) { // clip from library
-                    if (j is MaResourceTimeNode) {
+            var q is TimeNode;
+            if (i.url.contains("#")) { // clip from library
+                for (x in currentResource.resources) {
+                    if (x is MaResourceNode) {
+                        const j = (x as MaResourceNode).temporal;
                         q = j.lookup(i.url);
                     }
-                } 
-                if (q <> null) {
-                    q.playTime = i.playTime;
-                    q.playRate = i.playRate;
-                    q.playCount = i.playCount;
-                    const qt = q as ResourceTimeNode;
-                    insert qt into currentAnimResource.resources;
-                    qt.programs = foreach (prog in i.programs) {
-                        const p = Program {
-                            event: prog.event.deserialize();
-                            code: prog.code;
-                            sourceCode: prog.compiled;
-                            evalContext: Program.EvalContext {
-                                interactive: function from () to Boolean { interactive } 
-                                targetNode: qt;
-                                debugger: debugger;
-                                instanceSpace: currentScene.instanceSpace;
-                                lookupSpatial: currentScene.root.lookup;
-                                targetTimeline: player;
-                                lookupTemporal: mainTimeLayer.lookup;
-                            }
-                        }
-                        println("CREATING PROGRAM**** {prog} => {p.sourceCode}");
-                        insert p into allPrograms;
-                        p;
-                    }
                 }
+            } else {
+                for (j in tempResources) {
+                    if (i.url == j.url) {
+                        q = j;
+                        break;
+                    } 
+                }
+            }
+            if (q <> null) {
+                q.playTime = i.playTime;
+                q.playRate = i.playRate;
+                q.playCount = i.playCount;
+                const qt = q as ResourceTimeNode;
+                insert qt into currentAnimResource.resources;
+                qt.programs = foreach (prog in i.programs) {
+                    const p = Program {
+                        event: prog.event.deserialize();
+                        code: prog.code;
+                        sourceCode: prog.compiled;
+                        evalContext: Program.EvalContext {
+                            interactive: function from () to Boolean { interactive } 
+                            targetNode: qt;
+                            debugger: debugger;
+                            instanceSpace: currentScene.instanceSpace;
+                            lookupSpatial: currentScene.root.lookup;
+                            targetTimeline: player;
+                            lookupTemporal: mainTimeLayer.lookup;
+                        }
+                    }
+                    println("CREATING PROGRAM**** {prog} => {p.sourceCode}");
+                    insert p into allPrograms;
+                    p;
+                }
+            } else {
+                println("Couldn't resolve temporal resource: {i.url}");
+                null;
             }
 	}
         for (j in sceneRes.layers) {
@@ -819,9 +830,6 @@ public function run from (args is String[]) to ()
             if (i.url.startsWith("timenode://TransitionLayer")) {
                 t = TransitionLayer {
                     id: i.url;
-                    playTime: i.playTime;
-                    playRate: i.playRate;
-                    playCount: i.playCount;
                     content: foreach (j in i.content) {
                         convertTimeResource(j)
                     }
@@ -829,11 +837,50 @@ public function run from (args is String[]) to ()
                 const rtn = ResourceTimeNodeWrapper {
                     url: i.url;
                     wrapped: t as TimeGroup;
+                    blendWeight: i.blendWeight;
+                    playTime: i.playTime;
+                    playRate: i.playRate;
+                    playCount: i.playCount;
+                };
+                t = rtn;
+                addTimeResource(rtn);
+            } else if (i.url.startsWith("timenode://BlendLayer")) {
+                t = BlendLayer {
+                    id: i.url;
+                    content: foreach (j in i.content) {
+                        convertTimeResource(j)
+                    }
+               }
+                const rtn = ResourceTimeNodeWrapper {
+                    blendWeight: i.blendWeight;
+                    playTime: i.playTime;
+                    playRate: i.playRate;
+                    playCount: i.playCount;
+                    url: i.url;
+                    wrapped: t as TimeGroup;
                 };
                 t = rtn;
                 addTimeResource(rtn);
             } else {
-                t = mainTimeLayer.lookup(rebaseURL(i.url));
+                const u = rebaseURL(i.url);
+                t = mainTimeLayer.lookup(u);
+                if (t == null) {
+                    for (x in currentResource.resources) {
+                        if (x is MaResourceNode) {
+                            const j = (x as MaResourceNode).temporal;
+                            t = j.lookup(u);
+                            const rtn = ResourceTimeNodeWrapper {
+                                url: i.url;
+                                wrapped: t as TimeGroup;
+                                blendWeight: i.blendWeight;
+                                playTime: i.playTime;
+                                playRate: i.playRate;
+                                playCount: i.playCount;
+                            };
+                            t = rtn;
+                        }
+                    }
+                }
             }
             println("CONVERT TIME RESOURCE : {i.url} => {t}");
             t;
@@ -1047,6 +1094,7 @@ public function run from (args is String[]) to ()
                                                              if (clip is ResourceTimeNode) 
                                                                  then clip as ResourceTimeNode 
                                                                  else ResourceTimeNodeWrapper {
+                                                                         playCount: if clip is BlendLayer then -1 else 1; // hack...
                                                                          url: asset.url;
                                                                          wrapped: clip as TimeGroup;
                                                                      };
@@ -1257,7 +1305,7 @@ public function run from (args is String[]) to ()
                                            }
                                          },
                                          Tabview.Tab {
-				            title: "Other";
+				            title: "Eventual";
                                              content:
                                              Tabview {
                                                  tabs:

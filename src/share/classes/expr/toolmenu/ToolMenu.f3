@@ -124,7 +124,7 @@ public class ToolMenu is ResizableNode {
     public var scriptingCursor is Cursor = Cursor.CustomCursor { image: Image { url: "{__DIR__}pointer_interactive.png"} };
     public var selectingCursor is Cursor = Cursor.CustomCursor { image: Image { url: "{__DIR__}pointer_default.png"} };
 
-    var buttons = bind [rewind, play, floaters]; //fullScreen, record, rewind, play, loop, sound];
+    var buttons = bind [rewind, play, loop, floaters]; //fullScreen, record, rewind, play, loop, sound];
 
     const box = Group {
 	content: bind layout(buttons);
