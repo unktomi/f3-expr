@@ -5,6 +5,7 @@ import java.io.*;
 import java.util.zip.*;
 import expr.prog.Expression.ExprScene;
 import expr.prog.Expression.MemberNode;
+import expr.ResourceNode.MaResourceNode;
 
 public class Resource {
     public var id is String;
@@ -36,9 +37,10 @@ public class SpatialResource is Resource {
 }
 
 public class TemporalResource is Resource {
-    public var playTime is Duration;
-    public var playRate is Number;
-    public var playCount is Number;
+    public var blendWeight is Number = 1.0;
+    public var playTime is Duration = 0s;
+    public var playRate is Number = 1.0;
+    public var playCount is Number = 1.0;
     public var content is TemporalResource[];
 }
 
@@ -68,6 +70,11 @@ class ResourceBuilder {
     }
 
     function makeResource from (n is ResourceNode) to SpatialResource {
+        if (n is MaResourceNode) {
+            for (x in (n as MaResourceNode).model.getResources()) {
+                convertUrl(x);
+            }
+        }
         SpatialResource {
             url: convertUrl(n.url);
             tx: n.tx;
@@ -98,6 +105,7 @@ class ResourceBuilder {
         println("programs={n.programs}");
         TemporalResource {
             url: convertUrl(n.url);
+            blendWeight: n.blendWeight;
             playTime: n.playTime;
             playRate: n.playRate;
             playCount: n.playCount;

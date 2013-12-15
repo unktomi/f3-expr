@@ -129,7 +129,7 @@ class TimeNodeView is AbstractNode
 
     function getWidth from (i0 is Interval, visible is Interval) to Number 
     {
-        const i = if (i0.duration() == 0s) then visible.end - i0.start else i0.duration();
+        const i = if (i0.duration() == 0s or i0.duration() > 10000s) then visible.end - i0.start else i0.duration();
     	trax.durationToX(i);
     }
 
@@ -144,8 +144,9 @@ class TimeNodeView is AbstractNode
 	if (selected) then blendColor(CLIP_SELECTED_COLOR, target.sceneBlendWeight) else blendColor(CLIP_COLOR, target.sceneBlendWeight);
     }
 
-    bound function getContent from (target is TimeNode) to TransformNode[]
+    bound function getContent from (target0 is TimeNode) to TransformNode[]
     {
+        var target = if target0 is ResourceTimeNodeWrapper then (target0 as ResourceTimeNodeWrapper).wrapped else target0;
         if (target is TimeGroup) {
             var g = target as TimeGroup;
             foreach (x in g.content) TransformNode { content: bind trax.makeTimeNodeView(null, x) }
@@ -165,7 +166,8 @@ class TimeNodeView is AbstractNode
         super.update();
     }
     const self = this;
-    var w = bind getWidth(target.bounds, trax.visibleInterval);
+    var w = bind getWidth(if target.hasIndefiniteDuration() then Interval.<<0>> else target.bounds,
+                          trax.visibleInterval);
     var h = bind trax.getViewHeight();
     var fg = bind if w == 0 then bg else if (selected1) then CLIP_SELECTED_LABEL_PAINT else CLIP_LABEL_PAINT;//ColorPaint(Color.color(.7, .7, .7, 1));
     var bg = bind getFill(target);
@@ -216,7 +218,9 @@ class TimeNodeView is AbstractNode
 		 },
 		 Text.Label {
 		     blocksPointer: false;
-                     transform: bind translate(20+trax.durationToX(target.contentBounds.start), font.descent);
+                     transform: bind translate(20+trax.durationToX(if target.hasIndefiniteDuration() then 
+                                                                   trax.visibleInterval.start.max(target.contentBounds.start) else target.contentBounds.start), 
+                                               font.descent);
 		     //height: bind h;
 		     width: bind Math.max(w, 100);
 		     background: null;
@@ -250,7 +254,7 @@ class TimeNodeView is AbstractNode
                      }
                  }]
               },
-              Group {
+              if (true) then null else Group {
                   transform: bind translate(-w/2, 0);
                   content: bind if (target is Channel of ?) then {
                           var ch = target as Channel of Object;
@@ -262,7 +266,7 @@ class TimeNodeView is AbstractNode
                           }
                       } else null;
               },
-              Group {
+              if (true) then null else Group {
                   transform: bind translate(-w/2, 0);
                   content: bind if (target is Channel of Number) then makeCurve(target as Channel of Number) else null;
               },
@@ -644,9 +648,17 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
     function makeTimeNodeView from (parent is TimeNodeView, t0 is TimeNode) to TimeNodeView 
     {
         var t = t0;
-        if (t0 is ResourceTimeNode and (t0 as ResourceTimeNode).content[0] is TransitionLayer) {
-            t = (t0 as ResourceTimeNode).content[0] as TransitionLayer;
+        /*
+        if (t0 is ResourceTimeNode) {
+            const rtn = t0 as ResourceTimeNode;
+            const c = rtn.content[0];
+            if (c is TransitionLayer) {
+                t = c;
+            } else if (c is BlendLayer) {
+                t = c;
+            }
         }
+        */
         TimeNodeView {
             trax: this;
             target: t;

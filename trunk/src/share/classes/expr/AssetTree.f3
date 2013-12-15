@@ -88,6 +88,17 @@ public class TransitionLayerAsset is ClipAsset {
     }
 }
 
+public class BlendLayerAsset is ClipAsset {
+    override var name = "Blend Layer";
+    override var url = "timenode://BlendLayer";
+    var count = 1;
+    override public function getClip to TimeNode {
+	BlendLayer {
+	    id: "Blend Layer {count++}";
+	}
+    }
+}
+
 
 public class ImageAsset is Asset {
 }
@@ -319,7 +330,7 @@ public class AssetModel is Treemodel {
 	asset: Asset {
 	    name: "Assets";
 	    containedAssets: bind 
-	    [getPackageAssets(), TransitionLayerAsset{}, 
+	    [getPackageAssets(), TransitionLayerAsset{}, BlendLayerAsset {}, 
              Scene2DAsset {}, foreach (r in resources.resources) makeAsset(r)]
 	}
     }
