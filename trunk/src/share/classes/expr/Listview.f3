@@ -10,9 +10,11 @@ public abstract class Listmodel of a {
     public abstract function getValue from (i is Integer) to a;
 }
 
-public class Element of a {
+public abstract class Element of a {
     public var value is a;
     public var index is Integer;
+    public readonly var view is Node = bind render();
+    public abstract bound function render from () to Node;
 }
 
 public abstract class Listview of a is ResizableNode, Focusable, KeyboardInputHandler, Scrollable {
@@ -29,54 +31,62 @@ public abstract class Listview of a is ResizableNode, Focusable, KeyboardInputHa
 
     public var cellHeight = 15;
 
-    public var selectedRow = 0;
+    public var selectedRow = 0 on replace {
+        const lastVisible = scrollOffset + visibleRows;
+        if (selectedRow > lastVisible) {
+            scrollOffset = Math.min(model.size, scrollOffset + visibleRows / 2);
+        } else if (selectedRow < scrollOffset) {
+            scrollOffset = selectedRow;
+        }
+    }
 
     var scrollOffset is Integer;
     var values is a[];
+    bound function render1 from (e is Element of a) to Node {
+        render(e);
+    }
     function makeElement of a from (v is a) to Element of a 
     {
         Element of a {
-            value: v
+            value: v;
+            override bound function render from () to Node
+            {
+                render1(this);
+            }
         }
     };
-    var elements is (Element of a)[] = bind foreach (v in values) makeElement(v);
-    var views is Node[] = bind foreach (v in elements) render(v);
-    var txs = bind foreach (v in views) TransformNode { content: bind v };
+    readonly var elements is (Element of a)[] = bind foreach (v in values) makeElement(v);
+    readonly var txs = bind foreach (e in elements) TransformNode { content: bind e.view };
 
     abstract function render from (value is Element of a) to Node;
 
     public var selectedValue is a = bind values[selectedRow];
 
-    var visibleRows is Integer;
+    var visibleRows is Integer = bind Math.floor(height / cellHeight) as Integer;
     
     override function update {
-        super.update();
-        var y = height/2;
+        var y = height/2 - cellHeight/2.0;
         var i = scrollOffset;
         var j = 0;
-        while (y < height and i < model.size) {
+        while (j < visibleRows and i < model.size) {
             var v = model.getValue(i);
-            if (i == values.size()) {
+            if (j == values.size()) {
                 insert v into values;
             } else {
-                values[i] = v;
+                values[j] = v;
             }
-            if (j == 0) {
-                y -= views[i].contentBounds.extent.y;
-            }
-            elements[i].index = i;
-            //println("v={views[i]}, i={i}, y={y}");
-            txs[i].ty = y;
+            elements[j].index = i;
+            txs[j].ty = y;
             if (cellHeight > 0) {
                 y -= cellHeight;
             } else {
-                y -= views[i].contentBounds.height();
+                y -= elements[j].view.contentBounds.height();
             }
             j++;
             i++;
         }
-        visibleRows = j;
         delete values[j..];
+        super.update();
     }
 
     override var internalContent = Group {
@@ -131,6 +141,16 @@ public abstract class Listview of a is ResizableNode, Focusable, KeyboardInputHa
     {
         scrollOffset = Math.round(ty * model.size) as Integer;
     }
+
+    function scroll from (amount is Integer) to ()
+    {
+	scrollOffset = Math.max(0, Math.min(scrollOffset + amount, model.size - visibleRows));
+    }
+    
+    const onScroll = internalContent.observeMouseWheel().subscribe(function from (event is MouseWheelEvent) to () {
+            const y = event.scroll.y as Integer;
+            scroll(y);
+    });
 
     const onClick = 
 	internalContent.observeMouseDown().subscribe(function from (e is MouseEvent) to () {

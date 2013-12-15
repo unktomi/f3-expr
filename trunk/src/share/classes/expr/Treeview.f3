@@ -384,9 +384,9 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
 
     public var model is Treemodel;
 
-    var rows is Treenode[];
+    protected var rows is Treenode[];
 
-    var cells is Holder[] = bind foreach (i in [0..<rows.size()]) 
+    protected var cells is Holder[] = bind foreach (i in [0..<rows.size()]) 
 	Holder { 
           n: bind rows[i];
 	  override var cell = bind createCell(n);

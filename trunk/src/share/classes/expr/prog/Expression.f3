@@ -488,7 +488,7 @@ function formatClassName from (t is F3Type) to String
     if (not (t is F3ClassType)) {
         return t.getName();
     }
-    if (isObservableType(t)) {
+    if (Reflect.isObservableType(t)) {
         const v = getTypeArguments(t as F3ClassType)[0];
         return formatClassName(v);
     }
@@ -537,9 +537,12 @@ public interface Expression {
     public bound function getName to String;
     public function getType to F3Type;
     override function toString { "{getClass()}: {getName()} / {getType()}" }
-    public function toSource to String { "" }
+    public function toSource from (context is IContext) to String { "" }
     public function isObservable to Boolean { false }
     public function toEnglish to String { formatEnglishName(getName()) }
+    public function getTerminals to Expression[] { 
+        [] 
+    }
 }
 /*
 class ObserveIfType of a {
@@ -575,7 +578,7 @@ public abstract class ObjectExpression is Expression {
 abstract class VarContextExpression is ObjectExpression {
     public var varContext is Context.ClosureVarContext;
     override bound function getName to String { varContext.varName }
-    override function toSource { "(getVar(\"{varContext.varName}\") as {getType().getName()})" }
+    override function toSource from (context is IContext) to String { "(getVar(\"{varContext.varName}\") as {getType().getName()})" }
     override function toEnglish { varContext.varName }
 }
 
@@ -594,13 +597,13 @@ abstract class TimeNodeExpression is ObjectExpression {
         return t.id;
     }
     override bound function getName to String { timeNode.id }
-    override function toSource { "(getClip(\"{getId(timeNode)}\") as {getType().getName()})" }
+    override function toSource from (context is IContext) to String { "(getClip(\"{getId(timeNode)}\") as {getType().getName()})" }
 }
 
 abstract class NodeExpression is ObjectExpression {
     public var node is Node;
     override bound function getName to String { node.id }
-    override function toSource { "(getNode(\"{node.id}\") as {getType().getName()})" }
+    override function toSource from (context is IContext) to String { "(getNode(\"{node.id}\") as {getType().getName()})" }
 }
 
 function simplify from (s is String) to String {
@@ -622,6 +625,10 @@ public interface MemberExpression is Expression {
 
 public interface ObservableExpression is Expression {
     public var observers is ObserverExpression[];
+    override function getTerminals to Expression[] 
+    {
+        if (observers == []) then [] else foreach (ob in observers) ob.getTerminals();
+    }
 }
 
 public interface ObserverExpression is Expression {
@@ -632,6 +639,194 @@ public interface VarExpression is MemberExpression {
     override function getType to F3Type { member.t }
 }
 
+public class IPath {
+
+    public var parents is IPath[];
+
+    public var observer is ObserverExpression;
+
+    function getDepth to Integer {
+        var p = parents[0];
+        var count = 0;
+        while (p <> null) {
+            count++;
+            p = p.parents[0];
+        }
+        count;
+    }
+
+    function getWorldAccess to String {
+        return getLocalAccess();
+    }
+
+    function getEnglishAccess to String {
+        var observer is Expression = this.observer;
+        if (parents.size() == 0) {
+            if (observer is Parameter) {
+                const p = observer as Parameter;
+                return "{p.constantValue}";
+            }
+            return "the event";
+        }
+        if (observer is GetVarResult) {
+            while (not (observer is Result)) {
+                observer = (observer as GetVarResult).observable;
+            }
+            const func = (observer as Result).source;
+            const infix = func.funMember.isInfix;
+            const fun = func.fun;
+            if (infix) {
+                if (fun.isStatic()) {
+                    return "({parents[1].getEnglishAccess()} {formatEnglishName(fun.getName())} {parents[2].getEnglishAccess()})";
+                }
+                return "({parents[0].getEnglishAccess()} {formatEnglishName(fun.getName())} {parents[1].getEnglishAccess()})";
+            } else {
+                if (fun.isStatic()) {
+                    var args = "";
+                    var sep = "";
+                    for (p in parents[1..]) {
+                        const j = p.getEnglishAccess();
+                        args = "{args}{sep}{j}";
+                        sep = ", ";
+                    }
+                    return "{formatEnglishName(sourceFunName(fun))} ({args})";
+                } else {
+                    var args = "";
+                    var sep = "";
+                    for (p in parents[0..]) {
+                        args = "{sep}{args}{p.getEnglishAccess()}";
+                        sep = ", ";
+                    }
+                    return "{formatEnglishName(sourceFunName(fun))} ({args})";
+                }
+            }
+        }
+        if (observer is GetVar) {
+            const g = observer as GetVar;
+            return "the {formatEnglishName(g.member.toApply())} of {parents[0].getEnglishAccess()}";
+        }
+        if (observer is Parameter) {
+            return parents[0].getEnglishAccess();
+        }
+        if (observer is InputMemberExpression) {
+            const i = observer as InputMemberExpression;
+            return "{formatEnglishName(i.member.name)} {i.target.toEnglish()}";
+        }
+        return "";
+    }
+
+    function getLocalAccess to String 
+    {
+        var observer is Expression = this.observer;
+        if (parents.size() == 0) {
+            if (observer is Parameter) {
+                const p = observer as Parameter;
+                return "{p.constantValue}";
+            }
+            return "i";
+        }
+        if (observer is GetVarResult) {
+            while (not (observer is Result)) {
+                observer = (observer as GetVarResult).observable;
+            }
+            const func = (observer as Result).source;
+            const fun = func.fun;
+            if (fun.isStatic()) {
+                var args = "";
+                var sep = "";
+                for (p in parents[1..]) {
+                    const j = p.getWorldAccess();
+                    args = "{args}{sep}{j}";
+                    sep = ", ";
+                }
+                return "{fun.getDeclaringClass().getName()}.{fun.getName()}({args})";
+            } else {
+                var args = "";
+                var sep = "";
+                for (p in parents[1..]) {
+                    args = "{sep}{args}{p.getWorldAccess()}";
+                    sep = ", ";
+                }
+                return "{parents[0].getWorldAccess()}.{fun.getName()}({args})";
+            }
+        }
+        if (observer is GetVar) {
+            const g = observer as GetVar;
+            return "{parents[0].getWorldAccess()}.{g.member.toApply()}";
+        }
+        if (observer is Parameter) {
+            return parents[0].getWorldAccess();
+        }
+        if (observer is InputMemberExpression) {
+            const i = observer as InputMemberExpression;
+            return "\{ {parents[0].getWorldAccess()}; {i.target.toSource(null)}.{i.member.toApply()} \}";
+        }
+        if (true) throw new java.lang.RuntimeException("unhandled case: {observer}");
+        return "";
+    }
+
+    function getI to String {
+        var count = 0;
+        var p = parents[0];
+        while (p <> null) {
+            count++;
+            p = p.parents[0];
+        }
+        if (count == 0) then "i" else "i{count}";
+    }
+
+    override function toString to String {
+        "{observer} => {getWorldAccess()}";
+    }
+}
+
+class IContext {
+    const map = new java.util.HashMap of (ObserverExpression, IPath);
+    function getPath from (ob is ObserverExpression) to IPath {
+        map.get(ob)
+    }
+    function dump to () 
+    {
+        for (ent in map.entrySet()) {
+            println("{ent.getKey()} ---> {ent.getValue()}");
+            println("parents={ent.getValue().parents.size()}");
+            foreach (p in ent.getValue().parents) {
+                println("parent: {p.observer} {p}");
+            }
+        }
+    }
+
+    function getIVar from (ob is ObserverExpression) to String {
+        const path = getIPath(ob);
+        path.getI();
+    }
+
+    function getIPath from (ob is ObserverExpression) to IPath {
+        var result = map.get(ob);
+        if (result <> null) return result;
+        result = IPath {
+            observer: ob;
+        }
+        map.put(ob, result);
+        var b = ob.observable;
+        if (ob is GetVarResult) {
+            while (b <> null and not (b is Result)) {
+                b = (b as ObserverExpression).observable;
+            }
+            if (b <> null) {
+                const br = b as Result;
+                for (p in br.source.inputs) {
+                    insert getIPath(p) into result.parents;
+                }
+            }
+        } else if (b is ObserverExpression) {
+            const obs = b as ObserverExpression;
+            insert getIPath(obs) into result.parents;
+        }
+        return result;
+    }
+}
+/*
 function getIVar from (ob is ObserverExpression) to String {
     var depth = 0;
     var obs = ob;
@@ -639,7 +834,16 @@ function getIVar from (ob is ObserverExpression) to String {
 	var b = obs.observable;
 	if (b is Result) {
             const br = b as Result;
-	    b = if br.source.inputs == null then null else br.source.inputs[0].observable;
+	    b = if br.source.inputs == null then null else {
+                    var j is ObservableExpression;
+                    for (p in br.source.inputs) {
+                        if (descendsFromObservableRoot(p.observable)) {
+                            j = p.observable;
+                            break;
+                        }
+                    }
+                    j;
+                }
 	} 
 	if (b is ObserverExpression) {
 	    obs = b as ObserverExpression;
@@ -650,27 +854,34 @@ function getIVar from (ob is ObserverExpression) to String {
     }
     if (depth == 0) then "i" else "i{depth}";
 }
+*/
 
 public class GetVar is VarExpression, ObservableExpression, ObserverExpression {
-    override public function toSource to String {
+
+    override public function getTerminals to Expression[] {
+        if (observers == []) then [] else foreach (ob in observers) ob.getTerminals();
+    }
+
+    override public function toSource from (context is IContext) to String 
+    {
         println ("get var to source {this} observable={observable}");
         if (observable is Result) {
-            return observable.toSource();
+            return observable.toSource(context);
 	} 
 	if (observers == []) {
 	    return "";
 	}
-	const i = getIVar(this);
-	if (observable is MemberExpression and { const mexp = observable as MemberExpression; mexp.isObservable() }) {
+	const i = context.getIVar(this);
+	if (false and (observable is MemberExpression and { const mexp = observable as MemberExpression; mexp.isObservable() })) {
 
-	    "(foreach ({i} in debugger.debug({observable.toSource()}, \"{id}\")) {i}.{member.toApply()})";
+	    "(foreach ({i} in debugger.debug({observable.toSource(context)}, \"{id}\")) {i}.{member.toApply()})";
         } else {
-	    if (observable == null) {
-		if (OBSERVABLE_TYPE.isAssignableFrom(member.rt)) 
+	    if (true or observable == null) {
+		if (true or OBSERVABLE_TYPE.isAssignableFrom(member.rt)) 
 		    then "{i}.{member.toApply()}"
 		    else "debugger.debug(f3.util.Observables.observe(&{i}.{member.toApply()}), \"{id}\")";
 	    } else {
-		"(foreach ({i} in debugger.debug({observable.toSource()}, \"{id}\")) {i}.{member.toApply()})";
+		"(foreach ({i} in debugger.debug({observable.toSource(context)}, \"{id}\")) {i}.{member.toApply()})";
 	    }
 	}
     }
@@ -683,7 +894,7 @@ public class GetVar is VarExpression, ObservableExpression, ObserverExpression {
 	if (observers == []) {
 	    return "";
 	}
-	const i = getIVar(this);
+	const i = "";//context.getIVar(this);
 	if (observable is MemberExpression and { const mexp = observable as MemberExpression; mexp.isObservable() }) {
             "the {member.toEnglish()} of {observable.toEnglish()}";
         } else {
@@ -764,13 +975,13 @@ public class Function is MemberExpression {
 	    const m = observable as MemberExpression;
             if (inputs.size() == 1) {
                 if (inputs[0].observable <> null) {
-                    const i = getIVar(inputs[0]);
+                    const i = "";//context.getIVar(inputs[0]);
                     if (fun.isStatic()) {
                         println("static case 1");
-                        "when you {formatEnglishName(sourceFunName(fun))} {observable.toEnglish()}";
+                        "when {formatEnglishName(sourceFunName(fun))} of {observable.toEnglish()}";
                     } else {
                         println("non static case 1");
-                        "when you {formatEnglishName(fun.getName())} {observable.toEnglish()}";
+                        "when {formatEnglishName(fun.getName())} of {observable.toEnglish()}";
                     }
                 } else {
                     if (fun.isStatic()) {
@@ -801,7 +1012,7 @@ public class Function is MemberExpression {
                     println("non static case 3");
                     "({formatEnglishName(fun.getName())} {args}{sep}{targ})";
                 } else {
-                    const i = "event"; getIVar(inputs[j]);
+                    const i = "event"; //getIVar(inputs[j]);
                     var args is String = "";
                     var sep = "";
                     for (k in [0..<ft.minArgs()]) {
@@ -847,8 +1058,10 @@ public class Function is MemberExpression {
         return result;
     }
 
-    override public function toSource to String {
+
+    override public function toSource from (context is IContext) to String {
 	var observable is Expression;
+        var observables is Expression[];
         var j is Integer = -1;
         for (i in inputs) {
             if (descendsFromObservableRoot(i.observable)) {
@@ -858,65 +1071,66 @@ public class Function is MemberExpression {
                 } else {
                     println("multiple roots: {observable}, {i.observable}");
                 }
+                insert i.observable into observables;
             }
         }
         println("Function to source observable={observable}");
-	const result = if (not isObservableType(inputs[j].t) and observable is MemberExpression and { const mexp = observable as MemberExpression; mexp.isObservable() } ) {
+	const result = if (observables.size() == 1 and (not isObservableType(inputs[j].t) and observable is MemberExpression and { const mexp = observable as MemberExpression; mexp.isObservable() } )) {
 	    const m = observable as MemberExpression;
             if (inputs.size() == 1) {
                 if (inputs[0].observable <> null) {
-                    const i = getIVar(inputs[0]);
+                    const i = context.getIVar(inputs[0]);
                     if (fun.isStatic()) {
                         println("static case 1");
-                        "(foreach ({i} in debugger.debug({observable.toSource()}, \"{id}\")) {sourceFunName(fun)}())";
+                        "(foreach ({i} in debugger.debug({observable.toSource(context)}, \"{id}\")) {sourceFunName(fun)}())";
                     } else {
                         println("non static case 1");
-                        "(foreach ({i} in debugger.debug({observable.toSource()}, \"{id}\")) {i}.{fun.getName()}())";
+                        "(foreach ({i} in debugger.debug({observable.toSource(context)}, \"{id}\")) {i}.{fun.getName()}())";
 
                     }
                 } else {
                     if (fun.isStatic()) {
                         println("static case 2");
-                        "{fun.getName()}({observable.toSource()})";
+                        "{fun.getName()}({observable.toSource(context)})";
                     } else {
                         println("non static case 2");
-                        "{observable.toSource()}.{fun.getName()}()";
+                        "{observable.toSource(context)}.{fun.getName()}()";
                     }
                 }
             } else {
                 if (not fun.isStatic()) {
-                    const i = getIVar(inputs[j]);
+                    const i = context.getIVar(inputs[j]);
                     var sep = "";
                     var args is String;
-                    var targ is String = if (j == 0) then i else inputs[0].toSource();
+                    var targ is String = if (j == 0) then i else inputs[0].toSource(context);
                     for (k in [0..<ft.minArgs()]) {
-                        const p = if (k+1 == j) then i else inputs[k+1].toSource();
+                        const p = if (k+1 == j) then i else inputs[k+1].toSource(context);
                         args = "{args}{sep}{p}";
                         sep = ", ";
                     }
                     println("non static case 3");
-                    "(foreach ({i} in debugger.debug({observable.toSource()}, \"{id}\")) {targ}.{fun.getName()}({args}))";
+                    "(foreach ({i} in debugger.debug({observable.toSource(context)}, \"{id}\")) {targ}.{fun.getName()}({args}))";
                 } else {
-                    const i = getIVar(inputs[j]);
+                    const i = context.getIVar(inputs[j]);
                     var args is String = "";
                     var sep = "";
                     for (k in [0..<ft.minArgs()]) {
-                        const p = if (k+1 == j) then i else inputs[k+1].toSource();
+                        const p = if (k+1 == j) then i else inputs[k+1].toSource(context);
                         args = "{args}{sep}{p}";
                         sep = ", ";
                     }
                     println("static case 3");
-                    "(foreach ({i} in debugger.debug({observable.toSource()}, \"{id}\")) {sourceFunName(fun)}({args}))";
+                    "(foreach ({i} in debugger.debug({observable.toSource(context)}, \"{id}\")) {sourceFunName(fun)}({args}))";
                 }
             }
 	} else {
             if (not fun.isStatic()) {
-                const i = inputs[j].toSource();
+                const i = inputs[j].toSource(context);
                 var sep = "";
                 var args is String;
-                var targ is String = if (j == 0) then i else inputs[0].toSource();;
+                var targ is String = if (j == 0) then i else inputs[0].toSource(context);
                 for (k in [0..<ft.minArgs()]) {
-                    const p = if (k+1 == j) then i else inputs[k+1].toSource();
+                    const p = if (k+1 == j) then i else inputs[k+1].toSource(context);
                     args = "{args}{sep}{p}";
                     sep = ", ";
                 }
@@ -927,11 +1141,15 @@ public class Function is MemberExpression {
                 var sep = "";
                 for (k in [0..<ft.minArgs()]) {
                     const p = inputs[k+1];
-                    args = "{args}{sep}{p.toSource()}";
+                    args = "{args}{sep}{p.toSource(context)}";
                     sep = ", ";
                 }
                 println("static case 4");
-                "{fun.getDeclaringClass().getName()}.{fun.getName()}({args})";
+                if (observables.size() > 1) {
+                    "{observable.toSource(context)}) {fun.getDeclaringClass().getName()}.{fun.getName()}({args})";
+                } else {
+                    "{fun.getDeclaringClass().getName()}.{fun.getName()}({args})";
+                }
             }
         }
         println("gen source {this} => {result}");
@@ -953,9 +1171,9 @@ public class Parameter is ObserverExpression {
     {
         if (observable == null) then { const v = "{constantValue}"; if (v == "true") then "Yes" else if v == "false" then "No" else v } else observable.toEnglish();
     }
-    override public function toSource to String 
+    override public function toSource from (context is IContext) to String 
     {
-        if (observable == null) then "{constantValue}" else observable.toSource();
+        if (observable == null) then "{constantValue}" else observable.toSource(context);
     }
     override function toString to String {
         var i = 0;
@@ -966,6 +1184,9 @@ public class Parameter is ObserverExpression {
             i++;
         }
         "Parameter {i} {getName()} of {target} with observable: {observable}"
+    }
+    override function getTerminals to Expression[] {
+        target.output.getTerminals();
     }
 }
 
@@ -978,9 +1199,9 @@ public class Result is ObservableExpression {
     {
         source.toEnglish();
     }
-    public override function toSource to String 
+    public override function toSource from (context is IContext) to String 
     {
-        const result = source.toSource();
+        const result = source.toSource(context);
         println("source={source}");
         println("gen source {this} => {result}");
         return result;
@@ -1210,33 +1431,39 @@ class FunctionView is ExpressionView {
 public class InputMemberExpression is MemberExpression, ObserverExpression {
     override function getType to F3Type { member.t }
     public var target is ObjectExpression;
-    override public function toSource to String {
-	const i = getIVar(this);
+
+    override function getTerminals to Expression[] 
+    {
+        [this]
+    }
+
+    override public function toSource from (context is IContext) to String {
+	const i = context.getIVar(this);
         var res = 
         if (member.m is F3FunctionMember and (member.m as F3FunctionMember).getType().minArgs() > 0) {
-            "(foreach ({i} in debugger.debug({observable.toSource()}, \"{id}\")) {target.toSource()}.{member.toApply(i)})";
+            "(foreach ({i} in debugger.debug({observable.toSource(context)}, \"{id}\")) {target.toSource(context)}.{member.toApply(i)})";
 	} else if (observable is MemberExpression and (observable as MemberExpression).member.isObservable) {
 	    
-	    "(foreach ({i} in debugger.debug({observable.toSource()}, \"{id}\")) {target.toSource()}.{member.toApply()})";
+	    "(foreach ({i} in debugger.debug({observable.toSource(context)}, \"{id}\")) {target.toSource(context)}.{member.toApply()})";
 	} else {
 	    if (observable == null) {
 		if (true or member.isObservable) 
-		    then "{target.toSource()}.{member.toApply()}"
-		    else "debugger.debug(f3.util.Observables.observe(&{target.toSource()}.{member.toApply()}, \"{id}\"))";
+		    then "{target.toSource(context)}.{member.toApply()}"
+		    else "debugger.debug(f3.util.Observables.observe(&{target.toSource(context)}.{member.toApply()}, \"{id}\"))";
 	    } else {
-		"(foreach ({i} in debugger.debug({observable.toSource()}, \"{id}\")) {target.toSource()}.{member.toApply()})";
-		//"{observable.toSource()}.{member.toApply()}";
+		"(foreach ({i} in debugger.debug({observable.toSource(context)}, \"{id}\")) {target.toSource(context)}.{member.toApply()})";
+		//"{observable.toSource(}.{member.toApply()}";
 	    }
 	}
         return res;
     }
 
     override public function toEnglish to String {
-	const i = getIVar(this);
+	const i = "";//getIVar(this);
         var res = 
         if (member.m is F3FunctionMember and (member.m as F3FunctionMember).getType().minArgs() > 0) {
 	    "{member.toEnglish()} {target.toEnglish()} when you {observable.toEnglish()}";
-            //            "for each event in {observable.toEnglish()}, {target.toSource()}.{member.toEnglish("event")})";
+            //            "for each event in {observable.toEnglish()}, {target.toEnglish()}.{member.toEnglish("event")})";
 	} else if (observable is MemberExpression and (observable as MemberExpression).member.isObservable) {
 	    
 	    "{member.toEnglish()} {target.toEnglish()} after {observable.toEnglish()}";
@@ -1256,7 +1483,7 @@ public class InputMemberExpression is MemberExpression, ObserverExpression {
 public class OutputMemberExpression is MemberExpression, ObservableExpression {
     override function getType to F3Type { member.t }
     public var source is ObjectExpression;
-    override public function toSource to String {
+    override public function toSource from (context is IContext) to String {
 	""
     }
     override public function toEnglish to String {
@@ -1396,7 +1623,7 @@ public class GetVarView is OutputView {
     const tv is GetTreeview = GetTreeview {
         canvas: bind canvas;
         width: 180;
-        height: 200;
+        height: 250;
         get: bind get;
     }
     override var transform = bind translate(pos);
@@ -1528,21 +1755,21 @@ abstract class Constant is ObservableExpression {
 class NumberConstant is Constant {
     public var value is Number;
     override function getType to F3Type { Reflect.NUMBER_TYPE }
-    override function toSource to String { "{value}" }
+    override function toSource from (context is IContext) to String { "{value}" }
     override bound function getName to String { "{value}" }
 }
 
 class IntegerConstant is Constant {
     public var value is Integer;
     override function getType to F3Type { Reflect.INTEGER_TYPE }
-    override function toSource to String { "{value}" }
+    override function toSource from (context is IContext) to String { "{value}" }
     override bound function getName to String { "{value}" }
 }
 
 class BooleanConstant is Constant {
     public var value is Boolean;
     override function getType to F3Type { Reflect.BOOLEAN_TYPE }
-    override function toSource to String { "{value}" }
+    override function toSource from (context is IContext) to String { "{value}" }
     override bound function getName to String { "{value}" }
 }
 
@@ -1645,6 +1872,11 @@ public class ParameterView is InputView {
 }
 
 public class GetVarResult is GetVar {
+    override function getTerminals to Expression[] 
+    {
+        const terms = super.getTerminals();
+        if (terms == []) then this else terms;
+    }
 }
 
 public class OutputView is LinkedView {
@@ -1652,7 +1884,7 @@ public class OutputView is LinkedView {
     public var index is Integer;
     override readonly var transform = bind translate(0, index * -cellHeight);
     public readonly var outputName = bind expression.getName();
-    var getter = GetVarResult {
+    protected var getter = GetVar {
         member: bind Member {
             m: null;
             t: resultType;
@@ -1663,11 +1895,11 @@ public class OutputView is LinkedView {
     const getTree is GetTreeview = GetTreeview {
         canvas: bind canvas;
         width: bind cellWidth;
-        height: 200;
+        height: 250;
         get: bind getter;
     };
 
-    init {
+    postinit {
         if (expression is ObservableExpression) {
             insert getter into (expression as ObservableExpression).observers;
             getter.observable = (expression as ObservableExpression);
@@ -1697,13 +1929,26 @@ class ResultView is OutputView {
     public var result is Result;
     override var expression = bind result;
     override var resultType = bind if (unifiedType <> null) then unifiedType else result.getType();
+    override var getter = GetVarResult {
+        member: bind Member {
+            m: null;
+            t: resultType;
+            name: bind outputName;
+        }
+    };
     public var unifiedType is F3Type;
     public var inferred is ParameterView[];
 }
 
+class TreeGetVar is GetVar {
+    override public function getTerminals to Expression[] {
+        if (observers == []) then [] else foreach (ob in observers) ob.getTerminals();
+    }
+}
+
 class MemberTreenode is Treenode {
     public var m is Member;
-    public var get = bind GetVar { member: m }
+    public var get is GetVar = bind TreeGetVar { member: m }
     override var label = bind Names.formatName(m.name);
     readonly var members = bind m.getMembers();
     override var canOpen = bind { var n = members.size(); n > 0 };
@@ -1814,6 +2059,7 @@ public class MemberTreecell is Treeview.Treecell
 {
     public var canvas is Canvas;
     const self = this;
+    public var active;
 
     override function toString to String
     {
@@ -1956,6 +2202,17 @@ class GetTreeview is ResizableNode {
 	{
 	    self.getCell(tn as MemberTreenode)
 	}      
+        override function update to ()
+        {
+            super.update();
+            for (cell in cellMap.values()) {
+                cell.active = false;
+            }
+            for (row in rows) {
+                const cell = cellMap.get(row);
+                cell.active = true;
+            }
+        }
     };
 
     override var internalContent = bind tv;
@@ -2192,7 +2449,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             transform: translate(popupScene.mousePosition.x + 100, popupScene.mousePosition.y, 0);
             members: members;
             height: 200;
-            width: 200; 
+            width: 340; 
         }
         popupScene.setFocus(r);
         return r;
@@ -2390,7 +2647,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 		var r = GetVarView {
 		    parent: rootView;
 		    canvas: this;
-		    get: varRoot = GetVar {
+		    get: varRoot = TreeGetVar {
 			member: event;
 		    }
 		}
@@ -2451,7 +2708,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     const sourceCode = XHTML.Text {
         width: bind width;
-        style: "font-family:Lucida Grande; font-size: 11px;";
+        style: "font-family:Lucida Grande; font-size: 12px; color: black;";
         transform: bind translate(-width/2, -height/2);
         content: bind if not showSource then "<a href='source://'>Source Code</a>" else "<a href='graph://'>Hide</a><p/><div>{englishOutput}</div>";
     };
@@ -2673,71 +2930,6 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 	println(visit(varRoot));
     }
 
-    function getObservers from (e is Expression) to ObserverExpression[]
-    {
-        var result = 
-	if (e is Parameter) 
-	    then { 
-                const obsvs = (e as Parameter).target.output.observers;
-                println("parameter target = {(e as Parameter).target} obsvs={obsvs}");
-                foreach(x in obsvs) getObservers(x)
-            }
-            else if (e is InputMemberExpression) then {
-               const outs = (e as InputMemberExpression).target.outputs;
-               foreach (x in outs) {
-                   println("OUT {x} => {x.observers}");
-                   x.observers
-               }
-            }
-	    else if (e is ObservableExpression) 
-		then (e as ObservableExpression).observers
-		else [];
-        return result;
-    }
-    
-    function getTerminals from (e is Expression, 
-				result is function from Expression to ()) to ()
-    {
-        getTerminals(null, e, result);
-    }
-
-    function getTerminals from (p is Expression,
-                                e0 is Expression, 
-				result is function from Expression to ()) to ()
-    {
-        var e = e0;
-	const obsvrs = getObservers(e);
-	println("observers for {p} / {e} => {obsvrs}");
-	if (obsvrs == []) {
-            if (e is GetVar) {
-                if (p <> null) result(p);
-                /*
-                println("is getvar: {e}");
-                while (true) {
-                    if (e is Result) {
-                        result((e as Result).source);
-                        break;
-                    } else if (e is OutputMemberExpression) {
-                        result(e);
-                        break;
-                    }
-                    if (e is ObserverExpression) {
-                        e = (e as ObserverExpression).observable;
-                        println("e=>{e}");
-                    } else break;
-                }
-                */
-            } else {
-		result(e);
-	    }
-	} else {
-	    for (x in obsvrs) {
-                const p1 = if (e is Result) then (e as Result).source else if (e is InputMemberExpression) then e else if (e is Parameter) then e else p;
-		getTerminals(p1, x, result)
-	    }
-	}
-    }
-
     const serializationMap = new java.util.IdentityHashMap of (ExpressionView, ExprNode);
     public const deserializationMap = new java.util.HashMap of (String, LinkView);
 
@@ -2810,17 +3002,17 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     function visit from (e is Expression) to String
     {
         saveCode();
-	var terms is Expression[];
-	getTerminals(e, 
-		     function from (x is Expression) to ()
-		     {
-                         delete x from terms;
-			 println("adding {x}");
-			 insert x into terms;
-		     });
-	var itype = (e as MemberExpression).member.m.getDeclaringClass();
+	var termset = new java.util.HashSet of Expression();
+        var terms is Expression[];
+        for (term in e.getTerminals()) {
+            if (termset.add(term)) {
+                insert term into terms;
+            }
+        }
+        const mem = e as MemberExpression;
+	var itype = mem.member.m.getDeclaringClass();
         if (itype == null) return "";
-	var result = "var _ = function from (debugger is f3.util.ObservableDebugger, i$ is Object, getVar is function from String to Object, getNode is function from String to f3.media.scene.Node, getClip is function from String to f3.media.scene.TimeNode) to (f3.util.Observable of ?)[] \{ var i = i$ as {itype.getName()}; ";
+	var result = "var _ = function from (debugger is f3.util.ObservableDebugger, i$ is Object, getVar is function from String to Object, getNode is function from String to f3.media.scene.Node, getClip is function from String to f3.media.scene.TimeNode) to (f3.util.Observable of ?)[] \{ var i0 = i$ as {itype.getName()}; ";
         if (terms == []) {
             var rs = foreach (x in eventContext.content) {
                 if (x is Context.ResourceNodeContext) {
@@ -2831,28 +3023,34 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 terms = [varRoot];
             }
         }
-        var english = "";
+        var context = IContext {};
+        println("IPath");
         var ret = " return [";
         var sep = "";
-        var sep2 = "";
-        for (x in terms) {
-	    var src is String;
-            var eng is String;
-	    if (x is Parameter) {
-		src = (x as Parameter).target.toSource();
-                eng = (x as Parameter).target.toEnglish();
-	    } else {
-		src = x.toSource();
-                eng = x.toEnglish();
-	    }
-            var varName = "obs{indexof x}";
-            result = "{result} const {varName} = {src};";
-            ret = "{ret}{sep}{varName}";
-            sep = ", ";
-            english = "{english}{sep2}{eng}";
-            sep2 = ". ";
+        for (term in terms) {
+            var t = term;
+            if (t is Result) {
+                t = (t as Result).observers[0];
+            }
+            const p = context.getIPath(t as ObserverExpression);
         }
-        englishOutput = english;
+        context.dump();
+        var eng = "";
+        for (term in terms) {
+            var t = term;
+            if (t is Result) {
+                t = (t as Result).observers[0];
+            }
+            const p = context.getIPath(t as ObserverExpression);
+            result = "{result} const obs{indexof term} = foreach (i in i0.{mem.member.toApply()}) {p.getWorldAccess()};";
+            ret = "{ret}{sep}obs{indexof term}";
+            sep = ", ";
+            println(p.getWorldAccess());
+            eng = "{eng}For each {formatEnglishName(mem.member.name)} event: ";
+            eng = "{eng}{p.getEnglishAccess()}. "
+        }
+        println("ENGLISH={eng}");
+        englishOutput = eng;
         result = "{result}{ret}];\}";
         try {
             const toCompile = result;
