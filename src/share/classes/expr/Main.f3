@@ -96,7 +96,7 @@ function saveEditorState from (scene is Scene) to ()
     w.close();
 }
 
-function loadEditorState from (scene is Scene) to () 
+function loadEditorState from (stage is JoglStage, scene is Scene) to () 
 {
     const file = new java.io.File(".expr.editorstate");
     if (file.exists()) {
@@ -119,16 +119,16 @@ function loadEditorState from (scene is Scene) to ()
         };
         scene.root.foldLeft((), f);
         if (s.windowHeight <> 0 and s.windowWidth <> 0) {
-            (scene.stage as JoglStage).resizeWindow(s.windowWidth, s.windowHeight);
+            stage.resizeWindow(s.windowWidth, s.windowHeight);
         }
     }
 }
 
 class CachedScene is Scene {
-    public var scene is Scene;
-    override var camera = Camera2D {tx: bind -scene.width/2, ty: bind -scene.height/2}
+    public var scene is Scene[];
+    override var camera = Camera2D {tx: bind -width/2, ty: bind -height/2}
     var stageNode is StageNode = StageNode {
-	content: scene;
+	content: bind scene;
     }
     override function update {
 	if (stageNode.width <> width or stageNode.height <> height) {
@@ -193,6 +193,8 @@ var canUndo is Boolean;
 var canRedo is Boolean;
 var currentScenes is ResourceScene[] = [];
 var doUpdate is Observer of (());
+
+const IMAGE_LOADER = f3.jogl.awt.JoglStage.ImageLoader_INSTANCE;
 
 
 public function run from (args is String[]) to ()
@@ -895,7 +897,7 @@ public function run from (args is String[]) to ()
                     override function update {
                         const now = java.lang.System.currentTimeMillis();
                         if (lastTime == 0) {
-                            loadEditorState(this);
+                            loadEditorState(joglStage(), this);
                             lastTime = now;
                         } else if (now - lastTime > 2000) {
                             saveEditorState(this);
@@ -1403,12 +1405,20 @@ public function run from (args is String[]) to ()
          }
          return true;
      }
+    
+     function joglStage to JoglStage {
+         stage
+     }
      
-    var stage is JoglStage = JoglStage {
+     var stage is JoglStage = JoglStage {
 
         defaultCursor: bind toolCursor;
-
-        override var content = bind [currentScenes, manipLayer, editorScene];
+        /*
+        content: CachedScene {
+             scene: bind [currentScenes, manipLayer, editorScene];
+        }
+        */
+        content: bind [currentScenes, manipLayer, editorScene];
 	
         onClose: function from () to Boolean {
             if (not saveChangesIfNecessary()) {
