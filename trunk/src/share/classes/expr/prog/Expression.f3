@@ -76,8 +76,8 @@ function formatEnglishName from (name is String) to String {
 }
 
 function typeApply (target is F3Type, 
-                   srcType is F3Type,
-                   subst is F3Type) 
+                    srcType is F3Type,
+                    subst is F3Type) 
     to F3Type 
 {
     if (target == srcType) return subst;
@@ -103,7 +103,7 @@ function typeApply (target is F3Type,
             foreach (x in targs) 
             {
                 const pt = typeApply(x, srcType, subst);
-                println("checking type arg {srcType} against {x}, {subst} => {pt}");
+                println("target={clsType}: checking type arg {srcType} against {x}, {subst} => {pt}");
                 if (not matches) matches = pt <> x;
                 pt;
             };
@@ -697,7 +697,7 @@ public class IPath {
                     var args = "";
                     var sep = "";
                     for (p in parents[0..]) {
-                        args = "{sep}{args}{p.getEnglishAccess()}";
+                        args = "{args}{sep}{p.getEnglishAccess()}";
                         sep = ", ";
                     }
                     if (parents.size() > 1) {

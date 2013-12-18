@@ -179,6 +179,12 @@ class TimeNodeView is AbstractNode
         println("parent: {target.parent.id} <= {target.parent.getClass()}");
         if ((target.parent is ResourceTimeNode and not (target.parent is ResourceTimeNodeWrapper)) and target.parent.id == target.id) then "Main Timeline" else formatName(target.id);
     }   
+    var labelX = bind 
+        if (target.hasIndefiniteDuration() and trax.visibleInterval.start > target.playTime + target.contentBounds.start)
+            then trax.durationToX(trax.visibleInterval.start) - playX
+            else 
+                trax.durationToX(target.contentBounds.start);
+
     override var internalContent = Group {
 	content:
 	Group {
@@ -218,8 +224,7 @@ class TimeNodeView is AbstractNode
 		 },
 		 Text.Label {
 		     blocksPointer: false;
-                     transform: bind translate(20+trax.durationToX(if target.hasIndefiniteDuration() then 
-                                                                   trax.visibleInterval.start.max(target.contentBounds.start) else target.contentBounds.start), 
+                     transform: bind translate(20+labelX, 
                                                font.descent);
 		     //height: bind h;
 		     width: bind Math.max(w, 100);
@@ -242,7 +247,7 @@ class TimeNodeView is AbstractNode
 		 },
                  TransformNode {
                      visible: bind target is TimeGroup and { var g = target as TimeGroup; g.content.size() > 0 }
-                     tx: bind -w/2 + 13;
+                     tx: bind labelX+-w/2 + 13;
                      rz: bind if (expanded) then -90 else 0;
                      content: Polygon is MouseInputHandler {
                          points: [-3.5, -4.5, -3.5, 4.5, 3.5, 0];
