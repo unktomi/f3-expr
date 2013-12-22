@@ -75,9 +75,9 @@ function formatEnglishName from (name is String) to String {
     "<i>{m}</i>";
 }
 
-function typeApply (target is F3Type, 
-                    srcType is F3Type,
-                    subst is F3Type) 
+function typeApply from (target is F3Type, 
+                         srcType is F3Type,
+                         subst is F3Type) 
     to F3Type 
 {
     if (target == srcType) return subst;
@@ -196,6 +196,7 @@ public function introspect from (t is F3Type, all is Boolean) to Member[]
 			else []
     }
 }
+
 public function introspect from (clazz is F3ClassType) to Member[]
 {
     introspect(clazz, false);
@@ -447,7 +448,7 @@ public class FunctionMember is Member {
     override var name = formatName(m as F3FunctionMember);
 }
 
-function formatType(t is F3Type) to String 
+function formatType from (t is F3Type) to String 
 {
     if t.isTypeVariable() then "Any" else if (t is F3SequenceType) 
         then "{formatType((t as F3SequenceType).getComponentType())}[]" 
@@ -461,7 +462,7 @@ function formatType(t is F3Type) to String
             else t.getName();
 }
 
-function formatFunctionType(clazz is F3ClassType, ft is F3FunctionType) to String 
+function formatFunctionType from (clazz is F3ClassType, ft is F3FunctionType) to String 
 {
     var r = if clazz == null then "(" else "({formatType(clazz)}";
     var sep = if clazz == null then "" else ", ";
@@ -579,7 +580,7 @@ abstract class VarContextExpression is ObjectExpression {
     public var varContext is Context.ClosureVarContext;
     override bound function getName to String { varContext.varName }
     override function toSource from (context is IContext) to String { "(getVar(\"{varContext.varName}\") as {getType().getName()})" }
-    override function toEnglish { varContext.varName }
+    override function toEnglish to String { varContext.varName }
 }
 
 abstract class TimeNodeExpression is ObjectExpression {
@@ -2715,7 +2716,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 	const curLinkInfo = getLinkInfo();
 	if (curLinkInfo <> prevLinkInfo) {
 	    prevLinkInfo = curLinkInfo;
-	    linkMesh = genLines(curLinkInfo);
+	    linkMesh = genLines(curLinkInfo, zoomx, zoomy);
 	}
 	super.preupdate();
     }
@@ -2744,7 +2745,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     const sourceCode = XHTML.Text {
         width: bind width;
-        style: "font-family:Lucida Grande; font-size: 12px; color: black;";
+        style: "font-family:Lucida Grande; font-weight:normal; font-size: 12px; color: #101010E0;";
         transform: bind translate(-width/2, -height/2);
         content: bind if not showSource then "<a href='source://'>Source Code</a>" else "<a href='graph://'>Hide</a><p/><div>{englishOutput}</div>";
     };
@@ -2763,16 +2764,20 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 	Group {
 	    content:
            [Group { content: bind [bgRect, sourceCode] },
-	   localSpace = Group 
+	   Group 
            { 
-	       transform: bind translate(cx, cy) * scale(zoomx, zoomy);
-	       content: [Group { content: bind rootView }, Group { content: bind views }, Group { content: bind arrows},
-                         MeshNode {
-                             id: "lines"
-                             pickable: false;
-                             override var mesh = bind linkMesh;
-                             shader: effectLoader.loadPaintShader(ColorPaint(Color.color(.25, .25, .25)));
-                         }]
+               content: localSpace = Group {
+                   transform: bind translate(cx, cy) * scale(zoomx, zoomy);
+	           content: 
+                   [Group { content: bind rootView }, Group { content: bind views },
+                   MeshNode {
+                       id: "lines"
+                       pickable: false;
+                       override var mesh = bind linkMesh;
+                       shader: effectLoader.loadPaintShader(ColorPaint(Color.color(.25, .25, .25)));
+                   },
+                   Group { content: bind arrows}]
+               }
            }]
         };
     };
@@ -2868,12 +2873,14 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     const lineOff is Vec3 = new Vec3(15, 0, 0);
     const lineOff1 is Vec3 = new Vec3(18.5, 0, 0);
 
-    function genLines from (links is LinkInfo[]) to AbstractMesh {
+    function genLines from (links is LinkInfo[], zoomx is Number, zoomy is Number) to AbstractMesh {
 	lines.reset();
 	delete arrows[links.size()..];
 	while (arrows.size() < links.size()) {
 	    insert TransformNode { content: makeArrow(ARROW_COLOR) } into arrows; 
 	}
+        var lineOff = this.lineOff * zoomx;
+        var lineOff1 = this.lineOff1 * zoomx;
 	for (i in links) {
 	    const p0 = i.sourcePos;
 	    const sourceOff = lineOff*(i.sourceIndex+1);

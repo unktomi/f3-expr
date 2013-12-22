@@ -86,6 +86,7 @@ public class TemporalHierarchy
 
     public function selectTimeNode from (n is TimeNode) to ()
     {
+    println("SELECTING TIME NODE: {n}");
 	selectedTimeNode = n;
     }
 
