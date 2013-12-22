@@ -66,9 +66,11 @@ public class EditorState {
     public var cameraX is Number;
     public var cameraY is Number;
     public var cameraZ is Number;
+    public var playheadFrame is Integer = 0;
+    public var frameRate is Integer = 24;
 }
 
-function saveEditorState from (scene is Scene) to () 
+function saveEditorState from (scene is Scene, player is Timeline, trax is Trax) to () 
 {
     var internalWindows is InternalWindowState[];
     const f is function from ((), Node) to () 
@@ -92,13 +94,15 @@ function saveEditorState from (scene is Scene) to ()
             windowHeight: scene.stage.outsideHeight;
             windowWidth: scene.stage.outsideWidth;
             internalWindows: internalWindows;
+//            playheadFrame: trax.currentFrame as Integer;
+            frameRate: trax.frameRate as Integer;
         });
     w.flush();
     w.close();
     file.renameTo(new java.io.File(".expr.editorstate"));
 }
 
-function loadEditorState from (stage is JoglStage, scene is Scene) to () 
+function loadEditorState from (stage is JoglStage, scene is Scene, player is Timeline, trax is Trax) to () 
 {
     const file = new java.io.File(".expr.editorstate");
     if (file.exists()) {
@@ -123,6 +127,8 @@ function loadEditorState from (stage is JoglStage, scene is Scene) to ()
         if (s.windowHeight <> 0 and s.windowWidth <> 0) {
             stage.resizeWindow(s.windowWidth, s.windowHeight);
         }
+        trax.setFrameRate(s.frameRate);
+        player.setPlayhead((1s / s.frameRate) * s.playheadFrame);
     }
 }
 
@@ -429,12 +435,13 @@ public function run from (args is String[]) to ()
                 url: url;
 	        content: sound;
 	    }
-	    addResource(rn, pt);
 	    const rtn = ResourceTimeNode {
 		url: url;
 		content: Sound.Clip { sound: sound };
 		spatial: rn;
 	    }
+            rn.temporal = rtn;
+	    addResource(rn, pt);
             addTimeResource(rtn);
 	} else if (url.endsWith(".ma")) {
 	    const model = Ma.Model {
@@ -944,10 +951,10 @@ public function run from (args is String[]) to ()
                     override function update {
                         const now = java.lang.System.currentTimeMillis();
                         if (lastTime == 0) {
-                            loadEditorState(joglStage(), this);
+                            loadEditorState(joglStage(), this, player, trax);
                             lastTime = now;
                         } else if (now - lastTime > 2000) {
-                            saveEditorState(this);
+                            saveEditorState(this, player, trax);
                             if (savePoint <> MasterUndoable.now) {
                                 doSave();
                             }
@@ -1108,6 +1115,25 @@ public function run from (args is String[]) to ()
 						     }
 						 }
 					     }
+                                             if (asset is AssetTree.ResourceNodeAsset) {
+						 const clip = (asset as AssetTree.ResourceNodeAsset).rn.temporal;
+                                                 if (clip <> null) {
+                                                     const picked = getUnderMouseInEditor();
+                                                     for (j in picked) {
+                                                         println("j={j.node}");
+                                                         if (j.node is Trax) { 
+                                                             const rtn = clip;
+                                                             (j.node as Trax).onDrop(j, rtn, 
+                                                                                     function from (t is TimeNode) to ()
+                                                                                     {
+                                                                                         const rtn = t as ResourceTimeNode;
+                                                                                         addTimeResource(rtn);
+                                                                                     });
+                                                             break;
+                                                         }
+                                                     }
+                                                 }
+                                             }
                                              if (asset is AssetTree.SceneAsset) {
                                                  const picked = getUnderMouseInEditor();
                                                  if (picked == []) {
@@ -1377,7 +1403,7 @@ public function run from (args is String[]) to ()
                      },
 		     InternalWindow {
                         id: "Editor2";            
-                        gadget: bind trax.frameRateGadget;
+                        gadget: bind trax.combinedGadget;
 			containerBounds: bind Bounds.boundsFromRect(0, 
 								    0, 
 								    width,
@@ -1473,7 +1499,7 @@ public function run from (args is String[]) to ()
             if (not saveChangesIfNecessary()) {
                 return false;
             }
-            saveEditorState(editorScene);
+            saveEditorState(editorScene, player, trax);
             return true;
         }
         title: bind "{mainScene.currentResource.url} {if (savePoint <> MasterUndoable.now) then " (Unsaved)" else ""}";

@@ -467,7 +467,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	foreach (t in content) makeTimeNodeView(null, t)
     }
 
-    var frameRate is Number = bind frameRateN on replace { frameRateGadget.setText("{Math.round(frameRate) as Integer}") };
+    public readonly var frameRate is Number = bind frameRateN on replace { frameRateGadget.setText("{Math.round(frameRate) as Integer}") };
     var frameRateN is Number = 24.0;
 
     const lineMesh = LineMesh {};
@@ -481,7 +481,10 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
     function autoScrollRight {
     }
 
-    public var currentFrame is Number on replace { refreshPlayhead() }
+    public var currentFrame is Number on replace { 
+        frameGadget.setText("{(currentFrame as Integer)}");
+        refreshPlayhead();
+    }
 
     function refreshPlayhead from () to () 
     {
@@ -513,7 +516,8 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	Math.round((d / 1s) * frameRate);
     }
 
-    bound function frameToDuration from (frames is Number) to Duration {
+    bound function frameToDuration from (frames is Number) to Duration 
+    {
 	(1s / frameRate) * frames
     }
     
@@ -572,7 +576,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	pixelsPerFrame() * frameRate;
     }
 
-    bound function pixelsPerFrame to Number { /*frameRateN / 24.0 * */ PIXELS_PER_FRAME }
+    bound function pixelsPerFrame to Number { PIXELS_PER_FRAME }
     
     bound function frameToX from (frame is Number) to Number 
     {
@@ -588,6 +592,11 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
         target.paused = true;
 	target.setPlayhead(target.playhead);
         target.paused = value;
+    }
+
+    public function setFrameRate from (fps is Integer) to ()
+    {
+        frameRateN = fps;
     }
 
     function advancePlayhead from (frames is Number) to ()
@@ -680,20 +689,61 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
         }
     }
 
-    public var frameRateGadget is Text.Field = Text.Field {
+    readonly var gadgetFont = bind layoutEngine.createFont("font-size:10;font-family:Lucida Grande");
+    readonly var gadgetFg = ColorPaint(Color.color(.8, .8, .8));
+    readonly var gadgetBg = ColorPaint(Color.color(.4, .4, .4));
+        
+
+    public var frameGadget is Text.Field = Text.Field {
         width: bind 64;
         height: 13;
         rightJustified: true;
-        font: bind layoutEngine.createFont("font-size:10;font-family:Lucida Grande")
-        foreground: ColorPaint(Color.color(.8, .8, .8))
-        //background: bind if (not selected) then TEXT_BG_PAINT else SELECTED_BG_PAINT;
-        background: ColorPaint(Color.color(.4, .4, .4))
+        font: bind gadgetFont;
+        foreground: bind gadgetFg;
+        background: bind gadgetBg;
+        text: "0"
+    };
+
+    const onGadgetCommit = frameGadget.observeCommit().subscribe(function from (_ is ()) to () {
+           const currentFrame = Integer.parseInt(frameGadget.text);
+           target.setPlayhead(1s / frameRate * currentFrame);
+        });
+
+    public var frameRateGadget is Text.Field = Text.Field {
+        width: 48
+        height: 13;
+        rightJustified: true;
+        font: bind gadgetFont;
+        foreground: bind gadgetFg;
+        background: bind gadgetBg;
         text: "24"
     };
 
-    const onGadgetCommit = frameRateGadget.observeCommit().subscribe(function from (_ is ()) to () {
+    const onRateGadgetCommit = frameRateGadget.observeCommit().subscribe(function from (_ is ()) to () {
             frameRateN = Math.max(Integer.parseInt(frameRateGadget.text), 1);
         });
+
+    public var combinedGadget is Node = Group {
+        content: 
+        [TransformNode {
+            tx: -64
+            content: frameGadget;
+        },
+        TransformNode {
+            content: frameRateGadget;
+        },
+        TransformNode {
+            tx: 31;
+            content: Text.Label {
+                text: "fps";
+                font: bind gadgetFont;
+                width: 15;
+                height: 13;
+                foreground: bind gadgetFg;
+                background: bind gadgetBg;
+            }
+        }]
+    }
 
 
     bound function drawLabels from (w is Number, h is Number, offset is Number, frameRateN is Number) to Node[] 

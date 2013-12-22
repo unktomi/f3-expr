@@ -127,24 +127,21 @@ public class AssetTreenode is Treenode {
     }
 }
 
+public class ResourceNodeAsset is Asset {
+    override var url = bind rn.url;
+    public const rn is ResourceNode;
+}
+
 public function makeAsset from (r is ResourceNode) to Asset {
     if (r is MaResourceNode) {
 	MaAsset {
 	    model: (r as MaResourceNode).model;
             temporalRoot: r.temporal;
 	}
-    } else if (r.url.endsWith(".svg")) {
-	SVGAsset {
-	    url: r.url
-	} 
-    } else if (r.url.endsWith(".png")) {
-	ImageAsset {
-	    url: r.url;
-	}
     } else {
-	WebAsset {
-	    url: r.url;
-	}
+        ResourceNodeAsset {
+            rn: r;
+        }
     }
 }
 
