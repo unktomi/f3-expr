@@ -89,8 +89,8 @@ function saveEditorState from (scene is Scene) to ()
     const file = new java.io.File(".expr.editorstate.tmp");
     const w = new java.io.BufferedWriter(new java.io.FileWriter(file));
     IO.writeObject(w, EditorState {
-            windowHeight: scene.stage.height+21;
-            windowWidth: scene.stage.width;
+            windowHeight: scene.stage.outsideHeight;
+            windowWidth: scene.stage.outsideWidth;
             internalWindows: internalWindows;
         });
     w.flush();
@@ -556,7 +556,7 @@ public function run from (args is String[]) to ()
     }
 
     var stepping is Boolean = false;
-    var loop is Boolean = true;
+    var loop is Boolean = false;
     var nonInteractiveLoop = bind not interactive and loop;
     var full is Boolean = false;
 
@@ -1377,6 +1377,7 @@ public function run from (args is String[]) to ()
                      },
 		     InternalWindow {
                         id: "Editor2";            
+                        gadget: bind trax.frameRateGadget;
 			containerBounds: bind Bounds.boundsFromRect(0, 
 								    0, 
 								    width,
@@ -1597,7 +1598,14 @@ public function run from (args is String[]) to ()
         println("DELETE {x.getClass()} => {x}");
             if (x is ResourceTimeNode) {
                 const rn = x as ResourceTimeNode;
-                delete x as ResourceTimeNode from currentAnimResource.resources;
+                rn.foldLeft((), function from (_ is (), n is TimeNode) to () {
+                        n.pause();
+                    });
+                if (x.parent is ResourceTimeGroup) {
+                    delete (x as ResourceTimeNode) from (x.parent as ResourceTimeGroup).resources;
+                } else {
+                    delete x from (x.parent as TimeGroup).content;
+                }
                 return;
             }
             x = x.parent;

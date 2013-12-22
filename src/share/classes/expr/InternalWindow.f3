@@ -58,22 +58,20 @@ public class InternalWindow is ResizableNode, Focuser {
 	fillPaint: ColorPaint(Color.color(.44, .44, .44));
     }
 
+    public var gadget is Node;
+
     const buttonBar is Node = Group {
         transform: bind translate(0, self.height / 2 - 9 - 10);
         content: 
         [Rectangle {
             height: 18;
-            override var width = bind self.width;
+            width: bind self.width;
             fillPaint: bind titlePaint;
-        }/*,
-        Image {
-            transform: bind translate(-width/2 + 74/2, 1);
-            url: bind "{__DIR__}navigate.png";
         },
-        Image {
-            transform: bind translate(width/2 - 8.5, 0);
-            url: bind "{__DIR__}lock.png";
-        }*/]
+        TransformNode {
+            transform: bind translate(width / 2.0 - gadget.bounds.width() / 2.0, 0);
+            content: bind gadget
+        }]
     };
 
     const resizeCorner is Node = Image {

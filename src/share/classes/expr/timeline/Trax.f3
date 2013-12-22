@@ -175,15 +175,13 @@ class TimeNodeView is AbstractNode
     override var transform = bind translate(playX + w / 2.0, 0);
     function getTrackName from (target is TimeNode) to String
     {
-        println("target: {target.id} <= {target.getClass()}");
-        println("parent: {target.parent.id} <= {target.parent.getClass()}");
         if ((target.parent is ResourceTimeNode and not (target.parent is ResourceTimeNodeWrapper)) and target.parent.id == target.id) then "Main Timeline" else formatName(target.id);
     }   
     var labelX = bind 
         if (target.hasIndefiniteDuration() and trax.visibleInterval.start > target.playTime + target.contentBounds.start)
             then trax.durationToX(trax.visibleInterval.start) - playX
             else 
-                trax.durationToX(target.contentBounds.start);
+                trax.durationToX(target.contentBounds.start);//Math.min(trax.durationToX(target.contentBounds.start), 0.0);
 
     override var internalContent = Group {
 	content:
@@ -194,7 +192,9 @@ class TimeNodeView is AbstractNode
                 visible: bind row > trax.scrollY;
 		content: 
                 [Rectangle {
-                     width: bind w + trax.durationToX(target.contentBounds.start);               
+                     var ww = bind w + trax.durationToX(target.contentBounds.start);              
+                     transform: bind translate((ww - w) / 2.0, 0);
+                     width: bind ww
                      height: bind h;
 		     fillPaint: bind bg1;
                 },
@@ -234,7 +234,7 @@ class TimeNodeView is AbstractNode
 		     font: bind timeNodeViewFont;
 		 },
 		 Rectangle is MouseInputHandler {
-		     transform: bind translate(-w/2+5.0/2+2, 0);
+		     transform: bind translate(labelX+-w/2+5.0/2+2, 0);
 		     height: 9.0;
 		     width: 5.0;
 		     fillPaint: bind if target.pickable then fg else TransparentPaint;
@@ -377,8 +377,11 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
         println("row={yToRow(pt.y)}");
         const row = yToRow(pt.y);
         const tv = rowToTimeNodeView(row);
-        const targetNode = tv.target;
+        var targetNode = tv.target;
         println("targetNode={targetNode}");
+        if (targetNode is ResourceTimeNodeWrapper) {
+            targetNode = (targetNode as ResourceTimeNodeWrapper).wrapped;
+        }
         if (targetNode is TimeGroup) {
             tv.getParentTimeNodeView().open();
             insert clip into (targetNode as TimeGroup).content;
@@ -397,7 +400,8 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 
     const onPlayhead = DefaultObserver of Duration {
 	override function onNext from (event is Duration) to () {
-	    const d = if (loop and not target.paused and targetNode.contentBounds.duration() > 0s) event.rem(targetNode.bounds.start + targetNode.contentBounds.duration()) else event;
+	    //const d = if (loop and not target.paused and targetNode.contentBounds.duration() > 0s) event.rem(targetNode.bounds.start + targetNode.contentBounds.duration()) else event;
+            const d = event;
 	    currentFrame = (d.toMillis() / 1000) * frameRate;
 	    //println("currentFrame {event} => {currentFrame}");
             refreshPlayhead();
@@ -463,7 +467,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	foreach (t in content) makeTimeNodeView(null, t)
     }
 
-    var frameRate is Number = bind frameRateN;
+    var frameRate is Number = bind frameRateN on replace { frameRateGadget.setText("{Math.round(frameRate) as Integer}") };
     var frameRateN is Number = 24.0;
 
     const lineMesh = LineMesh {};
@@ -497,8 +501,12 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
     }
     
     const PIXELS_PER_FRAME = 10;
+    const TICK_PIXELS = 10;
     
     var visibleFrameCount is Number = bind (width-10) / pixelsPerFrame();
+
+    var unzoomedVisibleFrameCount is Number = bind (width-10) / PIXELS_PER_FRAME;
+    var unzoomedVisibleDuration = bind 1s / 24 * unzoomedVisibleFrameCount;
 
     bound function durationToFrame from (d is Duration) to Number
     {
@@ -555,14 +563,16 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	var pixels = d / 1s * pixelsPerSecond();
 	return pixels;
     }
+
+    bound function framesPerTick to Number {
+        pixelsPerFrame() * TICK_PIXELS;
+    }
     
     bound function pixelsPerSecond to Number {  
 	pixelsPerFrame() * frameRate;
     }
 
-    bound function pixelsPerFrame to Number { 
-        frameRateN / 24.0 * PIXELS_PER_FRAME;
-    }
+    bound function pixelsPerFrame to Number { /*frameRateN / 24.0 * */ PIXELS_PER_FRAME }
     
     bound function frameToX from (frame is Number) to Number 
     {
@@ -670,53 +680,70 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
         }
     }
 
+    public var frameRateGadget is Text.Field = Text.Field {
+        width: bind 64;
+        height: 13;
+        rightJustified: true;
+        font: bind layoutEngine.createFont("font-size:10;font-family:Lucida Grande")
+        foreground: ColorPaint(Color.color(.8, .8, .8))
+        //background: bind if (not selected) then TEXT_BG_PAINT else SELECTED_BG_PAINT;
+        background: ColorPaint(Color.color(.4, .4, .4))
+        text: "24"
+    };
+
+    const onGadgetCommit = frameRateGadget.observeCommit().subscribe(function from (_ is ()) to () {
+            frameRateN = Math.max(Integer.parseInt(frameRateGadget.text), 1);
+        });
+
 
     bound function drawLabels from (w is Number, h is Number, offset is Number, frameRateN is Number) to Node[] 
     {
 	//println("draw labels {offset}");
-	var x = -w / 2 + 15 + 15;
+	var x0 = -w / 2 + 15 + 15;
 	var y = h / 2 - 19;
-        var pp = pixelsPerFrame();
-        var off0 = offset mod pp;
-	var off = (offset - off0) * pp;
-        var off1 = off0 * pp;
+        var slop = offset mod 10;
+        var x = x0 - frameToX(slop);
 	foreach (i in [0..(w+100) step 100]) {
-	    var t = Text.Label {
-		height: 10;
-		width: 30;
-		background: bind this.backgroundPaint;
-		foreground: bind this.foregroundPaint;
-		transform: bind translate(-off1+x+i, y+10);
-		font: bind font;
-		text: bind "{Math.round((off+i)/pp) as Integer}"
-	    }
-            TransformNode {
-                tx: bind -t.content.textShape.getBounds().width() / 2
-                content: t
-            }
+            if (x+i < x0) then null else  {
+                    var t = Text.Label {
+                        height: 10;
+                        width: 30;
+                        background: bind this.backgroundPaint;
+                        foreground: bind this.foregroundPaint;
+                        transform: bind translate(x+i, y+10);
+                        font: bind font;
+                        text: bind "{Math.round(xToFrame(i)+offset-slop) as Integer}"
+                    }
+                    TransformNode {
+                        tx: bind -t.content.textShape.getBounds().width() / 2
+                            content: t
+                            }
+                }
 	}
     }
 
-    function drawLines from (w is Number, h is Number, viewHeight is Number, offset is Number) to AbstractMesh {
+    function drawLines from (w is Number, h is Number, viewHeight is Number, scroll is Number) to AbstractMesh {
 	//println("TIMELINE={target} pp={pixelsPerFrame()}");
 	const x0 = -w / 2 + 15;
 	const y0 = Math.round(h / 2 - viewHeight-5);
 	var x is Number = x0;
+        var slop = scroll mod 2;
 	var y is Number = y0;
 	var mid is Boolean = false;
 	lineMesh.reset();
 	lineMesh.moveTo(x, y);
-        var pp is Integer = PIXELS_PER_FRAME;
+        const pp = PIXELS_PER_FRAME;
+        var offset = 0;
         var off0 = offset mod pp;
 	var off = (offset - off0) * pp;
         var off1 = off0 * pp;
-        //x += off1;
+        x -= frameToX(slop);
         //println("OFF={offset}");
-	for (i in [0..(w+off) step pp]) {
+	for (i in [0..(w+off) step PIXELS_PER_FRAME]) {
 	    var n = if (mid) then 3 else 5;
 	    mid = not mid;
             const x1 = -off1+x+i;
-            if (x1 >= x) {
+            if (x1 >= x0) {
                 lineMesh.moveTo(x1, y);
                 lineMesh.lineTo(x1, y+n);
             }
@@ -750,7 +777,16 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
     {
         horizontalScrolling = b;
         if (not b) {
-            frameRateN = Math.round(frameRateN);
+            frameRateN = Math.max(Math.round(frameRateN), 1.0);
+            fixupPlayhead();
+        }
+    }
+
+    function fixupPlayhead to () {
+        if (currentFrame < scrollOffset) {
+            target.setPlayhead(frameToDuration(scrollOffset));
+        } else if (currentFrame > scrollOffset + visibleFrameCount) {
+            target.setPlayhead(frameToDuration(scrollOffset + visibleFrameCount));
         }
     }
 
@@ -816,7 +852,9 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 
     override function onKeyDown from (e is KeyboardEvent) to () {
 	var i = selectedTimeNodeView.row;
-	if (e.keyCode == Keys.Down) {
+	if (e.keyCode == Keys.F) {
+            frameSelection();
+	} else if (e.keyCode == Keys.Down) {
 	    const n = rowToTimeNodeView(i+1);
 	    if (n <> null) {
 		selectTimeNodeView(n);
@@ -984,5 +1022,34 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
     {
         if (not ch.pickable) { return }
         ch.setKey();
+    }
+
+    public function frameSelection to ()
+    {
+        var bounds is Interval;
+        if (selectedTimeNodeView <> null) {
+            const n = selectedTimeNodeView.target;
+            if (not n.hasIndefiniteDuration()) {
+                bounds = n.bounds;
+            }
+        } else {
+            for (t in timeNodeViews) {
+                const n = t.target;
+                if (not n.hasIndefiniteDuration()) {
+                    bounds = Interval.merge(bounds, n.bounds);
+                }
+            }
+        }
+        if (bounds.duration() == 0s) {
+            return;
+        }
+        bounds.add(target.playhead);
+        const margin = 10;
+        const pixels = (width - 10.0) - margin;
+        const ticks = pixels / TICK_PIXELS;
+        const seconds = bounds.duration() / 1s;
+        frameRateN = Math.max(ticks / seconds, 1.0);
+        scrollOffset = durationToFrame(bounds.start);
+        fixupPlayhead();
     }
 }

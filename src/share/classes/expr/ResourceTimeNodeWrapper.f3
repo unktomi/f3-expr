@@ -4,8 +4,8 @@ import f3.media.scene.*;
 public class ResourceTimeNodeWrapper is ResourceTimeNode {
     public var wrapped is TimeGroup;
     override var content = bind [wrapped];
-    public function unwrapContent to TimeNode[] {
+    public function unwrapContent to TimeNode[] 
+    {
         wrapped.content
     }
-   
 }
