@@ -1340,7 +1340,7 @@ public function run from (args is String[]) to ()
                                                      content: Scrollpane {
                                                         canZoomVertical: false;
                                                              content: inspector3 = Inspector {
-                                                                   inspecting: bind Inspector.inspect(otherHierarchy.selectedVariable);
+                                                                 inspecting: bind [Inspector.inspect(otherHierarchy.selectedVariable)];
                                                              }
                                                      }
                                                   },
