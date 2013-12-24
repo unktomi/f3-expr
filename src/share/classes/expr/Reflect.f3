@@ -143,7 +143,7 @@ public function getVar from (classType is F3ClassType, name is String) to F3VarM
     if (varMap == null) {
         const vars = classType.getVariables(true);
 	println("vars={vars}");
-        varMap = new java.util.HashMap of (String, F3VarMember);
+        varMap = new java.util.TreeMap of (String, F3VarMember)(String.CASE_INSENSITIVE_ORDER);
         for (varMember in vars) {
 	    varMap.put(varMember.getName(), varMember);
         }
@@ -158,7 +158,7 @@ public function getVars from (classType is F3ClassType) to F3VarMember[]
     if (varMap == null) {
         const vars = classType.getVariables(true);
 	println("vars={vars}");
-        varMap = new java.util.HashMap of (String, F3VarMember);
+        varMap = new java.util.TreeMap of (String, F3VarMember)(String.CASE_INSENSITIVE_ORDER);
         for (varMember in vars) {
 	    varMap.put(varMember.getName(), varMember);
         }

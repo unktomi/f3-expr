@@ -24,6 +24,21 @@ import expr.inspector.*;
 var exprMap1 = new java.util.HashMap of (F3ClassType, Member[]);
 var exprMap2 = new java.util.HashMap of (F3ClassType, Member[]);
 
+function thisMember from (typ is F3Type) to Member {
+    if (typ is F3ClassType) {
+        const clazz = typ as F3ClassType;
+        const m = clazz.getThis();
+        Member {
+            rt: m.getType();
+            t: m.getType();
+            m: m;
+            isObservable: true;
+            isObserver: false;
+        }
+    } else null;
+}
+
+
 const operatorSet = {
     const set = new java.util.HashSet of (String);
     set.add("add");
@@ -336,7 +351,7 @@ public function introspect from (clazz is F3ClassType, all is Boolean) to Member
 	    insert toInsert into result;
 	}
     }
-    const vars = clazz.getVariables(true);
+    const vars = Reflect.getVars(clazz);
     for (v in vars where not v.getName().contains("$") and not v.getName().startsWith("bnds") and not v.isStatic()) {
         println("v={v}");
 	var toInsert is Member;
@@ -1270,7 +1285,7 @@ public abstract class ExpressionView is AbstractNode {
     function onDrag from (e is MouseEvent) to () 
     {
 
-	pos += e.picked.dragPoint1 - e.picked.dragPoint0;
+	pos += canvas.toLocal * e.picked.dragPoint1 - canvas.toLocal * e.picked.dragPoint0;
     }
     function onUp from (e is MouseEvent) to () 
     {
@@ -1517,6 +1532,9 @@ public class ObjectView is ExpressionView {
             n = NodeObjNode {nodeId: (objectExpr as NodeExpression).node.id};
         } else if (objectExpr is TimeNodeExpression) {
             n = TimeNodeObjNode {timeNodeId: (objectExpr as TimeNodeExpression).timeNode.id};
+        } else if (objectExpr is VarContextExpression) {
+            const v = (objectExpr as VarContextExpression).varContext;
+            n = VarContextObjNode { varId: v.fullName(), varType: v.varType.t.getName() };
         } else {
             // @Todo
         }
@@ -1555,7 +1573,7 @@ public class ObjectView is ExpressionView {
         }
     };
 
-    var outputViews is OutputView[] = bind if (true) then [] else foreach (p in objectExpr.outputs) OutputView {
+    var outputViews is OutputView[] = bind foreach (p in objectExpr.outputs) OutputView {
 	canvas: bind canvas;
 	cellWidth: bind cellWidth;
 	expression: p;
@@ -1752,7 +1770,7 @@ public class InputView is LinkedView {
                     });
             }
         });
-    override bound function getLinkPos to Point3 { getWorldPos() - new Vec3(cellWidth/2, 0, 0) }
+    override bound function getLinkPos to Point3 { canvas.toLocal * (toSceneTransform * new Point3(-cellWidth/2, 0, 0) ) }
 }
 
 
@@ -1929,7 +1947,7 @@ public class OutputView is LinkedView {
     override function onUp from (e is MouseEvent) to () 
     {
     }
-    override bound function getLinkPos to Point3 { getWorldPos() + new Vec3(cellWidth/2, 0, 0) }
+    override bound function getLinkPos to Point3 {  canvas.toLocal * (toSceneTransform * new Point3(cellWidth/2, 0, 0) ) }
 }
 
 class ResultView is OutputView {
@@ -2293,8 +2311,8 @@ class TreeLinker {
     function onDrag from (e is MouseEvent) to ()
     {
         if (tv == null) return;
-        dx += e.screenDrag.x;
-        dy += e.screenDrag.y;
+        dx += e.drag.x;
+        dy += e.drag.y;
         updateArrow();
     }
 
@@ -2303,7 +2321,7 @@ class TreeLinker {
         const cell = tv.selectedTreecell as MemberTreecell;
         const tn = tv.selectedTreenode as MemberTreenode;
         const toLocal = canvas.toLocal;
-        const sourcePos = toLocal * cell.toSceneTransform.getTranslation();
+        const sourcePos = canvas.toLocal * cell.toSceneTransform.getTranslation();
         linkStart.pos = sourcePos + new Vec3(cell.bounds.extent.x, 0, 0);
         linkEnd.pos = startPos + new Vec3(dx-3.5, dy, 0);
         canvas.targetArrow.tx = linkEnd.pos.x;
@@ -2504,14 +2522,14 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     override public bound function getTx to Number { 1.0-(cx + width/2.0) / width }
     override public bound function getSx to Number { 
-        //Math.max(width / localSpace.contentBounds.width(), 1.0);
+        //Math.min(width / localSpace.bounds.width(), 1.0);
         0.1
     }    
 
     override public bound function getTy to Number { (cy + height/2.0) / height }
 
     override public bound function getSy to Number { 
-        //Math.max(height / localSpace.contentBounds.height(), 1.0);
+        //Math.min(height / localSpace.bounds.height(), 1.0);
         0.2
     }
 
@@ -2552,13 +2570,13 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             var c = clip as Context.ClosureVarContext;
             const typ = c.varType.t;
             var names = new java.util.HashSet of String;
-            const members = foreach (m in introspect(typ) where not m.name.contains("pdate") and names.add(m.name)) m;
+            const members = [foreach (m in introspect(typ) where not m.name.contains("pdate") and names.add(m.name)) m];
             insert ObjectView {
                 pos: toLocal * where.scenePoint;
                 objectExpr: VarContextExpression { 
                     varContext: c, override function getType to F3Type { typ }
                     inputMembers: foreach (m in members where  m.isObserver) m;
-                    outputMembers: foreach (m in members where m.isObservable and m.m is F3FunctionMember) m;
+                    outputMembers: thisMember(typ) 
                 }
                 canvas: this;
             } into views;
@@ -2579,7 +2597,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 	    objectExpr: NodeExpression { 
                 node: clip, override function getType to F3Type { typ }
                 inputMembers: foreach (m in members where m.isObserver) m;
-                //outputMembers: foreach (m in members where m.isObservable and m.m is F3FunctionMember) m;
+                outputMembers: thisMember(typ) 
             }
 	    canvas: this;
 	} into views;
@@ -2598,7 +2616,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 	    objectExpr: TimeNodeExpression { 
                 timeNode: clip, override function getType to F3Type { typ }
                 inputMembers: foreach (m in members where not m.isObservable and m.isObserver and m.t == UNIT_TYPE) m;
-                outputMembers: foreach (m in members where m.isObservable and m.m is F3FunctionMember) m;
+                outputMembers: thisMember(typ) 
             }
 	    canvas: this;
 	} into views;
@@ -2733,6 +2751,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         width: bind width;
         height: bind height;
         fillPaint: bind ColorPaint(Color.color(.9, .9, .9));
+
         override function onMouseDrag from (e is MouseEvent) to ()
         {
             const d = (e.picked.dragPoint1-e.picked.dragPoint0);
@@ -2801,7 +2820,13 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     override function onKeyDown from (e is KeyboardEvent) to () {
         if (e.keyCode == Keys.Delete or e.keyCode == Keys.Backspace) {
             deleteSelection();
+        } else if (e.keyCode == Keys.F) {
+            frameContent();
         }
+    }
+
+    function frameContent to ()
+    {
     }
 
     override function onMouseWheel from (e is MouseWheelEvent) to ()
@@ -2879,8 +2904,8 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 	while (arrows.size() < links.size()) {
 	    insert TransformNode { content: makeArrow(ARROW_COLOR) } into arrows; 
 	}
-        var lineOff = this.lineOff * zoomx;
-        var lineOff1 = this.lineOff1 * zoomx;
+        var lineOff = this.lineOff;
+        var lineOff1 = this.lineOff;
 	for (i in links) {
 	    const p0 = i.sourcePos;
 	    const sourceOff = lineOff*(i.sourceIndex+1);
@@ -3295,8 +3320,36 @@ public class TimeNodeObjNode is ObjNode {
 }
 
 public class VarContextObjNode is ObjNode {
+    public var varId is String;
+    public var varType is String;
     public override function createView from (canvas is Canvas) to ObjectView {
-        null
+        const c is Context.ClosureVarContext = canvas.eventContext.resolve(varId) as Context.ClosureVarContext;
+        const typ = c.varType.t;
+        const names = new java.util.HashSet of String;
+        const members = foreach (m in introspect(typ) where not m.name.contains("pdate") and names.add(m.name)) m;
+        const result = ObjectView {
+            pathFactory: canvas.pathFactory;
+            layoutEngine: canvas.layoutEngine;
+            imageLoader: canvas.imageLoader;
+            effectLoader: canvas.effectLoader;
+            canvas: canvas;
+            pos: new Point3(x, y, 0);
+            objectExpr: VarContextExpression { 
+                varContext: c, override function getType to F3Type { typ }
+                inputMembers: foreach (m in members where  m.isObserver) m;
+                outputMembers: foreach (m in members where m.isObservable and m.m is F3FunctionMember) m;
+            }
+        }
+        for (i in inputs) {
+            if (i.links.size() > 0) {
+                for (link in i.links) {
+                    const lnk = canvas.getLink(link);
+                    lnk.target = result.inputViews[indexof i];
+                }
+            }
+        }
+        insert result into canvas.views;
+        return result;
     }
 }
 

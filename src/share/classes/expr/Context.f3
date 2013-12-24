@@ -20,6 +20,22 @@ public class Context {
             c.updateParent();
         }
     }
+    public function fullName to String 
+    {
+        var p = this;
+        var r = "";
+        while (p <> null) {
+            r = "|{p.name}{r}";
+            p = p.parent;
+        }
+        return r;
+    }   
+
+    public function resolve from (path is String) to Context 
+    {
+        null; // @TODO
+    }
+
 }
 
 public abstract class GroupContext is Context {
@@ -82,12 +98,22 @@ public class ClosureVarContext is Context {
     public var varType is TypeAsset;
     public var varName is String = "variable";
     public var value is Object;
+    public var isEvent is Boolean;
     override var name = bind "{varName} [{varType.name}]";
+    override function fullName to String 
+    {
+        "{parent.fullName()}|{varName}";
+    }
 }
 
 public class VarContext is Context {
     public var call is CallContext;
     public var varType is F3Type;
+    var members = bind if (varType is F3ClassType) then Expression.introspect(varType as F3ClassType) else [];
+    override public bound function getContent to Context[] 
+    { 
+        foreach (m in members) MemberContext { member: m, parent: this } 
+    }
 }
 
 public class ParameterContext is VarContext {
