@@ -1330,6 +1330,7 @@ class FunctionView is ExpressionView {
             intValue: if (i.parameter.constantValue is Integer) then i.parameter.constantValue as Integer else 0;
             numberValue: if (i.parameter.constantValue is Number) then i.parameter.constantValue as Number else 0.0;
             booleanValue: if (i.parameter.constantValue is Boolean) then i.parameter.constantValue as Boolean else false;
+            stringValue: if (i.parameter.constantValue is String) then i.parameter.constantValue as String else "\"\"";
         };
         n.outputs = 
             foreach (link in output.getTree.getLinks() where not (link.target is TreecellGetVarView)) 
@@ -1886,6 +1887,26 @@ public class ParameterView is InputView {
             }
         }
     } 
+
+    function stringField to Text.Field {
+        StringField {
+            width: bind cellWidth - 46;
+            transform: translate(23, 0);
+            height: bind cellHeight;
+            font: bind font;
+            foreground: bind canvas.textFg;
+            background: bind canvas.textBg;
+            rightJustified: true;
+            override function handleCommit from (_ is ()) to ()
+            {
+                parameter.constantValue = "\"{text}\"";
+                canvas.dumpSrc();
+            }
+        }
+    }
+
+    readonly var textField = bind if Reflect.STRING_TYPE.isConvertibleFrom(getInputType()) then stringField() else null;
+
     readonly var sliderField = bind 
         if (Reflect.NUMBER_TYPE.isConvertibleFrom(getInputType())) 
             then numSlider() 
@@ -1893,7 +1914,12 @@ public class ParameterView is InputView {
                 then intSlider()
                 else if (Reflect.BOOLEAN_TYPE.isConvertibleFrom(getInputType())) 
                     then boolSlider() else null;
-    override var internalContent = Group { content: bind [label, if links.size() == 0 then sliderField else null] };
+    override var internalContent = Group { content: bind [label, if links.size() == 0 then [sliderField, textField] else null] };
+}
+
+abstract class StringField extends Text.Field {
+    protected function handleCommit from (_ is ()) to ();
+    const onCommit = observeCommit().subscribe(handleCommit);
 }
 
 public class GetVarResult is GetVar {
@@ -2634,6 +2660,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     const cellSelectedBg = ColorPaint(Color.color(.80, .80, .80));
     const cellBg = ColorPaint(Color.color(.7, .7, .7));
     const textFg = ColorPaint(Color.color(.2, .2, .2));
+    const textBg = ColorPaint(Color.color(.85, .85, .85));
     const titleBg = ColorPaint(Color.color(.9, .9, .9));
 
     var ARROW_COLOR = Color.color(.2, .2, .2);
@@ -3217,9 +3244,9 @@ public class FunNode is ExprNode {
                 println("bool value is {n.booleanValue}");
                 p.sliderField.t = if n.booleanValue then 1.0 else 0.5;
             } else if (Reflect.STRING_TYPE == p.parameter.getType()) {
-                p.parameter.constantValue = "\"\"";
+                p.parameter.constantValue = n.stringValue;
+                p.textField.setText(n.stringValue.substring(1, n.stringValue.length()-1));
             }
-            
         }
         for (p in outputs) {
             println("output: {p}");
@@ -3405,6 +3432,7 @@ public class TargetNode is ExprNode {
     public var intValue is Integer;
     public var numberValue is Number;
     public var booleanValue is Boolean;
+    public var stringValue is String = "\"\"";
 }
 
 public class SourceNode is ExprNode {

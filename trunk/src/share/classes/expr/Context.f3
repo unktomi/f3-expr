@@ -104,15 +104,41 @@ public class ClosureVarContext is Context {
     {
         "{parent.fullName()}|{varName}";
     }
+    function getMembers from (varType is F3Type) to Member[] {
+        const result = if (varType is F3ClassType) then Expression.introspect(varType as F3ClassType) else [];
+        println("members of {varType} => {result}");
+        return result;
+    }
+    function getContentFromType(varType is F3Type) to Context[] 
+    {
+        const results = foreach (m in getMembers(varType) where m.name.startsWith("observe")) MemberContext { member: m, parent: this } 
+        println("content from type of {varType} => {results}");
+        return results;
+    }
+    override public bound function getContent to Context[] 
+    { 
+        getContentFromType(varType.t);
+    }
 }
 
 public class VarContext is Context {
     public var call is CallContext;
     public var varType is F3Type;
-    var members = bind if (varType is F3ClassType) then Expression.introspect(varType as F3ClassType) else [];
+    var members = bind getMembers(varType);
+    function getMembers from (varType is F3Type) to Member[] {
+        const result = if (varType is F3ClassType) then Expression.introspect(varType as F3ClassType) else [];
+        println("members of {varType} => {result}");
+        return result;
+    }
+    function getContentFromType(varType is F3Type) to Context[] 
+    {
+        const results = foreach (m in members) MemberContext { member: m, parent: this } 
+        println("content from type of {varType} => {results}");
+        return results;
+    }
     override public bound function getContent to Context[] 
     { 
-        foreach (m in members) MemberContext { member: m, parent: this } 
+        getContentFromType(varType);
     }
 }
 
@@ -191,6 +217,7 @@ public class ContextTreemodel is Treemodel {
 public class ContextTreenode is Treenode {
     public var context is Context;
     override var label = bind context.name;
-    override var canOpen = bind sizeof context.getContent() > 0;
-    override var children = bind foreach (c in context.getContent()) ContextTreenode { context: bind c, parent: this }
+    var content = bind context.getContent();
+    override var canOpen = bind sizeof content > 0;
+    override var children = bind foreach (c in content) ContextTreenode { context: bind c, parent: this }
 }
