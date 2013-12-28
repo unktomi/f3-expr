@@ -275,7 +275,6 @@ public function introspect from (clazz is F3ClassType, all is Boolean) to Member
     for (f in funs where f.isPublic() and not f.getName().contains("$") and 
 	     OBJECT_TYPE <> f.getDeclaringClass() 
 	 ) { 
-
 	const ft = I.G(f.getType());
 	var rt = I.G(ft.getReturnType());
 	var toInsert is Member;
@@ -1237,6 +1236,9 @@ class ControlArrow is MeshNode.Instance {
 }
 
 public abstract class ExpressionView is AbstractNode {
+    public function setDebugValue from (x is Object) to () 
+    {
+    }
     override var id = bind expression.id;
     public function unlink from () to () {}
     override function toString { "{super.toString()}: {expression}" }
@@ -1624,6 +1626,7 @@ function getPath from (v is LinkView) to String {
 }
 
 public class GetVarView is OutputView {
+
     public override function serialize to ExprNode {
         const n = GetNode {
             id: "{id}";
@@ -1643,6 +1646,10 @@ public class GetVarView is OutputView {
                 }
             }
         return n;
+    }
+    override function setDebugValue from (obj is Object) to ()
+    {
+        tv.setDebugValue(obj);
     }
     override var resultType = bind get.getType();
     public var get is GetVar;
@@ -1999,13 +2006,15 @@ class TreeGetVar is GetVar {
 
 class MemberTreenode is Treenode {
     public var m is Member;
+    public var depth is Integer = bind (parent as MemberTreenode).depth + 1;
     public var get is GetVar = bind TreeGetVar { member: m }
     override var label = bind Names.formatName(m.name);
     readonly var members = bind m.getMembers();
     override var canOpen = bind { var n = members.size(); n > 0 };
     override var children = bind foreach (x in members) makeTreeNode(x);
 
-    public var value is F3Value = bind (parent as MemberTreenode).getValue(m.m);
+    readonly var parentValue = bind (parent as MemberTreenode).value;
+    public readonly var value is F3Value = bind getValue(parentValue, m.m);
 
     public function setValue from (value is F3Value) to ()
     {
@@ -2013,16 +2022,20 @@ class MemberTreenode is Treenode {
     }
 
     public function setValue from (m is F3Member, value is F3Value) to () {
-        var myValue = value;
+        const myValue = this.value;
         if (m is F3VarMember) {
-            var v = m as F3VarMember;
-            if (v.isStatic()) then v.setValue(null, value) else v.setValue(myValue as F3ObjectValue, value);
+            const v = m as F3VarMember;
+            try {
+                if (v.isStatic()) then v.setValue(null, value) else v.setValue(myValue as F3ObjectValue, value);
+            } catch (e is java.lang.Exception) {
+                println("failed to set {v} with {myValue} -> {value}");
+                e.printStackTrace();
+            }
         } 
     }
 
-    bound function getValue from (m is F3Member) to F3Value 
+    function getValue from (myValue is F3Value, m is F3Member) to F3Value 
     {
-        var myValue = value;
         if (m is F3VarMember) {
             var v = m as F3VarMember;
             if (v.isStatic()) then v.getValue(null) else if myValue == null then null else v.getValue(myValue as F3ObjectValue);
@@ -2050,7 +2063,8 @@ class MemberTreenode is Treenode {
         return null;
     }
 
-    function makeTreeNode from (x is Member) to MemberTreenode {
+    function makeTreeNode from (x is Member) to MemberTreenode 
+    {
 	const m = MemberTreenode {
             parent: this;
 	    m: x;
@@ -2058,7 +2072,8 @@ class MemberTreenode is Treenode {
 	insert m.get into get.observers;
 	m.get.observable = get;
 	return m;
-    };
+    }
+
     override function open {
     	children;
 	super.open();
@@ -2179,37 +2194,49 @@ public class MemberTreecell is Treeview.Treecell
 	}
     };
 
-    const indent = 2;
+    bound function showValue from (mtn is MemberTreenode) to Node 
+    {
+        if (mtn.value == null) then null else showValue1(mtn.depth, mtn.value);
+    }
 
-    function showValue from (mtn is MemberTreenode) to Node {
-        var value = mtn.value;
-        if (value == null) then null else {
-                var m = mtn.m;
-                if (NUMBER_TYPE.isAssignableFrom(value.getType())) {
+    function showValue1 from (depth is Integer, value is F3Value) to Node 
+    {
+        /*if (value == null) then null else*/ {
+                if (NUMBER_TYPE.isAssignableFrom(value.getType()) or 
+                    INTEGER_TYPE.isAssignableFrom(value.getType()) or  
+                    BOOLEAN_TYPE.isAssignableFrom(value.getType()) or
+                    STRING_TYPE.isAssignableFrom(value.getType())
+                    )  {
                     var fieldWidth = 64;
-                    var width = tv.cellWidth;
+                    var width = bind tv.cellWidth;
                     TransformNode {
-                        tx: bind width / 2 - fieldWidth / 2-indent;
-                        content: Inspector.NumberField {
+                        tx: bind width / 2 - fieldWidth / 2.0 - depth * 6;
+                        content: Text.Label {
+                            rightJustified: true;
+                            font: bind canvas.font;
                             height: bind tv.cellHeight;
                             width: bind fieldWidth;
-                            i: Inspector.InspectedNumber {
-                                member: m;
-                                override function get to java.lang.Float {
-                                    (mtn.value as f3.reflect.F3Local.Value).asObject() as Integer;
-                                }
-                                override function set from (n is java.lang.Float) to () 
-                                {
-                                    mtn.setValue(Reflect.ctx.mirrorOf(n));
-                                }
-                            }
+                            foreground: bind if isSelected() then getFg() else canvas.textFg;
+                            background: bind if isSelected() then getBg() else canvas.textBg;
+                            text: bind formatValue(value);
                         }
                     }
                 } else null
             }
     }
 
-    override bound function getValueContent to Node {
+    function formatValue from (v is F3Value) to String
+    {
+        const obj = (v as F3Local.Value).asObject();
+        if (BOOLEAN_TYPE.isAssignableFrom(v.getType())) 
+            {
+                const b is Boolean = obj as Boolean;
+                if b then "Yes" else "No"
+            } else obj.toString()
+    }
+
+    override bound function getValueContent to Node 
+    {
         var mtn = tn as MemberTreenode;
         showValue(mtn);
     }
@@ -2223,12 +2250,21 @@ class GetTreeview is ResizableNode {
     function open to () {
         treeModel.root.open();
     }
+    function setDebugValue from (obj is Object) to ()
+    {
+        debugValue = Reflect.ctx.mirrorOf(obj, get.getType());
+    }
+
+    var debugValue is F3Value;
+
     const treeModel = MemberTreemodel {
 	root: MemberTreenode {
 	    get: bind get;
 	    m: bind get.member;
+            value: bind debugValue;
 	}
     };
+
     public function getLinks to LinkView[]
     {
         foreach (x in cellMap.values()) foreach (y in x.linkedView.links where not (y is ParentLinkView)) y;
@@ -2237,7 +2273,7 @@ class GetTreeview is ResizableNode {
     function getRootLinkedView to LinkedView {
         getCell(treeModel.root as MemberTreenode).linkedView;
     }
-    var treeHeight = bind Math.min(treeModel.rowCount, 24)*cellHeight;
+    var treeHeight = bind Math.min(treeModel.rowCount, 10)*cellHeight;
     const self = this;
     const cellMap is java.util.Map of (MemberTreenode, MemberTreecell) =        
 	new java.util.HashMap of (MemberTreenode, MemberTreecell);
@@ -2498,10 +2534,12 @@ public class ExprDebugger is DebuggerEngine {
             const pc = view as ExpressionView;
             debugPC = pc;
             pc.select();
+            pc.setDebugValue(x);
             println("STEP {location} => {view} event={x}");
             canvas.targetTimeline.paused = true;
             insert function from () to () { k.onNext(x) } into todo;
         } else {
+            println("NOT STEPPING");
             update();
             k.onNext(x);
         }
@@ -2520,10 +2558,13 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     const treeLinker is TreeLinker = TreeLinker {
         canvas: this;
-    }
+    };
+
+    var popupDisp is Disposable;
+
     function getPopup from (e is MouseEvent, members is Member[], k is function from LinkedView to ()) to Node 
     {
-        var r = MemberListview  {
+       const r = MemberListview  {
             targetPosition: toLocal * e.picked.dragPoint1;
             canvas: this;
             k: k;
@@ -2534,12 +2575,18 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             width: 340; 
         }
         popupScene.setFocus(r);
+        popupLayer.modal = true;
+        popupDisp = popupLayer.observeBackgroundClicked.subscribe(function from (_ is ()) to () {
+                println("BACKGROUND CLICKED");
+                popupDisp.dispose();
+                k(null)
+            });
         return r;
       }
 
     public var interactive is function from () to Boolean;
 
-    public var popupLayer is Group;
+    public var popupLayer is PopupLayer;
     public var popupScene is Scene;
 
     var prog is Program;
@@ -3005,6 +3052,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         if (members <> []) {
             var popup is Node = getPopup(e, members, function (j is LinkedView) to () {
                     delete popupLayer.content;
+                    popupLayer.modal = false;
                     k(j)
                 });
             println("POPUP AT {e.sceneLocation}");
@@ -3137,7 +3185,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 t = (t as Result).observers[0];
             }
             const p = context.getIPath(t as ObserverExpression);
-            result = "{result} const obs{indexof term} = foreach (i in i0.{mem.member.toApply()}) {p.getWorldAccess()};";
+            result = "{result} const obs{indexof term} = foreach (i in debugger.debug(i0.{mem.member.toApply()}, \"{mem.id}\")) {p.getWorldAccess()};";
             ret = "{ret}{sep}obs{indexof term}";
             sep = ", ";
             println(p.getWorldAccess());
@@ -3442,7 +3490,7 @@ public class SourceNode is ExprNode {
 
 public class Editor is ResizableNode, Focuser {
 
-    public var popupLayer is Group;
+    public var popupLayer is PopupLayer;
     public var popupScene is Scene;
 
     public var stepping is Boolean;

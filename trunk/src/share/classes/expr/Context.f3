@@ -68,11 +68,18 @@ public abstract class ResourceObjectContext is Context {
     public bound function getTarget to ResourceTarget;
 }
 
+// hack
+function uniquify from (xs is Member[]) to Member[]
+{
+    const set = new java.util.HashSet of String;
+    foreach (x in xs where set.add(x.name)) x
+}
+
 public class ResourceNodeContext is ResourceObjectContext {
     override bound function getTarget to ResourceTarget { resource }
     public var resource is ResourceNode;
     override var name = bind "{formatName(resource.id)} [Scene]";
-    var members = bind Expression.introspect(Reflect.getType("f3.media.scene.TransformNode") as F3ClassType);
+    var members = bind uniquify(Expression.introspect(Reflect.getType("f3.media.scene.TransformNode") as F3ClassType));
     public override bound function getContent to Context[] { 
         foreach (x in members) if (not x.name.startsWith("observe")) then null else MemberContext { member: x, parent: this }
     }

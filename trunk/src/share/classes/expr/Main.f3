@@ -520,14 +520,10 @@ public function run from (args is String[]) to ()
     var editorScene is Scene;
     var internalWindowsLayer is Group;
     var popupLayerCallback is function from () to ();
-    var popupLayer is Group = Group {
-        content: Shape2D.Rectangle {
-            height: bind editorScene.height;
-            width: bind editorScene.width;
-            transform: bind translate(editorScene.width/2, editorScene.height/2);
-            fillPaint: Shape2D.ColorPaint(Color.TRANSPARENT);
-            visible: bind popupLayerCallback <> null;
-        }
+    var popupLayer is PopupLayer = PopupLayer {
+        height: bind editorScene.height;
+        width: bind editorScene.width;
+        //transform: bind translate(editorScene.width/2, editorScene.height/2);
     };
 
     function getUnderMouseInEditor to Pick[] 

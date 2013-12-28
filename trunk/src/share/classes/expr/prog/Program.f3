@@ -66,6 +66,7 @@ public class EvalContext {
             as function from (ObservableDebugger, Object, 
                               function from String to Object, function from String to Node, function from String to TimeNode) to (Observable of ?)[];
         unsubscribe();
+        println("evaluating with debugger: {debugger}");
         const obs = f(debugger, targetNode, lookupVarDebug, lookupSpatialDebug, lookupTemporalDebug);
         for (o in obs) {
             subscribe(o, prog.sourceCode);
@@ -150,7 +151,7 @@ public class Program {
     public const evalContext is EvalContext;
 
     public function evaluate to () {
-        evalContext.evaluate(this)
+        evalContext.evaluate(this, canvas.debuggerEngine)
     }
 
     public function evaluate from (sourceCode is String) to () {
