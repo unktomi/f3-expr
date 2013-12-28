@@ -63,10 +63,12 @@
     </javac>
     <f3c debug="yes" deprecation="no"
              destdir="${build.classes.dir}"
+         memoryMaximumSize="1G"
              excludes="${excludes}" includeantruntime="false"
              includes="**/*.f3" source="${javac.source}" sourcepath=""
              srcdir="${src.classes.dir}" target="${javac.target}"
              compilerclasspath="${javac.classpath}">
+	  <compilerarg value="-XDdumpjava"/>
 	  <compilerarg value="-XDdumpjava"/>
             <classpath>
                 <path path="lib/jogl-all.jar"/>

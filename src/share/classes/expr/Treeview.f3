@@ -170,6 +170,10 @@ public class Treecell is AbstractNode {
     var cellIsVisible = bind getCellIsVisible();
     override var visible = bind cellIsVisible; 
     protected var fg is Paint = bind getFg();
+    public bound function isSelected to Boolean 
+    {
+        tv.selectionRow == tn.row
+    }
     protected var bg is Paint = bind if (tv.selectionRow == tn.row) then tv.selectionBackground else getBg();
 
     public bound function getFg to Paint { tv.getFg(tn.row) }
@@ -216,6 +220,7 @@ public class Treecell is AbstractNode {
         for (cell in tv.cells) {
             println("tn={cell.n}");
             println("cell={cell.cell} visibleInScene={cell.cell.visibleInScene}, parent={cell.cell.parent}");
+            println("value={cell.cell.getValueContent()}");
         }
     }
     const onClick = 

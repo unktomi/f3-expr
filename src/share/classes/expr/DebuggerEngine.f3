@@ -35,9 +35,11 @@ public class DebugTarget of a is DefaultObservable of a {
     public const target is Observable of a;
     public const id is Object;
     override function subscribe from (obs is Observer of a) to Disposable {
+    println("DebugTarget subscribing to {target}");
         target.subscribe(DefaultObserver of a {
                 override function onNext from (x is a) to ()
                 {
+                println("DEBUG TARGET {id} {x} {obs}");
                     debugger.step(id, x, obs);
                 }
                 override function onError from (e is java.lang.Exception) to ()
