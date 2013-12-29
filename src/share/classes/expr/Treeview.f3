@@ -46,7 +46,7 @@ public class Treemodel is Foldable of Treenode {
 	return result;
     }
 
-    public var selectionObserver is Subject of Treenode = Subject of Treenode {};
+    public const selectionObserver is Subject of Treenode = Subject of Treenode {};
 
     public function open from (t is Treenode) to ()
     {
@@ -110,6 +110,11 @@ public abstract class Treenode is Foldable of Treenode {
     function getMaxRow to Integer 
     {
 	if (isOpen) then children[children.size()-1].getMinRow() else row;
+    }
+
+    public bound function getAllChildren to Treenode[] 
+    {
+        children
     }
 
     public bound function getChildren to Treenode[]
@@ -369,11 +374,7 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
     var visibleRows = bind Math.max(1, (Math.round(height / cellHeight - 0.5) as Integer));
 
     var selectionListener is Disposable;
-
-    postinit {
-        selectionListener = model.selectionObserver.subscribe(select);
-    }
-    
+        
     public bound function isRowVisible from (row is Integer) to Boolean
     {
         checkVisible(row, scrollOffset, visibleRows);
@@ -381,13 +382,19 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
 
     function select from (t is Treenode) to ()
     {
+        println("SELECTING TREE NODE {t.label}");
         if (selectedTreenode <> t) {
-            println("SELECTING TREE NODE {t.label}");
             nextSelection = t;
         }
     }
 
-    public var model is Treemodel;
+    public var model is Treemodel on replace {
+        selectionListener.dispose();
+        selectionListener = model.selectionObserver.subscribe(function from (t is Treenode) to () {
+                println("TREEVIEW SELECTION OBSERVER : {t}");
+                select(t);
+            });
+    }
 
     protected var rows is Treenode[];
 
@@ -418,14 +425,13 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
     var modelSelection is Treenode on replace { model.selectionObserver.onNext(modelSelection) }
 
     override function preupdate {
-	if (nextSelection <> null) {
-	    model.open(nextSelection);
-	}
 	model.update();
 	if (nextSelection <> null) {
 	    const row = nextSelection.row;
 	    nextSelection = null;
 	    selectionRow = row;
+            model.open(selectedTreenode);
+            println("OPENING: {selectedTreenode.label}");
 	}
         modelSelection = selectedTreenode;
 	const i = scrollOffset;

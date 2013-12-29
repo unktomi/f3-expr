@@ -187,6 +187,15 @@ public class RootPackageAsset is PackageAsset {
         ClassAsset {
                 className: "String";
                 clazz: Reflect.STRING_TYPE;
+        },
+        PrimitiveTypeAsset {
+                name: "Observable";
+                t: Reflect.NUMBER_TYPE;
+                containedAssets: foreach (m in Expression.OBSVB_MEMBERS) {
+                    MemberAsset {
+                        member: m;
+                    }
+                }
         }];
     override var containedAssets = bind [println, primitives, packages, classes]
 }

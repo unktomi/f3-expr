@@ -27,6 +27,7 @@ public class ExprNode is AbstractNode {
             xs
         }
     }
+    public var standalone is Boolean = true;
 
     var firstTime = true;
 
@@ -35,15 +36,16 @@ public class ExprNode is AbstractNode {
         if (firstTime) {
             firstTime = false;
             for (prog in programs) prog.evaluate();
+            timeline.setPlayhead(0s);
         }
     }
 
-    var timeline = Timeline {
+    var timeline = bind if (standalone) then Timeline {
         paused: bind not isInteractive;
         content: TimeGroup {
             content: bind temporalRoot;
-        }
-    }
+        } 
+    } else null;
 
     function loadExpr from (url is String) to ModelContent {
         var r is SceneResource = Resources.open(url);
@@ -114,14 +116,15 @@ public class ExprNode is AbstractNode {
             if (i.url.startsWith("timenode://TransitionLayer")) {
                 t = TransitionLayer {
                     id: i.url;
-                    playTime: i.playTime;
-                    playRate: i.playRate;
-                    playCount: i.playCount;
                     content: foreach (j in i.content) {
                         convertTimeResource(j)
                     }
                 }
                 const rtn = ResourceTimeNodeWrapper {
+                    blendWeight: i.blendWeight;
+                    playTime: i.playTime;
+                    playRate: i.playRate;
+                    playCount: i.playCount;
                     url: i.url;
                     wrapped: t as TimeGroup;
                 };
@@ -130,31 +133,36 @@ public class ExprNode is AbstractNode {
             } else if (i.url.startsWith("timenode://BlendLayer")) {
                 t = BlendLayer {
                     id: i.url;
-                    playTime: i.playTime;
-                    playRate: i.playRate;
-                    playCount: i.playCount;
                     content: foreach (j in i.content) {
                         convertTimeResource(j)
                     }
                 }
                 const rtn = ResourceTimeNodeWrapper {
                     url: i.url;
+                    blendWeight: i.blendWeight;
+                    playTime: i.playTime;
+                    playRate: i.playRate;
+                    playCount: i.playCount;
                     wrapped: t as TimeGroup;
                 };
                 t = rtn;
                 insert t into temporalRoot.content;
             } else {
                 t = temporalRoot.lookup(i.url);
+                t.playTime = i.playTime;
+                t.playRate = i.playRate;
+                t.playCount = i.playCount;
+                t.blendWeight = i.blendWeight;
             }
             println("CONVERT TIME RESOURCE : {i.url} => {t}");
             t;
         }
-        for (x in r.temporalResources) {
+        const temps = foreach (x in r.temporalResources) {
             convertTimeResource(x)
-        }
+        };
         ModelContent {
             spatialRoot: if (spatialRoot.content.size() == 1) then spatialRoot.content[0] else spatialRoot;
-            temporalRoot: if (temporalRoot.content.size() == 1) then temporalRoot.content[0] else temporalRoot;
+            temporalRoot: if (temps.size() == 1) then temps[0] else TimeGroup { content: temps };
         }
     }
 
