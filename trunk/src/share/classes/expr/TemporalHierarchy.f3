@@ -33,19 +33,26 @@ public class Model is Treeview.Treemodel {
         selectionObserver.onNext(selection);
     }
 
+    function findSelection from (tn is TimeNode, t is Treeview.Treenode) to Treenode {
+        const ht = t as Treenode;
+        if (ht.n <> null and ht.n == tn) {
+            return ht;
+        }
+        for (c in t.getAllChildren()) {
+            const r = findSelection(tn, c);
+            if (r <> null) return r;
+        }
+        return null;
+    }
+
     const selectionListener = 
 	h.observeSelection().subscribe(function from (tn is TimeNode) to () 
 				       {
-                                           println("selection change => {tn}");
-					   foldLeft((), 
-						    function from (_ is (), t is Treeview.Treenode) to () {
-							const ht = t as Treenode;
-							const n = ht.n;
-							if (n == tn) {
-                                                            println("t={t} n={n}");
-							    selection = ht;
-							}
-						    })
+                                           const found is Treenode = findSelection(tn, root);
+                                           if (found <> null) {
+                                               selection = found;
+                                               open(selection);
+                                           }
 				       });
 
     function onSelectionChange from (tn is Treeview.Treenode) to ()

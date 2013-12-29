@@ -337,22 +337,23 @@ public function run from (args is String[]) to ()
                 webBrowserFactory: TheWebBrowserFactory
 		url: url;
                 isInteractive: bind interactive;
+                standalone: true;
 	    }
 	    const rn = ResourceNode {
                 url: url;
                 content: bind model;
 	    }
 	    addResource(rn, pt);
-            if (false) {
+            if (not model.standalone) {
                 const rtn = ResourceTimeNode {
                     url: url;
                     content: bind model.temporalRoot;
                     spatial: rn;
                 }
-                //if (rtn.bounds.duration() > 0s) {
-		rn.temporal = rtn;
-		addTimeResource(rtn);
-                //}
+                if (rtn.bounds.duration() > 0s) {
+                    rn.temporal = rtn;
+                    addTimeResource(rtn);
+                }
             }
 	} else if (url.endsWith(".mp4") or url.endsWith(".mov")) {
             const movie = Movie {
@@ -830,15 +831,18 @@ public function run from (args is String[]) to ()
                         if (x is MaResourceNode) {
                             const j = (x as MaResourceNode).temporal;
                             t = j.lookup(u);
-                            const rtn = ResourceTimeNodeWrapper {
-                                url: i.url;
-                                wrapped: t as TimeGroup;
-                                blendWeight: i.blendWeight;
-                                playTime: i.playTime;
-                                playRate: i.playRate;
-                                playCount: i.playCount;
-                            };
-                            t = rtn;
+                            if (t <> null) {
+                                const rtn = ResourceTimeNodeWrapper {
+                                    url: i.url;
+                                    wrapped: t as TimeGroup;
+                                    blendWeight: i.blendWeight;
+                                    playTime: i.playTime;
+                                    playRate: i.playRate;
+                                    playCount: i.playCount;
+                                };
+                                t = rtn;
+                                break;
+                            }
                         }
                     }
                 }

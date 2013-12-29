@@ -40,22 +40,31 @@ public class Model is Treeview.Treemodel {
     }
 
     public var selection is Treenode on replace {
-	if (h.selectedNode <> selection.n) {
+	//if (h.selectedNode <> selection.n) {
 	    selectionObserver.onNext(selection);
-	}
+	//}
+    }
+
+    function findSelection from (tn is TransformNode, t is Treeview.Treenode) to Treenode {
+        const ht = t as Treenode;
+        if (ht.n <> null and ht.n == tn) {
+            return ht;
+        }
+        for (c in t.getAllChildren()) {
+            const r = findSelection(tn, c);
+            if (r <> null) return r;
+        }
+        return null;
     }
 
     const selectionListener = 
 	h.observeSelection().subscribe(function from (tn is TransformNode) to () 
 				       {
-					   foldLeft((), 
-						    function from (_ is (), t is Treeview.Treenode) to () {
-							const ht = t as Treenode;
-							const n = ht.n;
-							if (n <> null and n == tn) {
-							    selection = ht;
-							}
-						    })
+                                           const found is Treenode = findSelection(tn, root);
+                                           if (found <> null) {
+                                               selection = found;
+                                               open(selection);
+                                           }
 				       });
     const sceneSelectionListener = 
     	h.observeSceneSelection().subscribe(function from (s is ResourceScene) to () {

@@ -141,6 +141,15 @@ function makeFunMember from (name is String, params is F3Type[], ret is F3Type) 
     }
 }
 
+public const OBSVB_MEMBERS = {
+    const clazz = Reflect.findClass("f3.util.Observable");
+    const funs = Reflect.getFunctions(clazz, false);
+    const names = ["And", "Or", "Zip", "Drop", "Take", "Map"];
+    foreach (op in ["concat", "merge", "zip", "drop", "take", "map"]) {
+        foreach (fun in funs where fun.getName() == op) FunctionMember { m : fun, name: names[indexof op] }
+    };
+}
+
 public const NUM_MEMBERS = 
     [foreach (op in ["add", "subtract", "multiply", "divide", "remainder", "lessThan", "lessOrEqual", "greaterThan", "greaterOrEqual", "equal", "notEqual"]) {
         FunctionMember {
@@ -2698,10 +2707,8 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     {
 	println("ON DROP {where.scenePoint}, {where.dragPoint1} {clip}");
 	const typ = Reflect.getType("f3.media.scene.TimeNode");
-	const members = introspect(typ);
-	for (m in members where not m.isObservable and m.isObserver) {
-	    println(m);
-	}
+        const names = ["pause", "play", "playFromStart", "reverse"];
+	const members = foreach (x in introspect(typ), y in names where x.name == y) x;
 	insert ObjectView {
 	    pos: toLocal * where.scenePoint;
 	    objectExpr: TimeNodeExpression { 
@@ -3361,6 +3368,7 @@ public class NodeObjNode is ObjNode {
         const objectExpr =  NodeExpression { 
             node: clip, override function getType to F3Type { typ }
             inputMembers: foreach (m in members where not m.isObservable and m.isObserver and m.rt == UNIT_TYPE) m;
+            outputMembers: thisMember(typ) 
         }
         var result = ObjectView {
             pathFactory: canvas.pathFactory;
@@ -3389,11 +3397,12 @@ public class TimeNodeObjNode is ObjNode {
     public override function createView from (canvas is Canvas) to ObjectView {
         const clip = canvas.lookupTemporal(timeNodeId);
 	const typ = Reflect.getType("f3.media.scene.TimeNode");
-        const names = new java.util.HashSet of String;
-	const members = foreach (m in introspect(typ) where not m.name.contains("pdate") and names.add(m.name)) m;
+        const names = ["pause", "play", "playFromStart", "reverse"];
+	const members = foreach (x in introspect(typ), y in names where x.name == y) x;
         const objectExpr = TimeNodeExpression { 
             timeNode: clip, override function getType to F3Type { typ }
             inputMembers: foreach (m in members where not m.isObservable and m.isObserver and m.rt == UNIT_TYPE) m;
+            outputMembers: thisMember(typ) 
         }
         var result = ObjectView {
             pathFactory: canvas.pathFactory;
