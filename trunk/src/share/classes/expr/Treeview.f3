@@ -159,7 +159,7 @@ public abstract class Treenode is Foldable of Treenode {
 }
 
 function checkVisible from (row is Integer, scrollOffset is Integer, visibleRows is Integer) to Boolean {
-    println("check visible {row} {scrollOffset} {visibleRows}");
+    //    println("check visible {row} {scrollOffset} {visibleRows}");
     row >= scrollOffset and row < scrollOffset + visibleRows;
 }
 
@@ -225,8 +225,8 @@ public class Treecell is AbstractNode {
     }
     const onClick = 
 	internalContent.observeMouseDown().subscribe(function from (e is MouseEvent) to () {
-                println("row={tn.row} fg={fg}");
-                dumpCells();
+                //                println("row={tn.row} fg={fg}");
+                //                dumpCells();
 		const limit = -tv.cellWidth/2+tv.indent*(tn.column+1)+6;
 		if (tn.canOpen and e.location.x < limit) {
 		    if (not tn.isOpen) tn.open() else tn.close();
@@ -439,6 +439,8 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
     }
 
     var treeBg is Paint = bind bgs[0];
+
+    override var contentBounds = bind Bounds.boundsFromRect(width, height);
 
     override var internalContent = Content {
 	scissorBounds: bind Bounds.boundsFromRect(width, height);

@@ -427,11 +427,49 @@ public class Manipulator is AbstractNode
     {
         super.update();
         if (moveX == null) createHandlers();
+        if (not (scene.camera is Camera2D)) {
+            if (was2d) {
+                was2d = false;
+                rotateGuideY.visible = ry;
+                rotateGuideX.visible = rx;
+                rotateZ.visible = rz;
+                scaleZ.visible = sz;
+                moveZ.visible = tz;
+            }
+        } else if (scene.camera is Camera2D) {
+            if (not was2d) {
+                check2d();
+            }
+        }
     }   
 
     function hideAll 
     {
         for (i in allGadgets) i.visible = false;
+    }
+
+    var was2d is Boolean;
+    var rx is Boolean;
+    var ry is Boolean;
+    var rz is Boolean;
+    var sz is Boolean;
+    var tz is Boolean;
+
+    function check2d to ()
+    {
+        if (scene.camera is Camera2D) {
+            was2d = true;
+            rx = rotateGuideX.visible;
+            ry = rotateGuideY.visible;
+            rz = rotateZ.visible;
+            sz = scaleZ.visible;
+            tz = moveZ.visible;
+            rotateGuideY.visible = false;
+            rotateGuideX.visible = false;
+            rotateZ.visible = false;
+            scaleZ.visible = false;
+            moveZ.visible = false;
+        }
     }
 
     var isPivotMode = false;
@@ -441,30 +479,35 @@ public class Manipulator is AbstractNode
         enterTranslate();
         isPivotMode = true;
         for (i in [rotateX, rotateY, rotateZ, scaleX, scaleY, scaleZ]) i.visible = false;
+        check2d()
     }
 
     public function exitPivotMode 
     {
         for (i in [rotateX, rotateY, rotateZ, scaleX, scaleY, scaleZ]) i.visible = true;
         isPivotMode = false;
+        check2d()
     }
 
     function enterTranslate 
     {
         hideAll();
         for (i in [moveX, moveY, moveZ, moveAll]) i.visible = true;
+        check2d()
     }
 
     function enterRotate 
     {
         hideAll();
         for (i in [rotateX, rotateY, rotateZ, rotateGuideX, rotateGuideY, rotateGuideZ, rotateAll]) i.visible = true;
+        check2d()
     }
 
     function enterScale 
     {
         hideAll();
         for (i in [scaleX, scaleY, scaleZ, scaleAll]) i.visible = true;
+        check2d()
     }
 }
 

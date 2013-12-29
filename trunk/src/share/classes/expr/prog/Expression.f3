@@ -731,7 +731,11 @@ public class IPath {
         }
         if (observer is InputMemberExpression) {
             const i = observer as InputMemberExpression;
-            return "{formatEnglishName(i.member.name)} {i.target.toEnglish()}";
+            if (i.member.m is F3VarMember and i.member.isObserver) {
+                return "{formatEnglishName(i.member.name)} of {i.target.toEnglish()} = {parents[0].getEnglishAccess()}"
+            } 
+            const sep = if (i.member.m is F3VarMember) then " of " else " ";
+            return "{parents[0].getEnglishAccess()}; {formatEnglishName(i.member.name)}{sep}{i.target.toEnglish()}";
         }
         return "";
     }
@@ -780,7 +784,11 @@ public class IPath {
         }
         if (observer is InputMemberExpression) {
             const i = observer as InputMemberExpression;
-            return "\{ {parents[0].getWorldAccess()}; {i.target.toSource(null)}.{i.member.toApply()} \}";
+            if (i.member.m is F3VarMember and i.member.isObserver) {
+                return "\{ {i.target.toSource(null)}.{i.member.toApply()} = {parents[0].getWorldAccess()}; \}";
+            } else { 
+                return "\{ {parents[0].getWorldAccess()}; {i.target.toSource(null)}.{i.member.toApply()} \}";
+            }
         }
         if (true) throw new java.lang.RuntimeException("unhandled case: {observer}");
         return "";
@@ -2181,17 +2189,19 @@ public class MemberTreecell is Treeview.Treecell
                 self.unlink();
             }
             super.assignLinkIds();
+            println("me={getLinkBounds()}");
+            println("container={self.canvas.toLocal * self.tv.boundsInScene}");
+            println("tv={tv}");
+            println("tv.bounds={tv.bounds}");
         }
 	override bound function getLinkPos to Point3 
 	{
-            {
-                var me = getLinkBounds();
-                var container = self.canvas.toLocal * self.tv.boundsInScene;
-                new Point3(me.right(), 
-                           Math.min(container.top(), Math.max(container.bottom(), me.center.y)),
-                           0);
-            }
-	}
+            var me = getLinkBounds();
+            var container = self.canvas.toLocal * self.tv.boundsInScene;
+            new Point3(me.right(), 
+                       Math.min(container.top(), Math.max(container.bottom(), me.center.y)),
+                       0);
+        }
     };
 
     bound function showValue from (mtn is MemberTreenode) to Node 
@@ -2282,8 +2292,10 @@ class GetTreeview is ResizableNode {
         if (tn == null) return null;
 	var r = cellMap.get(tn);
 	if (r == null) {
+            const parentCell = getCell(tn.parent as MemberTreenode);
 	    r = MemberTreecell {
-                parentCell: getCell(tn.parent as MemberTreenode);
+                parentCell: parentCell;
+                active: parentCell == null;
 		canvas: canvas;
 		tn: tn;
 		tv: tv;
@@ -2310,7 +2322,11 @@ class GetTreeview is ResizableNode {
             var linkCount = 0;
             var cells = new java.util.ArrayList of MemberTreecell;
             for (cell in cellMap.values()) {
-                cell.active = false;
+                if (cell.parentCell == null) {
+                    cell.active = true;
+                } else {
+                    cell.active = false;
+                }
                 cells.add(cell);
             }
             java.util.Collections.sort(cells, java.util.Comparator of MemberTreecell {
@@ -2541,7 +2557,9 @@ public class ExprDebugger is DebuggerEngine {
         } else {
             println("NOT STEPPING");
             update();
-            k.onNext(x);
+            if (canvas.interactive()) {
+                k.onNext(x);
+            }
         }
     }
 }
@@ -3083,10 +3101,10 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         for (j in deserializationMap.values()) {
             if (j.source <> null and j.target <> null) {
                 j.link();
-                println("linked {j.id} {j.source} to {j.target}");
+                println("installLinks: linked {j.id} {j.source} to {j.target}");
                 insert j into links;
             } else {
-                println("bad link: {j}");
+                println("installLinks: bad link: {j}");
             }
         }
         deserializationMap.clear();
@@ -3112,31 +3130,36 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     }
 
     function saveCode to () {
-        serializationMap.clear();
-        serialize(rootExprView);
-        const w = new java.io.StringWriter();
-        println("root={rootExprView} => {serializationMap.get(rootExprView)}");
-        foreach (obj in views) {
-            var x = serialize(obj);
-            println("serialize {obj} => {x}");
-        }
-        var todo = ExprScene {};
-        foreach (j in serializationMap.values()) {
-            if (j is LinkNode) {
-                //insert j as LinkNode into todo.links;
-            } else {
-                insert j into todo.views;
+        if (links.size() == 0 and views.size() <= 1) {
+            prog.code = null;
+            prog.sourceCode = "";
+        } else {
+            serializationMap.clear();
+            serialize(rootExprView);
+            const w = new java.io.StringWriter();
+            println("root={rootExprView} => {serializationMap.get(rootExprView)}");
+            foreach (obj in views) {
+                var x = serialize(obj);
+                println("serialize {obj} => {x}");
             }
+            var todo = ExprScene {};
+            foreach (j in serializationMap.values()) {
+                if (j is LinkNode) {
+                    //insert j as LinkNode into todo.links;
+                } else {
+                    insert j into todo.views;
+                }
+            }
+            for (link in links) {
+                insert link.serialize() into todo.links;
+            }
+            IO.writeObject(w, todo);
+            println("serialize => {w}");
+            for (link in links) {
+                println("Link {link.id} {link.source.expression.getName()}: {link.source.id} => {link.target.expression.getName()}: {link.target.id}");
+            }
+            prog.code = todo;
         }
-        for (link in links) {
-            insert link.serialize() into todo.links;
-        }
-        IO.writeObject(w, todo);
-        println("serialize => {w}");
-        for (link in links) {
-            println("Link {link.id} {link.source.expression.getName()}: {link.source.id} => {link.target.expression.getName()}: {link.target.id}");
-        }
-        prog.code = todo;
         MasterUndoable.commit();
     }
 
@@ -3198,7 +3221,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         try {
             const toCompile = result;
             println("compiling: {toCompile}");
-            prog.evaluate(toCompile);
+            prog.evaluate(if terms.size() == 0 then "" else toCompile);
         } catch (thr is java.lang.Throwable) {
             thr.printStackTrace();
         }
@@ -3460,12 +3483,12 @@ public class GetNode is ExprNode {
                 const path = p.sourceId;
                 const tn = v.tv.treeModel.resolvePath(path);
                 tn.open();
-                println("path={path} tn={tn}");
-                println("v={v}, tv={v.tv}, treeModel={v.tv.treeModel}");
+                println("getNode path={path} tn={tn}");
+                println("getNode v={v}, tv={v.tv}, treeModel={v.tv.treeModel}");
                 for (link in p.links) {
                     const lnk = canvas.getLink(link);
                     const t = v.tv.getCell(tn).linkedView;
-                    println("t={t}");
+                    println("getNode t={t}, pos={t.getLinkPos()}");
                     lnk.source = t;
                 }
             }
@@ -3563,6 +3586,7 @@ public class Editor is ResizableNode, Focuser {
 	if (prog.canvas == null) {
             println("creating canvas with {pathFactory}");
 	    prog.canvas = Canvas {
+                interactive: interactive;
                 stepping: bind stepping;
                 debugger: debugger;
                 popupLayer: popupLayer;

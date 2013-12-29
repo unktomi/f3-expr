@@ -904,6 +904,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	var i = selectedTimeNodeView.row;
 	if (e.keyCode == Keys.F) {
             frameSelection();
+            e.stopPropagation();
 	} else if (e.keyCode == Keys.Down) {
 	    const n = rowToTimeNodeView(i+1);
 	    if (n <> null) {

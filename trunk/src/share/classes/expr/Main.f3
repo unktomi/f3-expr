@@ -24,33 +24,6 @@ import f3.util.*;
 import f3.util.Observer.*;
 import f3.util.Observable.*;
 
-
-function wrap of a from (xs is Observable of a, interactive is function from () to Boolean) to Observable of a 
-{
-    DefaultObservable of a {
-        override function subscribe from (y is Observer of a) to Disposable 
-        {
-            xs.subscribe(DefaultObserver of a {
-                    override function onNext from (x is a) to ()
-                    {
-                        println("debugger: on next {x} ({interactive()}");
-                        if (interactive()) {
-                            y.onNext(x);
-                        }
-                    }
-                    override function onError from (e is java.lang.Exception) to ()
-                    {
-                        y.onError(e);
-                    }
-                    override function onCompleted from () to ()
-                    {
-                        y.onCompleted();
-                    }
-                });
-        }
-    }
-}
-
 public class InternalWindowState {
     public var id is String;
     public var cx is Number;
@@ -364,7 +337,6 @@ public function run from (args is String[]) to ()
                 webBrowserFactory: TheWebBrowserFactory
 		url: url;
                 isInteractive: bind interactive;
-                debugger: debugger;
 	    }
 	    const rn = ResourceNode {
                 url: url;
@@ -564,15 +536,6 @@ public function run from (args is String[]) to ()
     var full is Boolean = false;
 
     var interactive is Boolean;
-
-    const debugger = ObservableDebugger {
-        override public function debug of a from (xs is Observable of a, id is Object) to Observable of a 
-        {
-            wrap(xs, function to Boolean {
-                    interactive
-                })
-        }
-    };
     
     const toolMenu is expr.toolmenu.ToolMenu = expr.toolmenu.ToolMenu {
     	transform: bind translate(stage.width /2, stage.height - 10);
@@ -719,7 +682,6 @@ public function run from (args is String[]) to ()
                     evalContext: Program.EvalContext {
                         interactive: function from () to Boolean { interactive } 
                         targetNode: currentTransform;
-                        debugger: debugger;
                         instanceSpace: currentScene.instanceSpace;
                         lookupSpatial: currentScene.root.lookup;
                         targetTimeline: player;
@@ -764,7 +726,6 @@ public function run from (args is String[]) to ()
                         evalContext: Program.EvalContext {
                             interactive: function from () to Boolean { interactive } 
                             targetNode: qt;
-                            debugger: debugger;
                             instanceSpace: currentScene.instanceSpace;
                             lookupSpatial: currentScene.root.lookup;
                             targetTimeline: player;
@@ -784,9 +745,7 @@ public function run from (args is String[]) to ()
             var scene = ResourceScene {
                 background: null;
                 id: j.name;
-                camera: Camera2D {
-                     near: -10000, far: 10000 
-                };
+                camera: Camera2D { near: -1000, far: 1000, tz: 900 };
             }
             insert scene into currentScenes;
             transformHierarchy.selectScene(scene);
@@ -815,7 +774,6 @@ public function run from (args is String[]) to ()
                         evalContext: Program.EvalContext {
                             interactive: function from () to Boolean { interactive } 
                             targetNode: currentTransform;
-                            debugger: debugger;
                             instanceSpace: currentScene.instanceSpace;
                             lookupSpatial: currentScene.root.lookup;
                             targetTimeline: player;
@@ -1433,7 +1391,6 @@ public function run from (args is String[]) to ()
 				    content: expr.prog.Expression.Editor {
 					 //event: bind inspector1.inspecting[inspector1.selectedIndex].member;
                                          stepping: bind stepping;
-                                         debugger: bind debugger;
                                          eventContext: bind contextModel.selectedMemberContext;
                                          targetObject: bind contextModel.selectedObjectContext.getTarget();
 					 targetSpace: bind currentScene.root;
