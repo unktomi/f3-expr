@@ -92,7 +92,7 @@ class ResourceBuilder {
             px: n.px;
             py: n.py;
             pz: n.pz;
-            programs: foreach (p in n.programs) ProgramResource {
+            programs: foreach (p in n.programs where p.code <> null) ProgramResource {
                 event: p.event.serialize();
                 code: p.code;
                 compiled: p.sourceCode;
@@ -110,7 +110,7 @@ class ResourceBuilder {
             playRate: n.playRate;
             playCount: n.playCount;
             content: foreach (j in n.unwrapContent()) if (j is ResourceTimeNode) then makeResource(j as ResourceTimeNode) else null;
-            programs: foreach (p in n.programs) ProgramResource {
+            programs: foreach (p in n.programs where p.code <> null) ProgramResource {
                 event: p.event.serialize();
                 code: p.code;
                 compiled: p.sourceCode;

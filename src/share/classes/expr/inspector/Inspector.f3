@@ -416,6 +416,7 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
 
 public function inspect from (obj is Object) to (Inspected of ?)[]
 {
+    println("INSPECTING => {obj}");
     if (obj == null) then [] else {
 	    const members = Expression.introspect(getType(obj.getClass()) as F3ClassType);
 	    foreach (m in members) {

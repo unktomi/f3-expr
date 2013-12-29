@@ -115,6 +115,8 @@ public class TransformHierarchy
 	}
         const rn = p as ResourceNode;
         selectedTransform = rn;
+        println("selectedNode => {selectedNode}");
+        println("selectedTransform => {selectedTransform}");
         selectedScene.selectedResource = rn;
 	selection.onNext(selectedTransform);
     };
