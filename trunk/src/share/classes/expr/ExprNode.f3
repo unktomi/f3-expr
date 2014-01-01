@@ -9,6 +9,8 @@ public class ModelContent {
     public var temporalRoot is TimeNode;
 }
 
+public const Start is Subject of (()) = Subject of (()) {};
+
 public class ExprNode is AbstractNode {
     public const soundLoader is SoundLoader = the SoundLoader;
     public const movieLoader is MovieLoader = the MovieLoader;
@@ -40,7 +42,7 @@ public class ExprNode is AbstractNode {
         }
     }
 
-    var timeline = bind if (standalone) then Timeline {
+    var timeline is Timeline = bind if (standalone) then Timeline {
         paused: bind not isInteractive;
         content: TimeGroup {
             content: bind temporalRoot;

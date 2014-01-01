@@ -487,7 +487,8 @@ function formatType from (t is F3Type) to String
 
 function formatFunctionType from (clazz is F3ClassType, ft is F3FunctionType) to String 
 {
-    var r = if clazz == null then "(" else "({formatType(clazz)}";
+     
+    var r = if clazz == null then "(" else "({if (Reflect.isObservableType(clazz)) "Observable" else formatType(clazz)}";
     var sep = if clazz == null then "" else ", ";
     for (i in [0..<ft.minArgs()]) {
         r = "{r}{sep}{formatType(ft.getArgumentType(i))}";
@@ -519,7 +520,7 @@ function formatClassName from (t is F3Type) to String
     const n = if (t.isTypeVariable()) then "Any" else t.getName();
     const dot = n.lastIndexOf(".");
     const base = n.substring(dot+1);
-    const parms is F3Type[] = (t as F3ClassType).getTypeParameters();
+    const parms is F3Type[] = (t as F3ClassType).getTypeArguments();
     if (parms.size() == 0) {
         return base;
     }  else if (parms.size() == 1) {
@@ -1275,17 +1276,20 @@ public abstract class ExpressionView is AbstractNode {
     public bound function getLabel to String {
         Names.formatName(expression.getName());
     }
-    public var label is Text.Label = bind Text.Label {
-	text: bind getLabel();
-	height: bind cellHeight;
-	width: bind cellWidth;
-	font: bind font;
-	foreground: bind canvas.textFg;
-	background: bind if (selected) then canvas.cellSelectedBg else canvas.cellBg;
-	pickable: true;
-        indent: 4;
-    };
-    public var defaultTitle is Node = bind Group {
+    public readonly var label is Text.Label = bind constructLabel();
+    bound function constructLabel() to Text.Label {
+        Text.Label {
+            text: bind getLabel();
+            height: bind cellHeight;
+            width: bind cellWidth;
+            font: bind font;
+            foreground: bind canvas.textFg;
+            background: bind if (selected) then canvas.cellSelectedBg else canvas.cellBg;
+            pickable: true;
+            indent: 4;
+        };
+    }
+    public var defaultTitle is Node = Group {
            content: bind
            [label,
            Rectangle {
@@ -1391,15 +1395,20 @@ class FunctionView is ExpressionView {
                             if (j <> x and j.links.size() == 0) {
                                 const t1 = typeApply(j.parameter.t, x.parameter.t, x.inputType);
                                 if (t1 <> j.parameter.t) {
+                                    println("t1={formatClassName(t1)} for {formatClassName(j.parameter.t)}");
                                     j.inputType = t1;
                                     insert x into j.inferred;
+                                    println("label={j.getLabel()}");
                                 }
                             }
                         }
                         const t0 = typeApply(output.result.getType(), x.parameter.t, x.inputType);
-                        println("t0={formatClassName(t0)} for {formatClassName(output.result.getType())}");
                         if (t0 <> output.result.getType()) {
+                            println("t0={formatClassName(t0)} for {formatClassName(output.result.getType())}");
                             output.unifiedType = t0;
+                            insert x into output.inferred;
+                            println("output resultType={output.resultType}");
+                            println("output member={output.getter.member}");
                         } 
                     }
                 } else {
@@ -1414,9 +1423,12 @@ class FunctionView is ExpressionView {
                                 }
                             }
                         }
-                        if (output.result.getType().isTypeVariable() and
-                            output.result.getType().getTypeVariable() == t.getTypeVariable()) {
-                            output.unifiedType = null;
+                        for (y in output.inferred) {
+                            if (y == x) {
+                                delete y from output.inferred;
+                                output.unifiedType = null;
+                                break;
+                            }
                         } 
                     }
                 }
@@ -1832,7 +1844,13 @@ public class ParameterView is InputView {
 
     override bound function getLabel to String 
     {
-        formatClassName(if (inputType <> null) then inputType else parameter.t)
+        makeLabel(if (inputType <> null) then inputType else parameter.t)
+    }
+
+    function makeLabel from (t is F3Type) to String
+    {
+        println("making label for type {t}");
+        formatClassName(t)
     }
 
     override public bound function getInputType to F3Type 
@@ -2004,13 +2022,17 @@ class ResultView is OutputView {
     public var result is Result;
     override var expression = bind result;
     override var resultType = bind if (unifiedType <> null) then unifiedType else result.getType();
-    override var getter = GetVarResult {
-        member: bind Member {
-            m: null;
-            t: resultType;
-            name: bind outputName;
-        }
-    };
+    override var getter = bind constructGetVarResult();
+    bound function constructGetVarResult to GetVarResult {
+        var self = this;
+        GetVarResult {
+            member: bind Member {
+               m: null;
+               t: this.resultType;
+               name: this.outputName;
+            }
+       }
+    }
     public var unifiedType is F3Type;
     public var inferred is ParameterView[];
 }
@@ -2064,7 +2086,8 @@ class MemberTreenode is Treenode {
         "MemberTreenode row={row} label={label} {m}"
     }
 
-    function resolvePath from (path is String) to MemberTreenode {
+    function resolvePath from (path is String) to MemberTreenode 
+    {
         if (path == "") return this;
         const slash = path.indexOf("/");
         const name = if slash > 0 then path.substring(0, slash) else path;
