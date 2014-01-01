@@ -167,6 +167,8 @@ public class MainContext is Context.MemberContext {
         t: Reflect.UNIT_TYPE;
         rt: Reflect.UNIT_TYPE;
         isObservable: yes;
+        override function toEnglish to String { "Start" }
+        override function toApply to String { "expr.ExprNode.Start" }
     }
 }
 
