@@ -21,6 +21,17 @@ import expr.choices.*;
 import expr.undo.*;
 import expr.inspector.*;
 
+function observeType from (t is F3Type) to F3Type {
+    if (Reflect.OBSERVABLE_TYPE.isAssignableFrom(t)) { 
+        const classType = t as F3ClassType;
+        const targs = classType.getTypeArguments();
+        if (targs.length > 0) {
+            return targs[0];
+        }
+    }
+    return t;
+}
+
 var exprMap1 = new java.util.HashMap of (F3ClassType, Member[]);
 var exprMap2 = new java.util.HashMap of (F3ClassType, Member[]);
 
@@ -146,7 +157,7 @@ public const OBSVB_MEMBERS = {
     const funs = Reflect.getFunctions(clazz, false);
     const names = ["And", "Or", "Zip", "Drop", "Take", "Map"];
     foreach (op in ["concat", "merge", "zip", "drop", "take", "map"]) {
-        foreach (fun in funs where fun.getName() == op) FunctionMember { m : fun, name: names[indexof op] }
+        foreach (fun in funs where fun.getName() == op) FunctionMember { m : fun }
     };
 }
 
@@ -189,10 +200,6 @@ public const BOOL_MEMBERS =
     }
     FunctionMember {
         m: Reflect.getFunction("f3.util.Observables", "IfNot", ["f3.util.Observable"]);
-    }
-    FunctionMember {
-        m: Reflect.getFunction("f3.util.Observables", "IfThenElse", ["f3.util.Observable"]);
-        name: "If/Then/Else";
     }
     FunctionMember {
         m: IF_EXPR;
@@ -514,7 +521,8 @@ function formatClassName from (t is F3Type) to String
         return t.getName();
     }
     if (Reflect.isObservableType(t)) {
-        const v = getTypeArguments(t as F3ClassType)[0];
+        const targs = getTypeArguments(t as F3ClassType);
+        const v = if targs == [] then (t as F3ClassType).getTypeParameters()[0] else targs[0];
         return formatClassName(v);
     }
     const n = if (t.isTypeVariable()) then "Any" else t.getName();
@@ -670,6 +678,27 @@ public class IPath {
 
     public var observer is ObserverExpression;
 
+    public function hasObservableInput to Boolean 
+    {
+        if (observer is Parameter) {
+            const p = observer as Parameter;
+            return OBSERVABLE_TYPE.isAssignableFrom(p.getType());
+        }
+        return parents == [];
+    }   
+
+    function getContainingObservableDepth to Integer 
+    {
+        var count = 0;
+        for (p in parents) {
+            count = Math.max(count, p.getContainingObservableDepth());
+        }
+        if (hasObservableInput()) {
+            count++;
+        }
+        return count;
+    }
+
     function getDepth to Integer {
         var p = parents[0];
         var count = 0;
@@ -700,7 +729,9 @@ public class IPath {
             const func = (observer as Result).source;
             const infix = func.funMember.isInfix;
             const fun = func.fun;
-            if (infix) {
+            if (fun == IF_EXPR) {
+                return "if ({parents[1].getEnglishAccess()}) then {parents[2].getEnglishAccess()} else {parents[3].getEnglishAccess()}";
+            } else if (infix) {
                 if (fun.isStatic()) {
                     return "({parents[1].getEnglishAccess()} {formatEnglishName(fun.getName())} {parents[2].getEnglishAccess()})";
                 }
@@ -745,7 +776,7 @@ public class IPath {
                 return "{formatEnglishName(i.member.name)} of {i.target.toEnglish()} = {parents[0].getEnglishAccess()}"
             } 
             const sep = if (i.member.m is F3VarMember) then " of " else " ";
-            return "{parents[0].getEnglishAccess()}; {formatEnglishName(i.member.name)}{sep}{i.target.toEnglish()}";
+            return "{parents[0].getEnglishAccess()}, {formatEnglishName(i.member.name)}{sep}{i.target.toEnglish()}";
         }
         return "";
     }
@@ -766,13 +797,23 @@ public class IPath {
             }
             const func = (observer as Result).source;
             const fun = func.fun;
+            var obDepth = -1;
+            var prefix = "";
             if (fun.isStatic()) {
                 var args = "";
                 var sep = "";
                 for (p in parents[1..]) {
-                    const j = p.getWorldAccess();
+                    var j = p.getWorldAccess();
+                    if (p.hasObservableInput()) {
+                        obDepth = p.getContainingObservableDepth();
+                        prefix = j;
+                        j = "obs{p.getContainingObservableDepth()-1}";
+                    }
                     args = "{args}{sep}{j}";
                     sep = ", ";
+                }
+                if (obDepth >= 0) {
+                    return "{prefix} \}; const obs{obDepth} = foreach (i{getDepth()} in {fun.getDeclaringClass().getName()}.{fun.getName()}({args})) \{";
                 }
                 return "{fun.getDeclaringClass().getName()}.{fun.getName()}({args})";
             } else {
@@ -797,7 +838,7 @@ public class IPath {
             if (i.member.m is F3VarMember and i.member.isObserver) {
                 return "\{ {i.target.toSource(null)}.{i.member.toApply()} = {parents[0].getWorldAccess()}; \}";
             } else { 
-                return "\{ {parents[0].getWorldAccess()}; {i.target.toSource(null)}.{i.member.toApply()} \}";
+                return "{parents[0].getWorldAccess()}; {i.target.toSource(null)}.{i.member.toApply()}";
             }
         }
         if (true) throw new java.lang.RuntimeException("unhandled case: {observer}");
@@ -1793,7 +1834,7 @@ public class InputView is LinkedView {
         });
     const onUp1 = observeMouseUp().subscribe(function from (e is MouseEvent) to () {
             if (link0 <> null) {
-                canvas.pickInput(e, getInputType(), function from (found is LinkedView) to () {
+                canvas.pickInput(e, observeType(getInputType()), function from (found is LinkedView) to () {
                         delete tmpLink from canvas.views;
                         if (found == this or found == null) {
                             insert link0 into links;
@@ -1895,7 +1936,7 @@ public class ParameterView is InputView {
                 this.t = t;
             }
             override var t on replace {
-                parameter.constantValue = (t * 100) as Integer;
+                parameter.constantValue = Math.round(t * 100) as Integer;
                 canvas.dumpSrc();
             }
             override function onCommit from (text is String) to ()
@@ -1904,7 +1945,7 @@ public class ParameterView is InputView {
             }
             override function getText from (t is Number) to String
             {
-                "{Math.round(t * 100) as Integer}";
+                "{Math.round(t * 100.0) as Integer}";
             }
         }
     }
@@ -3082,7 +3123,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             if (not hit) { hit = n is ExpressionView }
 	    if (n is InputView) {
 		const pv = n as InputView;
-		if (pv.getInputType() == UNIT_TYPE or pv.getInputType().isConvertibleFrom(t)) {
+		if (pv.getInputType() == UNIT_TYPE or observeType(pv.getInputType()).isConvertibleFrom(t)) {
 		    println("IS ASSIGNABLE {pv.getClass()} {pv.getInputType()} <- {t}");
 		    k(pv);
                     return;
@@ -3238,8 +3279,8 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 t = (t as Result).observers[0];
             }
             const p = context.getIPath(t as ObserverExpression);
-            result = "{result} const obs{indexof term} = foreach (i in debugger.debug(i0.{mem.member.toApply()}, \"{mem.id}\")) {p.getWorldAccess()};";
-            ret = "{ret}{sep}obs{indexof term}";
+            result = "{result} const obs1 = foreach (i in i0.{mem.member.toApply()}) \{ {p.getWorldAccess()} \}";
+            ret = "{ret}{sep}obs{p.getContainingObservableDepth()}";
             sep = ", ";
             println(p.getWorldAccess());
             eng = "{eng}For each {formatEnglishName(mem.member.name)} event: ";
