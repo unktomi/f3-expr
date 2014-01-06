@@ -34,7 +34,6 @@ class TabImpl is TransformNode, MouseInputHandler, Focuser {
     override public function getTargetOfFocus to Focusable {
 	if (tab.content is Focuser) then (tab.content as Focuser).getTargetOfFocus() else null;
     }
-
 }
 
 public class Tabview is ResizableNode, Focuser {
@@ -123,8 +122,12 @@ public class Tabview is ResizableNode, Focuser {
 	},
 	TransformNode {
 	    ty: bind -TAB_HEIGHT/2-2;
-	    content: bind selectedTab.content
+	    content: Content {
+               override var scissorBounds = bind Bounds.boundsFromRect(contentWidth, contentHeight);
+               content: bind selectedTab.content
+            }
 	}];
     }
-	
 }
+
+class Content is Group, Scissored {}
