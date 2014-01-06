@@ -257,7 +257,7 @@ public class Holder {
     public var n is Treenode;
 }
 
-public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrollable {
+public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrollable, Scissored {
 
     public var selectionBackground is Paint = 
 	ColorPaint(Color.color(.4, .4, .4, 1));
@@ -447,9 +447,9 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
     var treeBg is Paint = bind bgs[0];
 
     override var contentBounds = bind Bounds.boundsFromRect(width, height);
+    //override var scissorBounds = bind contentBounds;
 
-    override var internalContent = Content {
-	scissorBounds: bind Bounds.boundsFromRect(width, height);
+    override var internalContent = Group {
 	content:
 	[Rectangle {
 	    height: bind height;

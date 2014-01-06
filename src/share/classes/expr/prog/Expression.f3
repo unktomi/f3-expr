@@ -35,7 +35,8 @@ function observeType from (t is F3Type) to F3Type {
 var exprMap1 = new java.util.HashMap of (F3ClassType, Member[]);
 var exprMap2 = new java.util.HashMap of (F3ClassType, Member[]);
 
-function thisMember from (typ is F3Type) to Member {
+function thisMember from (typ is F3Type) to Member 
+{
     if (typ is F3ClassType) {
         const clazz = typ as F3ClassType;
         const m = clazz.getThis();
@@ -300,6 +301,9 @@ public function introspect from (clazz is F3ClassType, all is Boolean) to Member
 		rt_t = getTypeArguments(rt)[0];
 	    } else {
 	    }	
+            if (rt_t is F3SequenceType) {
+                rt_t = (rt_t as F3SequenceType).getComponentType();
+            }
 	    if (SUBJECT_TYPE.isAssignableFrom(rt)) {
 		toInsert = Member {
 		    m: f;
@@ -350,6 +354,8 @@ public function introspect from (clazz is F3ClassType, all is Boolean) to Member
 	    } else if (ft.minArgs() == 1) {
 		// observer of ft.getArgumentType(0)
 		//println("{f.getName()} => Observer of ({ft.getArgumentType(0)})");
+                continue;
+                /*
 		toInsert = Member {
 		    m: f;
 		    t: I.G(ft.getArgumentType(0));
@@ -357,6 +363,7 @@ public function introspect from (clazz is F3ClassType, all is Boolean) to Member
 		    isObserver: true;
                     isObservable: false;
 		}
+                */
 	    } else {
 		// observer of (ft.getArgumentType(0), ft.getArgumentType(1))
 		continue;
@@ -376,6 +383,9 @@ public function introspect from (clazz is F3ClassType, all is Boolean) to Member
 	    if (isObs or OBSERVER_TYPE.isAssignableFrom(rt)) {
 		rt = getTypeArguments(rt)[0];
 	    }	
+            if (rt is F3SequenceType) {
+                rt = (rt as F3SequenceType).getComponentType();
+            }
 	    if ((not v.isPublicRead() and not v.isPublicInit() and not v.isDef()) and v.isPublic()) {
 		println("{v.getName()} => Subject of ({rt})");
 		toInsert = Member {
@@ -1810,6 +1820,7 @@ public class InputView is LinkedView {
     public bound function getInputType to F3Type { expression.getType() };
     override var transform = bind translate(0, index * -cellHeight);
     override var internalContent = bind label;
+  
 
     var tmpLink is LinkedView = null;
     var link0 is LinkView;
@@ -1817,34 +1828,39 @@ public class InputView is LinkedView {
     var dy = 0.0;
     const onDown1 = observeMouseDown().subscribe(function from (e is MouseEvent) to () {
             dx = 0; dy = 0;
-            if (false and links.size() == 1) {
+            if (links.size() == 1) {
                 link0 = links[0];
-                tmpLink = InputView {
-                    canvas: canvas;
-                }
+                tmpLink = LinkedView {
+                    override function serialize to ExprNode { null }
+                    override var toSceneTransform = bind translate(pos);
+                };
                 tmpLink.pos = canvas.toLocal * e.sceneLocation;
                 insert tmpLink into canvas.views;
+                const source = link0.source;
+                link0.unlink();
+                link0.source = source;
                 link0.target = tmpLink;
                 link0.link();
-                delete links;
             }
         });
     const onDrag1 = observeMouseDrag().subscribe(function from (e is MouseEvent) to () {
-            tmpLink.pos = canvas.toLocal * e.picked.dragPoint1;
+            tmpLink.pos = canvas.toLocal * (e.picked.dragPoint1 - new Vec3(5, 0, 0));
         });
     const onUp1 = observeMouseUp().subscribe(function from (e is MouseEvent) to () {
             if (link0 <> null) {
                 canvas.pickInput(e, observeType(getInputType()), function from (found is LinkedView) to () {
                         delete tmpLink from canvas.views;
-                        if (found == this or found == null) {
-                            insert link0 into links;
-                            tmpLink = null;
-                            link0 = null;
-                        } else {
+                        const source = link0.source;
+                        link0.unlink();
+                        if (found <> null) {
+                            found.unlink();
                             link0.target = found;
+                            link0.source = source;
                             link0.link();
-                            canvas.dumpSrc();
                         }
+                        canvas.dumpSrc();
+                        tmpLink = null;
+                        link0 = null;
                     });
             }
         });
@@ -2474,7 +2490,7 @@ class TreeLinker {
         const toLocal = canvas.toLocal;
         const sourcePos = canvas.toLocal * cell.toSceneTransform.getTranslation();
         linkStart.pos = sourcePos + new Vec3(cell.bounds.extent.x, 0, 0);
-        linkEnd.pos = startPos + new Vec3(dx-3.5, dy, 0);
+        linkEnd.pos = startPos + new Vec3(dx-1, dy, 0);
         canvas.targetArrow.tx = linkEnd.pos.x;
         canvas.targetArrow.ty = linkEnd.pos.y;
     }
@@ -2492,6 +2508,7 @@ class TreeLinker {
                 link.unlink();
                 if (found <> null) {
                     //cell.link();
+                    found.unlink();
                     const newlink = LinkView { 
                         canvas: canvas;
                         source: cell.linkedView; 
@@ -2941,7 +2958,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     
 
     override var internalContent = Holder { 
-	scissorBounds: bind Bounds.boundsFromRect(width, height);
+	//scissorBounds: bind bgRect.bounds;
 	content:
 	Group {
 	    content:
