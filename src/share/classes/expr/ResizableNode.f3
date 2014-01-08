@@ -1,7 +1,7 @@
 package expr;
 import f3.media.scene.*;
 
-public abstract class ResizableNode is AbstractNode {
+public abstract class ResizableNode is AbstractNode, Scissored {
     public var width is Number;
     public var height is Number;
     public function resize from (w is Number, h is Number) to ()
@@ -9,4 +9,5 @@ public abstract class ResizableNode is AbstractNode {
 	width = w;
 	height = h;
     }
+    override var contentBounds = bind Bounds.boundsFromRect(width, height);
 }

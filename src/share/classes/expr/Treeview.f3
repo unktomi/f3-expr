@@ -304,7 +304,9 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
     public function pick from (y is Number) to Treenode 
     {
         const offset = y - (height/2 + scrollOffset * cellHeight);
+        println("offset={offset}");
         const i = -(offset / cellHeight) as Integer;
+        println("i={i}");
         return cells[i].cell.tn;
     }
 

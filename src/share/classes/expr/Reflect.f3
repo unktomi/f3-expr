@@ -17,6 +17,7 @@ public const OBJECT_TYPE = Reflect.findClass("java.lang.Object");
 public const OBSERVER_TYPE = Reflect.findClass("f3.util.Observer");
 public const OBSERVABLE_TYPE = Reflect.findClass("f3.util.Observable");
 public const SUBJECT_TYPE = Reflect.findClass("f3.util.Subject");
+public const MONAD_TYPE = Reflect.findClass("org.f3.runtime.Monad");
 
 public const classMap = new java.util.HashMap of (String, java.util.Map of (String, F3VarMember));
 public const funMap = new java.util.HashMap of (F3ClassType, F3FunctionMember[]);

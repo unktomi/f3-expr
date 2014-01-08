@@ -12,6 +12,7 @@ import expr.undo.*;
 public class Context {
     public var parent is Context;
     public readonly var name is String;
+    public readonly var label is String = bind name;
     public var contextType is F3Type;
     public bound function getContent to Context[]  { [] }
     public function updateParent to () {
@@ -91,7 +92,7 @@ public class ResourceTimeNodeContext is ResourceObjectContext {
     override var name = bind "{formatName(resource.id)} [Timeline]";
     var members = bind Expression.introspect(Reflect.getType("f3.media.scene.TimeNode") as F3ClassType);
     public override bound function getContent to Context[] { 
-        foreach (x in members) if (not x.name.startsWith("observe")) then null else MemberContext { member: x, parent: this }
+        [if (resource is ResourceTimeNodeWrapper) then { var w = resource as ResourceTimeNodeWrapper; foreach (g in w.unwrapContent()) if (g is ResourceTimeNode) then ResourceTimeNodeContext {  resource: g as ResourceTimeNode} else null } else null, foreach (x in members) if (not x.name.startsWith("observe")) then null else MemberContext { member: x, parent: this }]
     }
 }
 
@@ -164,6 +165,21 @@ public class LocalVarContext is Context {
 public class MemberContext is GroupContext {
     public var member is Member;
     override var name = bind Names.formatName(member.name);
+    override var label = bind "{if hasHandler then "+" else "-"}{name}";
+    public var hasHandler is Boolean;
+    postinit {
+        var p = parent;
+        while (p <> null and not (p is ResourceObjectContext)) {
+            p = p.parent;
+        }
+        const target = (p as ResourceObjectContext).getTarget();
+        for (prog in target.programs) {
+            if (member == prog.event) {
+                hasHandler = prog.sourceCode <> "";
+                break;
+            }
+        }
+    }
     /*
     public override bound function getContent to Context[] { 
         [foreach (x in member.getMembers()) MemberContext { member: x }, content]
@@ -223,7 +239,7 @@ public class ContextTreemodel is Treemodel {
 
 public class ContextTreenode is Treenode {
     public var context is Context;
-    override var label = bind context.name;
+    override var label = bind context.label;
     var content = bind context.getContent();
     override var canOpen = bind sizeof content > 0;
     override var children = bind foreach (c in content) ContextTreenode { context: bind c, parent: this }
