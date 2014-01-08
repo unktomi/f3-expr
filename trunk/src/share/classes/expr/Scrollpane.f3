@@ -63,8 +63,8 @@ public class Scrollpane is ResizableNode, Focuser {
     override var internalContent = Group {
         content:
         [TransformNode {
-                tx: -W/2, ty: H/2
-                content: bind content
+            tx: -W/2, ty: H/2
+            content: bind content
         },
         TransformNode {
             tx: bind width/2 - W / 2;

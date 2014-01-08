@@ -9,6 +9,7 @@ import f3.util.Observer.*;
 import java.lang.Math;
 
 class ContentHolder is Group, Scissored {
+    //override var contentBounds = bind scissorBounds;
 }
 
 const selectedTitlePaint = ColorPaint(Color.color(.2, .2, .2));

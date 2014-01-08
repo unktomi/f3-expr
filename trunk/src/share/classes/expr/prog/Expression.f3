@@ -684,7 +684,16 @@ public interface VarExpression is MemberExpression {
 
 public class IPath {
 
+    public var id is Integer;
     public var parents is IPath[];
+
+    public function getRootId to Integer {
+        var result = id;
+        for (p in parents) {
+            result = Math.max(id, p.getRootId());
+        }
+        return result;
+    }
 
     public var observer is ObserverExpression;
 
@@ -703,10 +712,10 @@ public class IPath {
         for (p in parents) {
             count = Math.max(count, p.getContainingObservableDepth());
         }
-        if (hasObservableInput()) {
+        if (hasObservableInput() and parents <> []) {
             count++;
         }
-        return count;
+        return count + id;
     }
 
     function getDepth to Integer {
@@ -872,9 +881,11 @@ public class IPath {
 
 class IContext {
     const map = new java.util.HashMap of (ObserverExpression, IPath);
-    function getPath from (ob is ObserverExpression) to IPath {
+    function getPath from (ob is ObserverExpression) to IPath 
+    {
         map.get(ob)
     }
+
     function dump to () 
     {
         for (ent in map.entrySet()) {
@@ -890,6 +901,8 @@ class IContext {
         const path = getIPath(ob);
         path.getI();
     }
+
+    var pathCount = 0;
 
     function getIPath from (ob is ObserverExpression) to IPath {
         var result = map.get(ob);
@@ -912,6 +925,11 @@ class IContext {
         } else if (b is ObserverExpression) {
             const obs = b as ObserverExpression;
             insert getIPath(obs) into result.parents;
+        }
+        if (result.parents == []) {
+            var id = pathCount++;
+            pathCount += result.getContainingObservableDepth();
+            result.id = id;
         }
         return result;
     }
@@ -3221,7 +3239,9 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         if (links.size() == 0 and views.size() <= 1) {
             prog.code = null;
             prog.sourceCode = "";
+            eventContext.hasHandler = false;
         } else {
+            eventContext.hasHandler = true;
             serializationMap.clear();
             serialize(rootExprView);
             const w = new java.io.StringWriter();
@@ -3296,7 +3316,8 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 t = (t as Result).observers[0];
             }
             const p = context.getIPath(t as ObserverExpression);
-            result = "{result} const obs1 = foreach (i in i0.{mem.member.toApply()}) \{ {p.getWorldAccess()} \}";
+            const d = p.getContainingObservableDepth();
+            result = "{result} const obs{p.getRootId()} = foreach (i in i0.{mem.member.toApply()}) \{ {p.getWorldAccess()} \}";
             ret = "{ret}{sep}obs{p.getContainingObservableDepth()}";
             sep = ", ";
             println(p.getWorldAccess());

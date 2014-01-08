@@ -187,15 +187,31 @@ public class TransformHierarchy
     public function move from (src is Node, target is Node) to ()
     {
 	const srcParent = src.parent as Group;
-	delete src from srcParent.content;
+        if (srcParent is ResourceGroup) {
+            delete src as ResourceNode from (srcParent as ResourceGroup).resources;
+        } else {
+            delete src from srcParent.content;
+        }
 	var targetGroup is Group;
-	if (not (target is Group)) {
+	if (not (target is Group) or target is ResourceNode) {
 	    const parent = target.parent as Group;
 	    const i = f3.util.Sequences.indexOf(parent.content, target);
-	    insert src after parent.content[i];
+            println("inserting into: {parent} at {i}");
+            if (parent is ResourceGroup) {
+                const g = parent as ResourceGroup;
+                insert src as ResourceNode after g.resources[i];
+            } else {
+                insert src after parent.content[i];
+            }
 	} else {
 	    const parent = target as Group;
-	    insert src into parent.content;
+            println("inserting into: {parent}");
+            if (parent is ResourceGroup) {
+                const g = (parent as ResourceGroup);
+                insert src as ResourceNode before g.resources[0];
+            } else {
+                insert src before parent.content[0];
+            }
 	}
     }
 

@@ -231,6 +231,18 @@ public function run from (args is String[]) to ()
 	scenes: bind currentScenes;
     }
 
+    function selectNodeLater from (n is Node) to ()
+    {
+        java.awt.EventQueue.invokeLater(java.lang.Runnable {
+                override function run to ()
+                {
+                    println("SELECT NODE LATER {n}");
+                    transformHierarchy.selectNode(n);
+                }
+            });
+    }
+
+
     const temporalHierarchy = TemporalHierarchy { root: bind currentAnimResource }
     const otherHierarchy = VariableHierarchy { root: bind mainContext }
     var currentCamera is Camera;
@@ -1207,15 +1219,32 @@ public function run from (args is String[]) to ()
                                                       
                                                       override function onMouseUp from (e is MouseEvent) to () 
                                                       {
-                                                          for (j in getUnderMouseInEditor()) {
-                                                              if (j.node is Expression.Canvas) {
-                                                                  (j.node as Expression.Canvas).onDrop(j, clip);
-                                                                  break;
+                                                          if (clip <> null) {
+                                                              for (j in getUnderMouseInEditor()) {
+                                                                  if (j.node is Expression.Canvas) {
+                                                                      (j.node as Expression.Canvas).onDrop(j, clip);
+                                                                      break;
+                                                                  }
                                                               }
+                                                              for (j in getUnderMouseInEditor()) {
+                                                                  if (j.node == this) {
+                                                                      const pt = j.node.toSceneTransform.inverse() * j.scenePoint;
+                                                                      const tn = pick(pt.y) as TransformHierarchy.Treenode;
+                                                                      println("PICKED => {tn} for {e.location.y}");
+                                                                      if (tn <> null) {
+                                                                          const n = tn.n;
+                                                                          println("PICKED => {n}");
+                                                                          if (clip <> n) {
+                                                                              transformHierarchy.move(clip, n);
+                                                                              selectNodeLater(clip);
+                                                                          }
+                                                                      }
+                                                                  }
+                                                              }
+                                                              delete dragger from popupLayer.content;
+                                                              clip = null;
+                                                              dragger = null;
                                                           }
-                                                          delete dragger from popupLayer.content;
-                                                          clip = null;
-                                                          dragger = null;
                                                       }
                                                   }
                                               }
@@ -1663,7 +1692,11 @@ public function run from (args is String[]) to ()
                         println("{java.lang.Runtime.getRuntime().freeMemory()} / {java.lang.Runtime.getRuntime().totalMemory()}");
 		    } else if (event.keyCode == Keys.F) {
                         if (currentScene == mainScene) {
-                            viewer.focusCamera(currentTransform);
+                            if (currentTransform <> null) {
+                                viewer.focusCamera(currentTransform);
+                            } else {
+                                viewer.focusCamera(mainScene.root);
+                            }
                         }
 		    } else if (event.keyCode >= Keys._0 and event.keyCode <= Keys._9) {
 			const index = event.keyCode - Keys._0;
