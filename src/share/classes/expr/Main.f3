@@ -1421,6 +1421,24 @@ public function run from (args is String[]) to ()
                                              }
                                          }
 				 },
+                                            Tabview.Tab {
+                                                title: "Graph Editor"
+                                                    content: Scrollpane {
+                                                    canZoomVertical: false;
+                                                    content: expr.timeline.GraphEditor {
+                                                        resourceTarget: bind (currentTransform as ResourceTarget); 
+                                                        loop: bind nonInteractiveLoop;
+                                                        target: player;
+                                                        targetNode: mainTimeLayer;
+                                                        temporalHierarchy: temporalHierarchy;
+                                                        removeClip: function from (clip is TimeNode) to ()
+                                                        {
+                                                            temporalHierarchy.deleteSelection();
+                                                            deleteAnimResource(clip);
+                                                        }
+                                                    }
+                                                }
+                                            },
 				 Tabview.Tab {
 				    title: bind "Event Handler: {contextModel.selectedContext.name}"
 				    content: expr.prog.Expression.Editor {
