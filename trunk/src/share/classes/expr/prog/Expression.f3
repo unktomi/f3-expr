@@ -3629,6 +3629,8 @@ public class Editor is ResizableNode, Focuser {
 
     public var stepping is Boolean;
 
+    override var scissorBounds = bind Bounds.boundsFromRect(width, height);
+
     override public function getTargetOfFocus to Focusable { canvas }
     public var targetObject is ResourceTarget;
     public var targetNode is ResourceNode = bind getAsNode(targetObject);

@@ -77,6 +77,32 @@ public class ResourceNode is TransformNode, ResourceTarget {
         }
         return target;
     }
+
+    public readonly var timeline is Timeline;
+
+    function createChannels to (Channel of Number)[] 
+    {
+        const names = ["tx", "ty", "tz", "rx", "ry", "rz", "sx", "sy", "sz", "px", "py", "pz"];
+        const ptrs = [&tx, &ty, &tz, &rx, &ry, &rz, &sx, &sy, &sz, &px, &py, &pz];
+        const chans = foreach (i in [0..<names.size()]) {
+            Channel of Number {
+                id: bind "{id}#{names[i]}";
+                targets: ptrs[i];
+            }
+        }
+        timeline = Timeline {
+            enabled: false;
+            paused: true;
+            content: channelBox = TimeGroup {
+                id: bind id;
+                content: chans;
+            }
+        }
+        println("CREATED CHANNELS for {id} => {chans}");
+        return chans;
+    }   
+
+    override var channels = createChannels();
 }
 
 public class MaResourceNode is ResourceNode {

@@ -1,7 +1,10 @@
 package expr;
 import expr.prog.Program;
+import f3.media.scene.*;
 
 public interface ResourceTarget {
     public var programs is Program[];
+    public var channels is (Channel of Number)[];
+    public var channelBox is TimeGroup;
 }
 

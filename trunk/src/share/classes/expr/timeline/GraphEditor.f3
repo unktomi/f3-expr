@@ -1,4 +1,77 @@
 package expr.timeline;
+import f3.media.scene.*;
+import f3.media.scene.KeyFrame.*;
+import expr.*;
 
-public class GraphEditor {
+public class GraphEditor is Trax {
+    override var graph = true;
+    public var resourceTarget is ResourceTarget;
+    override var clips = bind resourceTarget.channelBox;
+
+    var playheadPos is Duration;
+
+    override protected function setKeys to () 
+    {
+        foreach (clip in resourceTarget.channelBox.content) {
+            const ch = clip as Channel of Number;
+            var k = ch.pickKey(playheadPos);
+            var i is Interpolator of Number = KeyFrame.Linear;
+            if (k <> null) {
+                if (k.position == playheadPos and k.interpolator is KeyFrame.Tangent) {
+                    i = k.interpolator;
+                } else {
+                    if (k.position < playheadPos) {
+                        k = k.next;
+                    }
+                    if (k <> null and k.prev <> null and k.next <> null) {
+                        const frame1 = (k.prev.position / (1s/24))  as Integer;
+                        const frame2 = (k.position / (1s/24))  as Integer;
+                        const frame3 = (k.next.position / (1s/24))  as Integer;
+                        const x1 = frame1;
+                        const x2 = frame2;
+                        const x3 = frame3;
+                        const y1 = k.prev.value;
+                        const y2 = k.value;
+                        const y3 = k.next.value;
+                        const ox = x2 - x1;
+                        const oy = y2 - y1;
+                        const ix = x3 - x2;
+                        const iy = y3 - y2;
+                        i = KeyFrame.Tangent 
+                            {
+                                kox: ox;
+                                koy: oy;
+                                kix: ix;
+                                kiy: iy;
+                            };
+                    }
+                }
+            }
+            ch.setKey(playheadPos, i);
+        }
+    }
+
+    override protected function onPlayheadChange from (event is Duration) to ()
+    {
+        super.onPlayheadChange(event);
+        if (playheadPos <> event) {
+            println("playhead change {playheadPos} => {event}");
+            playheadPos = event;
+            const rn = (resourceTarget as ResourceNode);
+            rn.timeline.enabled = true;
+            rn.timeline.setPlayhead(event);
+            rn.timeline.enabled = false;
+        }
+    }
+    
+    override function refreshPlayhead to () 
+    {
+        super.refreshPlayhead();
+        /*
+        const rn = (resourceTarget as ResourceNode);
+        rn.timeline.enabled = true;
+        rn.timeline.setPlayhead(playheadPos);
+        rn.timeline.enabled = false;
+        */
+    }
 }
