@@ -5,18 +5,36 @@ import expr.*;
 
 public class GraphEditor is Trax {
     override var graph = true;
-    public var resourceTarget is ResourceTarget;
-    override var clips = bind resourceTarget.channelBox;
+    public var resourceTargets is ResourceTarget[];
+    override var clips = bind getChannelBoxes(resourceTargets);
+
+    bound function getChannelBoxes from (targets is ResourceTarget[]) to TimeNode[]
+    {
+        foreach(x in targets) x.channelBox;
+    }
 
     var playheadPos is Duration;
 
-    override protected function setKeys to () 
+    override protected function handleDelete to ()
     {
-        foreach (clip in resourceTarget.channelBox.content) {
+        deleteKeys();
+    }
+
+    function deleteKeys() 
+    {
+        foreach (resourceTarget in resourceTargets, clip in resourceTarget.channelBox.content) {
+            const ch = clip as Channel of ?;
+            ch.deleteKey();
+        }
+    }
+
+    override public function setKeys to () 
+    {
+        foreach (resourceTarget in resourceTargets, clip in resourceTarget.channelBox.content) {
             const ch = clip as Channel of Number;
             var k = ch.pickKey(playheadPos);
             var i is Interpolator of Number = KeyFrame.Linear;
-            if (k <> null) {
+            if (false and k <> null) {
                 if (k.position == playheadPos and k.interpolator is KeyFrame.Tangent) {
                     i = k.interpolator;
                 } else {
@@ -57,10 +75,12 @@ public class GraphEditor is Trax {
         if (playheadPos <> event) {
             println("playhead change {playheadPos} => {event}");
             playheadPos = event;
-            const rn = (resourceTarget as ResourceNode);
-            rn.timeline.enabled = true;
-            rn.timeline.setPlayhead(event);
-            rn.timeline.enabled = false;
+            for (resourceTarget in resourceTargets) {
+                const rn = (resourceTarget as ResourceNode);
+                rn.timeline.enabled = true;
+                rn.timeline.setPlayhead(event);
+                rn.timeline.enabled = false;
+            }
         }
     }
     
