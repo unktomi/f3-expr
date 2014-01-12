@@ -496,6 +496,7 @@ public function run from (args is String[]) to ()
     }
 
     var trax is expr.timeline.Trax;
+    var graphEditor is expr.timeline.GraphEditor;
     var inspector1 is Inspector;
     var inspector2 is Inspector;
     var inspector3 is Inspector;
@@ -1425,16 +1426,14 @@ public function run from (args is String[]) to ()
                                                 title: "Graph Editor"
                                                     content: Scrollpane {
                                                     canZoomVertical: false;
-                                                    content: expr.timeline.GraphEditor {
-                                                        resourceTarget: bind (currentTransform as ResourceTarget); 
+                                                    content: graphEditor = expr.timeline.GraphEditor {
+                                                        resourceTargets: bind currentResource.resources;
                                                         loop: bind nonInteractiveLoop;
                                                         target: player;
                                                         targetNode: mainTimeLayer;
                                                         temporalHierarchy: temporalHierarchy;
                                                         removeClip: function from (clip is TimeNode) to ()
                                                         {
-                                                            temporalHierarchy.deleteSelection();
-                                                            deleteAnimResource(clip);
                                                         }
                                                     }
                                                 }
@@ -1708,6 +1707,8 @@ public function run from (args is String[]) to ()
 		    } else if (event.keyCode == Keys.G) {
                         java.lang.System.gc();
                         println("{java.lang.Runtime.getRuntime().freeMemory()} / {java.lang.Runtime.getRuntime().totalMemory()}");
+		    } else if (event.keyCode == Keys.S) {
+                        graphEditor.setKeys();
 		    } else if (event.keyCode == Keys.F) {
                         if (currentScene == mainScene) {
                             if (currentTransform <> null) {

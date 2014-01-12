@@ -67,6 +67,31 @@ class KeyMark is Image, MouseInputHandler, KeyboardInputHandler {
     }
 }
 
+class GroupKeyMark is Image, MouseInputHandler, KeyboardInputHandler {
+    var kx = 0.0;
+    override var url = "{__DIR__}keybubblemarker.png";
+    public var k is Duration;
+    public var ch is ResourceTarget.ChannelBoxGroup;
+    public var trax is Trax;
+    override var transform = bind translate(trax.durationToX(k), 0);
+    override function onMouseDown from (event is MouseEvent) to ()
+    {
+        kx = trax.durationToX(k);
+    }
+    override function onMouseDrag from (event is MouseEvent) to ()
+    {
+        kx += (event.picked.dragPoint1 - event.picked.dragPoint0).x;
+        k = ch.moveKeyTo(k, trax.frameTo(trax.xToDuration(kx)));
+        trax.updatePlayhead();
+    }
+    override function onMouseUp from (event is MouseEvent) to ()
+    {
+        //println("commit playTime={target.playTime}, pickable={target.pickable}");
+        MasterUndoable.commit();
+    }
+}
+
+
 class TimeNodeView is AbstractNode 
 {
     public var cy is Number;
@@ -285,6 +310,21 @@ class TimeNodeView is AbstractNode
                  }]
               },
               if (not trax.graph) then null else Group {
+                visible: bind row > trax.scrollY;
+                  transform: bind translate(-w/2, 0);
+                  content: bind if (target is ResourceTarget.ChannelBoxGroup) then {
+                          var ch = target as ResourceTarget.ChannelBoxGroup;
+                          foreach (k in ch.keyTimes) {
+                              GroupKeyMark {
+                                  ch: bind ch;
+                                  k: k;
+                                  trax: bind trax;
+                              }
+                          }
+                      } else null;
+              },
+              if (not trax.graph) then null else Group {
+                visible: bind row > trax.scrollY;
                   transform: bind translate(-w/2, 0);
                   content: bind if (target is Channel of ?) then {
                           var ch = target as Channel of Object;
@@ -297,10 +337,11 @@ class TimeNodeView is AbstractNode
                           }
                       } else null;
               },
-              if (not trax.graph) then null else Group {
+              if (not trax.graph or not (target is Channel of Number)) then null else Group {
+                visible: bind row > trax.scrollY;
                   pickable: false;
                   transform: bind translate(-w/2, 0);
-                  content: bind if (target is Channel of Number) then makeCurve(target as Channel of Number) else null;
+                  content: bind makeCurve(target as Channel of Number);
               },
               Group { 
                   transform: bind translate(-w/2, 0);
@@ -376,6 +417,12 @@ public class Playhead is AbstractNode
 }
 
 public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable {
+
+    const onWheel = 
+	internalContent.observeMouseWheel().subscribe(function from (event is MouseWheelEvent) to () {
+		const y = event.scroll.y as Integer;
+		scrollVertically(y);
+	    });
 
     public var graph is Boolean;
     const arrow is Polygon = Polygon {
@@ -481,6 +528,12 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
     };
 
     override function update {
+        super.update();
+        performUpdate();
+    }
+
+    protected function performUpdate to ()
+    {
         root.updateRows(0);
         rowCount = root.rowCount;
     }
@@ -663,32 +716,30 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 
     var dur = bind visibleInterval.duration() + targetNode.contentBounds.end;
     var traxHeight = bind height - 20;
-    var sy0 = bind Math.min(traxHeight / Math.max(root.bounds.height(), 1), 1.0);
-    var ty0 = bind if root.bounds.height() == 0 then 0.0 else (scrollY * getViewHeight()) / root.bounds.height();
+    var rootContent = bind getRootContent();
+    var sy0 = bind Math.min(traxHeight / Math.max(rootContent.bounds.height(), 1), 1.0);
+    var ty0 = bind if rootContent.bounds.height() == 0 then 0.0 else (scrollY * getViewHeight()) / rootContent.bounds.height();
 
     override bound function getSy to Number { sy0 }
 
     override bound function getTy to Number { ty0 }
 
+    function scrollVertically from (i is Integer) to ()
+    {
+        scrollY = Math.max(0, Math.min(i+scrollY, rowCount - (traxHeight / getViewHeight()) as Integer));
+    }
+
     override public function setY from (ty is Number, sy is Number) to () {
-        scrollY = (ty * root.bounds.height() / getViewHeight()) as Integer;
+        scrollY = (ty * rootContent.bounds.height() / getViewHeight()) as Integer;
     }
 
     override public function setX from (tx is Number, sx is Number) to ()
     {
-        //println("tx={tx} sx={sx}");
         const cur = getSx();
-        // println("cur={cur}");
-        // println("pixelsPerFrame={pixelsPerFrame()}");
-        //println("frameRateN={frameRateN}");
         if (sx <> 0) {
             frameRateN *= cur / sx;
-            //println("tx=>{getTx()} sx=>{getSx()}");
-            //println("pixelsPerFrame={pixelsPerFrame()}");
-            //println("frameRateN={frameRateN}");
         }
         scrollOffset = durationToFrame(dur * tx);
-        //println("scrollOffset => {scrollOffset}");
     }
 
     const playhead is Playhead = Playhead {
@@ -986,14 +1037,21 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
         } else if (e.keyCode == Keys.Spacebar) {
             target.paused = not target.paused;
 	} else if (e.keyCode == Keys.Delete or e.keyCode == Keys.Backspace) {
-	    if (selectedTimeNodeView.target <> null) {
-		var selectedIndex = selectedTimeNodeView.row;
-		removeClip(selectedTimeNodeView.target);
-		selectedIndex = Math.min(selectedIndex, rowCount-1);
-		selectTimeNodeView(rowToTimeNodeView(selectedIndex));
-	    }
+            handleDelete();
 	}
     }
+
+    protected function handleDelete to ()
+    {
+        if (selectedTimeNodeView.target <> null) {
+            var selectedIndex = selectedTimeNodeView.row;
+            removeClip(selectedTimeNodeView.target);
+            selectedIndex = Math.min(selectedIndex, rowCount-1);
+            selectTimeNodeView(rowToTimeNodeView(selectedIndex));
+        }
+    }
+
+
     override function onKeyUp from (e is KeyboardEvent) to () {
     }
 
@@ -1014,7 +1072,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
     {
         const ty = valueBounds.x;
         var dy = (valueBounds.y - valueBounds.x);
-        const sy = if (dy == 0) then 1.0 else viewHeight / dy;
+        const sy = if (dy == 0 or viewHeight == 0) then 1.0 else (0.5 * viewHeight) / dy;
         println("VALUE BOUNDS {valueBounds}");
         println("ty={ty}, sy={sy}");
         var x1 is Number;
@@ -1062,7 +1120,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
         const outLength = Math.sqrt(x1*x1+y1*y1);
         const inLength = Math.sqrt(x2*x2+y2*y2);
 
-        TangentTool {
+        const tool = TangentTool {
             editable: false;
             transform: bind translate(durationToX(k.prev.position), -viewHeight/2.0);
             p1: bind new Vec2(0, (k.prev.value - ty)*sy);
@@ -1074,6 +1132,9 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
             outLength: outLength;
             isPointOnly: k.prev == null and k.next == null;
         }
+
+        tool.valueScale = new Vec2(1.0, 1.0 / sy);
+        return tool;
     }
 
     protected function getValueBounds from (keys is (Key of Number)[]) to Vec2 {

@@ -1,10 +1,64 @@
 package expr;
 import expr.prog.Program;
 import f3.media.scene.*;
+import f3.media.scene.KeyFrame.*;
+
+class KeyTarget of a {
+    public var ch is Channel of a;
+    public var k is Key of a;
+}
+
+public class ChannelBoxGroup is TimeGroup, ChannelBox {
+    public const keyMap = new java.util.TreeMap of (Duration, java.util.List of (KeyTarget of Object));
+    public var keyTimes is Duration[];
+
+    public function moveKeyTo from (src is Duration, target is Duration) to Duration
+    {
+        const ks = keyMap.get(src);
+        for (k in ks) {
+            k.k = k.ch.moveKey(k.k, target-src);
+        }
+        return target;
+    }
+
+    override function update from (sceneTime is Duration) to ()
+    {
+        super.update(sceneTime);
+        updateKeyMap();
+    }
+
+    function updateKeyMap to () 
+    {
+        keyMap.clear();
+        for (n in content) {
+            if (n is Channel of Object) {
+                const ch = n as Channel of Object;
+                for (k in ch.keys) {
+                    const j = ch.transform * k.position;
+                    var list = keyMap.get(j);
+                    if (list == null) {
+                        list = new java.util.LinkedList of KeyTarget of Object();
+                        keyMap.put(j, list);
+                    }
+                    list.add(KeyTarget of Object {k: k, ch: ch});
+                }
+            }
+        }
+        keyTimes = foreach (x in keyMap.keySet()) x;
+    }
+}
+
 
 public interface ResourceTarget {
+    public var url is String;
     public var programs is Program[];
-    public var channels is (Channel of Number)[];
-    public var channelBox is TimeGroup;
+
+    public function getChannels to (Channel of Number)[] { [] }
+
+    public const channelBox is TimeGroup = ChannelBoxGroup
+    {
+        id: bind "channelBox:{url}";
+        content: getChannels();
+    }
 }
 

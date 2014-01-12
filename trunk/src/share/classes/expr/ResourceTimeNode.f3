@@ -53,7 +53,6 @@ public class MaResourceTimeNode is ResourceTimeNode {
 }
 
 public class ResourceTimeNode is TimeGroup, ResourceTarget {
-    public const url is String;
     override var id = bind url;
     public var spatial is ResourceNode;
 
