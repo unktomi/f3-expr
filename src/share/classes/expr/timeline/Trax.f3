@@ -768,6 +768,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
             }
         }
         */
+        println("making time node view for target: {t} with content bounds {t.contentBounds}");
         TimeNodeView {
             trax: this;
             target: t;

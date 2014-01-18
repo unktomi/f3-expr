@@ -223,9 +223,7 @@ public function run from (args is String[]) to ()
 
     var currentResource is ResourceGroup = bind currentScene.currentResource;
 
-    const currentAnimResource is ResourceTimeGroup = ResourceTimeGroup {
-	id: "Temporal Hierarchy";
-    }
+    const currentAnimResource is ResourceTimeGroup = ResourceTimeGroup {}
 
     const transformHierarchy is TransformHierarchy = TransformHierarchy {
 	scenes: bind currentScenes;
@@ -281,7 +279,7 @@ public function run from (args is String[]) to ()
 
     const mainTimeLayer = TimeGroup {
 	id: "Hierarchy";
-	content: bind currentAnimResource;
+	content: currentAnimResource;
 	playRange: bind if (nonInteractiveLoop) then null else Interval { start: 0s, end: Duration.INDEFINITE };
 	playCount:  bind if (nonInteractiveLoop) then -1 else 1;
     }
@@ -297,7 +295,7 @@ public function run from (args is String[]) to ()
 	tz: 13;
 	near: 1;
 	far: 10000;
-        content: PointLight {}
+        content: [PointLight {}, SoundListener {}]
     }
 
     const viewer = DefaultExaminerViewer {
@@ -336,6 +334,10 @@ public function run from (args is String[]) to ()
         println("ADDING TIME RESOURCE { rn }");
         rn.updateParent();
 	insert rn into currentAnimResource.resources;
+        mainTimeLayer.content = [];
+        mainTimeLayer.content = currentAnimResource;
+        mainTimeLayer.updateParent();
+        println("all bounds = {mainTimeLayer.bounds}");
         insert Context.ResourceTimeNodeContext { 
             parent: contextModel.selectedGroupContext; 
             resource: rn;
@@ -418,9 +420,9 @@ public function run from (args is String[]) to ()
                 url: url;
                 paused: true
             }
-	    const rn = ResourceNode {
+	    const rn = SoundResourceNode {
                 url: url;
-	        content: sound;
+	        sound: sound;
 	    }
 	    const rtn = ResourceTimeNode {
 		url: url;
@@ -442,10 +444,8 @@ public function run from (args is String[]) to ()
                 model: model;
 		spatial: rn;
 	    }
-	    if (true or rtn.bounds.duration() > 0s) {
-		rn.temporal = rtn;
-		addTimeResource(rtn);
-	    }
+            rn.temporal = rtn;
+            addTimeResource(rtn);
 	} else if (url.endsWith(".xhtmli")) {
 	    const xhtml = XHTML.Text {
 		content: readTextFile(url).first;
@@ -489,6 +489,10 @@ public function run from (args is String[]) to ()
 	    const rn = ResourceNode {
 		url: url;
 		content: browser;
+                override function getFocusable to Focusable 
+                {
+                    browser
+                }
 	    }
 	    addResource(rn, pt);
 	}
@@ -654,6 +658,8 @@ public function run from (args is String[]) to ()
         currentScenes = [mainScene];
 	mainScene.currentResource.resources = [];
 	currentAnimResource.resources = [];
+        mainTimeLayer.content = [];
+        mainTimeLayer.content = currentAnimResource;
         contextModel.reset();
 	transformHierarchy.clearSelection();
         playerUrl = "";
@@ -820,7 +826,7 @@ public function run from (args is String[]) to ()
                     playCount: i.playCount;
                 };
                 t = rtn;
-                addTimeResource(rtn);
+                // addTimeResource(rtn);
             } else if (i.url.startsWith("timenode://BlendLayer")) {
                 t = BlendLayer {
                     id: i.url;
@@ -828,6 +834,23 @@ public function run from (args is String[]) to ()
                         convertTimeResource(j)
                     }
                }
+               const rtn = ResourceTimeNodeWrapper {
+                    blendWeight: i.blendWeight;
+                    playTime: i.playTime;
+                    playRate: i.playRate;
+                    playCount: i.playCount;
+                    url: i.url;
+                    wrapped: t as TimeGroup;
+                };
+                t = rtn;
+                //addTimeResource(rtn);
+            } else if (i.url.startsWith("timenode://Layer")) {
+                t = TimeGroup {
+                    id: i.url;
+                    content: foreach (j in i.content) {
+                        convertTimeResource(j)
+                    }
+                }
                 const rtn = ResourceTimeNodeWrapper {
                     blendWeight: i.blendWeight;
                     playTime: i.playTime;
@@ -837,39 +860,48 @@ public function run from (args is String[]) to ()
                     wrapped: t as TimeGroup;
                 };
                 t = rtn;
-                addTimeResource(rtn);
+                //addTimeResource(rtn);
             } else {
                 const u = rebaseURL(i.url);
                 t = mainTimeLayer.lookup(u);
                 if (t == null) {
                     for (x in currentResource.resources) {
-                        if (x is MaResourceNode) {
-                            const j = (x as MaResourceNode).temporal;
-                            t = j.lookup(u);
-                            if (t <> null) {
-                                const rtn = ResourceTimeNodeWrapper {
-                                    url: i.url;
-                                    wrapped: t as TimeGroup;
-                                    blendWeight: i.blendWeight;
-                                    playTime: i.playTime;
-                                    playRate: i.playRate;
-                                    playCount: i.playCount;
-                                };
-                                t = rtn;
-                                break;
+                        if (u == x.url) {
+                            t = x.temporal;
+                            break;
+                        } else {
+                            if (x is MaResourceNode) {
+                                const j = (x as MaResourceNode).temporal;
+                                t = j.lookup(u);
+                                if (t <> null) {
+                                    const rtn = ResourceTimeNodeWrapper {
+                                        url: i.url;
+                                        wrapped: t as TimeGroup;
+                                        blendWeight: i.blendWeight;
+                                        playTime: i.playTime;
+                                        playRate: i.playRate;
+                                        playCount: i.playCount;
+                                    };
+                                    t = rtn;
+                                    break;
+                                }
                             }
                         }
                     }
-                }
+                } 
             }
             println("CONVERT TIME RESOURCE : {i.url} => {t}");
             t;
         }
-        for (i in sceneRes.temporalResources) {
-            convertTimeResource(i);
-        }
+        var resulting = 
+            foreach (i in sceneRes.temporalResources) {
+                convertTimeResource(i);
+            }
+        currentAnimResource.resources = resulting as ResourceTimeNode[];
+        mainTimeLayer.content = [];
+        mainTimeLayer.content = currentAnimResource;
+        println("SET ANIM RESOURCES bounds={mainTimeLayer.bounds}");
         transformHierarchy.selectScene(mainScene);
-	//trax.setClips(currentAnimResource.resources);
         for (p in allPrograms) p.evaluate();
 	MasterUndoable.reset();
 	MasterUndoable.commit();
@@ -877,11 +909,9 @@ public function run from (args is String[]) to ()
 	mainScene.currentResource.url = url;
     }
 
-    const yesNo = Dialog.YesNoCancel {
-    }
+    const yesNo = Dialog.YesNoCancel {}
 
-    const fileSave = FileDialog.FileSave {
-    }
+    const fileSave = FileDialog.FileSave {}
 
     const fileOpen = FileDialog.FileOpen {
 	filterExtensions: [".expr"]
