@@ -77,6 +77,17 @@ public class ClipLibraryAsset is Asset {
     }
 }
 
+public class TimeLayerAsset is ClipAsset {
+    override var name = "Time Layer";
+    override var url = "timenode://Layer";
+    var count = 1;
+    override public function getClip to TimeNode {
+	TimeGroup {
+	    id: "Time Layer {count++}";
+	}
+    }
+}
+
 public class TransitionLayerAsset is ClipAsset {
     override var name = "Transition Layer";
     override var url = "timenode://TransitionLayer";
@@ -107,10 +118,6 @@ public class WebAsset is Asset {
 }
 
 public class SVGAsset is Asset {
-}
-
-public class TimeLayerAsset is Asset {
-    override var name = "Time Layer";
 }
 
 public class ExprAsset is Asset {
@@ -336,7 +343,7 @@ public class AssetModel is Treemodel {
 	asset: Asset {
 	    name: "Assets";
 	    containedAssets: bind 
-	    [getPackageAssets(), TransitionLayerAsset{}, BlendLayerAsset {}, 
+	    [getPackageAssets(), TimeLayerAsset {}, TransitionLayerAsset{}, BlendLayerAsset {}, 
              Scene2DAsset {}, foreach (r in resources.resources) makeAsset(r)]
 	}
     }

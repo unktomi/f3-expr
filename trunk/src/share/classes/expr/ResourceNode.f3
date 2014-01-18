@@ -79,9 +79,10 @@ public class ResourceNode is TransformNode, ResourceTarget {
 
     public readonly var timeline is Timeline = Timeline {
         content: bind channelBox;
+        enabled: false;
     }
 
-    const channels =   
+    function createChannels to (Channel of Number)[]
     {
         const names = ["tx", "ty", "tz", "rx", "ry", "rz", "sx", "sy", "sz", "px", "py", "pz"];
         const ptrs = [&tx, &ty, &tz, &rx, &ry, &rz, &sx, &sy, &sz, &px, &py, &pz];
@@ -92,12 +93,39 @@ public class ResourceNode is TransformNode, ResourceTarget {
             }
         }
     }   
-    override function getChannels to (Channel of Number)[] { channels }
-
+    var channels is (Channel of Number)[];
+    override function getChannels to (Channel of Number)[] { 
+        if (channels == null) then channels = createChannels() else channels;
+    }
 }
 
 public class MaResourceNode is ResourceNode {
     public const model is Ma.Model;
     override var url = bind model.url;
     override var content = bind model.getSpatialRoot();
+}
+
+public class SoundResourceNode is ResourceNode {
+
+    public const sound is Sound;
+
+    override var content = bind sound;
+
+    function createSoundChannels to (Channel of Number)[]
+    {
+        const names = ["volume"];
+        const ptrs = [&sound.volume];
+        foreach (i in [0..<names.size()]) {
+            Channel of Number {
+                id: bind "{id}#{names[i]}";
+                targets: ptrs[i];
+            }
+        }
+    }   
+
+    var soundChannels is (Channel of Number)[];
+
+    override function getChannels to (Channel of Number)[] { 
+        if (soundChannels == null) then soundChannels = [createSoundChannels(), super.getChannels()] else soundChannels;
+    }
 }

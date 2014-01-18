@@ -149,6 +149,23 @@ public class ExprNode is AbstractNode {
                 };
                 t = rtn;
                 insert t into temporalRoot.content;
+            } else if (i.url.startsWith("timenode://Layer")) {
+                t = TimeGroup {
+                    id: i.url;
+                    content: foreach (j in i.content) {
+                        convertTimeResource(j)
+                    }
+                }
+                const rtn = ResourceTimeNodeWrapper {
+                    blendWeight: i.blendWeight;
+                    playTime: i.playTime;
+                    playRate: i.playRate;
+                    playCount: i.playCount;
+                    url: i.url;
+                    wrapped: t as TimeGroup;
+                };
+                t = rtn;
+                insert t into temporalRoot.content;
             } else {
                 t = temporalRoot.lookup(i.url);
                 t.playTime = i.playTime;
