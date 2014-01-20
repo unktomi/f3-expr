@@ -354,8 +354,6 @@ public function introspect from (clazz is F3ClassType, all is Boolean) to Member
 	    } else if (ft.minArgs() == 1) {
 		// observer of ft.getArgumentType(0)
 		//println("{f.getName()} => Observer of ({ft.getArgumentType(0)})");
-                continue;
-                /*
 		toInsert = Member {
 		    m: f;
 		    t: I.G(ft.getArgumentType(0));
@@ -363,7 +361,6 @@ public function introspect from (clazz is F3ClassType, all is Boolean) to Member
 		    isObserver: true;
                     isObservable: false;
 		}
-                */
 	    } else {
 		// observer of (ft.getArgumentType(0), ft.getArgumentType(1))
 		continue;
@@ -857,7 +854,11 @@ public class IPath {
             if (i.member.m is F3VarMember and i.member.isObserver) {
                 return "\{ {i.target.toSource(null)}.{i.member.toApply()} = {parents[0].getWorldAccess()}; \}";
             } else { 
-                return "{parents[0].getWorldAccess()}; {i.target.toSource(null)}.{i.member.toApply()}";
+                if (i.member.isObserver) {
+                    return "{i.target.toSource(null)}.{i.member.toApply("{parents[0].getWorldAccess()}")}";
+                } else {
+                    return "{parents[0].getWorldAccess()}; {i.target.toSource(null)}.{i.member.toApply()}";
+                }
             }
         }
         if (true) throw new java.lang.RuntimeException("unhandled case: {observer}");

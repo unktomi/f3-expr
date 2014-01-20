@@ -1693,9 +1693,13 @@ public function run from (args is String[]) to ()
             delegate: viewer;
             override function onMouseWheel from (event is MouseWheelEvent) to ()
             {
-                if (editorScene.underMouse == []) {
-                    delegate.onMouseWheel(event);
+                if (editorScene.underMouse <> []) { return }
+                for (scene in currentScenes) {
+                    if (scene.underMouse <> []) {
+                        return;
+                    }
                 }
+                delegate.onMouseWheel(event);
             }
         });
     stage.addKeyboardInputHandler(KeyboardInputHandler {
