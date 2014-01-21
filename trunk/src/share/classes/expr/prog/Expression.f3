@@ -854,7 +854,7 @@ public class IPath {
             if (i.member.m is F3VarMember and i.member.isObserver) {
                 return "\{ {i.target.toSource(null)}.{i.member.toApply()} = {parents[0].getWorldAccess()}; \}";
             } else { 
-                if (i.member.isObserver) {
+                if (i.member.isObserver and is1ArgFunction(i.member)) {
                     return "{i.target.toSource(null)}.{i.member.toApply("{parents[0].getWorldAccess()}")}";
                 } else {
                     return "{parents[0].getWorldAccess()}; {i.target.toSource(null)}.{i.member.toApply()}";
@@ -863,6 +863,14 @@ public class IPath {
         }
         if (true) throw new java.lang.RuntimeException("unhandled case: {observer}");
         return "";
+    }
+    
+    function is1ArgFunction from (m is Member) to Boolean 
+    {
+        m.m is F3FunctionMember and {
+            const f = m.m as F3FunctionMember;
+            f.getType().minArgs() == 1
+        }
     }
 
     function getI to String {
