@@ -157,30 +157,35 @@ public class TransformHierarchy
 	selectedNode = n;
     }
 
-    public function deleteSelection {
+    public function deleteSelection to () 
+    {
 	var old = selectedTransform;
-	var prev is ResourceNode = null;
-	var next is ResourceNode = null;
+	var prev is Node = null;
+	var next is Node = null;
 	var t is Node;
         for (scene in scenes) {
             var root = scene.root;
             root.foldLeft((), 
                           function from (_ is (), n is Node) to () {
                               if (n == old) {
-                                  if (prev == null) {
-                                      prev = n as ResourceNode;
-                                  } else t = prev;
-                              } else if (n is ResourceNode) {
+                                  t = prev;
+                              } else {
                                   if (prev == t) {
-                                      next = n as ResourceNode;
+                                      next = n; 
                                   }
-                                  prev = n as ResourceNode;
+                                  prev = n;
                               }
 		      });
+            if (t <> null) {
+                break;
+            }
         }
+        println("deleting : {old}");
+        println("t={t}");
+        println("next={next}");
         if (t == null) {
-            t = next;
-        }
+            t = next;   
+        } 
         selectNode(t);
     }
 

@@ -1455,8 +1455,10 @@ public function run from (args is String[]) to ()
                                             Tabview.Tab {
                                                 title: "Graph Editor"
                                                     content: Scrollpane {
+
                                                     canZoomVertical: false;
                                                     content: graphEditor = expr.timeline.GraphEditor {
+                                                        mainTrax: bind trax;
                                                         resourceTargets: bind currentResource.resources;
                                                         loop: bind nonInteractiveLoop;
                                                         target: player;
@@ -1681,6 +1683,7 @@ public function run from (args is String[]) to ()
 		delete rn.temporal from currentAnimResource.resources;
 		//trax.setClips(currentAnimResource.resources);
 	    }
+            MasterUndoable.commit();        
 	}
     }
 
