@@ -102,6 +102,30 @@ class TimeNodeView is AbstractNode
     public var content is TransformNode[] = bind getContent(target);
     public var expanded = false;
 
+    var repeatMesh is LineMesh;
+
+    function getRepeatMesh from (x is Number, w is Number, h is Number, repeats is Number) to MeshNode 
+    {
+        if (repeats <= 1) {
+            repeatMesh = null;
+            return null;
+        }
+        if (repeatMesh == null) {
+            repeatMesh = LineMesh {};
+        }
+        repeatMesh.reset();
+        for (i in [0..<Math.floor(repeats) as Integer]) {
+            repeatMesh.moveTo(x + w * i, -h/2);
+            repeatMesh.lineTo(x + w * i, h/2);
+        }
+        const mesh = repeatMesh.getMesh();
+        mesh.updateBounds();
+        MeshNode {
+            mesh: mesh;
+            shader: bind effectLoader.loadPaintShader(CLIP_LABEL_PAINT);
+        }
+    }
+
     function updateRows from (row is Integer) to Integer
     {
         this.row = row;
@@ -272,6 +296,10 @@ class TimeNodeView is AbstractNode
                          MasterUndoable.commit();
 		     }
 		 },
+                 Group {
+                     transform: bind translate(trax.durationToX(target.contentBounds.start), 0)
+                     content: bind getRepeatMesh(-w/2, trax.durationToX(target.contentBounds.duration()), h, target.playCount);
+                 },
 		 Text.Label {
 		     blocksPointer: false;
                      transform: bind translate(20+labelX, 
@@ -554,7 +582,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
     }
 
     public readonly var frameRate is Number = bind frameRateN on replace { frameRateGadget.setText("{Math.round(frameRate) as Integer}") };
-    var frameRateN is Number = 24.0;
+    protected var frameRateN is Number = 24.0;
 
     const lineMesh = LineMesh {};
     const backgroundColor is Color = Color.color(0.6, 0.6, 0.6);//Color.color(0.90, 0.90, 0.90);

@@ -584,21 +584,6 @@ public interface Expression {
         [] 
     }
 }
-/*
-class ObserveIfType of a {
-    public var condition is Boolean;
-    public var Yes is Observable of a;
-    public var No is Observable of a;
-}
-
-class ObserveIf is ObjectExpression {
-    override function getType to F3Type { typ }
-    override var inputMembers = Member { name: "condition", t: BOOLEAN_TYPE, isObserver: true };
-    override var outputMembers = 
-        [Member { name: "yes", t: OBJECT_TYPE, isObservable: true },
-         Member { name: "no", t: OBJECT_TYPE, isObservable: true },
-}
-*/
 
 public abstract class ObjectExpression is Expression {
     public var inputMembers is Member[];
@@ -943,6 +928,7 @@ class IContext {
         return result;
     }
 }
+
 /*
 function getIVar from (ob is ObserverExpression) to String {
     var depth = 0;
@@ -975,7 +961,8 @@ function getIVar from (ob is ObserverExpression) to String {
 
 public class GetVar is VarExpression, ObservableExpression, ObserverExpression {
 
-    override public function getTerminals to Expression[] {
+    override public function getTerminals to Expression[] 
+    {
         if (observers == []) then [] else foreach (ob in observers) ob.getTerminals();
     }
 
@@ -1023,7 +1010,8 @@ public class GetVar is VarExpression, ObservableExpression, ObserverExpression {
                 "the {member.toEnglish()} of {observable.toEnglish()}";
 	    }
 	}
-    }}
+    }
+}
 
 public class SetVar is VarExpression, ObserverExpression {
 }
@@ -1526,16 +1514,18 @@ class FunctionView is ExpressionView {
         }
     }
 
-    var inputs is ParameterView[] = bind foreach (p in fun.inputs) ParameterView {
+    readonly var inputs is ParameterView[] = bind foreach (p in fun.inputs) ParameterView {
         targetView: this;
 	canvas: bind canvas;
 	parameter: p;
 	cellWidth: bind cellWidth;
     };
-    var output is ResultView = ResultView {
+
+    const output is ResultView = ResultView {
 	canvas: bind canvas;
 	result: bind fun.output;
     };
+
     const io = Group {
 	transform: bind translate(0, -cellHeight);
 	content: 
@@ -1548,6 +1538,7 @@ class FunctionView is ExpressionView {
 	     content: bind output;
 	 }]
     };
+
     override var internalContent = Group {
 	content: bind [title, funOutput, io];
     }
