@@ -4,17 +4,63 @@ import f3.media.scene.*;
 import f3.util.*;
 import f3.util.Observer.*;
 import expr.Names.*;
+import org.htmlcleaner.*;
+import org.f3.media.web.awesomium.Browser;
+
+bound function makeTreeNode from (parent is Treeview.Treenode, n is Node) to Treenode {
+    if (n is WebBrowserNode) {
+        WebBrowserTreenode {
+            parent: parent;
+            n: n;
+        }
+    } else {
+        Treenode {
+            parent: parent;
+            n: bind n;
+        }
+    }
+}
 
 public class Treenode is Treeview.Treenode {
     public var n is Node;
     override var label = bind if (n.parent is ResourceNode) then "Main Scene" else if (n.id <> "") then formatName(n.id) else "{n}";
     function asGroup from (n is Node) to Group { if (n is Group) then n as Group else null }
     override var canOpen = bind { var g = asGroup(n); g.content.size() > 0 }
-    override var children = bind foreach (x in asGroup(n).content) Treenode { n: bind x, parent: this };
+    override var children = bind foreach (x in asGroup(n).content) makeTreeNode(this, x);
     override function open to () {
 	super.open();
 	println("open {n} => {children.size()}");
     }
+}
+
+public class WebBrowserTreenode is Treenode {
+    override var canOpen = true;
+    override var children = HtmlContentTreenode {
+        n: bind n;
+        tagNode: bind ((n as WebBrowserNode).getImplementation() as Browser).getStaticDocument();
+    };
+}
+
+public class HtmlContentTreenode is Treenode {
+    public var tagNode is TagNode;
+    override var label = bind getLabel(tagNode);
+    function getLabel from (tagNode is TagNode) to String {
+        const id = tagNode.getAttributeByName("id");
+        const clazz = tagNode.getAttributeByName("class");
+        const name = tagNode.getName();
+        "{name}{if (id <> null) then " id={id}" else ""}{if (clazz <> null) then " class={clazz}" else ""}";
+    }
+
+    override var canOpen = bind { tagNode.getChildren().size() > 0 }
+    function convertChildren from (list is java.util.List of TagNode) to Treeview.Treenode[] 
+    {
+        foreach (x in list) HtmlContentTreenode {
+            n: bind n;
+            parent: this;
+            tagNode: x;
+        }
+    }
+    override var children = bind convertChildren(tagNode.getChildren());
 }
 
 public class SceneTreenode is Treenode {

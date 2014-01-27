@@ -15,6 +15,9 @@ public class Manipulator is AbstractNode
 
     const undoList = UndoList {};
 
+    override var cursor = Cursor.Default;
+    override var blocksPointer = true;
+
     public var target is TransformNode on replace old {
 
         if (old <> null) {
