@@ -23,7 +23,7 @@ public class ResourceNode is TransformNode, ResourceTarget {
     public const imageLoader is ImageLoader = the ImageLoader;
     override var id = bind url;
     public var temporal is ResourceTimeNode;
-
+    
     function subscribe of a from (ob is Observable of a, sourceCode is String, target is Node) to Disposable {
         ob.subscribe(DefaultObserver of a {
                 override function onNext from (x is a) to ()

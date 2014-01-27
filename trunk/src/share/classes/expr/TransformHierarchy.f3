@@ -8,7 +8,7 @@ import org.htmlcleaner.*;
 import org.f3.media.web.awesomium.Browser;
 
 bound function makeTreeNode from (parent is Treeview.Treenode, n is Node) to Treenode {
-    if (n is WebBrowserNode) {
+    if (n is WebBrowser) {
         WebBrowserTreenode {
             parent: parent;
             n: n;
@@ -21,9 +21,13 @@ bound function makeTreeNode from (parent is Treeview.Treenode, n is Node) to Tre
     }
 }
 
+function shouldFormat from (n is Node) to Boolean {
+    not (n is ResourceNode and (n as ResourceNode).useLiteralId);
+}
+
 public class Treenode is Treeview.Treenode {
     public var n is Node;
-    override var label = bind if (n.parent is ResourceNode) then "Main Scene" else if (n.id <> "") then formatName(n.id) else "{n}";
+    override var label = bind if (n.parent is ResourceNode) then "Main Scene" else if shouldFormat(n) then formatName(n.id) else n.id;
     function asGroup from (n is Node) to Group { if (n is Group) then n as Group else null }
     override var canOpen = bind { var g = asGroup(n); g.content.size() > 0 }
     override var children = bind foreach (x in asGroup(n).content) makeTreeNode(this, x);
@@ -35,20 +39,30 @@ public class Treenode is Treeview.Treenode {
 
 public class WebBrowserTreenode is Treenode {
     override var canOpen = true;
+    override var label = bind (n as WebBrowser).url;
     override var children = HtmlContentTreenode {
         n: bind n;
-        tagNode: bind ((n as WebBrowserNode).getImplementation() as Browser).getStaticDocument();
+        tagNode: bind ((n as WebBrowser).getImplementation() as Browser).getStaticDocument();
     };
 }
 
 public class HtmlContentTreenode is Treenode {
+
     public var tagNode is TagNode;
+
     override var label = bind getLabel(tagNode);
-    function getLabel from (tagNode is TagNode) to String {
-        const id = tagNode.getAttributeByName("id");
-        const clazz = tagNode.getAttributeByName("class");
-        const name = tagNode.getName();
-        "{name}{if (id <> null) then " id={id}" else ""}{if (clazz <> null) then " class={clazz}" else ""}";
+
+    function getLabel from (tagNode is TagNode) to String 
+    {
+        const idAttrs = ["id", "class", "type", "name", "href", "src"];
+        var result = tagNode.getName();
+        for (attr in idAttrs) {
+            const id = tagNode.getAttributeByName(attr);
+            if (id <> null) {
+                result = "{result} {attr}={id}";
+            }
+        }
+        return result;
     }
 
     override var canOpen = bind { tagNode.getChildren().size() > 0 }

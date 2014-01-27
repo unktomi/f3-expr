@@ -249,7 +249,8 @@ class TimeNodeView is AbstractNode
     override var transform = bind translate(playX + w / 2.0, 0);
     function getTrackName from (target is TimeNode) to String
     {
-        if ((target.parent is ResourceTimeNode and not (target.parent is ResourceTimeNodeWrapper)) and target.parent.id == target.id) then "Main Timeline" else formatName(target.id);
+        const shouldFormat = not (target is ResourceTimeNode) or not (target as ResourceTimeNode).useLiteralId;
+        if ((target.parent is ResourceTimeNode and not (target.parent is ResourceTimeNodeWrapper)) and target.parent.id == target.id) then "Main Timeline" else if shouldFormat then formatName(target.id) else target.id;
     }   
     var labelX = bind 
         if (target.hasIndefiniteDuration() and trax.visibleInterval.start > target.playTime + target.contentBounds.start)

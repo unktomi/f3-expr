@@ -484,16 +484,28 @@ public function run from (args is String[]) to ()
 	    addResource(rn, pt);
 	} else {
 	    const browser = WebBrowser {
+                id: url;
 		url: url
 	    }
 	    const rn = ResourceNode {
+                useLiteralId: true;
 		url: url;
+                id: url;
 		content: browser;
                 override function getFocusable to Focusable 
                 {
                     browser
                 }
 	    }
+	    const rtn = ResourceTimeNode {
+                useLiteralId: true;
+                id: url;
+		url: url;
+		spatial: rn;
+                content: bind browser.videoClips;
+	    }
+            rn.temporal = rtn;
+            addTimeResource(rtn);
 	    addResource(rn, pt);
 	}
 	MasterUndoable.commit();
