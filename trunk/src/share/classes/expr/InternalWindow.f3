@@ -16,7 +16,9 @@ const selectedTitlePaint = ColorPaint(Color.color(.2, .2, .2));
 const titlePaint = ColorPaint(Color.color(.3, .3, .3));
 
 public class InternalWindow is ResizableNode, Focuser {
+
     override var cursor = Cursor.Default;
+
     public var containerBounds is Bounds;
     public var cx is Number;
     public var cy is Number;
@@ -148,7 +150,8 @@ public class InternalWindow is ResizableNode, Focuser {
 	}
     };
 
-    function gridFit {
+    function gridFit to () 
+    {
 	cx = cx as Integer;
 	cy = cy as Integer;
     }
