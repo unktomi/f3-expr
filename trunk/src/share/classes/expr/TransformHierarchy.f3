@@ -68,7 +68,7 @@ public class HtmlContentTreenode is Treenode {
     override var canOpen = bind { tagNode.getChildren().size() > 0 }
     function convertChildren from (list is java.util.List of TagNode) to Treeview.Treenode[] 
     {
-        foreach (x in list) HtmlContentTreenode {
+        if (list == null) then [] else foreach (x in list) HtmlContentTreenode {
             n: bind n;
             parent: this;
             tagNode: x;
