@@ -502,7 +502,7 @@ public function run from (args is String[]) to ()
                 id: url;
 		url: url;
 		spatial: rn;
-                content: bind browser.videoClips;
+                content: bind [browser.videoClips, browser.audioClips];
 	    }
             rn.temporal = rtn;
             addTimeResource(rtn);
@@ -984,7 +984,7 @@ public function run from (args is String[]) to ()
 
                        content: 
                        [InternalWindow {
-                                    id: "Editor3";
+                        id: "Editor3";
 			containerBounds: bind Bounds.boundsFromRect(0, 
                                                                     0, 
                                                                     width,
