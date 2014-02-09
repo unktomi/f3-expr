@@ -19,6 +19,7 @@ import expr.EventLayer;
 
 public class EvalContext {
     public const eventContext is Context.MemberContext;
+    public const varContext is Context.ClosureVarContext;
     public var interactive is function from () to Boolean;
     public const targetNode is Object;
     public const debugger is ObservableDebugger = DebuggerEngine {

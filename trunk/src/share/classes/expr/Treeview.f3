@@ -236,6 +236,7 @@ public class Treecell is AbstractNode {
 		if (tn.canOpen and e.location.x < limit) {
 		    if (not tn.isOpen) tn.open() else tn.close();
 		}
+                println("tn={tn} canOpen={tn.canOpen} children={tn.children.size()}");
 		tv.selectionRow = tn.row;
 		tv.onMouseDown(e);
 	    });

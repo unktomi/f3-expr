@@ -137,7 +137,7 @@ class ResizableStageNode is ResizableNode, Focuser {
 	content.resize(w, h);
 	stage.resize(w as Integer, h as Integer);
     }
-    override var internalContent = Group { content: bind stage };
+    override var internalContent = Group { content: bind stage cursor: bind stage.cursor};
     public var content is ResizableNode;
     override public function getTargetOfFocus to Focusable 
     {
@@ -196,6 +196,7 @@ public function run from (args is String[]) to ()
 
     function handleContextVisibility from (ctx is Context, v is Boolean) to ()
     {
+    if (true) return;
         var c = ctx;
         while (c <> null) {
             //println("c={c.name} parent={c.parent.name} v={v}");
@@ -322,7 +323,7 @@ public function run from (args is String[]) to ()
             resource: rn;
         } 
         into contextModel.selectedGroupContext.content;
-        println("added asset to context { contextModel.selectedContext }");
+        println("added asset to context { contextModel.selectedGroupContext } => {contextModel.selectedGroupContext.content}");
         if (currentScene.camera is Camera2D) {
             rn.tx = pt.x;
             rn.ty = pt.y;
@@ -715,7 +716,7 @@ public function run from (args is String[]) to ()
                     sourceCode: prog.compiled;
                     evalContext: Program.EvalContext {
                         interactive: function from () to Boolean { interactive } 
-                        targetNode: currentTransform;
+                        targetNode: (currentTransform as ResourceTarget).findTarget(prog.targetPath);
                         instanceSpace: currentScene.instanceSpace;
                         lookupSpatial: currentScene.root.lookup;
                         targetTimeline: player;
@@ -1444,6 +1445,7 @@ public function run from (args is String[]) to ()
 			cx: 520, cy: 160;	   
 			      //imageLoader: null;
 			      content: ResizableStageNode {
+                              debug: true
 			    content: Tabview {
 				tabs: 
 				[Tabview.Tab {
@@ -1487,6 +1489,7 @@ public function run from (args is String[]) to ()
 				    content: expr.prog.Expression.Editor {
 					 //event: bind inspector1.inspecting[inspector1.selectedIndex].member;
                                          stepping: bind stepping;
+                                         varContext: bind contextModel.selectedVarContext;
                                          eventContext: bind contextModel.selectedMemberContext;
                                          targetObject: bind contextModel.selectedObjectContext.getTarget();
 					 targetSpace: bind currentScene.root;

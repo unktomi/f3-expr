@@ -137,6 +137,7 @@ public class ProgramResource is Resource {
     public var event is MemberNode;
     public var code is ExprScene;
     public var compiled is String;
+    public var targetPath is String;
 }
 
 class ExportingBuilder is ResourceBuilder {

@@ -236,6 +236,12 @@ function writeValue from (writer is ContentHandler, k is F3Value) to ()
     }
 }
 
+public function dumpOutput from (obj is Object) to String {
+    const w = new java.io.StringWriter();
+    writeObject(w, obj);
+    return w.toString();
+}
+
 public function readObject from (reader is java.io.Reader) to Object 
 {
     const h = Handler {}
