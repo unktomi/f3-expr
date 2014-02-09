@@ -15,6 +15,7 @@ public class Context {
     public readonly var label is String = bind name;
     public var contextType is F3Type;
     public bound function getContent to Context[]  { [] }
+
     public function updateParent to () {
         for (c in getContent()) {
             c.parent = this;
@@ -46,7 +47,6 @@ public abstract class GroupContext is Context {
         undoList.addTarget("content", &content);
     }
     public override bound function getContent to Context[]  { content }
-
 }
 
 public class CallContext is Context {
@@ -81,8 +81,9 @@ public class ResourceNodeContext is ResourceObjectContext {
     public var resource is ResourceNode;
     override var name = bind "{formatName(resource.id)} [Scene]";
     var members = bind uniquify(Expression.introspect(Reflect.getType("f3.media.scene.TransformNode") as F3ClassType));
+    var memberCtxs = bind foreach (x in members) if (not x.name.startsWith("observe")) then null else MemberContext { member: x, parent: this }
     public override bound function getContent to Context[] { 
-        foreach (x in members) if (not x.name.startsWith("observe")) then null else MemberContext { member: x, parent: this }
+        memberCtxs
     }
 }
 
@@ -91,18 +92,21 @@ public class ResourceTimeNodeContext is ResourceObjectContext {
     public var resource is ResourceTimeNode;
     override var name = bind "{formatName(resource.id)} [Timeline]";
     var members = bind Expression.introspect(Reflect.getType("f3.media.scene.TimeNode") as F3ClassType);
+    var myContent = bind [if (resource is ResourceTimeNodeWrapper) then { var w = resource as ResourceTimeNodeWrapper; foreach (g in w.unwrapContent()) if (g is ResourceTimeNode) then ResourceTimeNodeContext {  resource: g as ResourceTimeNode} else null } else null, foreach (x in members) if (not x.name.startsWith("observe")) then null else MemberContext { member: x, parent: this }];
+
     public override bound function getContent to Context[] { 
-        [if (resource is ResourceTimeNodeWrapper) then { var w = resource as ResourceTimeNodeWrapper; foreach (g in w.unwrapContent()) if (g is ResourceTimeNode) then ResourceTimeNodeContext {  resource: g as ResourceTimeNode} else null } else null, foreach (x in members) if (not x.name.startsWith("observe")) then null else MemberContext { member: x, parent: this }]
+        myContent
     }
 }
 
 public class AssetContext is Context {
     public var asset is Asset;
     override var name = bind asset.name;
-    override public bound function getContent to Context[] { foreach (x in asset.containedAssets) AssetContext { asset: x, parent: this } }
+    var myContent = bind foreach (x in asset.containedAssets) AssetContext { asset: x, parent: this };
+    override public bound function getContent to Context[] { myContent }
 }
 
-public class ClosureVarContext is Context {
+public class ClosureVarContext is GroupContext {
     public var varType is TypeAsset;
     public var varName is String = "variable";
     public var value is Object;
@@ -123,13 +127,14 @@ public class ClosureVarContext is Context {
         println("content from type of {varType} => {results}");
         return results;
     }
+    var myContent = bind [getContentFromType(varType.t), content];
     override public bound function getContent to Context[] 
     { 
-        getContentFromType(varType.t);
+        myContent;
     }
 }
 
-public class VarContext is Context {
+public class VarContext is GroupContext {
     public var call is CallContext;
     public var varType is F3Type;
     var members = bind getMembers(varType);
@@ -144,9 +149,10 @@ public class VarContext is Context {
         println("content from type of {varType} => {results}");
         return results;
     }
+    var myContent = bind         [getContentFromType(varType), content];
     override public bound function getContent to Context[] 
     { 
-        getContentFromType(varType);
+        myContent;
     }
 }
 
@@ -180,11 +186,6 @@ public class MemberContext is GroupContext {
             }
         }
     }
-    /*
-    public override bound function getContent to Context[] { 
-        [foreach (x in member.getMembers()) MemberContext { member: x }, content]
-    }
-    */
 }
 
 public class ContextTreemodel is Treemodel {
@@ -231,6 +232,7 @@ public class ContextTreemodel is Treemodel {
     public var selectedGroupContext is GroupContext;
     public var selectedMember is Member = bind selectedMemberContext.member;
     public var selectedMemberContext is MemberContext;
+    public readonly var selectedVarContext is ClosureVarContext = bind if (selectedContext is ClosureVarContext) then selectedContext as ClosureVarContext else null;
     override var root = ContextTreenode { context: bind rootContext };
     const disp = selectionObserver.subscribe(function from (tn is Treenode) to () {
             this.tn = tn;
@@ -243,4 +245,12 @@ public class ContextTreenode is Treenode {
     var content = bind context.getContent();
     override var canOpen = bind sizeof content > 0;
     override var children = bind foreach (c in content) ContextTreenode { context: bind c, parent: this }
+    override function toString to String {
+        const n = context;
+        if (n is Context.GroupContext) {
+            const content = (n as Context.GroupContext).content;
+            println("{n} n={n.label}, content={content}");
+        }
+        "Context TreeNode {n.name}, canOpen={canOpen}, content={n.getContent()}";
+    }
 }

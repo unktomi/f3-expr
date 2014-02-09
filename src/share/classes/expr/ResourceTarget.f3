@@ -9,6 +9,7 @@ class KeyTarget of a {
 }
 
 public class ChannelBoxGroup is TimeGroup, ChannelBox {
+    public var useLiteralId is Boolean;
     public const keyMap = new java.util.TreeMap of (Duration, java.util.List of (KeyTarget of Object));
     public var keyTimes is Duration[];
 
@@ -58,8 +59,14 @@ public interface ResourceTarget {
 
     public const channelBox is TimeGroup = ChannelBoxGroup
     {
+        useLiteralId: bind useLiteralId;
         id: bind "channelBox:{url}";
         content: getChannels();
+    }
+
+    public function findTarget from (id is String) to Object 
+    {
+        if (id == "") then this else null;
     }
 }
 

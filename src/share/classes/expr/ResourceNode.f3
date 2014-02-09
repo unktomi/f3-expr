@@ -23,6 +23,11 @@ public class ResourceNode is TransformNode, ResourceTarget {
     public const imageLoader is ImageLoader = the ImageLoader;
     override var id = bind url;
     public var temporal is ResourceTimeNode;
+
+    override public function findTarget from (id is String) to Object 
+    {
+        if (id == "") then this else lookup(id);
+    }
     
     function subscribe of a from (ob is Observable of a, sourceCode is String, target is Node) to Disposable {
         ob.subscribe(DefaultObserver of a {
