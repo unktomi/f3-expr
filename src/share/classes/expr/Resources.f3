@@ -4,6 +4,7 @@ import f3.media.svg.SVG;
 import java.io.*;
 import java.util.zip.*;
 import expr.prog.Expression.ExprScene;
+import expr.prog.Program;
 import expr.prog.Expression.MemberNode;
 import expr.ResourceNode.MaResourceNode;
 
@@ -93,11 +94,23 @@ class ResourceBuilder {
             py: n.py;
             pz: n.pz;
             programs: foreach (p in n.programs where p.code <> null) ProgramResource {
+                variable: getVarDecl(p);
                 event: p.event.serialize();
                 code: p.code;
                 compiled: p.sourceCode;
             }
         }
+    }
+
+    function getVarDecl from (p is Program) to VarDecl 
+    {
+        if (p.evalContext.varContext <> null) {
+            return VarDecl {
+                varName: p.evalContext.varContext.varName;
+                varType: p.evalContext.varContext.varType.name;
+            }
+        }
+        return null;
     }
     
     function makeResource from (n is ResourceTimeNode) to TemporalResource {
@@ -111,6 +124,7 @@ class ResourceBuilder {
             playCount: n.playCount;
             content: foreach (j in n.unwrapContent()) if (j is ResourceTimeNode) then makeResource(j as ResourceTimeNode) else null;
             programs: foreach (p in n.programs where p.code <> null) ProgramResource {
+                variable: getVarDecl(p);
                 event: p.event.serialize();
                 code: p.code;
                 compiled: p.sourceCode;
@@ -135,9 +149,15 @@ public class SceneResource is Resource {
 
 public class ProgramResource is Resource {
     public var event is MemberNode;
+    public var variable is VarDecl;
     public var code is ExprScene;
     public var compiled is String;
     public var targetPath is String;
+}
+
+public class VarDecl {
+    public var varName is String;
+    public var varType is String;
 }
 
 class ExportingBuilder is ResourceBuilder {

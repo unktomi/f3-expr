@@ -10,17 +10,9 @@ public class Treenode is Treeview.Treenode {
     public var n is Context;
     override var label = bind n.name;
     var content = bind n.getContent();
-    override var canOpen = bind children.size() > 0;
-    override var children = bind createChildren(content);
-    function createChildren from (xs is Context[]) to Treenode[] 
-    {
-        var content = n.getContent();
-        if (n is Context.GroupContext) {
-            content = (n as Context.GroupContext).content;
-            println("CREATE CHILDREN n={n.label}, content={content}");
-        }
+    override var canOpen = bind content.size() > 0;
+    override var children = bind
         foreach (x in content) Treenode { parent: this, n: bind x };
-    }
     override function open to () {
 	super.open();
     }
