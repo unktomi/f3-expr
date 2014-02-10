@@ -60,7 +60,7 @@ public abstract class Listview of a is ResizableNode, Focusable, KeyboardInputHa
 
     abstract function render from (value is Element of a) to Node;
 
-    public var selectedValue is a = bind values[selectedRow];
+    public var selectedValue is a = bind values[selectedRow-scrollOffset];
 
     var visibleRows is Integer = bind Math.floor(height / cellHeight) as Integer;
     

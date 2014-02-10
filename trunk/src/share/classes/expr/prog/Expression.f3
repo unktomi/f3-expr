@@ -212,6 +212,36 @@ public const BOOL_MEMBERS =
         m: IF_EXPR;
     }];
 
+public function introspectMembers from (v is Context.ClosureVarContext) to Member[] 
+{
+    const t = v.varType.t;
+    const mems = introspect(t);
+    if (mems == []) {
+        const name = t.getName();
+        const newMember = Member {
+            name: name;
+            rt: t;
+            t: t;
+            m: F3Member {
+                override function getName to String {
+                    name;
+                }
+                override function getDeclaringClass to F3ClassType {
+                    null
+                }
+                override function isStatic to Boolean { false }
+                override function isPublic to Boolean { true }
+                override function isPackage to Boolean { false }
+                override function isProtected to Boolean { false }
+            }
+            isObservable: true;
+            isObserver: false;
+        }
+        return [newMember]
+    }
+    return mems;
+}
+
 public function introspect from (t is F3Type) to Member[]
 {
     introspect(t, false);
@@ -435,9 +465,10 @@ public class Member {
     public const name = m.getName();
     public var isObservable is Boolean;
     public var isObserver is Boolean;
+    var members = bind Expression.introspect(t);
     public function getMembers to Member[]
     {
-	Expression.introspect(t);
+        members;
     }
 
     function toObservable to String 
@@ -2124,6 +2155,11 @@ public class OutputView is LinkedView {
     public var index is Integer;
     override readonly var transform = bind translate(0, index * -cellHeight);
     public readonly var outputName = bind expression.getName();
+    override function unlink to () 
+    {
+        for (link in getTree.getLinks()) link.unlink();
+        super.unlink();
+    }
     protected var getter = GetVar {
         member: bind Member {
             m: null;
@@ -2462,6 +2498,7 @@ class GetTreeview is ResizableNode {
 	root: MemberTreenode {
 	    get: bind get;
 	    m: bind get.member;
+            override var label = bind Names.formatName(m.t.getName());
             value: bind debugValue;
 	}
     };
@@ -2866,16 +2903,22 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     public function onDrop from (where is Pick, clip is Context) to ()
     {
         if (clip is Context.ClosureVarContext) {
-            var c = clip as Context.ClosureVarContext;
-            const typ = c.varType.t;
-            var names = new java.util.HashSet of String;
-            const members = [foreach (m in introspect(typ) where not m.name.contains("pdate") and names.add(m.name)) m];
+            const v = clip as Context.ClosureVarContext;
+            var p = v.parent;
+            while (p <> null) {
+                if (p == eventContext or p == varContext) break;
+                p = p.parent;
+            }
+            if (p == null) return;
+            const names = new java.util.HashSet of String;
+            const members = [foreach (m in introspectMembers(v) where not m.name.contains("pdate") and names.add(m.name)) m];
+            const typ = v.varType.t;
             insert ObjectView {
                 pos: toLocal * where.scenePoint;
                 objectExpr: VarContextExpression { 
-                    varContext: c, override function getType to F3Type { typ }
-                    inputMembers: foreach (m in members where  m.isObserver) m;
-                    outputMembers: thisMember(typ) 
+                    varContext: v, override function getType to F3Type { typ }
+                    inputMembers: foreach (x in members where x.isObserver) x;
+                    outputMembers: foreach (x in members where x.isObservable) x;
                 }
                 canvas: this;
             } into views;
@@ -3011,14 +3054,15 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                     name: t.getName();
                 }
                 isEvent: true;
-                name: "factored";
+                varName: "factored";    
+                parent: eventContext;
             }
             insert v into eventContext.content;
-            var newExp = GetVarView {
+            const newExp = GetVarView {
                 get: TreeGetVar {
                     member: bind newMember;
                 }
-                override bound function getLabel to String { "factored" }
+                override bound function getLabel to String { v.varName }
                 canvas: this;
                 isLabeled: true;
             }
@@ -3177,6 +3221,8 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 		var r = GetVarView {
 		    parent: rootView;
 		    canvas: this;
+                    isLabeled: true;
+                    override bound function getLabel to String { Names.formatName(event.name) }
 		    get: varRoot = TreeGetVar {
 			member: event;
 		    }
@@ -3241,6 +3287,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         style: "font-family:Lucida Grande; font-weight:normal; font-size: 12px; color: #101010E0;";
         transform: bind translate(-width/2, -height/2);
         content: bind if not showSource then "<a href='source://'>Source Code</a>" else "<a href='graph://'>Hide</a><p/><div>{englishOutput}</div>";
+        visible: bind englishOutput <> "";
     };
 
     const linkHandler = sourceCode.observeLinkClicked().subscribe(function from (u is String) to () {

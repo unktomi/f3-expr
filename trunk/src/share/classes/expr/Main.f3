@@ -1005,7 +1005,10 @@ public function run from (args is String[]) to ()
                                                             if (e.keyCode == Keys.Delete or
                                                                 e.keyCode == Keys.Backspace) {
                                                                 const toDelete = contextModel.selectedContext;
-                                                                delete toDelete from contextModel.selectedGroupContext.content;
+                                                                if (toDelete.parent instanceof Context.GroupContext) {
+                                                                    delete toDelete from (toDelete.parent as Context.GroupContext).content;
+                                                                    println("deleted {toDelete} from {contextModel.selectedGroupContext}");
+                                                                }
                                                             } else super.onKeyDown(e);
                                                         }                                       
                                                     }
