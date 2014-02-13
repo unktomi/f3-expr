@@ -374,7 +374,7 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
 	}
     }
 
-    var visibleRows = bind Math.max(1, (Math.round(height / cellHeight - 0.5) as Integer));
+    public readonly var visibleRows = bind Math.max(1, (Math.round(height / cellHeight - 0.5) as Integer));
 
     var selectionListener is Disposable;
         

@@ -23,6 +23,15 @@ import expr.inspector.*;
 import expr.Context.ClosureVarContext;
 import expr.AssetTree.TypeAsset;
 
+function formStaticMethodCall from (fun is F3FunctionMember) to String 
+{
+    if (fun is F3Local.CtorMember) {
+        "new {fun.getDeclaringClass().getName()}";
+    } else {
+        "{fun.getDeclaringClass().getName()}.{fun.getName()}";
+    }
+}
+
 function observeType from (t is F3Type) to F3Type {
     if (Reflect.OBSERVABLE_TYPE.isAssignableFrom(t)) { 
         const classType = t as F3ClassType;
@@ -34,8 +43,8 @@ function observeType from (t is F3Type) to F3Type {
     return t;
 }
 
-var exprMap1 = new java.util.HashMap of (F3ClassType, Member[]);
-var exprMap2 = new java.util.HashMap of (F3ClassType, Member[]);
+const exprMap1 = new java.util.HashMap of (F3ClassType, Member[]);
+const exprMap2 = new java.util.HashMap of (F3ClassType, Member[]);
 
 function thisMember from (typ is F3Type) to Member 
 {
@@ -515,7 +524,7 @@ public class FunctionMember is Member {
             isInfix: isInfix;
             declaringClass: m.getDeclaringClass().getName();
             name: m.getName();
-            outputType: t.getName();
+            outputType: ft.getReturnType().getName();
             inputTypes: foreach (i in [0..<ft.minArgs()]) ft.getArgumentType(i).getName();
         }
     }
@@ -889,10 +898,11 @@ public class IPath {
                     args = "{args}{sep}{j}";
                     sep = ", ";
                 }
+                const app = formStaticMethodCall(fun);
                 if (obDepth >= 0) {
-                    return "{prefix} \}; const obs{obDepth} = foreach (i{getDepth()} in {fun.getDeclaringClass().getName()}.{fun.getName()}({args})) \{";
+                    return "{prefix} \}; const obs{obDepth} = foreach (i{getDepth()} in {app}({args})) \{";
                 }
-                return "{fun.getDeclaringClass().getName()}.{fun.getName()}({args})";
+                return "{app}({args})";
             } else {
                 var args = "";
                 var sep = "";
@@ -1841,26 +1851,57 @@ public class GetVarView is OutputView {
     }
     override var resultType = bind get.getType();
     public var get is GetVar;
+    var treeHeight is Number = 400;
     const tv is GetTreeview = GetTreeview {
         canvas: bind canvas;
         width: 180;
-        height: 400;
+        treeHeight: bind treeHeight;
         get: bind get;
         exprView: bind this;
     }
     override var transform = bind translate(pos);
     override var expression = bind get;
     public var isLabeled is Boolean = false;
+    function resize from (e is MouseEvent) to ()
+    {
+        const d = (e.picked.dragPoint1-e.picked.dragPoint0);
+        treeHeight -= e.drag.y;
+        //tv.resize(tv.width, treeHeight);
+    }
+    function finishResize from (e is MouseEvent) to ()
+    {
+    }
+    function resizer to Node {
+        Rectangle {
+            fillPaint: ColorPaint(Color.color(0, 0, 0, 1));
+            height: 2;
+            width: bind cellWidth;
+            cursor: Cursor.SouthResize;
+            onMouseDrag: resize;
+            onMouseUp: finishResize;
+        }
+    }
     override var internalContent = Group {
-	content: bind if (isLabeled) then {
+	content: 
+        bind if (isLabeled) then {
                 [TransformNode {
                     content: bind label;
                 },
                 TransformNode {
                     ty: bind -cellHeight;
                     content: bind tv;
+                },
+                TransformNode {
+                    ty: bind -cellHeight-treeHeight + cellHeight/2;
+                    content: resizer();
                 }]
-            } else tv;
+            } else {
+            [tv, 
+             TransformNode {
+                   ty: bind -cellHeight-treeHeight + cellHeight/2;
+                    content: resizer();
+                }]
+        }
     };
     override bound function getLinkPos to Point3 { getWorldPos() }
 
@@ -2511,7 +2552,7 @@ class GetTreeview is ResizableNode {
     function getRootLinkedView to LinkedView {
         getCell(treeModel.root as MemberTreenode).linkedView;
     }
-    var treeHeight = bind Math.min(treeModel.rowCount, 10)*cellHeight;
+    public var treeHeight is Number;//= bind Math.min(treeModel.rowCount, 10)*cellHeight;
     const self = this;
     const cellMap is java.util.Map of (MemberTreenode, MemberTreecell) =        
 	new java.util.HashMap of (MemberTreenode, MemberTreecell);
@@ -2854,8 +2895,17 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     var prog is Program;
 
-    var selectedExpr is ExpressionView;
+    var selectedExpr is ExpressionView on replace {
+        moveToFront(selectedExpr);
+    };
 
+    function moveToFront from (exp is ExpressionView) to ()
+    {
+        if (exp <> views[views.size()-1])  {
+            delete exp from views;
+            insert exp after views[views.size()-1];
+        }
+    }
     override public bound function getTx to Number { 1.0-(cx + width/2.0) / width }
     override public bound function getSx to Number { 
         //Math.min(width / localSpace.bounds.width(), 1.0);
@@ -3673,7 +3723,8 @@ public class MemberNode {
     public var declaringClass is String;
     public var outputType is String;
     public function deserialize to Member {
-        const members = introspect(Reflect.getType(declaringClass) as F3ClassType);
+        const clazz = Reflect.getType(declaringClass) as F3ClassType;
+        const members = introspect(clazz);
         for (m in members) {
             if (m.name == name) {
                 return m;

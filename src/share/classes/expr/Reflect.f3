@@ -85,17 +85,24 @@ public function getFunction(clas is String, name is String, params is String[]) 
 {
     const c = getType(clas) as F3ClassType;
     const fs = getFunctions(c, true);
+
     const ps = foreach (p in params) getType(p);
     for (f in fs) {
 	if (f.getName() == name and f.getType().minArgs() == params.size()) {
 	    const ft = f.getType();
+            var found = true;
 	    for (j in [0..<ft.minArgs()]) {
 		const p0 = ft.getArgumentType(j);
 		const p1 = ps[j];
-		if (p0 <> p1) continue;
+		if (p0 <> p1) {
+                   found = false;
+                   break;
+                }
 	    }
-	    println("found {f}");
-	    return f;
+            if (found) { 
+                println("found {f}");
+                return f;
+            }
 	}
     }
     println("not found: {clas}.{name}({params})");
