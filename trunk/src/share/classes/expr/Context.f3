@@ -65,7 +65,7 @@ public class CallContext is Context {
     }
 }
 
-public abstract class ResourceObjectContext is Context {
+public abstract class ResourceObjectContext is GroupContext {
     public bound function getTarget to ResourceTarget;
 }
 
@@ -76,14 +76,34 @@ function uniquify from (xs is Member[]) to Member[]
     foreach (x in xs where set.add(x.name)) x
 }
 
+public class SubResourceNodeContext is ResourceNodeContext {
+    public var node is Node;
+    override var name = bind "{formatName(node.id)} [Node]";
+    function asGroup from (n is Node) to Group 
+    {
+        if (n is Group) then n as Group else null
+    }   
+    override protected var members = bind uniquify(Expression.introspect(Reflect.getType("f3.media.scene.Node") as F3ClassType));
+    override var containedNodes = bind foreach (x in asGroup(node).content) SubResourceNodeContext {
+        parent: this;
+        resource: resource;
+        node: x
+    }
+}
+
 public class ResourceNodeContext is ResourceObjectContext {
     override bound function getTarget to ResourceTarget { resource }
     public var resource is ResourceNode;
     override var name = bind "{formatName(resource.id)} [Scene]";
-    var members = bind uniquify(Expression.introspect(Reflect.getType("f3.media.scene.TransformNode") as F3ClassType));
+    protected var members = bind uniquify(Expression.introspect(Reflect.getType("f3.media.scene.TransformNode") as F3ClassType));
     var memberCtxs = bind foreach (x in members) if (not x.name.startsWith("observe")) then null else MemberContext { member: x, parent: this }
+    protected var containedNodes = bind foreach (x in resource.content) SubResourceNodeContext {
+        parent: this;
+        resource: resource;
+        node: x
+    }
     public override bound function getContent to Context[] { 
-        memberCtxs
+        [memberCtxs, containedNodes, content]
     }
 }
 
