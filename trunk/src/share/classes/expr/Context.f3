@@ -94,7 +94,7 @@ public class SubResourceNodeContext is ResourceNodeContext {
 public class ResourceNodeContext is ResourceObjectContext {
     override bound function getTarget to ResourceTarget { resource }
     public var resource is ResourceNode;
-    override var name = bind "{formatName(resource.id)} [Scene]";
+    override var name = bind "{if (resource.useLiteralId) then resource.id else formatName(resource.id)} [Scene]";
     protected var members = bind uniquify(Expression.introspect(Reflect.getType("f3.media.scene.TransformNode") as F3ClassType));
     var memberCtxs = bind foreach (x in members) if (not x.name.startsWith("observe")) then null else MemberContext { member: x, parent: this }
     protected var containedNodes = bind foreach (x in resource.content) SubResourceNodeContext {
@@ -110,7 +110,7 @@ public class ResourceNodeContext is ResourceObjectContext {
 public class ResourceTimeNodeContext is ResourceObjectContext {
     override bound function getTarget to ResourceTarget { resource }
     public var resource is ResourceTimeNode;
-    override var name = bind "{formatName(resource.id)} [Timeline]";
+    override var name = bind "{if (resource.useLiteralId) then resource.id else formatName(resource.id)} [Timeline]";
     var members = bind Expression.introspect(Reflect.getType("f3.media.scene.TimeNode") as F3ClassType);
     var myContent = bind [if (resource is ResourceTimeNodeWrapper) then { var w = resource as ResourceTimeNodeWrapper; foreach (g in w.unwrapContent()) if (g is ResourceTimeNode) then ResourceTimeNodeContext {  resource: g as ResourceTimeNode} else null } else null, foreach (x in members) if (not x.name.startsWith("observe")) then null else MemberContext { member: x, parent: this }];
 

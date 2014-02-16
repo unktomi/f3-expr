@@ -128,7 +128,7 @@ public class NumberField is SliderField {
     }
     postinit {
         onChange(i.get());
-	disp = i.observable.subscribe(onChange);
+        disp = i.observable.subscribe(onChange);
     }
     override var t on replace {
         var n = min + (max - min)*t;
@@ -176,8 +176,8 @@ public class BooleanField is SliderField {
 	t = if (n) then 1.0 else 0.5;
     }
     postinit {
-	onChange(i.get());
-	disp = i.observable.subscribe(onChange);
+        onChange(i.get());
+        disp = i.observable.subscribe(onChange);
     }
     override var t on replace {
         i.set(t > 0.5);
@@ -197,8 +197,8 @@ public class DurationField is SliderField {
 	t = n.toMillis() / 1000.0;
     }
     postinit {
-	onChange(i.get());
-	disp = i.observable.subscribe(onChange);
+        onChange(i.get());
+        disp = i.observable.subscribe(onChange);
     }
     override var t on replace {
 	println("t={t}");
@@ -414,62 +414,75 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
 	    });
 }
 
-public function inspect from (obj is Object) to (Inspected of ?)[]
+public function inspect from (obj is Object) to (Inspected of ?)[] {
+    foreach(x in inspect0(obj) where x <> null) x;
+}
+
+function inspect0 from (obj is Object) to (Inspected of ?)[]
 {
     println("INSPECTING => {obj}");
     if (obj == null) then [] else {
 	    const members = Expression.introspect(getType(obj.getClass()) as F3ClassType);
 	    foreach (m in members) {
 		println("m={m} {m.m} t={m.t}");
-		if (m.isObservable)  {
-		    if (m.m is F3VarMember and m.t == NUMBER_TYPE) {
-			const ptr = (m.m as F3Local.VarMember).getPointer(obj as F3Object) as ObservableRef of Number;
-			InspectedNumber {
-			    member: m;
-			    label: m.m.getName();
-			    observable: Observables.observe(ptr);
-			    override function get to Number { ptr.get() }
-			    override function set from (x is Number) to () { 
-                                ptr.set(x);
-                                println("set {m.m.getName()} => {x} => {ptr.get()}");
+                var result is Inspected of ?;
+                try {
+                    result = 
+                        if (m.isObservable)  {
+                            if (m.m is F3VarMember and m.t == NUMBER_TYPE) {
+                                const ptr = (m.m as F3Local.VarMember).getPointer(obj as F3Object) as ObservableRef of Number;
+                                InspectedNumber {
+                                    member: m;
+                                    label: m.m.getName();
+                                    observable: Observables.observe(ptr);
+                                    override function get to Number { ptr.get() }
+                                    override function set from (x is Number) to () { 
+                                        ptr.set(x);
+                                        println("set {m.m.getName()} => {x} => {ptr.get()}");
+                                    }
+                                }
+                            } else if (m.m is F3VarMember and m.t == BOOLEAN_TYPE) {
+                                const ptr = (m.m as F3Local.VarMember).getPointer(obj as F3Object) as ObservableRef of Boolean;
+                                InspectedBoolean {
+                                    member: m;
+                                    label: m.m.getName();
+                                    observable: Observables.observe(ptr);
+                                    override function get to Boolean { ptr.get() }
+                                    override function set from (x is Boolean) to () { ptr.set(x) }
+                                }
+                            } else if (m.m is F3VarMember and m.t == DURATION_TYPE) {
+                                const ptr = (m.m as F3Local.VarMember).getPointer(obj as F3Object) as ObservableRef of Duration;
+                                InspectedDuration {
+                                    member: m;
+                                    label: m.m.getName();
+                                    observable: Observables.observe(ptr);
+                                    override function get to Duration { ptr.get() }
+                                    override function set from (x is Duration) to () { ptr.set(x) }
+                                }
+                            } else if (m.m is F3VarMember and m.t == STRING_TYPE) {
+                                const ptr = (m.m as F3Local.VarMember).getPointer(obj as F3Object) as ObservableRef of String;
+                                InspectedString {
+                                    label: m.m.getName();
+                                    observable: Observables.observe(ptr);
+                                    override function get to String { var s = ptr.get(); println("{label} => get={s}"); s }
+                                    override function set from (x is String) to () { ptr.set(x) }
+                                }
+                            } else {
+                                /*
+                                  InspectedObservable of Object {
+                                  member: m;
+                                  label: m.m.getName();
+                                  }
+                                */
+                                null
                             }
-			}
-		    } else if (m.m is F3VarMember and m.t == BOOLEAN_TYPE) {
-			const ptr = (m.m as F3Local.VarMember).getPointer(obj as F3Object) as ObservableRef of Boolean;
-			InspectedBoolean {
-			    member: m;
-			    label: m.m.getName();
-			    observable: Observables.observe(ptr);
-			    override function get to Boolean { ptr.get() }
-			    override function set from (x is Boolean) to () { ptr.set(x) }
-			}
-		    } else if (m.m is F3VarMember and m.t == DURATION_TYPE) {
-			const ptr = (m.m as F3Local.VarMember).getPointer(obj as F3Object) as ObservableRef of Duration;
-			InspectedDuration {
-			    member: m;
-			    label: m.m.getName();
-			    observable: Observables.observe(ptr);
-			    override function get to Duration { ptr.get() }
-			    override function set from (x is Duration) to () { ptr.set(x) }
-			}
-		    } else if (m.m is F3VarMember and m.t == STRING_TYPE) {
-			const ptr = (m.m as F3Local.VarMember).getPointer(obj as F3Object) as ObservableRef of String;
-		        InspectedString {
-			    label: m.m.getName();
-			    observable: Observables.observe(ptr);
-			    override function get to String { var s = ptr.get(); println("{label} => get={s}"); s }
-			    override function set from (x is String) to () { ptr.set(x) }
-			}
-		    } else {
-                    /*
-			InspectedObservable of Object {
-			    member: m;
-			    label: m.m.getName();
-			}
-                        */
-                        null
-		    }
-		} else null;
+                        } else null;
+                    result.get();
+                } catch (e is java.lang.Exception) {
+                    e.printStackTrace();
+                    result = null;
+                }
+                result;
 	    }
 	}
 }
