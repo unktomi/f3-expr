@@ -1421,9 +1421,12 @@ public abstract class ExpressionView is AbstractNode {
     public var cellHeight is Number = bind canvas.cellHeight;
     public var font is Text.Font = bind canvas.font;
     public readonly var selected is Boolean = bind canvas.selectedExpr == this;
+    public var selectable is Boolean = false;
     public function select to ()
     {
-        canvas.selectedExpr = this;
+        if (selectable) {
+            canvas.selectedExpr = this;
+        }
     }
     public bound function getLabel to String {
         Names.formatName(expression.getName());
@@ -1455,19 +1458,24 @@ public abstract class ExpressionView is AbstractNode {
     public var title is Node = bind defaultTitle;
     function onDown from (e is MouseEvent) to () 
     {
-        canvas.selectedExpr = this;
-        if (e.altKey) {
-            canvas.factor(this);
+        if (selectable) {
+            canvas.selectedExpr = this;
+            if (e.altKey) {
+                canvas.factor(this);
+            }
         }
     }
     function onDrag from (e is MouseEvent) to () 
     {
-
-	pos += canvas.toLocal * e.picked.dragPoint1 - canvas.toLocal * e.picked.dragPoint0;
+        if (selectable) {
+            pos += canvas.toLocal * e.picked.dragPoint1 - canvas.toLocal * e.picked.dragPoint0;
+        }
     }
     function onUp from (e is MouseEvent) to () 
     {
-        canvas.saveCode();
+        if (selectable) {
+            canvas.saveCode();
+        }
     }
     var d1;
     var d2;
@@ -1479,7 +1487,9 @@ public abstract class ExpressionView is AbstractNode {
     }
 
     public function serialize to ExprNode {
-        throw new java.lang.RuntimeException("not implemented {getClass()}");
+        //throw new java.lang.RuntimeException("not implemented {getClass()}");
+        println("serialize not implemented: {this}");
+        return null;
     }
 
     public function getInputLinks to LinkView[] { [] }
@@ -1496,6 +1506,8 @@ class FunctionView is ExpressionView {
             link.unlink();
         }
     }
+
+    override var selectable = true;
 
     public override function serialize to ExprNode {
         const n = FunNode {
@@ -1714,7 +1726,7 @@ public class OutputMemberExpression is MemberExpression, ObservableExpression {
 public class ObjectView is ExpressionView {
 
     override var transform = bind translate(pos);
-
+    override var selectable = true;
     public var objectExpr is ObjectExpression;
     override var expression = bind objectExpr;
 
@@ -1830,6 +1842,7 @@ public class GetVarView is OutputView {
             id: "{id}";
             x: pos.x;
             y: pos.y;
+            visibleRowCount: visibleRowCount;
             member: get.member.serialize();
         }
         canvas.serializationMap.put(this, n);
@@ -1851,39 +1864,57 @@ public class GetVarView is OutputView {
     }
     override var resultType = bind get.getType();
     public var get is GetVar;
-    var treeHeight is Number = 400;
+    public var visibleRowCount is Number = 10;
     const tv is GetTreeview = GetTreeview {
         canvas: bind canvas;
         width: 180;
-        treeHeight: bind treeHeight;
+        visibleRowCount: bind visibleRowCount;
         get: bind get;
         exprView: bind this;
     }
     override var transform = bind translate(pos);
     override var expression = bind get;
     public var isLabeled is Boolean = false;
+    var isResizing is Boolean;
+    function startResize from (e is MouseEvent) to ()
+    {
+        isResizing = true;
+    }
     function resize from (e is MouseEvent) to ()
     {
         const d = (e.picked.dragPoint1-e.picked.dragPoint0);
         treeHeight -= e.drag.y;
         //tv.resize(tv.width, treeHeight);
+        visibleRowCount = treeHeight / cellHeight;
     }
     function finishResize from (e is MouseEvent) to ()
     {
+        isResizing = false;
+        visibleRowCount = Math.round(treeHeight / cellHeight) as Integer;
+        canvas.saveCode();
     }
     function resizer to Node {
         Rectangle {
-            fillPaint: ColorPaint(Color.color(0, 0, 0, 1));
+            fillPaint: ColorPaint(Color.color(.2, .2, .2, 1));
             height: 2;
             width: bind cellWidth;
             cursor: Cursor.SouthResize;
+            onMouseDown: startResize;
             onMouseDrag: resize;
             onMouseUp: finishResize;
         }
     }
+    var treeHeight is Number;
+    override function update to () {
+        super.update();
+        if (not isResizing) {
+            treeHeight = tv.treeHeight;
+        }
+    }
     override var internalContent = Group {
 	content: 
-        bind if (isLabeled) then {
+        bind 
+        if (isLabeled) then {
                 [TransformNode {
                     content: bind label;
                 },
@@ -1892,15 +1923,15 @@ public class GetVarView is OutputView {
                     content: bind tv;
                 },
                 TransformNode {
-                    ty: bind -cellHeight-treeHeight + cellHeight/2;
+                    ty: bind -cellHeight - treeHeight + cellHeight/2;
                     content: resizer();
                 }]
-            } else {
+        } else {
             [tv, 
-             TransformNode {
-                   ty: bind -cellHeight-treeHeight + cellHeight/2;
-                    content: resizer();
-                }]
+            TransformNode {
+                ty: bind -cellHeight - treeHeight + cellHeight/2;
+                content: resizer();
+            }]
         }
     };
     override bound function getLinkPos to Point3 { getWorldPos() }
@@ -2277,7 +2308,22 @@ class MemberTreenode is Treenode {
     public var depth is Integer = bind (parent as MemberTreenode).depth + 1;
     public var get is GetVar = bind TreeGetVar { member: m }
     override var label = bind Names.formatName(m.name);
-    readonly var members = bind m.getMembers();
+    readonly var members = bind filterMembers(m.getMembers());
+    function filterMembers from (xs is Member[]) to Member[] 
+    {
+        const set = new java.util.HashSet of String;
+        foreach (x in xs where set.add(x.name)) {
+            const r = if (x.m is F3FunctionMember and {
+                    const f = x.m as F3FunctionMember;
+                    const ft = f.getType();
+                    ft.minArgs() > 0 or (ft.getReturnType() == UNIT_TYPE or OBSERVABLE_TYPE.isAssignableFrom(ft.getReturnType()));
+                }) then null else x;
+            if (r <> null) {
+                println("member is {x.getClass()} {x}");
+            }
+            r;
+        }
+    }
     override var canOpen = bind { var n = members.size(); n > 0 };
     override var children = bind foreach (x in members) makeTreeNode(x);
 
@@ -2552,7 +2598,9 @@ class GetTreeview is ResizableNode {
     function getRootLinkedView to LinkedView {
         getCell(treeModel.root as MemberTreenode).linkedView;
     }
-    public var treeHeight is Number;//= bind Math.min(treeModel.rowCount, 10)*cellHeight;
+    public var visibleRowCount is Number = 10;
+    public var treeHeight is Number = bind Math.min(treeModel.rowCount, visibleRowCount)*cellHeight;
+    public bound function getTreeHeight to Number { treeHeight }
     const self = this;
     const cellMap is java.util.Map of (MemberTreenode, MemberTreecell) =        
 	new java.util.HashMap of (MemberTreenode, MemberTreecell);
@@ -3939,13 +3987,17 @@ public class VarContextObjNode is ObjNode {
 public class GetNode is ExprNode {
     public var outputs is SourceNode[];
     public var isOpen is Boolean;
+    public var visibleRowCount is Number = 10;
     public override function createView from (canvas is Canvas) to GetVarView {
         const m = member.deserialize();
         var v is GetVarView;
         if (m == canvas.event) {
             v = canvas.rootExprView;
+            v.visibleRowCount = visibleRowCount;
+            v.pos = new Point3(x, y, 0);
         } else {
             v = GetVarView {
+                visibleRowCount: visibleRowCount;
                 pathFactory: canvas.pathFactory;
                 layoutEngine: canvas.layoutEngine;
                 imageLoader: canvas.imageLoader;
