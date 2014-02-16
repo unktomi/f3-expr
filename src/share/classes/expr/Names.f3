@@ -12,7 +12,8 @@ public function formatName from (str is String) to String
         const slash = str.lastIndexOf(ch);
         if (slash > 0) return uncamelCase(str.substring(slash+1));
     }
-    return uncamelCase(str);
+    const result = uncamelCase(str);
+    if result == "" then str else result;
 }
 
 public function uncamelCase from (str is String) to String 

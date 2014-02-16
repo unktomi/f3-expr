@@ -202,7 +202,12 @@ public const INT_MEMBERS =
 const IF_EXPR = Reflect.getFunction("f3.lang.Builtins$BooleanOperators", "If", ["Boolean", "Object", "Object"]);
 
 public const BOOL_MEMBERS = 
-    [foreach (op in ["and", "or", "equal", "notEqual"]) {
+    [foreach (op in ["yes", "no"]) {
+        FunctionMember {
+            m: Reflect.getFunction("f3.lang.Builtins$BooleanOperators", op, []);
+        }
+    }
+    foreach (op in ["and", "or", "equal", "notEqual"]) {
         FunctionMember {
             isInfix: true;
             m: Reflect.getFunction("f3.lang.Builtins$BooleanOperators", op, ["Boolean", "Boolean"]);
@@ -789,7 +794,7 @@ public class IPath {
         if (parents.size() == 0) {
             if (observer is Parameter) {
                 const p = observer as Parameter;
-                return "{p.constantValue}";
+                return p.toEnglish();
             }
             if (observer.observable is OutputMemberExpression) {
                 const n = observer.observable as OutputMemberExpression;
@@ -1360,7 +1365,7 @@ public class Parameter is ObserverExpression {
     public var constantValue is Object = "(null as {t.getName()})";
     override public function toEnglish to String 
     {
-        if (observable == null) then { const v = "{constantValue}"; if (v == "true") then "Yes" else if v == "false" then "No" else v } else observable.toEnglish();
+        if (observable == null) then { const v = "{constantValue}";  if (v.startsWith("(null as")) then "null" else { if (v == "true") then "Yes" else if v == "false" then "No" else v } } else observable.toEnglish();
     }
     override public function toSource from (context is IContext) to String 
     {
@@ -1537,8 +1542,11 @@ class FunctionView is ExpressionView {
     } 
 
     public var fun is Function;
+
     override var transform = bind translate(pos);
+
     override var expression = bind fun;
+
     public function assignLinkIds to () {
         var j = 0;
         for (x in inputs) {
