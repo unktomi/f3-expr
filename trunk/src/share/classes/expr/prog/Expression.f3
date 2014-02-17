@@ -744,7 +744,8 @@ public class IPath {
         return e;
     }
 
-    public function getRootId to Integer {
+    public function getRootId to Integer 
+    {
         var result = id;
         for (p in parents) {
             result = Math.max(id, p.getRootId());
@@ -785,11 +786,13 @@ public class IPath {
         count;
     }
 
-    function getWorldAccess to String {
+    function getWorldAccess to String 
+    {
         return getLocalAccess();
     }
 
-    function getEnglishAccess to String {
+    function getEnglishAccess to String 
+    {
         var observer is ObserverExpression = this.observer;
         if (parents.size() == 0) {
             if (observer is Parameter) {
@@ -799,6 +802,9 @@ public class IPath {
             if (observer.observable is OutputMemberExpression) {
                 const n = observer.observable as OutputMemberExpression;
                 return n.toEnglish();
+            }
+            if (observer is TreeGetVar) {
+                return (observer as TreeGetVar).toEnglish();
             }
             println("PARENTS SIZE is ZERO {observer.getClass()} {observer}, observable={observer.observable.getClass()} {observer.observable}");
             return "the event";
@@ -855,10 +861,14 @@ public class IPath {
         if (observer is InputMemberExpression) {
             const i = observer as InputMemberExpression;
             if (i.member.m is F3VarMember and i.member.isObserver) {
-                return "{formatEnglishName(i.member.name)} of {i.target.toEnglish()} = {parents[0].getEnglishAccess()}"
+                return "the {formatEnglishName(i.member.name)} of {i.target.toEnglish()} = {parents[0].getEnglishAccess()}"
             } 
-            const sep = if (i.member.m is F3VarMember) then " of " else " ";
-            return "{parents[0].getEnglishAccess()}, {formatEnglishName(i.member.name)}{sep}{i.target.toEnglish()}";
+            if (i.member.isObserver and is1ArgFunction(i.member)) {
+                return "{formatEnglishName(i.member.name)} of {i.target.toEnglish()} {parents[0].getEnglishAccess()}"
+            } else {
+                const sep = if (i.member.m is F3VarMember) then " of " else " ";
+                return "{parents[0].getEnglishAccess()}, {formatEnglishName(i.member.name)}{sep}{i.target.toEnglish()}";
+            }
         }
         return "";
     }
@@ -878,6 +888,9 @@ public class IPath {
             if (observer.observable is OutputMemberExpression) {
                 const n = observer.observable as OutputMemberExpression;
                 return "i0";
+            }
+            if (observer is TreeGetVar) {
+                return (observer as TreeGetVar).getLocalAccess();
             }
             return "i";
         }
@@ -991,7 +1004,7 @@ class IContext {
 
     function getIPath from (ob is ObserverExpression) to IPath {
         var result = map.get(ob);
-        if (result <> null) return result;
+        //if (result <> null) return result;
         result = IPath {
             observer: ob;
         }
@@ -1057,6 +1070,11 @@ public class GetVar is VarExpression, ObservableExpression, ObserverExpression {
         if (observers == []) then [] else foreach (ob in observers) ob.getTerminals();
     }
 
+    public function getLocalAccess to String 
+    {
+        member.toApply();
+    }
+
     override public function toSource from (context is IContext) to String 
     {
         println ("get var to source {this} observable={observable}");
@@ -1082,25 +1100,7 @@ public class GetVar is VarExpression, ObservableExpression, ObserverExpression {
     }
 
     override public function toEnglish to String {
-        println ("get var to source {this} observable={observable}");
-        if (observable is Result) {
-            return observable.toEnglish();
-	} 
-	if (observers == []) {
-	    return "";
-	}
-	const i = "";//context.getIVar(this);
-	if (observable is MemberExpression and { const mexp = observable as MemberExpression; mexp.isObservable() }) {
-            "the {member.toEnglish()} of {observable.toEnglish()}";
-        } else {
-	    if (observable == null) {
-		if (OBSERVABLE_TYPE.isAssignableFrom(member.rt)) 
-		    then "the {member.toEnglish()} event"
-		    else "{member.toEnglish()}"
-	    } else {
-                "the {member.toEnglish()} of {observable.toEnglish()}";
-	    }
-	}
+        member.toEnglish();
     }
 }
 
@@ -1253,7 +1253,6 @@ public class Function is MemberExpression {
         println("gen english {this} => {result}");
         return result;
     }
-
 
     override public function toSource from (context is IContext) to String {
 	var observable is Expression;
@@ -1461,26 +1460,43 @@ public abstract class ExpressionView is AbstractNode {
             }];
     };
     public var title is Node = bind defaultTitle;
+    var dragging = false;
     function onDown from (e is MouseEvent) to () 
     {
         if (selectable) {
             canvas.selectedExpr = this;
-            if (e.altKey) {
-                canvas.factor(this);
+            const menuFactory = canvas.menuFactory;
+            if (e.isMouseButton3Down()) {
+                const menu = Menu {
+                    items: 
+                    [MenuItem {
+                        label: "Factor";
+                        action: canvas.factor.apply(this);
+                    },
+                    MenuItem {
+                        label: "Delete";
+                        action: canvas.deleteSelection;
+                    }]
+                }
+                println("menu factory => {menuFactory}");
+                e.stage.showPopupMenu(e.screenx, e.screeny, menu);
+            } else {
+                dragging = true;
             }
         }
     }
     function onDrag from (e is MouseEvent) to () 
     {
-        if (selectable) {
+        if (dragging) {
             pos += canvas.toLocal * e.picked.dragPoint1 - canvas.toLocal * e.picked.dragPoint0;
         }
     }
     function onUp from (e is MouseEvent) to () 
     {
-        if (selectable) {
+        if (dragging) {
             canvas.saveCode();
         }
+        dragging = false;
     }
     var d1;
     var d2;
@@ -2910,6 +2926,8 @@ var showSource is Boolean;
 
 public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollable, MouseInputHandler {
 
+    public const menuFactory is MenuFactory;
+
     public var stepping is Boolean;
 
     public const debuggerEngine is ExprDebugger = ExprDebugger {
@@ -3034,7 +3052,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     public function onDrop from (where is Pick, clip is Node) to ()
     {
 	println("ON DROP {where.scenePoint}, {where.dragPoint1} {clip}");
-	const typ = if (clip is SceneAPI) then Reflect.getType("expr.SceneAPI") else Reflect.getType(clip.getClass().getName());
+	const typ = if (clip is SceneAPI) then Reflect.getType("expr.SceneAPI") else Reflect.getType("f3.media.scene.TransformNode");
         var names = new java.util.HashSet of String;
 	const members = foreach (m in introspect(typ) where not m.name.contains("pdate") and names.add(m.name)) m;
         for (m in members) {
@@ -3167,9 +3185,12 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             const newExp = GetVarView {
                 get: TreeGetVar {
                     member: bind newMember;
+                    override function toEnglish to String { v.varName }
+                    override function getLocalAccess to String { "(getVar(\"{v.varName}\") as {v.varType.t.getName()})" }
                 }
                 override bound function getLabel to String { v.varName }
                 canvas: this;
+                selectable: true;
                 isLabeled: true;
             }
             for (e in linked) {
@@ -3215,6 +3236,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 code: todo;
             }
             const newCanvas = Canvas {
+                menuFactory: menuFactory;
                 interactive: interactive;
                 stepping: bind stepping;
                 debugger: debugger;
@@ -3330,6 +3352,8 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                     isLabeled: true;
                     override bound function getLabel to String { Names.formatName(event.name) }
 		    get: varRoot = TreeGetVar {
+                        override function toEnglish to String { "the event" }
+                        override function getLocalAccess to String { "i" }
 			member: event;
 		    }
 		}
@@ -3623,7 +3647,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     function genSource to () {
 	println("DUMP SRC:");
 	unsubscribe();
-	println(visit(varRoot));
+	println(visit(varRoot, foreach (v in views where v.expression <> varRoot and v is GetVarView) v.expression));
     }
 
     const serializationMap = new java.util.IdentityHashMap of (ExpressionView, ExprNode);
@@ -3702,12 +3726,12 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     var englishOutput is String;
     
-    function visit from (e is Expression) to String
+    function visit from (e is Expression, es is Expression[]) to String
     {
         saveCode();
 	var termset = new java.util.HashSet of Expression();
         var terms is Expression[];
-        for (term in e.getTerminals()) {
+        for (term in foreach (x in [e, es]) x.getTerminals()) {
             if (termset.add(term)) {
                 insert term into terms;
             }
@@ -4058,6 +4082,7 @@ public class SourceNode is ExprNode {
 
 public class Editor is ResizableNode, Focuser {
 
+    public var menuFactory is MenuFactory;
     public var popupLayer is PopupLayer;
     public var popupScene is Scene;
 
@@ -4136,6 +4161,7 @@ public class Editor is ResizableNode, Focuser {
 	if (prog.canvas == null) {
             println("creating canvas with {pathFactory}");
 	    prog.canvas = Canvas {
+                menuFactory: menuFactory;
                 interactive: interactive;
                 stepping: bind stepping;
                 debugger: debugger;
