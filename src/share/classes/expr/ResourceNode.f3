@@ -85,6 +85,7 @@ public class ResourceNode is TransformNode, ResourceTarget {
     public readonly var timeline is Timeline = Timeline {
         content: bind channelBox;
         enabled: false;
+        paused: true;
     }
 
     function createChannels to (Channel of Number)[]
@@ -95,6 +96,7 @@ public class ResourceNode is TransformNode, ResourceTarget {
             Channel of Number {
                 id: bind "{id}#{names[i]}";
                 targets: ptrs[i];
+//                debug: true;
             }
         }
     }   
