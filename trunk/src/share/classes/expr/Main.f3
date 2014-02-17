@@ -228,7 +228,7 @@ public function run from (args is String[]) to ()
     const currentAnimResource is ResourceTimeGroup = ResourceTimeGroup {}
 
     const transformHierarchy is TransformHierarchy = TransformHierarchy {
-	scenes: bind currentScenes;
+	scenes: bind currentScenes with inverse;
     }
 
     function selectNodeLater from (n is Node) to ()

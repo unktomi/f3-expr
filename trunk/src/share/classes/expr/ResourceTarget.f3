@@ -16,10 +16,13 @@ public class ChannelBoxGroup is TimeGroup, ChannelBox {
     public function moveKeyTo from (src is Duration, target is Duration) to Duration
     {
         const ks = keyMap.get(src);
-        for (k in ks) {
-            k.k = k.ch.moveKey(k.k, target-src);
+        if (ks <> null) {
+            for (k in ks) {
+                k.k = k.ch.moveKey(k.k, target-src);
+            }
+            return target;
         }
-        return target;
+        return src;
     }
 
     override function update from (sceneTime is Duration) to ()

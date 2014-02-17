@@ -254,6 +254,16 @@ public class TransformHierarchy
 	const srcParent = src.parent as Group;
         if (srcParent is ResourceGroup) {
             delete src as ResourceNode from (srcParent as ResourceGroup).resources;
+        } else if (src is SceneAPI) {
+            println("src={src}, target={target}");
+            if (target is SceneAPI) {
+                const x = src as SceneAPI;
+                const y = target as SceneAPI;
+                const i = f3.util.Sequences.indexOf(scenes, y.scene);
+                delete (x.scene as ResourceScene) from scenes;
+                insert (x.scene as ResourceScene) before scenes[i];
+            }
+            return;
         } else {
             delete src from srcParent.content;
         }

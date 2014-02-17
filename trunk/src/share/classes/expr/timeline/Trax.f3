@@ -510,6 +510,16 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	}
     };
 
+    const onPausedOb = DefaultObserver of Boolean {
+	override function onNext from (event is Boolean) to () {
+            onPaused(event)
+	}
+    };
+
+    protected function onPaused from (b is Boolean) to ()
+    {
+    }
+
     protected function onPlayheadChange from (event is Duration) to ()
     {
         //const d = if (loop and not target.paused and targetNode.contentBounds.duration() > 0s) event.rem(targetNode.bounds.start + targetNode.contentBounds.duration()) else event;
@@ -1104,9 +1114,10 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
     {
         const ty = valueBounds.x;
         var dy = (valueBounds.y - valueBounds.x);
-        const sy = if (dy == 0 or viewHeight == 0) then 1.0 else (0.5 * viewHeight) / dy;
+        var sy = if (dy == 0 or viewHeight == 0) then 1.0 else (0.5 * viewHeight) / dy;
         println("VALUE BOUNDS {valueBounds}");
         println("ty={ty}, sy={sy}");
+        if (sy == Number.POSITIVE_INFINITY) { sy = 1.0 }
         var x1 is Number;
         var y1 is Number;
         var x2 is Number;
