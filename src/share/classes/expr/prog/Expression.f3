@@ -1919,7 +1919,7 @@ public class GetVarView is OutputView {
     }
     function resizer to Node {
         Rectangle {
-            fillPaint: ColorPaint(Color.color(.2, .2, .2, 1));
+            fillPaint: ColorPaint(Color.color(.4, .4, .4, 1));
             height: 2;
             width: bind cellWidth;
             cursor: Cursor.SouthResize;

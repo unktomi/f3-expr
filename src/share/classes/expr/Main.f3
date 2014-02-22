@@ -710,7 +710,8 @@ public function run from (args is String[]) to ()
 	    currentTransform.px = i.px;
 	    currentTransform.py = i.py;
 	    currentTransform.pz = i.pz;
-            (currentTransform as ResourceNode).programs = foreach (prog in i.programs) {
+            const rn = (currentTransform as ResourceNode);
+            rn.programs = foreach (prog in i.programs) {
                 const p = Program {
                     event: prog.event.deserialize();
                     code: prog.code;
@@ -727,6 +728,20 @@ public function run from (args is String[]) to ()
                 println("CREATING PROGRAM**** {prog} => {p.sourceCode}");
                 insert p into allPrograms;
                 p;
+            }
+            rn.channelBox.playTime = i.animation.playTime;
+            rn.channelBox.playRate = i.animation.playRate;
+            rn.channelBox.playCount = i.animation.playCount;
+            rn.channelBox.blendWeight = i.animation.blendWeight;
+            foreach (x in i.animation.content) {
+                const c = rn.resolveChannel(x.target);
+                c.playTime = x.playTime;
+                c.playCount = x.playCount;
+                c.playRate = x.playRate;
+                c.blendWeight = x.blendWeight;
+                c.keys = foreach (k in x.keys) {
+                    c.createKey(k.keyTime, k.keyValue, f3.media.scene.KeyFrame.Linear);
+                }
             }
 	}
         var tempResources = currentAnimResource.resources;
