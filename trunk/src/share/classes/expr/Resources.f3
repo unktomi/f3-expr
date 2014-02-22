@@ -12,6 +12,25 @@ public class Resource {
     public var id is String;
     public var url is String;
     public var programs is ProgramResource[];
+    public var animation is ChannelBoxResource;
+}
+
+public class ChannelBoxResource is Temporal {
+    public var content is ChannelResource[];
+}
+
+public class ChannelResource is Temporal {
+    public var target is String;
+    public var keys is KeyFrame[];
+}
+
+public class KeyFrame {
+    public var keyTime is Duration;
+    public var keyValue is Number;
+    public var kix is Number;
+    public var kiy is Number;
+    public var kox is Number;
+    public var koy is Number;
 }
 
 public class ProjectResource is Resource {
@@ -37,11 +56,14 @@ public class SpatialResource is Resource {
     public var pz is Number;
 }
 
-public class TemporalResource is Resource {
+public interface Temporal {
     public var blendWeight is Number = 1.0;
     public var playTime is Duration = 0s;
     public var playRate is Number = 1.0;
     public var playCount is Number = 1.0;
+}
+
+public class TemporalResource is Temporal, Resource {
     public var content is TemporalResource[];
 }
 
@@ -98,6 +120,30 @@ class ResourceBuilder {
                 event: p.event.serialize();
                 code: p.code;
                 compiled: p.sourceCode;
+            }
+            animation: ChannelBoxResource {
+                blendWeight: n.channelBox.blendWeight;
+                playTime: n.channelBox.playTime;
+                playRate: n.channelBox.playRate;
+                playCount: n.channelBox.playCount;
+                content: foreach (j in n.channelBox.content) {
+                    const c = j as Channel;
+                    ChannelResource {
+                        target: c.id;
+                        blendWeight: c.blendWeight;
+                        playTime: c.playTime;
+                        playRate: c.playRate;
+                        playCount: c.playCount;
+                        keys: foreach (k1 in c.keys) {
+                            const k = k1 as f3.media.scene.KeyFrame.Key of Number;
+                            const i = k.interpolator;
+                            KeyFrame {
+                                keyTime: k.position;
+                                keyValue: k.value;
+                            }
+                        }
+                    }
+                }
             }
         }
     }

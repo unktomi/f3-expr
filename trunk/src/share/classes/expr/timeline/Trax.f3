@@ -1115,7 +1115,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
         const ty = valueBounds.x;
         var dy = (valueBounds.y - valueBounds.x);
         var sy = if (dy == 0 or viewHeight == 0) then 1.0 else (0.5 * viewHeight) / dy;
-        println("VALUE BOUNDS {valueBounds}");
+        println("VALUE BOUNDS {ch.id} {valueBounds}");
         println("ty={ty}, sy={sy}");
         if (sy == Number.POSITIVE_INFINITY) { sy = 1.0 }
         var x1 is Number;

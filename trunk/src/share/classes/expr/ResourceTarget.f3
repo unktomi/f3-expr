@@ -60,6 +60,11 @@ public interface ResourceTarget {
 
     public function getChannels to (Channel of Number)[] { [] }
 
+    public function resolveChannel from (id is String) to Channel of Number
+    {
+        channelBox.lookup(id) as Channel of Number;
+    }
+
     public const channelBox is TimeGroup = ChannelBoxGroup
     {
         useLiteralId: bind useLiteralId;

@@ -68,7 +68,7 @@ public class GraphEditor is Trax {
                     }
                 }
             }
-            println("setting key {playheadPos}");
+            //println("setting key {playheadPos}");
             ch.setKey(i);
         }
     }
@@ -77,7 +77,7 @@ public class GraphEditor is Trax {
     {
         super.onPlayheadChange(event);
         if (playheadPos <> event) {
-            println("playhead change {playheadPos} => {event}");
+            //println("playhead change {playheadPos} => {event}");
             playheadPos = event;
             for (resourceTarget in resourceTargets) {
                 const rn = (resourceTarget as ResourceNode);
