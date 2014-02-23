@@ -733,7 +733,7 @@ public function run from (args is String[]) to ()
             rn.channelBox.playTime = i.animation.playTime;
             rn.channelBox.playRate = i.animation.playRate;
             rn.channelBox.playCount = i.animation.playCount;
-            rn.channelBox.blendWeight = i.animation.blendWeight;
+            rn.channelBox.blendWeight = 1.0;//i.animation.blendWeight;
             foreach (x in i.animation.content) {
                 const c = rn.resolveChannel(x.target);
                 c.playTime = x.playTime;
