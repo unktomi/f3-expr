@@ -80,16 +80,41 @@ const operatorMap = {
     map.put("Add", "+");
     map.put("Subtract", "-");
     map.put("Sub", "-");
-    map.put("Mul", "*");
-    map.put("Multiply", "*");
+    map.put("Mul", "\u00d7");
+    map.put("Multiply", "\u00d7");
     map.put("Div", "/");
     map.put("Divide", "/");
-    map.put("Greater Or Equal", "&gt;=");
-    map.put("Less Or Equal", "&lt;=");
+    map.put("Greater Or Equal", "\u2265");
+    map.put("Less Or Equal", "\u2264");
     map.put("Greater Than", "&gt;");
     map.put("Less Than", "&lt;");
     map.put("Equal", "==");
-    map.put("Not Equal", "&lt;&gt;");
+    map.put("Not Equal", "\u2260");
+    map;
+}
+
+
+const reverseOperatorMap = {
+    const map = new java.util.HashMap of (String, String);
+    map.put("+", "Add");
+    map.put("-", "Subtract");
+    map.put("sub", "Subtract");
+    map.put("*", "Multiply");
+    map.put("mul", "Multiply");
+    map.put("/", "Divide");
+    map.put("div", "Divide");
+    map.put(">=", "Greater Or Equal");
+    map.put("ge", "Greater Or Equal");
+    map.put("<=", "Less Or Equal");
+    map.put("le", "Less Or Equal");
+    map.put(">", "Greater Than");
+    map.put("gt", "Greater Than");
+    map.put("<", "Less Than");
+    map.put("lt", "Less Than");
+    map.put("==", "Equal");
+    map.put("eq", "Equal");
+    map.put("<>", "Not Equal");
+    map.put("neq", "Not Equal");
     map;
 }
 
@@ -196,10 +221,12 @@ public const INT_MEMBERS =
         }
     },
     FunctionMember {
-            m: Reflect.getFunction("f3.lang.Builtins$IntegerOperators", "negate", ["Number"]);
+            m: Reflect.getFunction("f3.lang.Builtins$IntegerOperators", "negate", ["Integer"]);
     }];
 
 const IF_EXPR = Reflect.getFunction("f3.lang.Builtins$BooleanOperators", "If", ["Boolean", "Object", "Object"]);
+const NUM_NEGATE = Reflect.getFunction("f3.lang.Builtins$NumberOperators", "negate", ["Number"]);
+const INT_NEGATE = Reflect.getFunction("f3.lang.Builtins$IntegerOperators", "negate", ["Integer"]);
 
 public const BOOL_MEMBERS = 
     [foreach (op in ["yes", "no"]) {
@@ -249,7 +276,7 @@ public function introspectMembers from (v is Context.ClosureVarContext) to Membe
                 override function isProtected to Boolean { false }
             }
             isObservable: true;
-            isObserver: false;
+            isObserver: true;
         }
         return [newMember]
     }
@@ -559,12 +586,18 @@ function formatFunctionType from (clazz is F3ClassType, ft is F3FunctionType) to
         r = "{r}{sep}{formatType(ft.getArgumentType(i))}";
         sep = ", ";
     }
-    "{r}) -> {formatType(ft.getReturnType())}";
+    "{r}) \u2192 {formatType(ft.getReturnType())}";
+}
+
+function argCount from (f is F3FunctionMember) to Integer 
+{
+    (if f.isStatic() then 0 else 1) + f.getType().minArgs();
 }
 
 function formatName from (f is F3FunctionMember) to String 
 {
-    "{Names.formatName(f.getName())} {formatFunctionType(if f.isStatic() then null else f.getDeclaringClass(), f.getType())}"
+    const name = if argCount(f) == 2 and reverseOperatorMap.containsKey(f.getName()) then reverseOperatorMap.get(f.getName()) else f.getName();
+    "{Names.formatName(name)} {formatFunctionType(if f.isStatic() then null else f.getDeclaringClass(), f.getType())}"
 }
 
 function formatClassName from (t is F3Type) to String 
@@ -819,6 +852,8 @@ public class IPath {
             const fun = func.fun;
             if (fun == IF_EXPR) {
                 return "if ({parents[1].getEnglishAccess()}) then {parents[2].getEnglishAccess()} else {parents[3].getEnglishAccess()}";
+            } else if (fun == NUM_NEGATE or fun == INT_NEGATE) {
+                return "-{parents[1].getEnglishAccess()}";
             } else if (infix) {
                 if (fun.isStatic()) {
                     return "({parents[1].getEnglishAccess()} {formatEnglishName(fun.getName())} {parents[2].getEnglishAccess()})";
@@ -1436,7 +1471,7 @@ public abstract class ExpressionView is AbstractNode {
         Names.formatName(expression.getName());
     }
     public readonly var label is Text.Label = bind constructLabel();
-    bound function constructLabel() to Text.Label {
+    bound function constructLabel to Text.Label {
         Text.Label {
             text: bind getLabel();
             height: bind cellHeight;
@@ -3731,11 +3766,19 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         saveCode();
 	var termset = new java.util.HashSet of Expression();
         var terms is Expression[];
-        for (term in foreach (x in [e, es]) x.getTerminals()) {
+        var terms2 is Expression[];
+        for (term in e.getTerminals()) {
             if (termset.add(term)) {
                 insert term into terms;
             }
         }
+        /*
+        for (term in (foreach x in es x.getTerminals())) {
+            if (termset.add(term)) {
+                insert term into terms2;
+            }
+        }
+        */
         const mem = e as MemberExpression;
 	var itype = mem.member.m.getDeclaringClass();
         if (itype == null) return "";
