@@ -1811,7 +1811,18 @@ public class ObjectView is ExpressionView {
         n.y = pos.y;
         canvas.serializationMap.put(this, n);
         n.inputs = foreach (i in inputViews) TargetNode { targetId: "{i.id}", links: foreach (link in i.links) "{link.id}" };
-        n.outputs = foreach (i in outputViews) SourceNode { sourceId: "{i.id}", links: foreach (link in i.links) "{link.id}" };
+        //n.outputs = foreach (i in outputViews) SourceNode { sourceId: "{i.id}", links: foreach (link in i.links) "{link.id}" };
+        const tv = outputViews[0].getTree;
+        n.outputs = 
+            foreach (link in tv.getLinks() where not (link.target is TreecellGetVarView)) 
+            {
+                var p = getPath(link);
+                //println("GET VAR VIEW {get.member.name} => {getPath(link)}");
+                SourceNode {
+                    sourceId: p;
+                    links: ["{link.id}"];
+                }
+            }
         return n;
     }
 
@@ -1886,12 +1897,14 @@ public class ObjectView is ExpressionView {
 }
 
 function getPath from (v is LinkView) to String {
-    if (v.source instanceof TreecellGetVarView) {
-        var g = v.source as TreecellGetVarView;
-        var p = getPath(g.parentLink);
-        return "{p}{g.get.member.name}/";
-    }
-    return "/";
+    const result = 
+        if (v.source instanceof TreecellGetVarView) {
+            var g = v.source as TreecellGetVarView;
+            var p = getPath(g.parentLink);
+            "{p}{g.get.member.name}/";
+        } else "/";
+    println("get path {v} => {result}");
+    return result;
 }
 
 public class GetVarView is OutputView {
@@ -2515,8 +2528,9 @@ public class MemberTreecell is Treeview.Treecell
     {
         if (parentLink == null) {
             var n = (tn as MemberTreenode);
-            var p = (n.parent as MemberTreenode);
-            const pv = if p == null then null else tv.getView(p) as MemberTreecell;
+            //var p = (n.parent as MemberTreenode);
+            //const pv = if p == null then null else tv.getView(p) as MemberTreecell;
+            const pv = parentCell;
             if (pv <> null) {
                 if (parentLink == null) {
                     parentLink = ParentLinkView {
@@ -2526,6 +2540,7 @@ public class MemberTreecell is Treeview.Treecell
                         target: linkedView;
                     }
                 }
+                pv.link();
                 parentLink.link();
             }
         }
@@ -3938,6 +3953,7 @@ public class FunNode is ExprNode {
                     const t = cell.linkedView;
                     println("t={t}");
                     lnk.source = t;
+                    cell.link();
                 }
             }
         }
@@ -3983,6 +3999,24 @@ public class NodeObjNode is ObjNode {
                 for (link in i.links) {
                     const lnk = canvas.getLink(link);
                     lnk.target = result.inputViews[indexof i];
+                }
+            }
+        }
+        for (p in outputs) {
+            println("***output: {p} {p.links}, {p.sourceId}");
+            const v = result;
+            if (p.links.size() > 0) {
+                const path = p.sourceId;
+                const tn = v.outputViews[0].getTree.treeModel.resolvePath(path);
+                tn.open();
+                println("***path={path} tn={tn}");
+                for (link in p.links) {
+                    const lnk = canvas.getLink(link);
+                    const cell = v.outputViews[0].getTree.getCell(tn);
+                    const t = cell.linkedView;
+                    println("***t={t}");
+                    lnk.source = t;
+                    cell.link();
                 }
             }
         }
@@ -4099,9 +4133,11 @@ public class GetNode is ExprNode {
                 println("getNode v={v}, tv={v.tv}, treeModel={v.tv.treeModel}");
                 for (link in p.links) {
                     const lnk = canvas.getLink(link);
-                    const t = v.tv.getCell(tn).linkedView;
+                    const cell = v.tv.getCell(tn);
+                    const t = cell.linkedView;
                     println("getNode t={t}, pos={t.getLinkPos()}");
                     lnk.source = t;
+                    cell.link();
                 }
             }
         }

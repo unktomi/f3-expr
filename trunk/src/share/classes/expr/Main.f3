@@ -675,6 +675,7 @@ public function run from (args is String[]) to ()
         mainTimeLayer.content = [];
         mainTimeLayer.content = currentAnimResource;
         contextModel.reset();
+        contextTree.select(contextModel.root);
 	transformHierarchy.clearSelection();
         playerUrl = "";
 	MasterUndoable.reset();

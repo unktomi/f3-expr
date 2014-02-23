@@ -383,7 +383,7 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
         checkVisible(row, scrollOffset, visibleRows);
     }
 
-    function select from (t is Treenode) to ()
+    public function select from (t is Treenode) to ()
     {
         println("SELECTING TREE NODE {t.label}");
         if (selectedTreenode <> t) {
