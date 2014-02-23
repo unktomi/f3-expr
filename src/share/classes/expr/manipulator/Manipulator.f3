@@ -15,9 +15,6 @@ public class Manipulator is AbstractNode
 
     const undoList = UndoList {};
 
-    override var cursor = Cursor.Default;
-    override var blocksPointer = true;
-
     public var target is TransformNode on replace old {
 
         if (old <> null) {
@@ -125,28 +122,36 @@ public class Manipulator is AbstractNode
     }
 
     var lastMoveAllPoint is Point3[];
+    var screenPlane is Plane;
+
     function doTranslateAll from (event is MouseEvent) to ()
     {
 	const worldTransform = target.toSceneTransform;
-        const pt = (worldTransform * p).getTranslation();
+        //const pt = (worldTransform * p).getTranslation();
+        const pt = event.sceneLocation;
         const ray = scene.camera.getPickRay(event.screenx, event.screeny);
-        const plane = Plane {
-            point: pt;
-            normal: -ray.direction;
+        var plane is Plane;
+        if (lastMoveAllPoint == []) {
+            screenPlane = plane = Plane {
+                point: pt;
+                normal: -ray.direction;
+            } 
+        } else {
+            plane = screenPlane;
         }
         const hit = plane.intersectRay(ray);
         if (hit == null) {
             return;
         }
-        if (lastMoveAllPoint == []) {
-            lastMoveAllPoint = [hit.point];
-            return;
-        }
         const toLocal = target.parentToSceneTransform.inverse();
         const p1 = toLocal * hit.point;
-        const p2 = toLocal * lastMoveAllPoint[0];
+        if (lastMoveAllPoint == []) {
+            lastMoveAllPoint = [p1];
+            return;
+        }
+        const p2 = lastMoveAllPoint[0];
         const d = p1 - p2;
-        lastMoveAllPoint = [hit.point];
+        lastMoveAllPoint = [p1];
         applyTranslate(d);
     }
 
@@ -424,6 +429,11 @@ public class Manipulator is AbstractNode
         }
         allGadgets = [/*moveX, moveY, moveZ, rotateX, rotateY, rotateZ, */rotateGuideX, rotateGuideY, rotateGuideZ, rotateAll, moveAll, /*scaleX, scaleY, scaleZ,*/ scaleAll];
         enterTranslate();
+        internalContent.foldLeft((), function from (_ is (), n is Node) to () {
+                if (n.blocksPointer) {
+                    n.cursor = Cursor.Default;
+                }
+            });
     }
 
     override function update 
