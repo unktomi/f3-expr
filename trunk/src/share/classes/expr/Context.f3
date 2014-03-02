@@ -147,11 +147,23 @@ public class ClosureVarContext is GroupContext {
         println("content from type of {varType} => {results}");
         return results;
     }
-    var myContent = bind [getContentFromType(varType.t), content];
+    public const inputContext = VarInputContext {parent: this};
+    public const outputContext = VarOutputContext {parent: this};
+    var myContent = bind [inputContext, outputContext, content];
     override public bound function getContent to Context[] 
     { 
-        myContent;
+        myContent
     }
+}
+
+public class VarInputContext is GroupContext {
+    public function getVar to ClosureVarContext { parent as ClosureVarContext }
+    override var name = "Input";
+}
+
+public class VarOutputContext is GroupContext {
+    public function getVar to ClosureVarContext { parent as ClosureVarContext }
+    override var name = "Output";
 }
 
 public class VarContext is GroupContext {
