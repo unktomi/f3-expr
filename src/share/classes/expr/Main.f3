@@ -287,7 +287,11 @@ public function run from (args is String[]) to ()
     }
 
     const player = Timeline {
-	paused: true;
+	override var paused = true on replace {
+            if (not paused and playhead == 0s) {
+                ExprNode.Start.onNext(())
+            }
+        }
 	content: mainTimeLayer;
     }
 
@@ -1305,10 +1309,10 @@ public function run from (args is String[]) to ()
                                                                       }
                                                                   }
                                                               }
-                                                              delete dragger from popupLayer.content;
-                                                              clip = null;
-                                                              dragger = null;
                                                           }
+                                                          delete dragger from popupLayer.content;
+                                                          clip = null;
+                                                          dragger = null;
                                                       }
                                                   }
                                               }
