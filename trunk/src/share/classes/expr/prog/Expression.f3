@@ -261,6 +261,8 @@ public const BOOL_MEMBERS =
         m: IF_EXPR;
     }];
 
+public const UNIT_MEMBERS = [FunctionMember { m: Reflect.getFunction("f3.util.Observable", "count", []) }];
+
 public function introspectMembers from (v is Context.ClosureVarContext) to Member[] 
 {
     const t = v.varType.t;
@@ -310,7 +312,9 @@ public function introspect from (t is F3Type, all is Boolean) to Member[]
 		    then INT_MEMBERS 
 		    else if (t == BOOLEAN_TYPE)
 			then BOOL_MEMBERS
-			else []
+                        else if (t == UNIT_TYPE)
+                            then UNIT_MEMBERS
+                            else []
     }
 }
 
@@ -821,14 +825,31 @@ public class IPath {
 
     public var observer is ObserverExpression;
 
-    public function hasObservableInput to Boolean 
-    {
+    // a => Observable of a;
+    function needsLift to Boolean {
         if (observer is Parameter) {
             const p = observer as Parameter;
-            return OBSERVABLE_TYPE.isAssignableFrom(p.getType());
+            if (OBSERVABLE_TYPE.isAssignableFrom(p.getType())) return true;
         }
         return parents == [];
-    }   
+    }
+
+    // Observable of a => a
+    function needsLower to Boolean {
+        if (observer is Parameter) {
+            const p = observer as Parameter;
+            const observable = observer.observable;
+            if (observable is GetVarResult) {
+                var exp is Expression = observable;
+                while (not (exp is Result)) {
+                    exp = (exp as GetVarResult).observable;
+                }
+                var result = exp as Result;
+                if (OBSERVABLE_TYPE.isAssignableFrom(result.t)) return true;
+            }
+        }
+        return parents == [];
+    }
 
     function getContainingObservableDepth to Integer 
     {
@@ -836,7 +857,7 @@ public class IPath {
         for (p in parents) {
             count = Math.max(count, p.getContainingObservableDepth());
         }
-        if (hasObservableInput() and parents <> []) {
+        if (needsLift() and parents <> []) {
             count++;
         }
         return count + id;
@@ -978,10 +999,17 @@ public class IPath {
                 var sep = "";
                 for (p in parents[1..]) {
                     var j = p.getWorldAccess();
-                    if (p.hasObservableInput()) {
+                    if (p.needsLift()) {
+                        println("NON STATIC LIFT: {p}");
                         obDepth = p.getContainingObservableDepth();
                         prefix = j;
                         j = "obs{p.getContainingObservableDepth()-1}";
+                    } else if (p.needsLower()) {
+                        println("NON STATIC LOWER: {p}");
+                        println("NON STATIC LOWER j: {j}");
+                        obDepth = p.getContainingObservableDepth();
+                        prefix = j;
+                        j = "i{getDepth()}";
                     }
                     args = "{args}{sep}{j}";
                     sep = ", ";
@@ -994,11 +1022,27 @@ public class IPath {
             } else {
                 var args = "";
                 var sep = "";
+                var j0 = parents[0].getWorldAccess();
+                if (parents[0].needsLift()) {
+                    obDepth = parents[0].getContainingObservableDepth();
+                    prefix = j0;
+                    j0 = "obs{obDepth-1}";
+                    println("NON STATIC LIFT: prefix={prefix}, j0={j0}");
+                }
                 for (p in parents[1..]) {
-                    args = "{sep}{args}{p.getWorldAccess()}";
+                    var j = p.getWorldAccess();
+                    if (obDepth < 0 and p.needsLift()) {
+                        obDepth = p.getContainingObservableDepth();
+                        prefix = j;
+                        j = "obs{p.getContainingObservableDepth()-1}";
+                    }
+                    args = "{args}{sep}{j}";
                     sep = ", ";
                 }
-                return "{parents[0].getWorldAccess()}.{fun.getName()}({args})";
+                if (obDepth >= 0) {
+                    return "{prefix} \}; const obs{obDepth} = foreach (i{getDepth()} in {j0}.{fun.getName()}({args})) \{";
+                }
+                return "{parents[0].getWorldAccess()}.{fun.getName()}({args})";                
             }
         }
         if (observer is GetVar) {
@@ -2182,7 +2226,9 @@ public class InputView is LinkedView {
                             link0.link();
                         }
                         canvas.dumpSrc();
-                        MasterUndoable.commit();
+                        if (found <> null) {
+                            MasterUndoable.commit();
+                        }
                         tmpLink = null;
                         link0 = null;
                     });
