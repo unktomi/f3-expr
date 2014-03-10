@@ -1,5 +1,6 @@
 package expr;
 import f3.reflect.*;
+import com.google.common.reflect.TypeToken;
 
 public const ctx = F3Local.getContext();
 
@@ -176,10 +177,4 @@ public function getVars from (classType is F3ClassType) to F3VarMember[]
 }
 
 public function run from (args is String[]) to () {
-    for (clazz in args) {
-        println(clazz);
-        for (f in getFunctions(findClass(clazz), yes)) {
-            println(f);
-        }
-    }
 }

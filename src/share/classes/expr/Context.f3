@@ -126,6 +126,13 @@ public class AssetContext is Context {
     override public bound function getContent to Context[] { myContent }
 }
 
+public class FunctionDefinitionContext is GroupContext {
+    public var functionName is String;
+    override var name = bind "{functionName}";
+    public var inputs is Member[];
+    public var outputs is Member[];
+}
+
 public class ClosureVarContext is GroupContext {
     public var varType is TypeAsset;
     public var varName is String = "variable";

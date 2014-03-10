@@ -33,7 +33,7 @@ public class GraphEditor is Trax {
 
     override public function setKeys to () 
     {
-        foreach (resourceTarget in resourceTargets, clip in resourceTarget.channelBox.content) {
+        foreach (resourceTarget in resourceTargets, clip in resourceTarget.channelBox.content where clip.pickableInScene) {
             const ch = clip as Channel of Number;
             var k = ch.pickKey(playheadPos);
             var i is Interpolator of Number = KeyFrame.Linear;
@@ -45,9 +45,10 @@ public class GraphEditor is Trax {
                         k = k.next;
                     }
                     if (k <> null and k.prev <> null and k.next <> null) {
-                        const frame1 = (k.prev.position / (1s/24))  as Integer;
-                        const frame2 = (k.position / (1s/24))  as Integer;
-                        const frame3 = (k.next.position / (1s/24))  as Integer;
+                        const fps = 1s / frameRateN;
+                        const frame1 = (k.prev.position / fps)  as Integer;
+                        const frame2 = (k.position / fps)  as Integer;
+                        const frame3 = (k.next.position / fps)  as Integer;
                         const x1 = frame1;
                         const x2 = frame2;
                         const x3 = frame3;
