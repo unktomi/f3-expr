@@ -79,6 +79,7 @@
 		<path path="lib/f3.awesomium.jogl.jar"/>
 		<path path="lib/f3.cg.jogl.awt.jar"/>
 		<path path="lib/json-simple-1.1.1.jar"/>
+		<path path="lib/guava-16.0.1.jar"/>
             </classpath>
     </f3c>
   </target>

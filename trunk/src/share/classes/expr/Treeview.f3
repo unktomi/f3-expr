@@ -449,7 +449,7 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
 
     var treeBg is Paint = bind bgs[0];
 
-    override var contentBounds = bind Bounds.boundsFromRect(width, height);
+    //override var contentBounds = bind Bounds.boundsFromRect(width, height);
     //override var scissorBounds = bind contentBounds;
 
     override var internalContent = Group {

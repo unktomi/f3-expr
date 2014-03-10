@@ -180,7 +180,10 @@ public class BooleanField is SliderField {
         disp = i.observable.subscribe(onChange);
     }
     override var t on replace {
-        i.set(t > 0.5);
+        try {
+            i.set(t > 0.5);
+        } catch (e is org.f3.runtime.AssignToBoundException) {
+        }
     }
     override function getText from (t is Number) to String
     {
@@ -415,14 +418,18 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
 }
 
 public function inspect from (obj is Object) to (Inspected of ?)[] {
-    foreach(x in inspect0(obj) where x <> null) x;
+    foreach(x in inspect0(obj, Reflect.getType(obj.getClass()) as F3ClassType) where x <> null) x;
 }
 
-function inspect0 from (obj is Object) to (Inspected of ?)[]
+public function inspect from (obj is Object, t is F3ClassType) to (Inspected of ?)[] {
+    foreach(x in inspect0(obj, t) where x <> null) x;
+}
+
+function inspect0 from (obj is Object, classType is F3ClassType) to (Inspected of ?)[]
 {
     println("INSPECTING => {obj}");
     if (obj == null) then [] else {
-	    const members = Expression.introspect(getType(obj.getClass()) as F3ClassType);
+	    const members = Expression.introspect(classType);
 	    foreach (m in members) {
 		println("m={m} {m.m} t={m.t}");
                 var result is Inspected of ?;

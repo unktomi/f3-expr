@@ -89,6 +89,7 @@ const operatorMap = {
     map.put("Sub", "-");
     map.put("Mul", "\u00d7");
     map.put("Multiply", "\u00d7");
+    map.put("*", "\u00d7");
     map.put("Div", "/");
     map.put("Divide", "/");
     map.put("Greater Or Equal", "\u2265");
@@ -612,6 +613,9 @@ function formatClassName from (t is F3Type) to String
     if (t == UNIT_TYPE) {
         return "()"
     }
+    if (t == OBJECT_TYPE) {
+        return "Any"
+    }
     if (t is F3FunctionType) {
         return formatFunctionType(null, t as F3FunctionType)
     }
@@ -664,6 +668,7 @@ function getNextId to String {
 }
 
 public interface Expression {
+    protected const undoList = UndoList {};
     public var id is String = getNextId();
     public bound function getName to String;
     public function getType to F3Type;
@@ -732,7 +737,8 @@ abstract class NodeExpression is ObjectExpression {
     override bound function getName to String { node.id }
     override function toSource from (context is IContext) to String { "(getNode(\"{node.id}\") as {getType().getName()})" }
     override function toEnglish to String {
-        formatEnglishName(getName())
+        //formatEnglishName(getName())
+        "<code>\"{getName()}\"</code>"
     }
 }
 
@@ -759,10 +765,31 @@ public interface ObservableExpression is Expression {
     {
         if (observers == []) then [] else foreach (ob in observers) ob.getTerminals();
     }
+
+    postinit {
+        undoList.addTarget("observers", AbstractRef of ObserverExpression[] {
+                override function get to ObserverExpression[] { observers } 
+                override function set from (xs is ObserverExpression[]) to () {
+                    observers = xs;
+                }
+            });
+    }
+
 }
 
 public interface ObserverExpression is Expression {
     public var observable is ObservableExpression;
+
+    postinit {
+        undoList.addTarget("observers", AbstractRef of ObservableExpression {
+                override function get to ObservableExpression { observable } 
+                override function set from (x is ObservableExpression) to () 
+                {
+                    observable = x;
+                }
+            });
+    }
+
 }
 
 public interface VarExpression is MemberExpression {
@@ -902,7 +929,7 @@ public class IPath {
         if (observer is InputMemberExpression) {
             const i = observer as InputMemberExpression;
             if (i.member.m is F3VarMember and i.member.isObserver) {
-                return "the {formatEnglishName(i.member.name)} of {i.target.toEnglish()} = {parents[0].getEnglishAccess()}"
+                return "assign {parents[0].getEnglishAccess()} to the {formatEnglishName(i.member.name)} of {i.target.toEnglish()}"
             } 
             if (i.member.isObserver and is1ArgFunction(i.member)) {
                 return "{formatEnglishName(i.member.name)} of {i.target.toEnglish()} {parents[0].getEnglishAccess()}";
@@ -1455,6 +1482,7 @@ class ControlArrow is MeshNode.Instance {
 }
 
 public abstract class ExpressionView is AbstractNode {
+    const undoList = UndoList {}
     public function setDebugValue from (x is Object) to () 
     {
     }
@@ -1540,6 +1568,7 @@ public abstract class ExpressionView is AbstractNode {
     {
         if (dragging) {
             canvas.saveCode();
+            MasterUndoable.commit();
         }
         dragging = false;
     }
@@ -1550,6 +1579,7 @@ public abstract class ExpressionView is AbstractNode {
 	d1 = label.observeMouseDown().subscribe(onDown);
 	d2 = label.observeMouseUp().subscribe(onUp);
 	d3 = label.observeMouseDrag().subscribe(onDrag);
+        undoList.addTarget("pos", &pos);
     }
 
     public function serialize to ExprNode {
@@ -1673,8 +1703,8 @@ class FunctionView is ExpressionView {
             }
         }
     }
-
-    const funOutput = OutputView {
+    /*
+    const funOutput is OutputView = if true then null else OutputView {
         canvas: bind canvas;
         cellWidth: 16;
         expression: bind fun;
@@ -1685,7 +1715,7 @@ class FunctionView is ExpressionView {
         override function assignLinkIds to () {
         }
     }
-
+    */
     readonly var inputs is ParameterView[] = bind foreach (p in fun.inputs) ParameterView {
         targetView: this;
 	canvas: bind canvas;
@@ -1713,7 +1743,7 @@ class FunctionView is ExpressionView {
     };
 
     override var internalContent = Group {
-	content: bind [title, funOutput, io];
+	content: bind [title, /* funOutput, */ io];
     }
 
     override function update {
@@ -2074,6 +2104,13 @@ public class LinkView is ExpressionView {
         source.assignLinkIds();
     }
 
+    postinit {
+        undoList.addTarget("target", &target);
+        undoList.addTarget("source", &source);
+        undoList.addTarget("targetLinkId", &targetLinkId);
+        undoList.addTarget("sourceLinkId", &sourceLinkId);
+    }
+
     override var internalContent = Group {
 	override var transform = bind translate(target.getLinkPos())
 	content: bind canvas.makeArrow(canvas.ARROW_COLOR);
@@ -2081,7 +2118,7 @@ public class LinkView is ExpressionView {
 }
 
 abstract class LinkedView is ExpressionView {
-    var links is LinkView[];
+    var links is LinkView[] on replace { canvas.dumpSrc() }
     override function unlink from () to () {
         const links = this.links;
 	for (link in links) {
@@ -2095,6 +2132,9 @@ abstract class LinkedView is ExpressionView {
     }
     public bound function getLinkPos to Point3 { pos }
     public function assignLinkIds to () {
+    }
+    postinit {
+        undoList.addTarget("links", &links);
     }
 }
 
@@ -2142,6 +2182,7 @@ public class InputView is LinkedView {
                             link0.link();
                         }
                         canvas.dumpSrc();
+                        MasterUndoable.commit();
                         tmpLink = null;
                         link0 = null;
                     });
@@ -2335,7 +2376,6 @@ public class OutputView is LinkedView {
     const getTree is GetTreeview = GetTreeview {
         canvas: bind canvas;
         width: bind cellWidth;
-        height: 250;
         get: bind getter;
         exprView: this;
     };
@@ -2350,7 +2390,6 @@ public class OutputView is LinkedView {
     override var internalContent = Group 
     {
 	content: bind getTree
-
     }
     /*
     override function onDrag from (e is MouseEvent) to () 
@@ -2659,12 +2698,13 @@ public class MemberTreecell is Treeview.Treecell
     }
 }
 
-class GetTreeview is ResizableNode {
+class GetTreeview is AbstractNode {
     public var event is Member;
     public var canvas is Canvas;
     public var exprView is OutputView;
     public var cellHeight = bind canvas.cellHeight;
     public var get is GetVar;
+    public var width is Number;
     function open to () {
         treeModel.root.open();
     }
@@ -2675,11 +2715,13 @@ class GetTreeview is ResizableNode {
 
     var debugValue is F3Value;
 
+    public var rootName is String = bind formatType(get.member.t);
+
     const treeModel = MemberTreemodel {
 	root: MemberTreenode {
 	    get: bind get;
 	    m: bind get.member;
-            override var label = bind Names.formatName(m.t.getName());
+            override var label = bind rootName;
             value: bind debugValue;
 	}
     };
@@ -2772,7 +2814,15 @@ class GetTreeview is ResizableNode {
         }
     };
 
-    override var internalContent = bind tv;
+    override var internalContent = Group {
+        content: bind  [tv/*, Rectangle {
+                strokePaint: ColorPaint(Color.RED);
+                transform: bind translate(tv.bounds.center);
+                width: bind tv.bounds.extent.x * 2;
+                height: bind tv.bounds.extent.y * 2;
+                pickable: false;
+                }*/]
+    }
 
     // fix me: move this stuff to canvas
 
@@ -2855,6 +2905,7 @@ class TreeLinker {
                     newlink.link();
                 } 
                 canvas.dumpSrc();
+                MasterUndoable.commit();
             });
     }
     var tmpLink is LinkView = null;
@@ -3122,6 +3173,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 }
                 canvas: this;
             } into views;
+            MasterUndoable.commit();
         }
     }
 
@@ -3143,6 +3195,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             }
 	    canvas: this;
 	} into views;
+        MasterUndoable.commit();
     }
 
     public function onDrop from (where is Pick, clip is TimeNode) to ()
@@ -3160,6 +3213,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             }
 	    canvas: this;
 	} into views;
+        MasterUndoable.commit();
     }
 
     function gatherInputs from (link is LinkView, 
@@ -3366,6 +3420,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     }
 
     public var event is Member;
+    public var subject is Member;
     public var eventContext is Context.MemberContext;
     public var varContext is Context.ClosureVarContext;
 
@@ -3404,20 +3459,32 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 	unsubscribe();
     }
 
-    const rootView is Node = TransformNode { 
-        tx: bind -width / 2.0 + 120; 
+    const terminalView is Node = TransformNode { 
+        tx: bind width / 2.0 + 120; 
         ty: bind height / 2 - 20; 
-        content: bind rootExprView;  
+        content: bind terminalExprView;  
     };
 
-    public readonly var rootExprView is GetVarView = bind makeGetter(event);
+    const initialView is Node = TransformNode { 
+        tx: bind -width / 2.0 + 120; 
+        ty: bind height / 2 - 20; 
+        content: bind initialExprView;  
+    };
+
+    public readonly var initialExprView is GetVarView = bind makeGetter(event);
+    public readonly var terminalExprView is ExpressionView = bind makeSetter(subject);
+
+    function makeSetter from (subject is Member) to ExpressionView 
+    {
+        null; //@TODO
+    }
 
     var varRoot is GetVar;
 
     function makeGetter from (event is Member) to GetVarView {
 	if (event == null) then null else {
 		var r = GetVarView {
-		    parent: rootView;
+		    parent: initialView;
 		    canvas: this;
                     isLabeled: true;
                     override bound function getLabel to String { Names.formatName(event.name) }
@@ -3428,6 +3495,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 		    }
 		}
 		r.updateParent();
+                MasterUndoable.commit();
 		r;
 	    }
     }
@@ -3469,7 +3537,6 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     var selectionRect = Rectangle {
         transform: bind translate(selectionPoint);
         visible: false;
-        //fillPaint: ColorPaint(Color.GRAY);
         strokePaint: ColorPaint(Color.color(.2, .2, .2, 1));
         pickable: false;
         /*
@@ -3480,6 +3547,159 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         */
     };
 
+    function createFunctionFromSelection 
+        from (result is java.util.Set of ExpressionView,
+              links is java.util.Set of LinkView) 
+        to Function
+    {
+        const bounds = canvas.toLocal * selectionRect.strokeMesh.boundsInScene;
+        var inputTypes is F3Type[];
+        var outputTypes is F3Type[];
+        for (link in canvas.links) {
+            var src is ExpressionView = link.source;
+            var target is ExpressionView = link.target;
+            println("src={src}");
+            println("target={target}");
+            println("bounds={bounds}, src={src.boundsInScene}, target={target.boundsInScene}");
+            var containsSrc = bounds.contains(link.source.getLinkPos());
+            var containsTarget = bounds.contains(link.target.getLinkPos());
+            println("containsSrc={containsSrc}, containsTarget={containsTarget}");
+            if (containsSrc and containsTarget) {
+                // implementation
+                links.add(link);
+            } else if (containsSrc and not containsTarget) {
+                // output
+                println("output: {src.expression.getType()}");
+                insert src.expression.getType() into outputTypes;
+            } else if (containsTarget and not containsSrc) {
+                // input
+                println("input: {target.expression.getType()}");
+                insert target.expression.getType() into inputTypes;
+            } else {
+                continue;
+            }
+            if (containsSrc) {
+                if (src is ResultView) {
+                    src = (src as ResultView).sourceView;
+                    result.add(src);
+                } else if (src is ObjectOutputView) {
+                    src = (src as ObjectOutputView).sourceView;
+                    result.add(src);
+                } else {
+                    result.add(src);
+                }
+            }
+            if (containsTarget) {
+                result.add(target);
+            }
+        }
+        const ft = ctx.makeFunctionType(inputTypes, if outputTypes.size() > 0 then outputTypes[0] else Reflect.UNIT_TYPE);
+        println("ft={ft}");
+        var name = "extracted function";
+        return Function {
+            funMember: FunctionMember {
+                m: F3FunctionMember {
+                    override function getName to String {
+                        name;
+                    }
+                    override function getDeclaringClass to F3ClassType {
+                        null;
+                    }
+                    override function isStatic to Boolean { false }
+                    override function isPublic to Boolean { true }
+                    override function isPackage to Boolean { false }
+                    override function isProtected to Boolean { false }
+                    override function getType to F3FunctionType { return ft }
+                    override function invoke from (owner is F3ObjectValue, args is nativearray of F3Value) to F3Value
+                    {
+                        null;
+                    }
+                }
+            }
+        }
+    }
+
+    function deleteViewsInSelection to ()
+    {
+        const bounds = selectionRect.strokeMesh.boundsInScene;
+        const vs = foreach (v in views where bounds.contains(v.boundsInScene)) v;
+        for (v in vs) {
+            v.unlink();
+            delete v from views;
+        }
+        saveCode();
+        MasterUndoable.commit();
+    }
+
+    function extract from () to () 
+    {
+        const linked = new java.util.HashSet of ExpressionView();
+        const links = new java.util.HashSet of LinkView();
+        const fun = createFunctionFromSelection(linked, links);
+        /*
+        const bounds = selectionRect.boundsInScene;
+        for (v in views where bounds.contains(v.boundsInScene)) {
+            serialize(v);
+            for (link in v.getInputLinks()) gatherInputsInSelection(link, linked, links);
+        }
+        var todo = ExprScene {};
+        println("extract views {linked}");
+        for (e in serializationMap.values()) {
+            insert e into todo.views;
+        }
+        for (link in links) {
+            insert link.serialize() into todo.links;
+        }
+        const newExp = FunctionView {
+            fun: fun
+        }
+        for (e in linked) {
+            e.unlink();
+            delete e from views;
+        }
+        const prog = Program {
+            event: event;
+            evalContext: Program.EvalContext {
+                interactive: interactive;
+                targetNode: targetNode;
+                debugger: debugger;
+                instanceSpace: instanceSpace;
+                lookupSpatial: targetSpace.lookup;
+                targetTimeline: targetTimeline;
+                lookupTemporal: targetTime.lookup;
+                eventContext: eventContext;
+                varContext: v;
+            }
+            code: todo;
+        }
+        const newCanvas = Canvas {
+            menuFactory: menuFactory;
+            interactive: interactive;
+            stepping: bind stepping;
+            debugger: debugger;
+            popupLayer: popupLayer;
+            popupScene: popupScene;
+            pathFactory: pathFactory;
+            width: width;
+            height: height;
+            targetNode: targetNode,
+            event: event;
+            eventContext: eventContext;
+            varContext: v;
+            targetSpace: targetSpace;
+            targetTime: targetTime;
+            targetTimeline: targetTimeline;
+            instanceSpace: instanceSpace;
+        }
+        prog.canvas = newCanvas;
+        newCanvas.prog = prog;
+        prog.deserialize();
+        prog.reset();
+        prog.canvas.genSource();
+        insert prog into targetNode.programs;
+        */
+    }
+
     function modifySelection from (e is MouseEvent) to ()
     {
         const drag0 = selectionTransformInverse * e.dragStart;
@@ -3487,9 +3707,14 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         const drag = drag1 - drag0;
         selectionPoint += new Vec3(drag.x, drag.y, 0) / 2;
         selectionRect.width += drag.x;
-        selectionRect.height += drag.y;
+        selectionRect.height += -drag.y;
         println("dragStart: {e.dragStart}, dragEnd: {e.dragEnd}, location: {e.location}, drag: {e.drag}");
         println("modified selection : {selectionPoint.x}, {selectionPoint.y}, {selectionRect.width}, {selectionRect.height}");
+        println("BOUNDS fill={selectionRect.fillMesh.bounds}");
+        println("BOUNDS stroke ={selectionRect.strokeMesh.bounds}");
+        println("CONTENT BOUNDS={selectionRect.contentBounds}");
+        println("BOUNDS={selectionRect.bounds}");
+        println("BOUNDS IN SCENE={selectionRect.boundsInScene}");
     }
         
     function endSelection from (e is MouseEvent) to ()
@@ -3498,8 +3723,8 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         
     function beginSelection from (e is MouseEvent) to ()
     {
-        selectionPoint = selectionTransformInverse * e.location;
         selectionRect.visible = true;
+        selectionPoint = selectionTransformInverse * e.location;
         selectionRect.width = 0;
         selectionRect.height = 0;
         println("begin selection: {e}");
@@ -3525,6 +3750,19 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 }
             } else if (e.isMouseButton3Down()) {
                 // popup menu
+                const menu = Menu {
+                    items: 
+                    [MenuItem {
+                        label: "Factor";
+                        action: canvas.extract
+                    },
+                    MenuItem {
+                        label: "Delete";
+                        action: canvas.deleteViewsInSelection;
+                    }]
+                }
+                println("menu factory => {menuFactory}");
+                e.stage.showPopupMenu(e.screenx, e.screeny, menu);
             }
         }
 
@@ -3551,7 +3789,6 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         } 	
     };
 
-
     const sourceCode = XHTML.Text {
         width: bind width;
         style: "font-family:Lucida Grande; font-weight:normal; font-size: 12px; color: #101010E0;";
@@ -3560,15 +3797,21 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         visible: bind englishOutput <> "";
     };
 
-    const linkHandler = sourceCode.observeLinkClicked().subscribe(function from (u is String) to () {
-            println("link clicked: {u}");
-            println("prog={prog}");
-            println("prog.sourceCode={prog.sourceCode}");
-            showSource = (u == "source://");
-        });
+    const undoList = expr.undo.UndoList {} on replace {
+	undoList.addTarget("links", &links);
+	undoList.addTarget("views", &views);
+    }
+
+    const linkHandler = sourceCode.observeLinkClicked().subscribe(function from (u is String) to () 
+                                                                  {
+                                                                      println("link clicked: {u}");
+                                                                      println("prog={prog}");
+                                                                      println("prog.sourceCode={prog.sourceCode}");
+                                                                      showSource = (u == "source://");
+                                                                  });
     
-    var selectionTransform = bind translate(cx, cy) * scale(zoomx, zoomy);
-    var selectionTransformInverse = bind selectionTransform.inverse();
+    readonly var selectionTransform = bind translate(cx, cy) * scale(zoomx, zoomy);
+    readonly var selectionTransformInverse = bind selectionTransform.inverse();
 
     override var internalContent = Holder { 
 	//scissorBounds: bind bgRect.bounds;
@@ -3581,7 +3824,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                content: localSpace = Group {
                    transform: bind selectionTransform;
 	           content: 
-                   [Group { content: bind rootView }, Group { content: bind views },
+                   [Group { content: bind initialView }, Group {content: bind terminalView}, Group { content: bind views },
                    MeshNode {
                        id: "lines"
                        pickable: false;
@@ -3603,15 +3846,18 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         selectedExpr = null;
     }
 
-    public function deleteSelection to () {
+    public function deleteSelection to () 
+    {
         var n = selectedExpr;
         selectedExpr = null;
         n.unlink();
         delete n from views;
         dumpSrc();
+        MasterUndoable.commit();
     }
 
-    override function onKeyDown from (e is KeyboardEvent) to () {
+    override function onKeyDown from (e is KeyboardEvent) to () 
+    {
         if (e.keyCode == Keys.Delete or e.keyCode == Keys.Backspace) {
             deleteSelection();
         } else if (e.keyCode == Keys.F) {
@@ -3635,7 +3881,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 	fun: getFunction("expr.Console", "println", ["Object"]);
     };
 
-    public var views is ExpressionView[] = [];
+    public var views is ExpressionView[] = [] on replace { canvas.dumpSrc() }
     /*
      = FunctionView {
 	pos: new Point3(100, 0, 0);
@@ -3646,13 +3892,14 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     var arrows is TransformNode[];
 
-    public var links is LinkView[];
+    public var links is LinkView[] on replace { canvas.dumpSrc() }
 
     var lines = LineMesh {};
 
     var linkMesh is AbstractMesh;
 
-    function getLinkInfo {
+    function getLinkInfo to LinkInfo[] 
+    {
 	foreach (link in links where link.visible) {
 	    var source = link.source;
 	    var sourcePos = source.getLinkPos();
@@ -3692,7 +3939,8 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     const lineOff is Vec3 = new Vec3(15, 0, 0);
     const lineOff1 is Vec3 = new Vec3(18.5, 0, 0);
 
-    function genLines from (links is LinkInfo[], zoomx is Number, zoomy is Number) to AbstractMesh {
+    function genLines from (links is LinkInfo[], zoomx is Number, zoomy is Number) to AbstractMesh 
+    {
 	lines.reset();
 	delete arrows[links.size()..];
 	while (arrows.size() < links.size()) {
@@ -3824,15 +4072,17 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         return result;
     }
 
-    function serialize from (e is ExpressionView) to ExprNode {
+    function serialize from (e is ExpressionView) to ExprNode 
+    {
         if (e == null) return null;
-        var r = serializationMap.get(e);
+        const r = serializationMap.get(e);
         //println("serializing: { e } => { r }");
         if (r <> null) return r;
         return e.serialize();
     }
 
-    function saveCode to () {
+    function saveCode to () 
+    {
         if (links.size() == 0 and views.size() <= 1) {
             prog.code = null;
             prog.sourceCode = "";
@@ -3840,9 +4090,9 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         } else {
             eventContext.hasHandler = true;
             serializationMap.clear();
-            serialize(rootExprView);
+            serialize(initialExprView);
             const w = new java.io.StringWriter();
-            //println("root={rootExprView} => {serializationMap.get(rootExprView)}");
+            //println("root={initialExprView} => {serializationMap.get(initialExprView)}");
             foreach (obj in views) {
                 var x = serialize(obj);
                 //                println("serialize {obj} => {x}");
@@ -3865,7 +4115,6 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             }
             prog.code = todo;
         }
-        MasterUndoable.commit();
     }
 
     var englishOutput is String;
@@ -3873,7 +4122,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     function visit from (e is Expression, es is Expression[]) to String
     {
         saveCode();
-	var termset = new java.util.HashSet of Expression();
+	const termset = new java.util.HashSet of Expression();
         var terms is Expression[];
         var terms2 is Expression[];
         for (term in e.getTerminals()) {
@@ -3958,7 +4207,8 @@ public class MemberNode {
     public var name is String;
     public var declaringClass is String;
     public var outputType is String;
-    public function deserialize to Member {
+    public function deserialize to Member 
+    {
         const clazz = Reflect.getType(declaringClass) as F3ClassType;
         const members = introspect(clazz);
         for (m in members) {
@@ -3986,7 +4236,8 @@ public class ExprNode {
     public var x is Number;
     public var y is Number;
     public var member is MemberNode;
-    public function createView from (canvas is Canvas) to ExpressionView {
+    public function createView from (canvas is Canvas) to ExpressionView 
+    {
         println("implement me!: {this}");
         return null;
     }
@@ -4043,7 +4294,9 @@ public class FunNode is ExprNode {
             if (p.links.size() > 0) {
                 const path = p.sourceId;
                 const tn = v.output.getTree.treeModel.resolvePath(path);
-                tn.open();
+                if (tn.parent <> null) {
+                    tn.open();
+                }
                 println("path={path} tn={tn}");
                 for (link in p.links) {
                     const lnk = canvas.getLink(link);
@@ -4073,7 +4326,8 @@ public class ObjNode is ExprNode {
 
 public class NodeObjNode is ObjNode {
     public var nodeId is String;
-    public override function createView from (canvas is Canvas) to ObjectView {
+    public override function createView from (canvas is Canvas) to ObjectView 
+    {
         const clip = canvas.lookupSpatial(nodeId);
 	const typ = Reflect.getType(clip.getClass().getName());
         const names = new java.util.HashSet of String;
@@ -4106,7 +4360,9 @@ public class NodeObjNode is ObjNode {
             if (p.links.size() > 0) {
                 const path = p.sourceId;
                 const tn = v.outputViews[0].getTree.treeModel.resolvePath(path);
-                tn.open();
+                if (tn.parent <> null) {
+                    tn.open();
+                }
                 println("***path={path} tn={tn}");
                 for (link in p.links) {
                     const lnk = canvas.getLink(link);
@@ -4125,7 +4381,8 @@ public class NodeObjNode is ObjNode {
 
 public class TimeNodeObjNode is ObjNode {
     public var timeNodeId is String;
-    public override function createView from (canvas is Canvas) to ObjectView {
+    public override function createView from (canvas is Canvas) to ObjectView 
+    {
         const clip = canvas.lookupTemporal(timeNodeId);
 	const typ = Reflect.getType("f3.media.scene.TimeNode");
         const names = ["pause", "play", "playFromStart", "reverse"];
@@ -4160,7 +4417,8 @@ public class TimeNodeObjNode is ObjNode {
 public class VarContextObjNode is ObjNode {
     public var varId is String;
     public var varType is String;
-    public override function createView from (canvas is Canvas) to ObjectView {
+    public override function createView from (canvas is Canvas) to ObjectView 
+    {
         const c is Context.ClosureVarContext = canvas.eventContext.resolve(varId) as Context.ClosureVarContext;
         const typ = c.varType.t;
         const names = new java.util.HashSet of String;
@@ -4195,11 +4453,12 @@ public class GetNode is ExprNode {
     public var outputs is SourceNode[];
     public var isOpen is Boolean;
     public var visibleRowCount is Number = 10;
-    public override function createView from (canvas is Canvas) to GetVarView {
+    public override function createView from (canvas is Canvas) to GetVarView 
+    {
         const m = member.deserialize();
         var v is GetVarView;
         if (m == canvas.event) {
-            v = canvas.rootExprView;
+            v = canvas.initialExprView;
             v.visibleRowCount = visibleRowCount;
             v.pos = new Point3(x, y, 0);
         } else {
@@ -4226,7 +4485,9 @@ public class GetNode is ExprNode {
             if (p.links.size() > 0) {
                 const path = p.sourceId;
                 const tn = v.tv.treeModel.resolvePath(path);
-                tn.open();
+                if (tn.parent <> null) {
+                    tn.open();
+                }
                 println("getNode path={path} tn={tn}");
                 println("getNode v={v}, tv={v.tv}, treeModel={v.tv.treeModel}");
                 for (link in p.links) {
@@ -4276,7 +4537,7 @@ public class Editor is ResizableNode, Focuser {
     public var eventContext is Context.MemberContext;
     public var varContext is Context.ClosureVarContext;
     public var event is Member = bind eventContext.member;
-
+    public var subject is Member;
     public var targetSpace is Node;
     public var targetTime is TimeNode;
     public var targetTimeline is Timeline;
@@ -4318,6 +4579,7 @@ public class Editor is ResizableNode, Focuser {
                 println("NO MATCH");
             }
 	}
+        const found = prog == null;
 	if (prog == null) {
 	    prog = Program { 
                 event: event;
@@ -4349,6 +4611,7 @@ public class Editor is ResizableNode, Focuser {
                 height: height;
 		targetNode: target,
 		event: event;
+                subject: subject;
                 eventContext: eventContext;
                 varContext: varContext;
 		targetSpace: targetSpace;
@@ -4367,7 +4630,7 @@ public class Editor is ResizableNode, Focuser {
             prog.canvas.prog = prog;
             prog.deserialize();
             prog.reset();
-            prog.canvas.dumpSrc()
+            prog.canvas.dumpSrc();
 	}
 	return prog.canvas;
     }
