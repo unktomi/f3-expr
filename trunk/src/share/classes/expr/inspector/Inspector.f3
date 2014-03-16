@@ -418,7 +418,7 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
 }
 
 public function inspect from (obj is Object) to (Inspected of ?)[] {
-    foreach(x in inspect0(obj, Reflect.getType(obj.getClass()) as F3ClassType) where x <> null) x;
+    if (obj == null) then [] else foreach (x in inspect0(obj, Reflect.getType(obj.getClass()) as F3ClassType) where x <> null) x;
 }
 
 public function inspect from (obj is Object, t is F3ClassType) to (Inspected of ?)[] {
