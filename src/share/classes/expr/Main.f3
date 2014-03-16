@@ -1580,7 +1580,7 @@ public function run from (args is String[]) to ()
                                                 }
                                             },
 				 Tabview.Tab {
-				    title: bind "Event Handler: {contextModel.selectedContext.name}"
+				    title: bind if (contextModel.selectedVarContext <> null) then "Definition: {contextModel.selectedVarContext.name}" else "Event Handler: {contextModel.selectedContext.name}"
 				    content: expr.prog.Expression.Editor {
                                          menuFactory: THE_MENU_FACTORY;
 					 //event: bind inspector1.inspecting[inspector1.selectedIndex].member;

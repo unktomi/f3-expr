@@ -192,7 +192,7 @@ function typeApply from (target is F3Type,
     return target;
 }
 
-function makeFunMember from (name is String, params is F3Type[], ret is F3Type) to Member 
+function makeFunMember from (name is String, params is F3Type[], ret is F3Type) to FunctionMember 
 {
     FunctionMember {
 	ft: ctx.makeFunctionType(params, ret);
@@ -201,7 +201,7 @@ function makeFunMember from (name is String, params is F3Type[], ret is F3Type) 
     }
 }
 
-;public const OBSVB_MEMBERS = {
+public const OBSVB_MEMBERS = {
     const clazz = Reflect.findClass("f3.util.Observable");
     const funs = Reflect.getFunctions(clazz, false);
     const names = ["And", "Or", "Zip", "Drop", "Take", "Map"];
@@ -581,7 +581,7 @@ function formatType from (t is F3Type) to String
         then "{formatType((t as F3SequenceType).getComponentType())}[]" 
         else if (t is F3FunctionType) then formatFunctionType(null, t as F3FunctionType) 
             else if (t is F3ClassType) then { 
-                    //const ct = t as F3ClassType; 
+                    const ct = t as F3ClassType; 
                     //const dot = t.getName().lastIndexOf("."); 
                     //if (dot >= 0) then t.getName().substring(dot+1) else t.getName();
                     formatClassName(t)
@@ -592,7 +592,7 @@ function formatType from (t is F3Type) to String
 function formatFunctionType from (clazz is F3ClassType, ft is F3FunctionType) to String 
 {
      
-    var r = if clazz == null then "(" else "({if (Reflect.isObservableType(clazz)) "Observable" else formatType(clazz)}";
+    var r = if clazz == null then "(" else "({formatType(clazz)}";
     var sep = if clazz == null then "" else ", ";
     for (i in [0..<ft.minArgs()]) {
         r = "{r}{sep}{formatType(ft.getArgumentType(i))}";
@@ -801,7 +801,6 @@ public interface VarExpression is MemberExpression {
 }
 
 public class IPath {
-
     public var id is Integer;
     public var parents is IPath[];
 
@@ -831,7 +830,7 @@ public class IPath {
             const p = observer as Parameter;
             if (OBSERVABLE_TYPE.isAssignableFrom(p.getType())) return true;
         }
-        return parents == [];
+        return false;
     }
 
     // Observable of a => a
@@ -848,7 +847,7 @@ public class IPath {
                 if (OBSERVABLE_TYPE.isAssignableFrom(result.t)) return true;
             }
         }
-        return parents == [];
+        return false;
     }
 
     function getContainingObservableDepth to Integer 
@@ -978,6 +977,10 @@ public class IPath {
             }
             if (observer.observable is OutputMemberExpression) {
                 const n = observer.observable as OutputMemberExpression;
+                const src = n.source;
+                if (src is VarContextExpression) {
+                    return "<<{src.getName()}>>";
+                }
                 return "i0";
             }
             if (observer is TreeGetVar) {
@@ -3377,7 +3380,11 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                     //const src = cell.linkedView;
                     println("SOURCE of link = {src}");
                     const lnk = LinkView {
-                        canvas: this;
+                        canvas: canvas;
+                        pathFactory: canvas.pathFactory;
+                        layoutEngine: canvas.layoutEngine;
+                        imageLoader: canvas.imageLoader;
+                        effectLoader: canvas.effectLoader;
                         source: src;
                         target: targets[indexof path];
                     }
@@ -3387,6 +3394,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             }
             const prog = Program {
                 event: event;
+                parent: this.prog;
                 evalContext: Program.EvalContext {
                     interactive: interactive;
                     targetNode: targetNode;
@@ -3413,6 +3421,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 		targetNode: targetNode,
 		event: event;
                 eventContext: eventContext;
+                subject: v;
                 varContext: v;
 		targetSpace: targetSpace;
 		targetTime: targetTime;
@@ -3466,7 +3475,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     }
 
     public var event is Member;
-    public var subject is Member;
+    public var subject is Context.ClosureVarContext;
     public var eventContext is Context.MemberContext;
     public var varContext is Context.ClosureVarContext;
 
@@ -3506,7 +3515,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     }
 
     const terminalView is Node = TransformNode { 
-        tx: bind width / 2.0 + 120; 
+        tx: bind width / 2.0 - 120; 
         ty: bind height / 2 - 20; 
         content: bind terminalExprView;  
     };
@@ -3520,9 +3529,27 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     public readonly var initialExprView is GetVarView = bind makeGetter(event);
     public readonly var terminalExprView is ExpressionView = bind makeSetter(subject);
 
-    function makeSetter from (subject is Member) to ExpressionView 
+    var subjectExp is Expression;
+
+    var subjectNameListener is Disposable;
+
+    function makeSetter from (c is Context.ClosureVarContext) to ExpressionView 
     {
-        null; //@TODO
+        if (c == null) {
+            return null;
+        }
+        subjectNameListener.dispose();
+        subjectNameListener = Observables.observe(&c.varName).subscribe(function from (n is String) to () {
+                dumpSrc();
+            });
+        const fun = Function { funMember: bind makeFunMember(c.varName, [c.varType.t], UNIT_TYPE) };
+        subjectExp = fun;
+        FunctionView {
+            selectable: false;
+            canvas: this;
+            fun: fun
+            override var output = null;
+        }
     }
 
     var varRoot is GetVar;
@@ -4186,7 +4213,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         const mem = e as MemberExpression;
 	var itype = mem.member.m.getDeclaringClass();
         if (itype == null) return "";
-	var result = "var _ = function from (debugger is f3.util.ObservableDebugger, i$ is Object, getVar is function from String to Object, getNode is function from String to f3.media.scene.Node, getClip is function from String to f3.media.scene.TimeNode) to (f3.util.Observable of ?)[] \{ var i0 = i$ as {itype.getName()}; ";
+	var result = "var _ = function from (debugger is f3.util.ObservableDebugger, i$ is Object, getVar is function from String to Object, getNode is function from String to f3.media.scene.Node, getClip is function from String to f3.media.scene.TimeNode) to (f3.util.Observable of ?)[] \{ var i0 = i$ as {itype.getName()};  ";
         if (terms == []) {
             var rs = foreach (x in eventContext.content) {
                 if (x is Context.ResourceNodeContext) {
@@ -4208,35 +4235,52 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             }
             const p = context.getIPath(t as ObserverExpression);
         }
-        context.dump();
         var eng = "";
-        for (term in terms) {
-            var t = term;
-            if (t is Result) {
-                t = (t as Result).observers[0];
+        if (subjectExp <> null) {
+            for (link in terminalExprView.getInputLinks()) {
+                context.getIPath(link.target.expression as ObserverExpression);
             }
-            const p = context.getIPath(t as ObserverExpression);
-            const d = p.getContainingObservableDepth();
-            var app = mem.member.toApply();
-            if (not mem.member.m.isStatic()) {
-                app = "i0.{app}";
+            const t = terminalExprView.getInputLinks()[0].target.expression as ObserverExpression;
+            if (t <> null) {
+                const p = context.getIPath(t);
+                const j = p.getWorldAccess();
+                eng = "<i>{subject.varName}</i> = {p.getEnglishAccess()}";
+                println("code => {j}");
+                prog.defineVar(subject.varName, "var <<{subject.varName}>> = {j}; ");
+            } else {
+                prog.defineVar(subject.varName, "var <<{subject.varName}>> is <<{subject.varType.t}; ");
             }
-            result = "{result} const obs{p.getRootId()} = foreach (i in {app}) \{ {p.getWorldAccess()} \}";
-            ret = "{ret}{sep}obs{p.getContainingObservableDepth()}";
-            sep = ", ";
-            println(p.getWorldAccess());
-            eng = "{eng}For each {formatEnglishName(mem.member.name)} event: ";
-            eng = "{eng}{p.getEnglishAccess()}. "
-        }
-        println("ENGLISH={eng}");
-        englishOutput = eng;
-        result = "{result}{ret}];\}";
-        try {
-            const toCompile = result;
-            println("compiling: {toCompile}");
-            prog.evaluate(if terms.size() == 0 then "" else toCompile);
-        } catch (thr is java.lang.Throwable) {
-            thr.printStackTrace();
+            englishOutput = eng;
+        } else {
+            context.dump();
+            for (term in terms) {
+                var t = term;
+                if (t is Result) {
+                    t = (t as Result).observers[0];
+                }
+                const p = context.getIPath(t as ObserverExpression);
+                const d = p.getContainingObservableDepth();
+                var app = mem.member.toApply();
+                if (not mem.member.m.isStatic()) {
+                    app = "i0.{app}";
+                }
+                result = "{result} const obs{p.getRootId()} = foreach (i in {app}) \{ %VARS%; {p.getWorldAccess()} \}";
+                ret = "{ret}{sep}obs{p.getContainingObservableDepth()}";
+                sep = ", ";
+                println(p.getWorldAccess());
+                eng = "{eng}For each {formatEnglishName(mem.member.name)} event: ";
+                eng = "{eng}{p.getEnglishAccess()}. ";
+            }
+            println("ENGLISH={eng}");
+            englishOutput = eng;
+            result = "{result}{ret}];\}";
+            try {
+                const toCompile = result;
+                println("compiling: {toCompile}");
+                prog.evaluate(if terms.size() == 0 then "" else toCompile);
+            } catch (thr is java.lang.Throwable) {
+                thr.printStackTrace();
+            }
         }
 	result;
     }
@@ -4583,7 +4627,7 @@ public class Editor is ResizableNode, Focuser {
     public var eventContext is Context.MemberContext;
     public var varContext is Context.ClosureVarContext;
     public var event is Member = bind eventContext.member;
-    public var subject is Member;
+    public var subject is Context.ClosureVarContext;
     public var targetSpace is Node;
     public var targetTime is TimeNode;
     public var targetTimeline is Timeline;
@@ -4610,24 +4654,51 @@ public class Editor is ResizableNode, Focuser {
         content: bind canvas;
     }
 
-    function getCanvas from (target is ResourceTarget, eventContext is Context.MemberContext, varContext is Context.ClosureVarContext) to Canvas
+    function getCanvas 
+        from (target is ResourceTarget, 
+              eventContext is Context.MemberContext, 
+              varContext is Context.ClosureVarContext) 
+        to Canvas
     {
 	var prog is Program;
         println("TARGET: {target}, programs={target.programs.size()}");
+        var parentProg is Program;
 	for (x in target.programs) {
             println("PROGRAM {x.event.m}, event={eventContext.member.m}");
             println("PROGRAM {java.lang.System.identityHashCode(x.event.m)}, event={java.lang.System.identityHashCode(eventContext.member.m)}");
 	    if (x.event == eventContext.member and x.evalContext.varContext == varContext) { // hack
                 println("FOUND IT");
 		prog = x;
-		break;
 	    } else {
+                if (x.event == eventContext.member and varContext <> null and x.evalContext.varContext == null) {
+                    parentProg = x;
+                }
                 println("NO MATCH");
             }
 	}
         const found = prog == null;
 	if (prog == null) {
+            if (parentProg == null and varContext <> null) {
+                parentProg = Program { 
+                    parent: parentProg;
+                    event: event;
+                    evalContext: Program.EvalContext {
+                        eventContext: eventContext;
+                        varContext: null;
+                        interactive: interactive;
+                        targetNode: target;
+                        debugger: debugger;
+                        instanceSpace: instanceSpace;
+                        lookupSpatial: targetSpace.lookup;
+                        targetTimeline: targetTimeline;
+                        lookupTemporal: targetTime.lookup;
+                    }
+                }
+                insert parentProg into target.programs;
+            }
+	    insert prog into target.programs;
 	    prog = Program { 
+                parent: parentProg;
                 event: event;
                 evalContext: Program.EvalContext {
                     eventContext: eventContext;
@@ -4657,7 +4728,7 @@ public class Editor is ResizableNode, Focuser {
                 height: height;
 		targetNode: target,
 		event: event;
-                subject: subject;
+                subject: varContext;
                 eventContext: eventContext;
                 varContext: varContext;
 		targetSpace: targetSpace;

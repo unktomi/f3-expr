@@ -154,9 +154,8 @@ public class ClosureVarContext is GroupContext {
         println("content from type of {varType} => {results}");
         return results;
     }
-    public const inputContext = VarInputContext {parent: this};
     public const outputContext = VarOutputContext {parent: this};
-    var myContent = bind [inputContext, outputContext, content];
+    var myContent = bind [outputContext, content];
     override public bound function getContent to Context[] 
     { 
         myContent
@@ -170,7 +169,7 @@ public class VarInputContext is GroupContext {
 
 public class VarOutputContext is GroupContext {
     public function getVar to ClosureVarContext { parent as ClosureVarContext }
-    override var name = "Output";
+    override var name = "Observe Change";
 }
 
 public class VarContext is GroupContext {
@@ -244,14 +243,18 @@ public class ContextTreemodel is Treemodel {
         selectedGroupContext = (p as ContextTreenode).context as GroupContext;
         p = tn;
         var m is MemberContext = null;
+        var v is ClosureVarContext;
         while (p <> null) {
             var j = (p as ContextTreenode).context;
-            m = if (j is MemberContext) then (j as MemberContext) else null;
-            if (m <> null) {
-                break;
+            if (m == null) {
+                m = if (j is MemberContext) then (j as MemberContext) else null;
+            }
+            if (v == null) {
+                v = if (j is ClosureVarContext) then j as ClosureVarContext else null;
             }
             p = p.parent;
         }
+        selectedVarContext = v;
         selectedMemberContext = m;
         println("selected context => {selectedContext}");
         p = tn;
@@ -267,11 +270,12 @@ public class ContextTreemodel is Treemodel {
         selectedObjectContext = o;
         println("selected object context => {o}: {o.getTarget()}");
     }
+    public var selectedVarInputContext is VarInputContext = bind if (selectedContext is VarInputContext) then selectedContext as VarInputContext else null;
     public var selectedObjectContext is ResourceObjectContext;
     public var selectedGroupContext is GroupContext;
     public var selectedMember is Member = bind selectedMemberContext.member;
     public var selectedMemberContext is MemberContext;
-    public readonly var selectedVarContext is ClosureVarContext = bind if (selectedContext is ClosureVarContext) then selectedContext as ClosureVarContext else null;
+    public readonly var selectedVarContext is ClosureVarContext;
     override var root = ContextTreenode { context: bind rootContext };
     const disp = selectionObserver.subscribe(function from (tn is Treenode) to () {
             this.tn = tn;

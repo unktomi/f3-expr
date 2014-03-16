@@ -69,7 +69,7 @@ public class EvalContext {
             return;
         }
         const debugger = if externalDebugger <> null then externalDebugger else this.debugger;
-        const f = evaluator.compileAndRun(prog.sourceCode) 
+        const f = evaluator.compileAndRun(prog.getSourceCode()) 
             as function from (ObservableDebugger, Object, 
                               function from String to Object, function from String to Node, function from String to TimeNode) to (Observable of ?)[];
         unsubscribe();
@@ -152,19 +152,41 @@ public class Program {
     public var sourceCode is String;
     public var subtarget is String;
 
+    public var parent is Program;
+
     public const debugger is ProgramDebugger = ProgramDebugger {
         program: this;
     }
 
     public const evalContext is EvalContext;
 
+    const varSources = new java.util.HashMap of (String, String);
+
+    public function defineVar from (varName is String, source is String) to ()
+    {
+        varSources.put(varName, source);
+        if (parent <> null) {
+            parent.defineVar(varName, source);
+        }
+    }
+
     public function evaluate to () {
         evalContext.evaluate(this, canvas.debuggerEngine)
     }
 
-    public function evaluate from (sourceCode is String) to () {
-        this.sourceCode = sourceCode;
+    public function evaluate from (sourceTemplate is String) to () {
+        this.sourceCode = sourceTemplate;
         evaluate();
+    }
+
+    function getSourceCode to String {
+        var varSource is String = "";
+        for (v in varSources.values()) {
+            varSource = "{varSource}{v}";
+        }
+        const result = sourceCode.replace("%VARS%", varSource);
+        println("SOURCE => {result}");
+        return result;
     }
 
     public function reset to ()
