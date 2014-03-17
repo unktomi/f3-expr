@@ -347,4 +347,20 @@ public class AssetModel is Treemodel {
              Scene2DAsset {}, foreach (r in resources.resources) makeAsset(r)]
 	}
     }
+
+    public function findTypeAsset from (t is String) to TypeAsset 
+    {
+        var r is TypeAsset;
+        root.foldLeft((), function from (_ is (), tn is Treenode) to () {
+                const n = tn as AssetTreenode;
+                if (n.asset is TypeAsset) {
+                    const ta = n.asset as TypeAsset;
+                    if (ta.t.getName() == t) {
+                        r = ta;
+                    }
+                }
+                return ();
+            });
+        return r;
+    }
 }
