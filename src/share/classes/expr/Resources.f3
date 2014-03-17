@@ -294,6 +294,7 @@ function copyStream from (input is java.io.InputStream, output is java.io.Output
 
 public function save 
     from (url is String,
+          topLevel is Program[],
 	  mainScene is Scene,
 	  spatial is ResourceGroup,
 	  temporal is ResourceTimeGroup,
@@ -310,6 +311,20 @@ public function save
 	    width: scene.width;
 	    height: scene.height;
 	    name: scene.id;
+            programs: foreach (p in topLevel) {
+                ProgramResource {
+                    variables: foreach (x in p.varSources.entrySet()) {
+                        VarDecl {
+                            varName: x.getKey().varName;
+                            varType: "{x.getKey().varType.t}";
+                            sourceCode: x.getValue().sourceCode;
+                            code: x.getValue().code;
+                        }
+                    }
+                    code: p.code;
+                    compiled: p.sourceCode;
+                }
+            }
 	    spatialResources:
 	    foreach (i in spatial.resources) {
 		builder.makeResource(i)

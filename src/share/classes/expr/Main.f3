@@ -659,6 +659,7 @@ public function run from (args is String[]) to ()
         if (mainScene.currentResource.url <> "") {
             savePoint = MasterUndoable.now;
             Resources.save(mainScene.currentResource.url,
+                           mainContext.programs,
                            mainScene,
                            mainScene.currentResource,
                            currentAnimResource,
@@ -747,6 +748,50 @@ public function run from (args is String[]) to ()
         function rebaseURL from (u is String) to String {
             if (u.startsWith("timenode://") or u.contains("#")) then u else new java.net.URL(baseURL, u).toString();
         }
+        const topLevels = foreach (prog in sceneRes.programs) {
+            const p = Program {
+                event: mainContext.member,
+                code: prog.code;
+                sourceCode: prog.compiled;
+                evalContext: Program.EvalContext {
+                    interactive: function from () to Boolean { interactive } 
+                    targetNode: mainContext.getTarget();
+                    instanceSpace: currentScene.instanceSpace;
+                    lookupSpatial: currentScene.root.lookup;
+                    targetTimeline: player;
+                    lookupTemporal: mainTimeLayer.lookup;
+                }
+            }
+            println("CREATED PROGRAM {p.event}");
+            var ps = [p];
+            for (d in prog.variables) {
+                const v = Context.ClosureVarContext {
+                    parent: mainContext,
+                    varName: d.varName;
+                    varType: findTypeAsset(d.varType);
+                }
+                insert v into mainContext.content;
+                println("CREATED VAR: {v}");
+                const vp = Program {
+                    event: p.event;
+                    code: d.code;
+                    sourceCode: d.sourceCode;
+                    evalContext: Program.EvalContext {
+                        interactive: function from () to Boolean { interactive } 
+                        targetNode: mainContext.getTarget();
+                        instanceSpace: currentScene.instanceSpace;
+                        lookupSpatial: currentScene.root.lookup;
+                        targetTimeline: player;
+                        lookupTemporal: mainTimeLayer.lookup;
+                    }
+                }
+                p.defineVar(v, vp);
+                insert p into ps;
+            }
+            insert p into allPrograms;
+            ps
+        }
+        mainContext.programs = topLevels;
 	for (i in sceneRes.spatialResources) {
 	    doDrop(rebaseURL(i.url), new Point3(i.tx, i.ty, i.tz));
 	    currentTransform.tx = i.tx;
@@ -766,8 +811,9 @@ public function run from (args is String[]) to ()
 	    currentTransform.pz = i.pz;
             const rn = (currentTransform as ResourceNode);
             rn.programs = foreach (prog in i.programs) {
+                const mem = prog.event.deserialize();;
                 const p = Program {
-                    event: prog.event.deserialize();
+                    event: mem;
                     code: prog.code;
                     sourceCode: prog.compiled;
                     evalContext: Program.EvalContext {
@@ -782,7 +828,7 @@ public function run from (args is String[]) to ()
                 var ps = [p];
                 var targetContext = resolveContext(rn, p.event);
                 println("RESOLVED CONTEXT {rn} => {targetContext}");
-                foreach (d in prog.variables) {
+                for (d in prog.variables) {
                     const v = Context.ClosureVarContext {
                         parent: targetContext;
                         varName: d.varName;
