@@ -8,13 +8,33 @@ import expr.AssetTree.*;
 import expr.Context.*;
 import expr.Names.*;
 import expr.undo.*;
+import org.f3.runtime.Foldable;
 
-public class Context {
+public class Context is Foldable of Context {
     public var parent is Context;
     public readonly var name is String;
     public readonly var label is String = bind name;
     public var contextType is F3Type;
     public bound function getContent to Context[]  { [] }
+
+    override function foldLeft of a from (z is a, f is function from (a, Context) to a) to a
+    {
+        var r = f(z, this);
+        for (x in getContent()) {
+            r = x.foldLeft(r, f);
+        }
+        return r;
+    }
+
+    override function foldRight of a from (z is a, f is function from (Context, a) to a) to a 
+    {
+        var r = z;
+        const xs is Context[] = getContent().reverse();
+        for (x in xs) {
+            r = x.foldRight(r, f);
+        }
+        return f(this, r);
+    }
 
     public function updateParent to () {
         for (c in getContent()) {
@@ -33,11 +53,46 @@ public class Context {
         return r;
     }   
 
-    public function resolve from (path is String) to Context 
+    function getRoot to Context 
     {
-        null; // @TODO
+        var p is Context = this;
+        while (p.parent <> null) {
+            p = p.parent;
+        }
+        return p;
     }
 
+    public function resolve from (path0 is String) to Context 
+    {
+        const r = resolve0(path0);
+        println("resolve {path0} in {name} => {r}");
+        return r;
+    }
+
+    function resolve0 from (path0 is String) to Context 
+    {
+        var path = path0;
+        if (parent == null) {
+            if (path == name or path == "|{name}") {
+                return this;
+            }
+            if (path.startsWith("|{name}|")) {
+                path = path.substring(name.length()+1);
+            }
+        } else if (path.startsWith("|")) {
+            return getRoot().resolve(path);
+        }
+        for (x in getContent()) {
+            println("checking `{path}` against {x.name} in {name}");
+            if (path == x.name) {
+                return x;
+            }
+            if (path.startsWith("{x.name}|")) {
+                return x.resolve(path.substring(x.name.length()+1));
+            }
+        }
+        return null;
+    }
 }
 
 public abstract class GroupContext is Context {
@@ -47,6 +102,7 @@ public abstract class GroupContext is Context {
         undoList.addTarget("content", &content);
     }
     public override bound function getContent to Context[]  { content }
+
 }
 
 public class CallContext is Context {
@@ -65,7 +121,7 @@ public class CallContext is Context {
     }
 }
 
-public abstract class ResourceObjectContext is GroupContext {
+public interface ResourceObjectContext {
     public bound function getTarget to ResourceTarget;
 }
 
@@ -91,7 +147,7 @@ public class SubResourceNodeContext is ResourceNodeContext {
     }
 }
 
-public class ResourceNodeContext is ResourceObjectContext {
+public class ResourceNodeContext is GroupContext, ResourceObjectContext {
     override bound function getTarget to ResourceTarget { resource }
     public var resource is ResourceNode;
     override var name = bind "{if (resource.useLiteralId) then resource.id else formatName(resource.id)} [Scene]";
@@ -107,7 +163,7 @@ public class ResourceNodeContext is ResourceObjectContext {
     }
 }
 
-public class ResourceTimeNodeContext is ResourceObjectContext {
+public class ResourceTimeNodeContext is GroupContext, ResourceObjectContext {
     override bound function getTarget to ResourceTarget { resource }
     public var resource is ResourceTimeNode;
     override var name = bind "{if (resource.useLiteralId) then resource.id else formatName(resource.id)} [Timeline]";
@@ -138,7 +194,8 @@ public class ClosureVarContext is GroupContext {
     public var varName is String = "variable";
     public var value is Object;
     public var isEvent is Boolean;
-    override var name = bind "{varName} [{varType.name}]";
+    override var name = bind varName;
+    override var label = bind "{varName} [{varType.name}]";
     override function fullName to String 
     {
         "{parent.fullName()}|{varName}";
@@ -232,6 +289,7 @@ public class ContextTreemodel is Treemodel {
     public function reset to () 
     {
         rootContext.content = [];
+        tn = null;
         tn = root;
     }
     var tn is Treenode on replace {

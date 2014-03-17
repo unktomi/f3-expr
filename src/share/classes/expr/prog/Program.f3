@@ -146,6 +146,7 @@ class ProgramDebugger is DebuggerEngine {
 }
 
 public class Program {
+
     public var event is Member;
     public var canvas is Canvas;
     public var code is ExprScene;
@@ -160,29 +161,40 @@ public class Program {
 
     public const evalContext is EvalContext;
 
-    const varSources = new java.util.HashMap of (String, String);
+    public const varSources = new java.util.HashMap of (Context.ClosureVarContext, Program);
 
-    public function defineVar from (varName is String, source is String) to ()
+    public function undefineVar from (v is Context.ClosureVarContext) to ()
     {
-        varSources.put(varName, source);
-        if (parent <> null) {
-            parent.defineVar(varName, source);
-        }
+        varSources.remove(v);
     }
 
-    public function evaluate to () {
+    public function defineVar from (v is Context.ClosureVarContext, p is Program) to ()
+    {
+        varSources.put(v, p);
+    }
+
+    public function defineVar from (v is Context.ClosureVarContext, source is String) to ()
+    {
+        sourceCode = source;
+        parent.defineVar(v, this);
+    }
+
+    public function evaluate to () 
+    {
         evalContext.evaluate(this, canvas.debuggerEngine)
     }
 
-    public function evaluate from (sourceTemplate is String) to () {
+    public function evaluate from (sourceTemplate is String) to () 
+    {
         this.sourceCode = sourceTemplate;
         evaluate();
     }
 
-    function getSourceCode to String {
+    function getSourceCode to String 
+    {
         var varSource is String = "";
         for (v in varSources.values()) {
-            varSource = "{varSource}{v}";
+            varSource = "{varSource}{v.sourceCode}";
         }
         const result = sourceCode.replace("%VARS%", varSource);
         println("SOURCE => {result}");
@@ -194,13 +206,14 @@ public class Program {
         evalContext.unsubscribe();
     }
 
-    public function deserialize to () {
-        var idMap = new java.util.HashMap of (String, ExprNode);
+    public function deserialize to () 
+    {
+        const idMap = new java.util.HashMap of (String, ExprNode);
         for (v in code.views) {
             idMap.put(v.id, v);
         }
         canvas.deserializationMap.clear();
-        var viewMap = new java.util.HashMap of (String, ExpressionView);
+        const viewMap = new java.util.HashMap of (String, ExpressionView);
         for (v in code.views) {
             const view = v.createView(canvas);
             println("deserialized {v} into {view}");

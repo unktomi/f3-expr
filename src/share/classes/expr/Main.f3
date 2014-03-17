@@ -161,7 +161,8 @@ function readTextFile from (url is String) to (String, Integer)
 
 }
 
-public class MainContext is Context.MemberContext {
+public class MainContext is Context.MemberContext, Context.ResourceObjectContext, ResourceTarget {
+    override public bound function getTarget to ResourceTarget { this }
     override var member = Expression.Member {
         name: "Start";
         t: Reflect.UNIT_TYPE;
@@ -564,6 +565,11 @@ public function run from (args is String[]) to ()
         camera: camera;
     }
 
+    const assetModel = AssetTree.AssetModel {
+        resources: bind mainScene.currentResource;
+    }
+
+
 /*
     const cachedScene = CachedScene {
         background: null;
@@ -632,7 +638,8 @@ public function run from (args is String[]) to ()
     
     var manip is expr.manipulator.Manipulator;
 
-    function save to Boolean {
+    function save to Boolean 
+    {
         if (mainScene.currentResource.url == "") {
             var result = fileSave.open();
             if (result <> null) {
@@ -647,7 +654,8 @@ public function run from (args is String[]) to ()
         doSave();
     }
 
-    function doSave to Boolean {
+    function doSave to Boolean 
+    {
         if (mainScene.currentResource.url <> "") {
             savePoint = MasterUndoable.now;
             Resources.save(mainScene.currentResource.url,
@@ -660,7 +668,8 @@ public function run from (args is String[]) to ()
         return false;
     }
 
-    function doExport to () {
+    function doExport to () 
+    {
         save();
         const u = new java.net.URL(mainScene.currentResource.url);
         fileSave.fileName = "{new java.io.File(u.getFile()).getName()}.zip";
@@ -678,7 +687,8 @@ public function run from (args is String[]) to ()
     }
 
     
-    function close from () to () {
+    function close from () to () 
+    {
 	savePoint = 0;
         mainScene.currentResource.url = "";
         currentScenes = [mainScene];
@@ -686,6 +696,7 @@ public function run from (args is String[]) to ()
 	currentAnimResource.resources = [];
         mainTimeLayer.content = [];
         mainTimeLayer.content = currentAnimResource;
+        mainContext.programs = [];
         contextModel.reset();
         contextTree.select(contextModel.root);
 	transformHierarchy.clearSelection();
@@ -693,6 +704,34 @@ public function run from (args is String[]) to ()
         temporalHierarchy2.clearSelection();
         playerUrl = "";
 	MasterUndoable.reset();
+    }
+
+    function findTypeAsset from (t is String) to TypeAsset 
+    {
+        assetModel.findTypeAsset(t);
+    }
+
+    function resolveContext from (n is ResourceNode, event is Expression.Member) to Context.GroupContext
+    {
+        var r is Context.GroupContext;
+        mainContext.foldLeft((), function from (_ is (), c is Context) to () 
+                             {
+                                 if (r == null and c is Context.ResourceNodeContext) {
+                                     const rc = c as Context.ResourceNodeContext;
+                                     if (rc.resource == n) {
+                                         for (ctx in rc.getContent()) {
+                                             if (ctx is Context.MemberContext) {
+                                                 const memCtx = ctx as Context.MemberContext;
+                                                 if (memCtx.member == event) {
+                                                     r = memCtx;
+                                                 }
+                                             }
+                                         }
+                                     }
+                                 }
+                                 return ();
+                             });
+        return r;
     }
 
     const undoList = expr.undo.UndoList {} on replace {
@@ -740,9 +779,36 @@ public function run from (args is String[]) to ()
                         lookupTemporal: mainTimeLayer.lookup;
                     }
                 }
+                var ps = [p];
+                var targetContext = resolveContext(rn, p.event);
+                println("RESOLVED CONTEXT {rn} => {targetContext}");
+                foreach (d in prog.variables) {
+                    const v = Context.ClosureVarContext {
+                        parent: targetContext;
+                        varName: d.varName;
+                        varType: findTypeAsset(d.varType);
+                    }
+                    insert v into targetContext.content;
+                    println("CREATED VAR: {v}");
+                    const vp = Program {
+                        event: p.event;
+                        code: d.code;
+                        sourceCode: d.sourceCode;
+                        evalContext: Program.EvalContext {
+                            interactive: function from () to Boolean { interactive } 
+                            targetNode: (currentTransform as ResourceTarget).findTarget(prog.targetPath);
+                            instanceSpace: currentScene.instanceSpace;
+                            lookupSpatial: currentScene.root.lookup;
+                            targetTimeline: player;
+                            lookupTemporal: mainTimeLayer.lookup;
+                        }
+                    }
+                    p.defineVar(v, vp);
+                    insert p into ps;
+                }
                 println("CREATING PROGRAM**** {prog} => {p.sourceCode}");
                 insert p into allPrograms;
-                p;
+                ps
             }
             rn.channelBox.playTime = i.animation.playTime;
             rn.channelBox.playRate = i.animation.playRate;
@@ -1036,9 +1102,28 @@ public function run from (args is String[]) to ()
                                                             if (e.keyCode == Keys.Delete or
                                                                 e.keyCode == Keys.Backspace) {
                                                                 const toDelete = contextModel.selectedContext;
-                                                                if (toDelete.parent instanceof Context.GroupContext) {
+                                                                if (toDelete.parent is Context.GroupContext) {
+                                                                    println("delete parent={toDelete.parent}");
+                                                                    var par = toDelete.parent;
+                                                                    while (par <> null) {
+                                                                        if (par is Context.ResourceObjectContext) {
+                                                                            const targ = (par as Context.ResourceObjectContext).getTarget();
+                                                                            println("delete targ={targ}");
+                                                                            for (p in targ.programs) {
+                                                                                println("delete checking {p}");
+                                                                                if (p.evalContext.varContext == toDelete) {
+                                                                                    delete p from targ.programs;
+                                                                                    p.parent.undefineVar(p.evalContext.varContext);
+                                                                                    println("deleted VAR {p.evalContext.varContext.varName}");
+                                                                                    break;
+                                                                                }
+                                                                            }
+                                                                            break;
+                                                                        }
+                                                                        par = par.parent;
+                                                                    }
                                                                     delete toDelete from (toDelete.parent as Context.GroupContext).content;
-                                                                    println("deleted {toDelete} from {contextModel.selectedGroupContext}");
+                                                                    println("deleted {toDelete} from {toDelete.parent}");
                                                                 }
                                                             } else super.onKeyDown(e);
                                                         }                                       
@@ -1166,9 +1251,7 @@ public function run from (args is String[]) to ()
                                      Scrollpane { 
                                          canZoomVertical: false;
                                          content: Treeview {
-					 model: AssetTree.AssetModel {
-					     resources: bind mainScene.currentResource;
-					 }
+					 model: assetModel
 
 					 var dragger is TransformNode;
                                          var tn is AssetTree.AssetTreenode;

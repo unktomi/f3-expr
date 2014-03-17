@@ -1805,6 +1805,13 @@ class FunctionView is ExpressionView {
     }
 }
 
+class SetterView extends FunctionView {
+    override var selectable = false;
+    public var variable is Context.ClosureVarContext;
+    override var output = null;
+    override var fun = Function { funMember: bind makeFunMember(variable.varName, [variable.varType.t], UNIT_TYPE) };
+}
+
 public class InputMemberExpression is MemberExpression, ObserverExpression {
     override function getType to F3Type { member.t }
     public var target is ObjectExpression;
@@ -3209,6 +3216,15 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 if (p == eventContext or p == varContext) break;
                 p = p.parent;
             }
+            if (p == null) {
+                p = eventContext.parent;
+                while (p <> null) {
+                    if (p == v.parent) {
+                        break;
+                    }
+                    p = p.parent;
+                }
+            }
             if (p == null) return;
             const names = new java.util.HashSet of String;
             const members = [foreach (m in introspectMembers(v) where not m.name.contains("pdate") and names.add(m.name)) m];
@@ -3321,9 +3337,11 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 evExp = (evExp as Result).observers[0];
             }
             const ipath = ctx.getIPath(evExp as ObserverExpression);
+            var linkIds is String[];
             for (outLink in outLinks) {
                 if (outLink.target <> null) {
                     insert outLink.source into srcs;
+                    insert outLink.id into linkIds;
                     const path = getPath(outLink);
                     println("path={path}");
                     insert path.substring(0, path.lastIndexOf("/")) into paths;
@@ -3333,13 +3351,6 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 }
             }
             const t = f.fun.ft.getReturnType();
-            const ob = typeApply(OBSERVABLE_TYPE, OBSERVABLE_TYPE.getTypeArguments()[0], t);
-            println("OB TYPE={ob}");
-            const name = t.getName();
-            const st = typeApply(SUBJECT_TYPE, SUBJECT_TYPE.getTypeParameters()[0], t);
-            const newMember = FunctionMember {
-                m: Reflect.getFunction("f3.util.Subject", "onNext", ["java.lang.Object"]);
-            }
             const v = ClosureVarContext {
                 varType: TypeAsset {
                     t: t;
@@ -3349,17 +3360,24 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 varName: "factored";    
                 parent: eventContext;
             }
+            insert VarContextObjNode {
+                varId: v.varName;
+                varType: "{v.varType.t}";
+                inputs: TargetNode { targetId: targets[0].id, links: linkIds }
+            } into todo.views;
             insert v into eventContext.content;
-            const newExp = GetVarView {
-                get: TreeGetVar {
-                    member: bind newMember;
-                    override function toEnglish to String { v.varName }
-                    override function getLocalAccess to String { "(getVar(\"{v.varName}\") as f3.util.Subject of {v.varType.t.getName()})" }
+            const newExp = {
+                const names = new java.util.HashSet of String;
+                const members = [foreach (m in introspectMembers(v) where not m.name.contains("pdate") and names.add(m.name)) m];
+                const typ = v.varType.t;
+                ObjectView {
+                    objectExpr: VarContextExpression { 
+                        varContext: v, override function getType to F3Type { typ }
+                        inputMembers: foreach (x1 in members where x1.isObserver) x1;
+                        outputMembers: foreach (x1 in members where x1.isObservable) x1;
+                    }
+                    canvas: this;
                 }
-                override bound function getLabel to String { v.varName }
-                canvas: this;
-                selectable: true;
-                isLabeled: true;
             }
             for (e in linked) {
                 e.unlink();
@@ -3373,11 +3391,8 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             paths = ["/factored"];
             if (targets <> []) {
                 for (path in paths) {
-                    var tn = newExp.getTree.treeModel.root as MemberTreenode;
-                    println("TN FOR path {path} => {tn}");
-                    //const cell = newExp.getTree.getCell(tn);
-                    const src = newExp.getTree.getRootLinkedView();
                     //const src = cell.linkedView;
+                    const src = newExp.outputViews[0];
                     println("SOURCE of link = {src}");
                     const lnk = LinkView {
                         canvas: canvas;
@@ -3527,29 +3542,29 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     };
 
     public readonly var initialExprView is GetVarView = bind makeGetter(event);
-    public readonly var terminalExprView is ExpressionView = bind makeSetter(subject);
+    public readonly var terminalExprView is SetterView = bind makeSetter(subject);
 
     var subjectExp is Expression;
 
     var subjectNameListener is Disposable;
 
-    function makeSetter from (c is Context.ClosureVarContext) to ExpressionView 
+    function makeSetter from (c is Context.ClosureVarContext) to SetterView 
     {
         if (c == null) {
             return null;
         }
         subjectNameListener.dispose();
-        subjectNameListener = Observables.observe(&c.varName).subscribe(function from (n is String) to () {
-                dumpSrc();
-            });
-        const fun = Function { funMember: bind makeFunMember(c.varName, [c.varType.t], UNIT_TYPE) };
-        subjectExp = fun;
-        FunctionView {
-            selectable: false;
+        subjectNameListener = Observables.observe(&c.varName).subscribe(function from (n is String) to () 
+                                                                        {
+                                                                            dumpSrc();
+                                                                        });
+        const result = SetterView {
             canvas: this;
-            fun: fun
-            override var output = null;
+            variable: c;
         }
+
+        subjectExp = result.fun;
+        return result;
     }
 
     var varRoot is GetVar;
@@ -4211,7 +4226,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         }
         */
         const mem = e as MemberExpression;
-	var itype = mem.member.m.getDeclaringClass();
+	var itype = if mem.member.m.isStatic() then OBJECT_TYPE else mem.member.m.getDeclaringClass();
         if (itype == null) return "";
 	var result = "var _ = function from (debugger is f3.util.ObservableDebugger, i$ is Object, getVar is function from String to Object, getNode is function from String to f3.media.scene.Node, getClip is function from String to f3.media.scene.TimeNode) to (f3.util.Observable of ?)[] \{ var i0 = i$ as {itype.getName()};  ";
         if (terms == []) {
@@ -4246,9 +4261,9 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 const j = p.getWorldAccess();
                 eng = "<i>{subject.varName}</i> = {p.getEnglishAccess()}";
                 println("code => {j}");
-                prog.defineVar(subject.varName, "var <<{subject.varName}>> = {j}; ");
+                prog.defineVar(subject, "var <<{subject.varName}>> = {j}; ");
             } else {
-                prog.defineVar(subject.varName, "var <<{subject.varName}>> is <<{subject.varType.t}; ");
+                prog.defineVar(subject, "var <<{subject.varName}>> is <<{subject.varType.t}; ");
             }
             englishOutput = eng;
         } else {
@@ -4507,9 +4522,22 @@ public class TimeNodeObjNode is ObjNode {
 public class VarContextObjNode is ObjNode {
     public var varId is String;
     public var varType is String;
-    public override function createView from (canvas is Canvas) to ObjectView 
+    public override function createView from (canvas is Canvas) to ExpressionView 
     {
         const c is Context.ClosureVarContext = canvas.eventContext.resolve(varId) as Context.ClosureVarContext;
+        println("RESOLVED VAR {varId} TO {c}, SUBJECT={canvas.subject} {canvas.subject.varName}");
+        if (canvas.subject <> null and c == canvas.subject) {
+            var r = canvas.terminalExprView;
+            for (i in inputs) {
+                if (i.links.size() > 0) {
+                    for (link in i.links) {
+                        const lnk = canvas.getLink(link);
+                        lnk.target = r.inputs[0];
+                    }
+                }
+            }
+            return r;
+        }
         const typ = c.varType.t;
         const names = new java.util.HashSet of String;
         const members = foreach (m in introspect(typ) where not m.name.contains("pdate") and names.add(m.name)) m;
