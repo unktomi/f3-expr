@@ -703,14 +703,14 @@ public abstract class ObjectExpression is Expression {
 public class VarContextExpression is ObjectExpression {
     public var varContext is Context.ClosureVarContext;
     override bound function getName to String { varContext.varName }
-    override function toSource from (context is IContext) to String { "(getVar(\"{varContext.varName}\") as f3.util.Subject of {getType().getName()})" }
+    override function toSource from (context is IContext) to String { "(getVar(\"{varContext.varName}\") as f3.lang.ref of {getType().getName()})" }
     override function toEnglish to String { varContext.varName }
     override function getType to F3Type {
         varContext.varType.t;
     }
     public var member is Member = FunctionMember {
         isObserver: true;
-        m: Reflect.getFunction("f3.util.Subject", "onNext", ["java.lang.Object"]);
+        m: Reflect.getFunction("f3.util.Observer", "onNext", ["java.lang.Object"]);
     }
 }
 
@@ -1060,7 +1060,7 @@ public class IPath {
             if (i.member.m is F3VarMember and i.member.isObserver) {
                 return "\{ {i.target.toSource(null)}.{i.member.toApply()} = {parents[0].getWorldAccess()}; \}";
             } else if (i.target is VarContextExpression) {
-                return "{i.target.toSource(null)}.onNext({parents[0].getWorldAccess()})";
+                return "{i.target.toSource(null)}.set({parents[0].getWorldAccess()})";
             } else { 
                 if (i.member.isObserver and is1ArgFunction(i.member)) {
                     return "{i.target.toSource(null)}.{i.member.toApply("{parents[0].getWorldAccess()}")}";
@@ -1590,7 +1590,7 @@ public abstract class ExpressionView is AbstractNode {
                 const menu = Menu {
                     items: 
                     [MenuItem {
-                        label: "Factor";
+                        label: "Shortcut";
                         action: canvas.factor.apply(this);
                     },
                     MenuItem {
@@ -3357,7 +3357,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                     name: t.getName();
                 }
                 isEvent: true;
-                varName: "factored";    
+                varName: "shortcut";    
                 parent: eventContext;
             }
             insert VarContextObjNode {
@@ -3841,7 +3841,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 const menu = Menu {
                     items: 
                     [MenuItem {
-                        label: "Factor";
+                        label: "Shortcut";
                         action: canvas.extract
                     },
                     MenuItem {
@@ -4261,7 +4261,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 const j = p.getWorldAccess();
                 eng = "<i>{subject.varName}</i> = {p.getEnglishAccess()}";
                 println("code => {j}");
-                prog.defineVar(subject, "var <<{subject.varName}>> = {j}; ");
+                prog.defineVar(subject, "var <<{subject.varName}>> is <<{subject.varType.t}>> = {j}; ");
             } else {
                 prog.defineVar(subject, "var <<{subject.varName}>> is <<{subject.varType.t}; ");
             }
@@ -4670,7 +4670,7 @@ public class Editor is ResizableNode, Focuser {
         return (ctx as Context.ResourceNodeContext).resource;
     }
 
-    var canvas is Canvas = bind getCanvas(targetObject, eventContext, varContext);
+    var canvas is Canvas = bind getCanvas(targetObject, targetObject.programs, eventContext, varContext);
 
     override var internalContent = bind sp;
 
@@ -4684,6 +4684,7 @@ public class Editor is ResizableNode, Focuser {
 
     function getCanvas 
         from (target is ResourceTarget, 
+              programs is Program[],
               eventContext is Context.MemberContext, 
               varContext is Context.ClosureVarContext) 
         to Canvas
@@ -4691,7 +4692,7 @@ public class Editor is ResizableNode, Focuser {
 	var prog is Program;
         println("TARGET: {target}, programs={target.programs.size()}");
         var parentProg is Program;
-	for (x in target.programs) {
+	for (x in programs) {
             println("PROGRAM {x.event.m}, event={eventContext.member.m}");
             println("PROGRAM {java.lang.System.identityHashCode(x.event.m)}, event={java.lang.System.identityHashCode(eventContext.member.m)}");
 	    if (x.event == eventContext.member and x.evalContext.varContext == varContext) { // hack
