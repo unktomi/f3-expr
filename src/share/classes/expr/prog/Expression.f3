@@ -1010,9 +1010,8 @@ public class IPath {
                     } else if (p.needsLower()) {
                         println("NON STATIC LOWER: {p}");
                         println("NON STATIC LOWER j: {j}");
-                        obDepth = p.getContainingObservableDepth();
                         prefix = j;
-                        j = "i{getDepth()}";
+                        j = "i{p.getDepth()-1}";
                     }
                     args = "{args}{sep}{j}";
                     sep = ", ";
@@ -1021,7 +1020,7 @@ public class IPath {
                 if (obDepth >= 0) {
                     return "{prefix} \}; const obs{obDepth} = foreach (i{getDepth()} in {app}({args})) \{";
                 }
-                return "{app}({args})";
+                return "{prefix} {app}({args})";
             } else {
                 var args = "";
                 var sep = "";
