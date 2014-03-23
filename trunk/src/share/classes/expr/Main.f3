@@ -610,6 +610,7 @@ public function run from (args is String[]) to ()
 	toggleFullscreen: function { full = not full; stage.setFullscreen(full) }
         onSetSelecting: function from () to () {
             interactive = false;
+            delete mainScene.instanceSpace.content;
         }
         onSetScripting: function from () to () {
             interactive = true;

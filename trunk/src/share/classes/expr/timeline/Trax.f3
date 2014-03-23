@@ -95,7 +95,7 @@ class GroupKeyMark is Image, MouseInputHandler, KeyboardInputHandler {
 class TimeNodeView is AbstractNode 
 {
     public var cy is Number;
-    public var row is Integer;
+    public var row is Number;
     public var trax is Trax;
     public var target is TimeNode;
     public var playX is Number = bind getPlayX(target.playTime);
@@ -125,18 +125,17 @@ class TimeNodeView is AbstractNode
             shader: bind effectLoader.loadPaintShader(CLIP_LABEL_PAINT);
         }
     }
-
-    function updateRows from (row is Integer) to Integer
+    function updateRows from (row is Number) to Number
     {
         this.row = row;
-        var j = row+1;
+        var j = row + this.rows;
         if (expanded) {
             for (k in content) {
                 const i = k.content[0] as TimeNodeView;
                 j = i.updateRows(j);
             }
         } 
-        rowCount = j - row;
+        rowCount = j - row; 
         return j;
     }
 
@@ -175,16 +174,16 @@ class TimeNodeView is AbstractNode
             var j = 1;
             for (k in content) {
                 const i = k.content[0] as TimeNodeView;
-                if (j + i.rowCount > row) {
+                if (j + (i.rowCount as Integer) > row) {
                     return i.getRow(row-j);
                 }
-                j += i.rowCount;
+                j += i.rowCount as Integer;
             }
         }
         return null;
     }
 
-    public var rowCount is Integer;
+    public var rowCount is Number;
 
     bound function getRowCount from (content is Group[], result is Integer) to Integer {
         if (content == []) then result else {
@@ -207,7 +206,7 @@ class TimeNodeView is AbstractNode
     	trax.durationToX(i);
     }
 
-    var selected1 = bind selected and trax.focused;
+    bound var selected1 = selected and trax.focused;
 
     bound function blendColor from (c is Color, a is Number) to ColorPaint {
         ColorPaint(if (a == 1.0) then c else Color.color(c.red, c.green, c.blue, c.opacity * a));
@@ -240,12 +239,12 @@ class TimeNodeView is AbstractNode
         super.update();
     }
     const self = this;
-    var w = bind getWidth(if target.hasIndefiniteDuration() then Interval.<<0>> else target.bounds,
-                          trax.visibleInterval);
-    var h = bind trax.getViewHeight();
-    var fg = bind if w == 0 then bg else if (selected1) then CLIP_SELECTED_LABEL_PAINT else CLIP_LABEL_PAINT;//ColorPaint(Color.color(.7, .7, .7, 1));
-    var bg = bind getFill(target);
-    var bg1 = ColorPaint(Color.color(.83, .83, .83));
+    bound var w = getWidth(if target.hasIndefiniteDuration() then Interval.<<0>> else target.bounds, trax.visibleInterval);
+    var rows is Number = 1;
+    bound var h is Number = trax.getViewHeight() * rows;
+    bound var fg = if w == 0 then bg else if (selected1) then CLIP_SELECTED_LABEL_PAINT else CLIP_LABEL_PAINT;//ColorPaint(Color.color(.7, .7, .7, 1));
+    bound var bg = getFill(target);
+    const bg1 = ColorPaint(Color.color(.83, .83, .83));
     override var transform = bind translate(playX + w / 2.0, 0);
     function getTrackName from (target is TimeNode) to String
     {
@@ -254,49 +253,74 @@ class TimeNodeView is AbstractNode
         const shouldFormat = shouldFormat1 and shouldFormat2;
         if ((target.parent is ResourceTimeNode and not (target.parent is ResourceTimeNodeWrapper)) and target.parent.id == target.id) then "Main Timeline" else if shouldFormat then formatName(target.id) else target.id;
     }   
-    var labelX = bind 
+    bound var labelX = 
         if (target.hasIndefiniteDuration() and trax.visibleInterval.start > target.playTime + target.contentBounds.start)
             then trax.durationToX(trax.visibleInterval.start) - playX
             else 
                 trax.durationToX(target.contentBounds.start);//Math.min(trax.durationToX(target.contentBounds.start), 0.0);
+    bound var rectY = Math.max(rows-1, 0) * -trax.getViewHeight()/2;
 
     override var internalContent = Group {
 	content:
 	Group {
             var dx is Number;
+            var dy is Number;
+            var resizing is Boolean;
+            var dragging is Boolean;
 	    content: bind
 	    [if (target == null) then null else Group { 
-                visible: bind row > trax.scrollY;
+                visible: bind row + rows - 1 > trax.scrollY;
 		content: 
                 [Rectangle {
                      var ww = bind w + trax.durationToX(target.contentBounds.start);              
-                     transform: bind translate((ww - w) / 2.0, 0);
+                     transform: bind translate((ww - w) / 2.0, rectY);
                      width: bind ww
                      height: bind h;
 		     fillPaint: bind bg1;
                 },
                 Rectangle is MouseInputHandler {
-                     transform: bind translate(trax.durationToX(target.contentBounds.start), 0)
+                    transform: bind translate(trax.durationToX(target.contentBounds.start), rectY)
                      height: bind h;
                      width: bind w;
 		     fillPaint: bind bg;
 		     strokePaint: bind CLIP_LABEL_PAINT;
 		     blocksPointer: true;
+                     cursor: bind if resizing then Cursor.SouthResize else null;
+                     override function onMouseMove from  (event is MouseEvent) to ()
+                     {
+                         if (trax.graph and target is Channel and not dragging) {
+                             resizing = event.location.y <= rectY + 2;
+                         }
+                     }
 		     override function onMouseDown from (event is MouseEvent) to ()
 		     {
+                         resizing = trax.graph and target is Channel and event.location.y <= rectY + 2;
 			 dx = trax.durationToX(target.playTime);
+                         dy = rows * trax.getViewHeight();
 			 trax.selectTimeNodeView(self)
 		     }
 		     override function onMouseDrag from (event is MouseEvent) to ()
 		     {
-			 dx += (event.picked.dragPoint1 - event.picked.dragPoint0).x;
-			 target.playTime = trax.frameTo(trax.xToDuration(dx));
-			 trax.updatePlayhead();
+                         dragging = true;
+                         if (not resizing) {
+                             dx += (event.picked.dragPoint1 - event.picked.dragPoint0).x;
+                             target.playTime = trax.frameTo(trax.xToDuration(dx));
+                             trax.updatePlayhead();
+                         } else {
+                             dy -= (event.picked.dragPoint1 - event.picked.dragPoint0).y;
+                             rows = Math.max(dy / trax.getViewHeight(), 1.0);
+                         }
 		     }
 		     override function onMouseUp from (event is MouseEvent) to ()
 		     {
 			 //println("commit playTime={target.playTime}, pickable={target.pickable}");
-                         MasterUndoable.commit();
+                         dragging = false;
+                         if (not resizing) {
+                             MasterUndoable.commit();
+                         } else {
+                             resizing = false;
+                             rows = Math.max((dy / trax.getViewHeight()) as Integer, 1);
+                         }
 		     }
 		 },
                  Group {
@@ -369,10 +393,10 @@ class TimeNodeView is AbstractNode
                       } else null;
               },
               if (not trax.graph or not (target is Channel of Number)) then null else Group {
-                visible: bind row > trax.scrollY;
+                  visible: bind row > trax.scrollY;
                   pickable: false;
                   transform: bind translate(-w/2, 0);
-                  content: bind makeCurve(target as Channel of Number);
+                  content: bind makeCurve(target as Channel of Number, h);
               },
               Group { 
                   transform: bind translate(-w/2, 0);
@@ -576,7 +600,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
     protected function performUpdate to ()
     {
         root.updateRows(0);
-        rowCount = root.rowCount;
+        rowCount = root.rowCount as Integer;
     }
 
     const root is TimeNodeView = TimeNodeView {
@@ -658,10 +682,10 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
     {
         var j = 0;
         for (i in timeNodeViews) {
-            if (j + i.rowCount > row) {
+            if (j + (i.rowCount as Integer) > row) {
                 return i.getRow(row-j);
             }
-            j += i.rowCount;
+            j += i.rowCount as Integer;
         }
         return null;
     }
@@ -1114,8 +1138,9 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
     {
         const ty = valueBounds.x;
         var dy = (valueBounds.y - valueBounds.x);
-        var sy = if (dy == 0 or viewHeight == 0) then 1.0 else (0.5 * viewHeight) / dy;
+        var sy = if (dy == 0 or viewHeight == 0) then 1.0 else (viewHeight) / dy;
         println("VALUE BOUNDS {ch.id} {valueBounds}");
+        println("VIEW HEIGHT {viewHeight}");
         println("ty={ty}, sy={sy}");
         if (sy == Number.POSITIVE_INFINITY) { sy = 1.0 }
         var x1 is Number;
@@ -1165,7 +1190,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 
         const tool = TangentTool {
             editable: false;
-            transform: bind translate(durationToX(k.prev.position), -viewHeight/2.0);
+            transform: bind translate(durationToX(k.prev.position), -viewHeight);
             p1: bind new Vec2(0, (k.prev.value - ty)*sy);
             p2: bind new Vec2(durationToX(k.position-k.prev.position) / ch.toSceneTransform.rate,
                               (k.value - ty)*sy);
@@ -1175,7 +1200,6 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
             outLength: outLength;
             isPointOnly: k.prev == null and k.next == null;
         }
-
         tool.valueScale = new Vec2(1.0, 1.0 / sy);
         return tool;
     }
@@ -1196,25 +1220,25 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
                                               valueBounds is Vec2,
                                               viewHeight is Number) to PathElement[]
     {
-        makeCurveFromTangent(makeTangent(ch, k, interp, valueBounds, viewHeight), durationToX(k.prev.position));
+        makeCurveFromTangent(makeTangent(ch, k, interp, valueBounds, viewHeight), durationToX(k.prev.position), viewHeight);
     }
 
-    protected function makeCurveFromTangent from (t is TangentTool, x is Number) to PathElement[]
+    protected function makeCurveFromTangent from (t is TangentTool, x is Number, viewHeight is Number) to PathElement[]
     {
-        const off = new Vec2(x, 0); 
+        const off = new Vec2(x, -viewHeight+getViewHeight()/2); 
         if (t.isPointOnly) then [] else [moveTo(t.p1 + off), 
                                                 cubicTo(t.cp1+off, t.cp2+off, t.p2+off)];
     }
 
-    function makePathElements from (ch is Channel, keys is (KeyFrame.Key of Number)[]) to Shape2D.PathElement[] 
+    function makePathElements from (ch is Channel, keys is (KeyFrame.Key of Number)[], viewHeight is Number) to Shape2D.PathElement[] 
     {
-        foreach (k in keys) makeCurveContent(ch, k, k.interpolator, getValueBounds(keys), getViewHeight()) 
+        foreach (k in keys) makeCurveContent(ch, k, k.interpolator, getValueBounds(keys), viewHeight) 
     }
 
-    protected function makeCurve from (ch is Channel of Number) to Node {
+    protected function makeCurve from (ch is Channel of Number, viewHeight is Number) to Node {
         Path {
             strokePaint: ColorPaint(Color.GREEN);
-            content: bind makePathElements(ch, ch.keys);
+            content: bind makePathElements(ch, ch.keys, viewHeight);
         }
     }
 
