@@ -54,7 +54,7 @@ public class EvalContext {
         return r;
     }
     
-    public const evaluator = 
+    public var evaluator = bind
         new org.f3.tools.script.ScriptShell(java.lang.Thread.currentThread().getContextClassLoader());
 
     public function evaluate from (prog is Program) to ()
@@ -66,6 +66,9 @@ public class EvalContext {
     {
         if (prog.sourceCode == "") {
             unsubscribe();
+            return;
+        }
+        if (prog.parent <> null) {
             return;
         }
         const debugger = if externalDebugger <> null then externalDebugger else this.debugger;

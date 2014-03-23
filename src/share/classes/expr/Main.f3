@@ -773,6 +773,7 @@ public function run from (args is String[]) to ()
                 insert v into mainContext.content;
                 println("CREATED VAR: {v}");
                 const vp = Program {
+                    parent: p
                     event: p.event;
                     code: d.code;
                     sourceCode: d.sourceCode;
@@ -786,7 +787,7 @@ public function run from (args is String[]) to ()
                     }
                 }
                 p.defineVar(v, vp);
-                insert p into ps;
+                insert vp into ps;
             }
             insert p into allPrograms;
             ps
@@ -837,6 +838,7 @@ public function run from (args is String[]) to ()
                     insert v into targetContext.content;
                     println("CREATED VAR: {v}");
                     const vp = Program {
+                        parent: p
                         event: p.event;
                         code: d.code;
                         sourceCode: d.sourceCode;
@@ -850,7 +852,7 @@ public function run from (args is String[]) to ()
                         }
                     }
                     p.defineVar(v, vp);
-                    insert p into ps;
+                    insert vp into ps;
                 }
                 println("CREATING PROGRAM**** {prog} => {p.sourceCode}");
                 insert p into allPrograms;
