@@ -3,6 +3,7 @@ import f3.media.scene.*;
 import expr.Treeview.*;
 import expr.prog.Expression;
 import expr.prog.Expression.Member;
+import expr.prog.Expression.Function;
 import f3.reflect.*;
 import expr.AssetTree.*;
 import expr.Context.*;
@@ -182,11 +183,10 @@ public class AssetContext is Context {
     override public bound function getContent to Context[] { myContent }
 }
 
-public class FunctionDefinitionContext is GroupContext {
-    public var functionName is String;
-    override var name = bind "{functionName}";
-    public var inputs is Member[];
-    public var outputs is Member[];
+public class FunctionDefinitionContext is MemberContext, ResourceObjectContext {
+    public var fun is Function;
+    override var member = bind fun.funMember;
+    override bound function getTarget to ResourceTarget { null }
 }
 
 public class ClosureVarContext is GroupContext {

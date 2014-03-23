@@ -166,7 +166,7 @@ class ResourceBuilder {
             playRate: n.playRate;
             playCount: n.playCount;
             content: foreach (j in n.unwrapContent()) if (j is ResourceTimeNode) then makeResource(j as ResourceTimeNode) else null;
-            programs: foreach (p in n.programs where p.code <> null) ProgramResource {
+            programs: foreach (p in n.programs where p.code <> null and p.parent == null) ProgramResource {
                 variables: foreach (x in p.varSources.entrySet()) {
                     VarDecl {
                         varName: x.getKey().varName;
@@ -311,7 +311,7 @@ public function save
 	    width: scene.width;
 	    height: scene.height;
 	    name: scene.id;
-            programs: foreach (p in topLevel) {
+            programs: foreach (p in topLevel where p.parent == null) {
                 ProgramResource {
                     variables: foreach (x in p.varSources.entrySet()) {
                         VarDecl {

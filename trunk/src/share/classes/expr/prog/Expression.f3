@@ -1581,6 +1581,7 @@ public abstract class ExpressionView is AbstractNode {
     };
     public var title is Node = bind defaultTitle;
     var dragging = false;
+    protected var dragFilter is Tuple3 = Tuple3.<<1>>;
     function onDown from (e is MouseEvent) to () 
     {
         if (selectable) {
@@ -1593,6 +1594,10 @@ public abstract class ExpressionView is AbstractNode {
                         label: "Shortcut";
                         action: canvas.factor.apply(this);
                     },
+                    MenuItem {
+                        label: "Parameterize";
+                        action: canvas.parameterize.apply(this);
+                    }
                     MenuItem {
                         label: "Delete";
                         action: canvas.deleteSelection;
@@ -1608,7 +1613,7 @@ public abstract class ExpressionView is AbstractNode {
     function onDrag from (e is MouseEvent) to () 
     {
         if (dragging) {
-            pos += canvas.toLocal * e.picked.dragPoint1 - canvas.toLocal * e.picked.dragPoint0;
+            pos += dragFilter * (canvas.toLocal * e.picked.dragPoint1 - canvas.toLocal * e.picked.dragPoint0);
         }
     }
     function onUp from (e is MouseEvent) to () 
@@ -1653,6 +1658,10 @@ class FunctionView is ExpressionView {
     override var selectable = true;
 
     public override function serialize to ExprNode {
+        serializeFunction();
+    }
+
+    public function serializeFunction to FunNode {
         const n = FunNode {
             id: "{id}";
             x: pos.x;
@@ -1793,23 +1802,42 @@ class FunctionView is ExpressionView {
 	content: bind [title, /* funOutput, */ io];
     }
 
-    override function update {
+    override function update to ()
+    {
 	super.update();
 	for (i in inputs) {
 	    i.index = indexof i;
 	}
     }
 
-    public override function getInputLinks to LinkView[] { 
+    public override function getInputLinks to LinkView[] 
+    {
         foreach (i in inputs) i.links 
     }
 }
 
-class SetterView extends FunctionView {
-    override var selectable = false;
+public class SetterNode is ExprNode {
+    public var funNode is FunNode;
+    public override function createView from (canvas is Canvas) to FunctionView 
+    {
+        funNode.linkView(canvas, canvas.terminalExprView); 
+    }
+}
+
+public class SetterView is FunctionView {
+    override var selectable = true;
     public var variable is Context.ClosureVarContext;
     override var output = null;
     override var fun = Function { funMember: bind makeFunMember(variable.varName, [variable.varType.t], UNIT_TYPE) };
+    override var dragFilter = new Tuple3(1.0, 0.0, 0.0);
+    public override function serialize to ExprNode 
+    {
+        const c = variable;
+        VarContextObjNode {
+            varId: c.fullName();
+            varType: c.varType.t.getName();
+        }
+    }
 }
 
 public class InputMemberExpression is MemberExpression, ObserverExpression {
@@ -2398,7 +2426,7 @@ public class ParameterView is InputView {
     override var internalContent = Group { content: bind [label, if links.size() == 0 then [sliderField, textField] else null] };
 }
 
-abstract class StringField extends Text.Field {
+abstract class StringField is Text.Field {
     protected function handleCommit from (_ is ()) to ();
     const onCommit = observeCommit().subscribe(handleCommit);
 }
@@ -3302,6 +3330,10 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         }
     }
 
+    function parameterize from (ev is ExpressionView) to ()
+    {
+    }
+
     function factor from (ev is ExpressionView) to ()
     {
         const linked = new java.util.HashSet of ExpressionView();
@@ -3490,6 +3522,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     }
 
     public var event is Member;
+    public var parameters is Context.ClosureVarContext[];
     public var subject is Context.ClosureVarContext;
     public var eventContext is Context.MemberContext;
     public var varContext is Context.ClosureVarContext;
@@ -3529,13 +3562,13 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 	unsubscribe();
     }
 
-    const terminalView is Node = TransformNode { 
+    const terminalView is TransformNode = TransformNode { 
         tx: bind width / 2.0 - 120; 
         ty: bind height / 2 - 20; 
-        content: bind terminalExprView;  
+        content: bind terminalExprView;
     };
 
-    const initialView is Node = TransformNode { 
+    const initialView is TransformNode = TransformNode { 
         tx: bind -width / 2.0 + 120; 
         ty: bind height / 2 - 20; 
         content: bind initialExprView;  
@@ -3562,7 +3595,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             canvas: this;
             variable: c;
         }
-
+        result.updateParent();
         subjectExp = result.fun;
         return result;
     }
@@ -3581,6 +3614,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                         override function getLocalAccess to String { "i" }
 			member: event;
 		    }
+                    dragFilter: new Tuple3(1.0, 0.0, 0.0);
 		}
 		r.updateParent();
                 MasterUndoable.commit();
@@ -3630,7 +3664,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         /*
         stroke: Stroke {
             miterlimit: 2;
-            //dash: [2];
+            dash: [2];
         }
         */
     };
@@ -3725,6 +3759,10 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         const links = new java.util.HashSet of LinkView();
         const fun = createFunctionFromSelection(linked, links);
         /*
+        const ctx = FunctionDefinitionContext {
+            inputs: for (p in fun.
+        }
+
         const bounds = selectionRect.boundsInScene;
         for (v in views where bounds.contains(v.boundsInScene)) {
             serialize(v);
@@ -4368,7 +4406,10 @@ public class FunNode is ExprNode {
                 funMember: m as FunctionMember;
             }
         }
-        println("creating function {m}");
+        linkView(canvas, v);
+    }
+    protected function linkView from (canvas is Canvas, v is FunctionView) to FunctionView {
+        const m = v.fun.funMember;
         for (n in inputs) {
             var i = indexof n;
             const p = v.inputs[i];
