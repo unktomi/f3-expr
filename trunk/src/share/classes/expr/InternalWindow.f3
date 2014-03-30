@@ -17,7 +17,6 @@ const titlePaint = ColorPaint(Color.color(.3, .3, .3));
 
 public class InternalWindow is ResizableNode, Focuser {
 
-    override var cursor = Cursor.Default;
 
     public var containerBounds is Bounds;
     public var cx is Number;
@@ -81,6 +80,7 @@ public class InternalWindow is ResizableNode, Focuser {
 	override var transform = bind translate(self.width/2 - 7, -self.height/2 + 7-1);
         url: bind "{__DIR__}resize-corner.png";
 	//fillPaint: ColorPaint(Color.color(.65, .65, .65));
+        override var cursor = Cursor.SouthEastResize;
     };
 
     const leftSide is Node = Rectangle {
@@ -105,16 +105,19 @@ public class InternalWindow is ResizableNode, Focuser {
     public var content is ResizableNode;
 
     const contentHolder = ContentHolder {
+        override var cursor = Cursor.Default;
 	scissorBounds: bind Bounds.boundsFromRect(content.width+1, content.height+1);
 	content: bind content;
     }
 
     override var internalContent = Group {
-	content: bind [titleBar, buttonBar, line, TransformNode { ty: -14, content: bind contentHolder}, 
-        resizeCorner, leftSide, rightSide];
-    } 
+	content: bind [titleBar, buttonBar, line, 
+                       TransformNode { ty: -14, content: bind contentHolder }, 
+                       resizeCorner, leftSide, rightSide];
+    }
     
-    override function update {
+    override function update to ()
+    {
 	if (dirty) {
 	    dirty = false;
 	    resize(width, height);

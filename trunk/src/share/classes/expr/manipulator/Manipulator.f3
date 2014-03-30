@@ -53,24 +53,25 @@ public class Manipulator is AbstractNode
             undoList.addTarget("pz", &target.pz);
         }
     }
+
     public var viewer is ExaminerViewer; 
     
     public var scene is Scene;
 
     public var viewSize is Number = 1.0;
 
-    public function expand 
+    public function expand to ()
     {
         viewSize *= 1.1;
     }
 
-    public function shrink 
+    public function shrink to ()
     {
         viewSize /= 1.1;
     }
 
     public readonly var viewScale = bind {
-        var s = if (scene.camera is Camera2D) then 10.0 else viewer.centerDistance / 100;
+        var s = if (scene.camera is Camera2D) then 10.0 else centerDistance / 100;
         if (s <> 0) then s*viewSize else 1.0;
     }
 
@@ -79,9 +80,9 @@ public class Manipulator is AbstractNode
         content: bind model.getSpatialRoot()
     };
 
-    readonly var t = bind translate(target.tx, target.ty, target.tz);
-    readonly var p = bind translate(target.px, target.py, target.pz);
-    readonly var r = bind rotate(target.rx, target.ry, target.rz);
+    bound var t = translate(target.tx, target.ty, target.tz);
+    bound var p = translate(target.px, target.py, target.pz);
+    bound var r = rotate(target.rx, target.ry, target.rz);
 
     override var internalContent = Group {
         transform: bind if (target == null) then Mat4.<<1>> else target.parentToSceneTransform * t * p * r;
@@ -242,14 +243,14 @@ public class Manipulator is AbstractNode
         target.rz = angles.z;
     }
 
-    const onMouseUp = DefaultObserver of MouseEvent {
+    const onMouseUp = Observer of MouseEvent {
         override function onNext from (event is MouseEvent) to () 
         {
             MasterUndoable.commit();
         }
     }
 
-    const onMouseDownTranslate = DefaultObserver of MouseEvent {
+    const onMouseDownTranslate = Observer of MouseEvent {
         override function onNext from (event is MouseEvent) to () 
         {
             lastMoveAllPoint = [];
@@ -257,7 +258,7 @@ public class Manipulator is AbstractNode
         }
     }
 
-    const onMouseDownRotate = DefaultObserver of MouseEvent {
+    const onMouseDownRotate = Observer of MouseEvent {
         override function onNext from (event is MouseEvent) to () 
         {
             lastMouse = [];
@@ -265,56 +266,56 @@ public class Manipulator is AbstractNode
         }
     }
 
-    const onMouseDownScale = DefaultObserver of MouseEvent {
+    const onMouseDownScale = Observer of MouseEvent {
         override function onNext from (event is MouseEvent) to () 
         {
             enterScale();
         }
     }
 
-    const onScaleAll = DefaultObserver of MouseEvent {
+    const onScaleAll = Observer of MouseEvent {
         override function onNext from (event is MouseEvent) to () 
         {
             doScaleAll(event);
         }
     }
 
-    const onScaleX = DefaultObserver of MouseEvent {
+    const onScaleX = Observer of MouseEvent {
         override function onNext from (event is MouseEvent) to () 
         {
             doScale(event, Vec3.X_AXIS);
         }
     }
 
-    const onScaleY = DefaultObserver of MouseEvent {
+    const onScaleY = Observer of MouseEvent {
         override function onNext from (event is MouseEvent) to () 
         {
             doScale(event, Vec3.Y_AXIS);
         }
     }
 
-    const onScaleZ = DefaultObserver of MouseEvent {
+    const onScaleZ = Observer of MouseEvent {
         override function onNext from (event is MouseEvent) to () 
         {
             doScale(event, Vec3.Z_AXIS);
         }
     }
 
-    const onRotateX = DefaultObserver of MouseEvent {
+    const onRotateX = Observer of MouseEvent {
         override function onNext from (event is MouseEvent) to () 
         {
             doRotate(event, Vec3.X_AXIS);
         }
     }
 
-    const onRotateY = DefaultObserver of MouseEvent {
+    const onRotateY = Observer of MouseEvent {
         override function onNext from (event is MouseEvent) to () 
         {
             doRotate(event, Vec3.Y_AXIS);
         }
     }
 
-    const onRotateZ = DefaultObserver of MouseEvent {
+    const onRotateZ = Observer of MouseEvent {
         override function onNext from (event is MouseEvent) to () 
         {
             doRotate(event, Vec3.Z_AXIS);
@@ -328,21 +329,21 @@ public class Manipulator is AbstractNode
         }
     }
 
-    const onMoveX = DefaultObserver of MouseEvent {
+    const onMoveX = Observer of MouseEvent {
         override function onNext from (event is MouseEvent) to () 
         {
             doTranslate(event, Vec3.X_AXIS, moveX.toSceneTransform)
         }
     }
 
-    const onMoveY = DefaultObserver of MouseEvent {
+    const onMoveY = Observer of MouseEvent {
         override function onNext from (event is MouseEvent) to () 
         {
             doTranslate(event, Vec3.Y_AXIS, moveY.toSceneTransform)
         }
     }
 
-    const onMoveZ = DefaultObserver of MouseEvent {
+    const onMoveZ = Observer of MouseEvent {
         override function onNext from (event is MouseEvent) to () 
         {
             doTranslate(event, Vec3.Z_AXIS, moveZ.toSceneTransform)
@@ -436,8 +437,11 @@ public class Manipulator is AbstractNode
             });
     }
 
+    var centerDistance is Number = 1.0;
+
     override function update 
     {
+        centerDistance = scene.camera.distanceTo(target.toSceneTransform.getTranslation());
         super.update();
         if (moveX == null) createHandlers();
         if (not (scene.camera is Camera2D)) {
