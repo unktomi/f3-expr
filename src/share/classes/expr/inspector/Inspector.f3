@@ -442,7 +442,10 @@ function inspect0 from (obj is Object, classType is F3ClassType) to (Inspected o
                                     member: m;
                                     label: m.m.getName();
                                     observable: Observables.observe(ptr);
-                                    override function get to Number { ptr.get() }
+                                    override function get to Number { 
+                                        println("getting value of {m.m.getName()} in {obj}");
+                                        ptr.get() 
+                                    }
                                     override function set from (x is Number) to () { 
                                         ptr.set(x);
                                         println("set {m.m.getName()} => {x} => {ptr.get()}");

@@ -198,6 +198,12 @@ function makeFunMember from (name is String, params is F3Type[], ret is F3Type) 
 	ft: ctx.makeFunctionType(params, ret);
 	name: name;
 	t: ret;
+        override function equals from (obj is Object) to Boolean {
+            (obj is FunctionMember) and {
+                const fun = obj as FunctionMember;
+                fun.ft == ft;
+            }
+        }
     }
 }
 
@@ -1247,24 +1253,28 @@ public class Function is MemberExpression {
     public var ft is F3FunctionType = bind funMember.ft;
     public var fun is F3FunctionMember = bind member.m as F3FunctionMember;
     override function getType { ft }
+    var isStatic = bind fun.isStatic();
+    var clazz = bind fun.getDeclaringClass();
+    var isNull = bind fun == null;
+    var argCount1 = bind ft.minArgs();
     public var inputs is Parameter[] =
 	bind 
-        [if (fun == null) then null else 
+        [if (isNull) then null else 
          Parameter {
-             name: if (fun.isStatic()) then "()" else formatClassName(fun.getDeclaringClass());
+             name: bind if (isStatic) then "()" else formatClassName(clazz);
              target: this;
-             t: if (fun.isStatic()) then UNIT_TYPE else fun.getDeclaringClass()
+             t: bind if (isStatic) then UNIT_TYPE else clazz;
          },           
-         foreach (i in [0..<ft.minArgs()]) {
+         foreach (i in [0..<argCount1]) {
              Parameter {
-                 name: argName(ft, i);
+                 name: bind argName(ft, i);
                  target: this;
-                 t: ft.getArgumentType(i);
+                 t: bind ft.getArgumentType(i);
              }
          }];
     public var output is Result = Result {
         source: this;
-	t: ft.getReturnType()
+	t: bind ft.getReturnType()
     }
 
     override public function toEnglish to String {
@@ -1554,6 +1564,9 @@ public abstract class ExpressionView is AbstractNode {
     public bound function getLabel to String {
         Names.formatName(expression.getName());
     }
+    var exprName = bind expression.getName() on replace {
+        canvas.dumpSrc();
+    }
     public readonly var label is Text.Label = bind constructLabel();
     bound function constructLabel to Text.Label {
         Text.Label {
@@ -1587,23 +1600,25 @@ public abstract class ExpressionView is AbstractNode {
             canvas.setSelectedExpr(this);
             const menuFactory = canvas.menuFactory;
             if (e.isMouseButton3Down()) {
-                const menu = Menu {
-                    items: 
-                    [MenuItem {
-                        label: "Shortcut";
-                        action: canvas.factor.apply(this);
-                    },
-                    MenuItem {
-                        label: "Parameterize";
-                        action: canvas.parameterize.apply(this);
+                if (this <> canvas.terminalExprView) {
+                    const menu = Menu {
+                        items: 
+                        [MenuItem {
+                                label: "Shortcut";
+                                action: canvas.factor.apply(this);
+                            },
+                            MenuItem {
+                                label: "Parameterize";
+                                action: canvas.parameterize.apply(this);
+                            }
+                            MenuItem {
+                                label: "Delete";
+                                action: canvas.deleteSelection;
+                            }]
                     }
-                    MenuItem {
-                        label: "Delete";
-                        action: canvas.deleteSelection;
-                    }]
+                    println("menu factory => {menuFactory}");
+                    e.stage.showPopupMenu(e.screenx, e.screeny, menu);
                 }
-                println("menu factory => {menuFactory}");
-                e.stage.showPopupMenu(e.screenx, e.screeny, menu);
             } else {
                 dragging = true;
             }
@@ -1771,10 +1786,10 @@ class FunctionView is ExpressionView {
         }
     }
     */
-    readonly var inputs is ParameterView[] = bind foreach (p in fun.inputs) ParameterView {
+    bound var inputs is ParameterView[] = foreach (p in fun.inputs) ParameterView {
         targetView: this;
 	canvas: bind canvas;
-	parameter: p;
+	parameter: bind p;
 	cellWidth: bind cellWidth;
     };
 
@@ -3185,6 +3200,9 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     function moveToFront from (exp is ExpressionView) to ()
     {
+        if (exp == terminalExprView) {
+            return;
+        }
         if (exp <> views[views.size()-1])  {
             delete exp from views;
             insert exp after views[views.size()-1];
@@ -4300,7 +4318,8 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 println("code => {j}");
                 prog.defineVar(subject, "var <<{subject.varName}>> is <<{subject.varType.t}>> = {j}; ");
             } else {
-                prog.defineVar(subject, "var <<{subject.varName}>> is <<{subject.varType.t}; ");
+                eng = "<i>{subject.varName}</i> = {terminalExprView.inputs[0].parameter.toEnglish()}";
+                prog.defineVar(subject, "var <<{subject.varName}>> is <<{subject.varType.t}>> = {terminalExprView.inputs[0].parameter.toSource(context)}; ");
             }
             englishOutput = eng;
         } else {
