@@ -78,9 +78,9 @@ public class Tabview is ResizableNode, Focuser {
 	super.update();
 	if (lastSelected <> selectedTab) {
 	    lastSelected = selectedTab;
-	    selectedTab.content.resize(contentWidth, contentHeight);
             selectedTab.onSelect();
 	}
+        selectedTab.content.resize(contentWidth, contentHeight);
 	minTabWidth = width / Math.max(tabs.size(), 1);
 	var maxLabelWidth = 0.0;
 	var x = 0.0;
