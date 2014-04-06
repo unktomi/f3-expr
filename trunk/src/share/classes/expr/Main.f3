@@ -527,11 +527,46 @@ public function run from (args is String[]) to ()
 
     var trax is expr.timeline.Trax;
     var graphEditor is expr.timeline.GraphEditor;
-    var inspector0 is Inspector;
-    var inspector1 is Inspector;
-    var inspector2 is Inspector;
-    var inspector3 is Inspector;
-    var currentTransform = bind transformHierarchy.selectedTransform;
+    const inspector0 is Inspector = Inspector {
+        var toInspect = bind { var t = temporalHierarchy2.selectedTimeNode; if t <> temporalHierarchy2.root then t else null };
+        inspecting: bind Inspector.inspect(toInspect, Reflect.getType("f3.media.scene.TimeNode") as f3.reflect.F3ClassType);
+    };
+    const inspector1 is Inspector = Inspector {
+        inspecting: bind Inspector.inspect(if (currentTransform == null) then currentScene else currentTransform);
+    };
+    const inspector2 is Inspector = Inspector {
+        inspecting: bind Inspector.inspect(temporalHierarchy.selectedTransform);
+    };
+    var inspector3 is Inspector = Inspector {
+        inspecting: bind [Inspector.inspect(otherHierarchy.selectedVariable)];
+    }
+    
+    const inspectors = foreach (i in [inspector0, inspector1, inspector2, inspector3]) {
+        Scrollpane { canZoomVertical: false, content: i }
+    }
+
+    var inspectorSelection is Integer;
+
+    bound var selectedInspector is ResizableNode = inspectors[inspectorSelection];
+
+    function inspectSpatial to () 
+    {
+        inspectorSelection = 1;
+    }
+    function inspectTemporal to () 
+    {
+        inspectorSelection = 2;
+    }
+    function inspectKeyable to () 
+    {
+        inspectorSelection = 0;
+    }
+    function inspectEventual to () 
+    {
+        inspectorSelection = 3;
+    }
+
+    bound var currentTransform = transformHierarchy.selectedTransform;
     currentCamera = camera;
 
     var savePoint is Integer;
@@ -1158,7 +1193,7 @@ public function run from (args is String[]) to ()
                                         content: Tabview {
                                             tabs: 
                                             [
-Tabview.Tab {
+                                    Tabview.Tab {
 				     title: "Assets";
 				     content:
                                      Scrollpane { 
@@ -1398,6 +1433,10 @@ Tabview.Tab {
                                                         }
                                                     }
                                                 }
+                                            },
+                                            Tabview.Tab {
+                                               title: "Inspector";
+                                               content: bind selectedInspector;
                                             }]
                                         }
                                     }
@@ -1414,299 +1453,233 @@ Tabview.Tab {
 			    
 			      content: Tabview {
 				tabs: 
-				[
-
-				 Tabview.Tab {
+				[Tabview.Tab {
 				     title: "Keyable";
-				     content:
-                                         Tabview {
-                                             tabs:
-                                             [Tabview.Tab {
-                                                     title: "Inspector";
-                                                     content: Scrollpane {
-                                                         canZoomVertical: false;
-                                                         content: inspector0 = Inspector {
-                                                             var toInspect = bind { var t = temporalHierarchy2.selectedTimeNode; if t <> temporalHierarchy2.root then t else null };
-                                                             inspecting: bind Inspector.inspect(toInspect, Reflect.getType("f3.media.scene.TimeNode") as f3.reflect.F3ClassType);
-                                                         }
-                                                     }
-                                                 },
-                                                 Tabview.Tab {
-                                                     title: "Hierarchy";
-                                                     content:
-                                                     Scrollpane {
-                                                         canZoomVertical: false;
-                                                         content:
-                                                         Treeview {
-                                                             model: TemporalHierarchy.Model {
-                                                                 h: bind temporalHierarchy2
-                                                             }
-                                                             var dragger is TransformNode;
-                                                             var clip is TimeNode;
-                                                             override function onMouseDrag from (e is MouseEvent) to () {
-                                                                 if (dragger == null) {
-                                                                     clip = (selectedTreenode as TemporalHierarchy.Treenode).n;
-                                                                     dragger = TransformNode {
-                                                                         pickable: false;
-                                                                         content: Group {
-                                                                             transform: translate(-e.sceneLocation.x, 0);
-                                                                             content: getDragCell();
-                                                                         }
-                                                                     }
-                                                                     insert dragger into popupLayer.content;
-                                                                 }
-                                                                 dragger.tx = editorScene.mousePosition.x;
-                                                                 dragger.ty = editorScene.mousePosition.y;
-                                                             }
-                                                             
-                                                             override function onMouseUp from (e is MouseEvent) to () 
-                                                             {
-                                                                 for (j in getUnderMouseInEditor()) {
-                                                                     if (j.node is Expression.Canvas) {
-                                                                         (j.node as Expression.Canvas).onDrop(j, clip);
-                                                                         break;
-                                                                     }
-                                                                 }
-                                                                 delete dragger from popupLayer.content;
-                                                                 clip = null;
-                                                                 dragger = null;
-                                                             }
-                                                         }
-                                                     }
-					     }]; 
+                                     onSelect: inspectKeyable;
+                                     content:
+                                           Scrollpane {
+                                               canZoomVertical: false;
+                                               content:
+                                               Treeview {
+                                                   model: TemporalHierarchy.Model {
+                                                       h: bind temporalHierarchy2;
+                                                   }
+                                                   var dragger is TransformNode;
+                                                   var clip is TimeNode;
+                                                   override function onMouseDrag from (e is MouseEvent) to () {
+                                                       if (dragger == null) {
+                                                           clip = (selectedTreenode as TemporalHierarchy.Treenode).n;
+                                                           dragger = TransformNode {
+                                                               pickable: false;
+                                                               content: Group {
+                                                                   transform: translate(-e.sceneLocation.x, 0);
+                                                                   content: getDragCell();
+                                                               }
+                                                           }
+                                                           insert dragger into popupLayer.content;
+                                                       }
+                                                       dragger.tx = editorScene.mousePosition.x;
+                                                       dragger.ty = editorScene.mousePosition.y;
+                                                   }
+                                                   
+                                                   override function onMouseUp from (e is MouseEvent) to () 
+                                                   {
+                                                       for (j in getUnderMouseInEditor()) {
+                                                           if (j.node is Expression.Canvas) {
+                                                               (j.node as Expression.Canvas).onDrop(j, clip);
+                                                               break;
+                                                           }
+                                                       }
+                                                       delete dragger from popupLayer.content;
+                                                       clip = null;
+                                                       dragger = null;
+                                                   }
+                                               }
                                            }
-                                         },
-
-
+                                 },
 				 Tabview.Tab {
 				     title: "Spatial";
-				     content:
-				     Tabview {
-					 tabs:
-					 [Tabview.Tab {
-					     title: "Inspector";
-                                                 content: Scrollpane {
-                                                     canZoomVertical: false;
-                                                     content: inspector1 = Inspector {
-                                                         inspecting: bind Inspector.inspect(if (currentTransform == null) then currentScene else currentTransform);
+                                     onSelect: inspectSpatial;
+                                     content: Scrollpane {
+                                         canZoomVertical: false;
+                                         content:
+                                         Treeview {
+                                             model: TransformHierarchy.Model {
+                                                 h: bind transformHierarchy;
+                                             }
+                                             override function onKeyDown from (e is KeyboardEvent) to ()
+                                             {
+                                                 if (e.keyCode == Keys.Delete or
+                                                     e.keyCode == Keys.Backspace) {
+                                                     if (currentTransform <> null) {
+                                                         const toDelete = currentTransform;
+                                                         transformHierarchy.deleteSelection();
+                                                         deleteResource(toDelete);
+                                                     } else {
+                                                         if (transformHierarchy.selectedScene <> mainScene) {
+                                                             delete transformHierarchy.selectedScene from
+                                                                 currentScenes;
+                                                         }
+                                                     }
+                                                 } else super.onKeyDown(e);
+                                             }
+                                             var dragger is TransformNode;
+                                             var clip is Node;
+                                             override function onMouseDrag from (e is MouseEvent) to () {
+                                                 if (dragger == null) {
+                                                     clip = (selectedTreenode as TransformHierarchy.Treenode).n;
+                                                     dragger = TransformNode {
+                                                         pickable: false;
+                                                         content: Group {
+                                                             transform: translate(-e.sceneLocation.x, 0);
+                                                             content: getDragCell();
+                                                         }
+                                                     }
+                                                     insert dragger into popupLayer.content;
+                                                 }
+                                                 dragger.tx = editorScene.mousePosition.x;
+                                                 dragger.ty = editorScene.mousePosition.y;
+                                             }
+                                             
+                                             override function onMouseUp from (e is MouseEvent) to () 
+                                             {
+                                                 if (clip <> null) {
+                                                     for (j in getUnderMouseInEditor()) {
+                                                         if (j.node is Expression.Canvas) {
+                                                             (j.node as Expression.Canvas).onDrop(j, clip);
+                                                             break;
+                                                         }
+                                                     }
+                                                     for (j in getUnderMouseInEditor()) {
+                                                         if (j.node == this) {
+                                                             const pt = j.node.toSceneTransform.inverse() * j.scenePoint;
+                                                             const tn = pick(pt.y) as TransformHierarchy.Treenode;
+                                                             println("PICKED => {tn} for {e.location.y}");
+                                                             if (tn <> null) {
+                                                                 const n = tn.n;
+                                                                 println("PICKED => {n}");
+                                                                 if (clip <> n) {
+                                                                     transformHierarchy.move(clip, n);
+                                                                     selectNodeLater(clip);
+                                                                 }
+                                                             }
+                                                         }
                                                      }
                                                  }
-					  },
-					  Tabview.Tab {
-					     title: "Hierarchy"
-                                             content: Scrollpane {
-                                                  canZoomVertical: false;
-                                                  content:
-                                                  Treeview {
-                                                      model: TransformHierarchy.Model {
-                                                          h: bind transformHierarchy;
-                                                      }
-                                                      override function onKeyDown from (e is KeyboardEvent) to ()
-                                                      {
-                                                          if (e.keyCode == Keys.Delete or
-                                                              e.keyCode == Keys.Backspace) {
-                                                              if (currentTransform <> null) {
-                                                                  const toDelete = currentTransform;
-                                                                  transformHierarchy.deleteSelection();
-                                                                  deleteResource(toDelete);
-                                                              } else {
-                                                                  if (transformHierarchy.selectedScene <> mainScene) {
-                                                                      delete transformHierarchy.selectedScene from
-                                                                          currentScenes;
-                                                                  }
-                                                              }
-                                                          } else super.onKeyDown(e);
-                                                      }
-                                                      var dragger is TransformNode;
-                                                      var clip is Node;
-                                                      override function onMouseDrag from (e is MouseEvent) to () {
-                                                          if (dragger == null) {
-                                                              clip = (selectedTreenode as TransformHierarchy.Treenode).n;
-                                                              dragger = TransformNode {
-                                                                  pickable: false;
-                                                                  content: Group {
-                                                                      transform: translate(-e.sceneLocation.x, 0);
-                                                                      content: getDragCell();
-                                                                  }
-                                                              }
-                                                              insert dragger into popupLayer.content;
-                                                          }
-                                                          dragger.tx = editorScene.mousePosition.x;
-                                                          dragger.ty = editorScene.mousePosition.y;
-                                                      }
-                                                      
-                                                      override function onMouseUp from (e is MouseEvent) to () 
-                                                      {
-                                                          if (clip <> null) {
-                                                              for (j in getUnderMouseInEditor()) {
-                                                                  if (j.node is Expression.Canvas) {
-                                                                      (j.node as Expression.Canvas).onDrop(j, clip);
-                                                                      break;
-                                                                  }
-                                                              }
-                                                              for (j in getUnderMouseInEditor()) {
-                                                                  if (j.node == this) {
-                                                                      const pt = j.node.toSceneTransform.inverse() * j.scenePoint;
-                                                                      const tn = pick(pt.y) as TransformHierarchy.Treenode;
-                                                                      println("PICKED => {tn} for {e.location.y}");
-                                                                      if (tn <> null) {
-                                                                          const n = tn.n;
-                                                                          println("PICKED => {n}");
-                                                                          if (clip <> n) {
-                                                                              transformHierarchy.move(clip, n);
-                                                                              selectNodeLater(clip);
-                                                                          }
-                                                                      }
-                                                                  }
-                                                              }
-                                                          }
-                                                          delete dragger from popupLayer.content;
-                                                          clip = null;
-                                                          dragger = null;
-                                                      }
-                                                  }
-                                              }
-					 }]
+                                                 delete dragger from popupLayer.content;
+                                                 clip = null;
+                                                 dragger = null;
+                                             }
+                                         }
 				     }
 				 },
 				 Tabview.Tab {
 				     title: "Temporal";
+                                     onSelect: inspectTemporal;
 				     content:
-                                         Tabview {
-                                             tabs:
-                                             [Tabview.Tab {
-                                                     title: "Inspector";
-                                                     content: Scrollpane {
-                                                         canZoomVertical: false;
-                                                         content: inspector2 = Inspector {
-                                                             inspecting: bind Inspector.inspect(temporalHierarchy.selectedTransform);
+                                     Scrollpane {
+                                         canZoomVertical: false;
+                                         content:
+                                         Treeview {
+                                             model: TemporalHierarchy.Model {
+                                                 h: bind temporalHierarchy
+                                                     }
+                                             override function onKeyDown from (e is KeyboardEvent) to ()
+                                             {
+                                                 if (e.keyCode == Keys.Delete or
+                                                     e.keyCode == Keys.Backspace) {
+                                                     const toDelete = temporalHierarchy.selectedTransform;
+                                                     temporalHierarchy.deleteSelection();
+                                                     deleteAnimResource(toDelete);
+                                                 } else super.onKeyDown(e);
+                                             }
+                                             var dragger is TransformNode;
+                                             var clip is TimeNode;
+                                             override function onMouseDrag from (e is MouseEvent) to () {
+                                                 if (dragger == null) {
+                                                     clip = (selectedTreenode as TemporalHierarchy.Treenode).n;
+                                                     dragger = TransformNode {
+                                                         pickable: false;
+                                                         content: Group {
+                                                             transform: translate(-e.sceneLocation.x, 0);
+                                                             content: getDragCell();
                                                          }
                                                      }
-                                                 },
-                                                 Tabview.Tab {
-                                                     title: "Hierarchy";
-                                                     content:
-                                                     Scrollpane {
-                                                         canZoomVertical: false;
-                                                         content:
-                                                         Treeview {
-                                                             model: TemporalHierarchy.Model {
-                                                                 h: bind temporalHierarchy
-                                                             }
-                                                             override function onKeyDown from (e is KeyboardEvent) to ()
-                                                             {
-                                                                 if (e.keyCode == Keys.Delete or
-                                                                     e.keyCode == Keys.Backspace) {
-                                                                     const toDelete = temporalHierarchy.selectedTransform;
-                                                                     temporalHierarchy.deleteSelection();
-                                                                     deleteAnimResource(toDelete);
-                                                                 } else super.onKeyDown(e);
-                                                             }
-                                                             var dragger is TransformNode;
-                                                             var clip is TimeNode;
-                                                             override function onMouseDrag from (e is MouseEvent) to () {
-                                                                 if (dragger == null) {
-                                                                     clip = (selectedTreenode as TemporalHierarchy.Treenode).n;
-                                                                     dragger = TransformNode {
-                                                                         pickable: false;
-                                                                         content: Group {
-                                                                             transform: translate(-e.sceneLocation.x, 0);
-                                                                             content: getDragCell();
-                                                                         }
-                                                                     }
-                                                                     insert dragger into popupLayer.content;
-                                                                 }
-                                                                 dragger.tx = editorScene.mousePosition.x;
-                                                                 dragger.ty = editorScene.mousePosition.y;
-                                                             }
-                                                             
-                                                             override function onMouseUp from (e is MouseEvent) to () 
-                                                             {
-                                                                 for (j in getUnderMouseInEditor()) {
-                                                                     if (j.node is Expression.Canvas) {
-                                                                         (j.node as Expression.Canvas).onDrop(j, clip);
-                                                                         break;
-                                                                     }
-                                                                 }
-                                                                 delete dragger from popupLayer.content;
-                                                                 clip = null;
-                                                                 dragger = null;
-                                                             }
-                                                         }
+                                                     insert dragger into popupLayer.content;
+                                                 }
+                                                 dragger.tx = editorScene.mousePosition.x;
+                                                 dragger.ty = editorScene.mousePosition.y;
+                                             }
+                                             
+                                             override function onMouseUp from (e is MouseEvent) to () 
+                                             {
+                                                 for (j in getUnderMouseInEditor()) {
+                                                     if (j.node is Expression.Canvas) {
+                                                         (j.node as Expression.Canvas).onDrop(j, clip);
+                                                         break;
                                                      }
-					     }]; 
-                                           }
-                                         },
-                                         Tabview.Tab {
+                                                 }
+                                                 delete dragger from popupLayer.content;
+                                                 clip = null;
+                                                 dragger = null;
+                                             }
+                                         }
+                                     }
+                                 },
+                                 Tabview.Tab {
+                                            onSelect: inspectEventual;
 				            title: "Eventual";
-                                             content:
-                                             Tabview {
-                                                 tabs:
-                                                 [Tabview.Tab {
-                                                     title: "Inspector";
-                                                     content: Scrollpane {
-                                                        canZoomVertical: false;
-                                                             content: inspector3 = Inspector {
-                                                                 inspecting: bind [Inspector.inspect(otherHierarchy.selectedVariable)];
-                                                             }
+                                            content: Scrollpane {
+                                                 canZoomVertical: false;
+                                                 content:
+                                                 Treeview {
+                                                     model: VariableHierarchy.Model {
+                                                         h: bind otherHierarchy;
                                                      }
-                                                  },
-                                                  Tabview.Tab {
-                                                      title: "Hierarchy";
-                                                      content:
-                                                      Scrollpane {
-                                                          canZoomVertical: false;
-                                                         content:
-                                                         Treeview {
-                                                             model: VariableHierarchy.Model {
-                                                                 h: bind otherHierarchy
-                                                             }
-                                                             override function onKeyDown from (e is KeyboardEvent) to ()
-                                                             {
-                                                                 if (e.keyCode == Keys.Delete or
-                                                                     e.keyCode == Keys.Backspace) {
-                                                                     const toDelete = otherHierarchy.selectedVariable;
-                                                                     otherHierarchy.deleteSelection();
-                                                                     //deleteAnimResource(toDelete);
-                                                                 } else super.onKeyDown(e);
-                                                             }
-                                                             var dragger is TransformNode;
-                                                             var clip is Context;
-                                                             override function onMouseDrag from (e is MouseEvent) to () {
-                                                                 if (dragger == null) {
-                                                                     clip = (selectedTreenode as VariableHierarchy.Treenode).n;
-                                                                     dragger = TransformNode {
-                                                                         pickable: false;
-                                                                         content: Group {
-                                                                             transform: translate(-e.sceneLocation.x, 0);
-                                                                             content: getDragCell();
-                                                                         }
-                                                                     }
-                                                                     insert dragger into popupLayer.content;
+                                                     override function onKeyDown from (e is KeyboardEvent) to ()
+                                                     {
+                                                         if (e.keyCode == Keys.Delete or
+                                                             e.keyCode == Keys.Backspace) {
+                                                             const toDelete = otherHierarchy.selectedVariable;
+                                                             otherHierarchy.deleteSelection();
+                                                             //deleteAnimResource(toDelete);
+                                                         } else super.onKeyDown(e);
+                                                     }
+                                                     var dragger is TransformNode;
+                                                     var clip is Context;
+                                                     override function onMouseDrag from (e is MouseEvent) to () {
+                                                         if (dragger == null) {
+                                                             clip = (selectedTreenode as VariableHierarchy.Treenode).n;
+                                                             dragger = TransformNode {
+                                                                 pickable: false;
+                                                                 content: Group {
+                                                                     transform: translate(-e.sceneLocation.x, 0);
+                                                                     content: getDragCell();
                                                                  }
-                                                                 dragger.tx = editorScene.mousePosition.x;
-                                                                 dragger.ty = editorScene.mousePosition.y;
                                                              }
-                                                             
-                                                             override function onMouseUp from (e is MouseEvent) to () 
-                                                             {
-                                                                 for (j in getUnderMouseInEditor()) {
-                                                                     if (j.node is Expression.Canvas) {
-                                                                         (j.node as Expression.Canvas).onDrop(j, clip);
-                                                                         break;
-                                                                     }
-                                                                 }
-                                                                 delete dragger from popupLayer.content;
-                                                                 clip = null;
-                                                                 dragger = null;
+                                                             insert dragger into popupLayer.content;
+                                                         }
+                                                         dragger.tx = editorScene.mousePosition.x;
+                                                         dragger.ty = editorScene.mousePosition.y;
+                                                     }
+                                                     
+                                                     override function onMouseUp from (e is MouseEvent) to () 
+                                                     {
+                                                         for (j in getUnderMouseInEditor()) {
+                                                             if (j.node is Expression.Canvas) {
+                                                                 (j.node as Expression.Canvas).onDrop(j, clip);
+                                                                 break;
                                                              }
                                                          }
+                                                         delete dragger from popupLayer.content;
+                                                         clip = null;
+                                                         dragger = null;
                                                      }
-                                                  }];
+                                                 }
                                              }
                                          }];
-                             }
-                         }
+                               }
+                           }
                      },
 		     InternalWindow {
                         id: "Editor2";            
