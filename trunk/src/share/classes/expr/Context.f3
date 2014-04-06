@@ -213,6 +213,7 @@ public class ClosureVarContext is GroupContext {
     public var varName is String = "variable";
     public var value is Object;
     public var isEvent is Boolean;
+    public var program is Program;
     override var name = bind varName;
     override var label = bind "{varName} [{varType.name}]";
     override function fullName to String 
@@ -231,7 +232,7 @@ public class ClosureVarContext is GroupContext {
         return results;
     }
     public const outputContext = VarOutputContext {parent: this};
-    var myContent = bind [outputContext, content];
+    var myContent = bind [/*outputContext ,*/ content];
     override public bound function getContent to Context[] 
     { 
         myContent
