@@ -153,7 +153,7 @@ public class ResourceNodeContext is GroupContext, ResourceObjectContext {
     public var resource is ResourceNode;
     override var name = bind "{if (resource.useLiteralId) then resource.id else formatName(resource.id)} [Scene]";
     protected var members = bind uniquify(Expression.introspect(Reflect.getType("f3.media.scene.TransformNode") as F3ClassType));
-    var memberCtxs = bind foreach (x in members) if (not x.name.startsWith("observe")) then null else MemberContext { member: x, parent: this }
+    public readonly var memberCtxs = bind foreach (x in members) if (not x.name.startsWith("observe")) then null else MemberContext { member: x, parent: this }
     protected var containedNodes = bind foreach (x in resource.content) SubResourceNodeContext {
         parent: this;
         resource: resource;
