@@ -246,7 +246,7 @@ public function run from (args is String[]) to ()
 
     const temporalHierarchy = TemporalHierarchy { root: bind currentAnimResource }
     const temporalHierarchy2 = TemporalHierarchy { root: ResourceTimeGroup {
-            override var id = "Channel Hierarchy";
+            override var id = "Hierarchy";
             override protected function updateParent to () { // hack...
             }
             content: bind foreach (target in currentResource.resources) target.channelBox;
@@ -356,9 +356,6 @@ public function run from (args is String[]) to ()
             parent: contextModel.selectedGroupContext; 
             resource: rn;
         } 
-        for (p in rn.programs) {
-            ctx.createProgram(p.event).program = p;
-        }
         insert ctx into contextModel.selectedGroupContext.content;
     }
 
@@ -724,7 +721,18 @@ public function run from (args is String[]) to ()
                                  if (r == null and c is Context.ResourceNodeContext) {
                                      const rc = c as Context.ResourceNodeContext;
                                      if (rc.resource == n) {
-                                         const mc is Context.MemberContext = rc.createProgram(p.event);
+                                         var rc1 = rc;
+                                         if (p.targetPath <> "") {
+                                             rc.foldLeft((), function from (_ is (), c is Context) to () {
+                                                     if (c is Context.SubResourceNodeContext) {
+                                                         const g = c as Context.SubResourceNodeContext;
+                                                         if (g.node.id == p.targetPath) {
+                                                             rc1 = g;
+                                                         }
+                                                     }
+                                                 });
+                                         }
+                                         const mc is Context.MemberContext = rc1.createProgram(p.event);
                                          mc.program = p;
                                          r = mc;
                                      }
@@ -753,6 +761,7 @@ public function run from (args is String[]) to ()
                 code: prog.code;
                 sourceCode: prog.compiled;
                 evalContext: Program.EvalContext {
+                    eventContext: mainContext;
                     interactive: function from () to Boolean { interactive } 
                     targetNode: mainContext.getTarget();
                     instanceSpace: currentScene.instanceSpace;
@@ -777,6 +786,8 @@ public function run from (args is String[]) to ()
                     code: d.code;
                     sourceCode: d.sourceCode;
                     evalContext: Program.EvalContext {
+                        eventContext: mainContext;
+                        varContext: v;
                         interactive: function from () to Boolean { interactive } 
                         targetNode: mainContext.getTarget();
                         instanceSpace: currentScene.instanceSpace;
@@ -785,6 +796,7 @@ public function run from (args is String[]) to ()
                         lookupTemporal: mainTimeLayer.lookup;
                     }
                 }
+                v.program = vp;
                 p.defineVar(v, vp);
                 insert vp into ps;
             }
@@ -838,12 +850,14 @@ public function run from (args is String[]) to ()
                     insert v into targetContext.content;
                     println("CREATED VAR: {v}");
                     const vp = Program {
-                        parent: p
+                        parent: p;
                         event: p.event;
                         code: d.code;
                         sourceCode: d.sourceCode;
                         targetPath: prog.targetPath;
                         evalContext: Program.EvalContext {
+                            eventContext: targetContext as Context.MemberContext;
+                            varContext: v;
                             interactive: function from () to Boolean { interactive } 
                             targetNode: (currentTransform as ResourceTarget).findTarget(prog.targetPath);
                             instanceSpace: currentScene.instanceSpace;
@@ -852,6 +866,7 @@ public function run from (args is String[]) to ()
                             lookupTemporal: mainTimeLayer.lookup;
                         }
                     }
+                    v.program = vp;
                     p.defineVar(v, vp);
                     insert vp into ps;
                 }
@@ -1142,187 +1157,8 @@ public function run from (args is String[]) to ()
                                     content: ResizableStageNode {
                                         content: Tabview {
                                             tabs: 
-                                            [Tabview.Tab {
-                                                title: "Events";
-                                                content: Scrollpane {
-                                                    canZoomVertical: false;
-                                                    content: contextTree = Treeview {
-                                                        model: bind contextModel;
-                                                        override function onMouseDown from (e is MouseEvent) to ()
-                                                        {
-                                                            if (e.isMouseButton3Down()) {
-                                                                const ctx = (contextTree.selectedTreenode as Context.ContextTreenode).context;
-                                                                if (ctx is Context.ResourceObjectContext) {
-                                                                    const r = ctx as Context.ResourceObjectContext;
-                                                                    const menu = Menu {
-                                                                        items: Menu {
-                                                                            label: "Events"
-                                                                            items: 
-                                                                            foreach (j in r.getMembers()) {
-                                                                                MenuItem {
-                                                                                    label: j.name;
-                                                                                    action: function to () 
-                                                                                    {
-                                                                                        println("calling create program {j} on {r}");
-                                                                                        r.createProgram(j);
-                                                                                    }
-                                                                                }
-                                                                            }
-                                                                        }
-                                                                    };
-                                                                    e.stage.showPopupMenu(e.screenx, e.screeny+contextTree.cellHeight, menu);
-                                                                }
-                                                            }
-                                                        }
-                                                        override function onKeyDown from (e is KeyboardEvent) to ()
-                                                        {
-                                                            if (e.keyCode == Keys.Delete or
-                                                                e.keyCode == Keys.Backspace) {
-                                                                const toDelete = contextModel.selectedContext;
-                                                                if (toDelete.parent is Context.GroupContext) {
-                                                                    println("delete parent={toDelete.parent}");
-                                                                    var par = toDelete.parent;
-                                                                    while (par <> null) {
-                                                                        if (par is Context.ResourceObjectContext) {
-                                                                            const targ = (par as Context.ResourceObjectContext).getTarget();
-                                                                            println("delete targ={targ}");
-                                                                            for (p in targ.programs) {
-                                                                                println("delete checking {p}");
-                                                                                if (p.evalContext.varContext == toDelete) {
-                                                                                    delete p from targ.programs;
-                                                                                    p.parent.undefineVar(p.evalContext.varContext);
-                                                                                    println("deleted VAR {p.evalContext.varContext.varName}");
-                                                                                    break;
-                                                                                }
-                                                                            }
-                                                                            break;
-                                                                        }
-                                                                        par = par.parent;
-                                                                    }
-                                                                    delete toDelete from (toDelete.parent as Context.GroupContext).content;
-                                                                    println("deleted {toDelete} from {toDelete.parent}");
-                                                                }
-                                                            } else super.onKeyDown(e);
-                                                        }                                       
-                                                    }
-                                                }
-                                            },
-				 Tabview.Tab {
-				     title: "Channel Box";
-				     content:
-                                         Tabview {
-                                             tabs:
-                                             [Tabview.Tab {
-                                                     title: "Inspector";
-                                                     content: Scrollpane {
-                                                         canZoomVertical: false;
-                                                         content: inspector0 = Inspector {
-                                                             var toInspect = bind { var t = temporalHierarchy2.selectedTimeNode; if t <> temporalHierarchy2.root then t else null };
-                                                             inspecting: bind Inspector.inspect(toInspect, Reflect.getType("f3.media.scene.TimeNode") as f3.reflect.F3ClassType);
-                                                         }
-                                                     }
-                                                 },
-                                                 Tabview.Tab {
-                                                     title: "Hierarchy";
-                                                     content:
-                                                     Scrollpane {
-                                                         canZoomVertical: false;
-                                                         content:
-                                                         Treeview {
-                                                             model: TemporalHierarchy.Model {
-                                                                 h: bind temporalHierarchy2
-                                                             }
-                                                             var dragger is TransformNode;
-                                                             var clip is TimeNode;
-                                                             override function onMouseDrag from (e is MouseEvent) to () {
-                                                                 if (dragger == null) {
-                                                                     clip = (selectedTreenode as TemporalHierarchy.Treenode).n;
-                                                                     dragger = TransformNode {
-                                                                         pickable: false;
-                                                                         content: Group {
-                                                                             transform: translate(-e.sceneLocation.x, 0);
-                                                                             content: getDragCell();
-                                                                         }
-                                                                     }
-                                                                     insert dragger into popupLayer.content;
-                                                                 }
-                                                                 dragger.tx = editorScene.mousePosition.x;
-                                                                 dragger.ty = editorScene.mousePosition.y;
-                                                             }
-                                                             
-                                                             override function onMouseUp from (e is MouseEvent) to () 
-                                                             {
-                                                                 for (j in getUnderMouseInEditor()) {
-                                                                     if (j.node is Expression.Canvas) {
-                                                                         (j.node as Expression.Canvas).onDrop(j, clip);
-                                                                         break;
-                                                                     }
-                                                                 }
-                                                                 delete dragger from popupLayer.content;
-                                                                 clip = null;
-                                                                 dragger = null;
-                                                             }
-                                                         }
-                                                     }
-					     }]; 
-                                           }
-                                         },
-
-                                            Tabview.Tab {
-                                                title: "Cameras";
-                                                content: Tabview {
-                                                    var sn = Scene {
-                                                        content: bind currentScene.root;
-                                                    }
-                                                    var st = StageNode {
-                                                        content: sn;
-                                                    }
-                                                tabs:
-                                                    bind foreach (m in currentScene.currentModels) {
-                                                        var cams = bind foreach (cam in getCamerasFromModel(m.model)) cam;
-                                                        if (cams.size() == 0) then null else
-                                                        Tabview.Tab {
-                                                        title: m.id;
-
-                                                        content: Tabview {
-                                                            tabs:
-                                                             bind foreach ( cam in cams) 
-                                                                Tabview.Tab {
-                                                                title: cam.id;
-                                                                var g is Group = Group {};
-                                                                onSelect: function to () {
-                                                                    g.content = st;
-                                                                    sn.camera = cam;
-                                                                }
-                                                                content: ResizableNode {
-                                                                    override function resize from (w is Number, h is Number) to () 
-                                                                    {
-                                                                        st.resize(w as Integer, h as Integer);
-                                                                    }
-                                                                    override var internalContent = bind g;
-                                                                }
-                                                            }
-                                                        }
-                                                        }
-                                                    }
-                                                }
-                                            }]
-                                        }
-                                    }
-                       },
-                       InternalWindow {
-                        id: "Editor1";            
-			containerBounds: bind Bounds.boundsFromRect(0, 
-                                                                    0, 
-                                                                    width,
-                                                                    height-MENU_HEIGHT)
-		    	height: 400, width: 300;
-			cx: 160, cy: 800-300;	   
-			    content: ResizableStageNode {
-			    
-			      content: Tabview {
-				tabs: 
-				[Tabview.Tab {
+                                            [
+Tabview.Tab {
 				     title: "Assets";
 				     content:
                                      Scrollpane { 
@@ -1459,6 +1295,189 @@ public function run from (args is String[]) to ()
 				       }
                                      }
 				 },
+                                 Tabview.Tab {
+                                                title: "Events";
+                                                content: Scrollpane {
+                                                    canZoomVertical: false;
+                                                    content: contextTree = Treeview {
+                                                        model: bind contextModel;
+                                                        override function onMouseDown from (e is MouseEvent) to ()
+                                                        {
+                                                            if (e.isMouseButton3Down()) {
+                                                                const ctx = (contextTree.selectedTreenode as Context.ContextTreenode).context;
+                                                                if (ctx is Context.ResourceObjectContext) {
+                                                                    const r = ctx as Context.ResourceObjectContext;
+                                                                    const menu = Menu {
+                                                                        items: Menu {
+                                                                            label: "Events"
+                                                                            items: 
+                                                                            foreach (j in r.getMembers()) {
+                                                                                MenuItem {
+                                                                                    label: Names.formatName(j.name);
+                                                                                    action: function to () 
+                                                                                    {
+                                                                                        println("calling create program {j} on {r}");
+                                                                                        r.createProgram(j);
+                                                                                    }
+                                                                                }
+                                                                            }
+                                                                        }
+                                                                    };
+                                                                    e.stage.showPopupMenu(e.screenx, e.screeny+contextTree.cellHeight, menu);
+                                                                }
+                                                            }
+                                                        }
+                                                        override function onKeyDown from (e is KeyboardEvent) to ()
+                                                        {
+                                                            if (e.keyCode == Keys.Delete or
+                                                                e.keyCode == Keys.Backspace) {
+                                                                const toDelete = contextModel.selectedContext;
+                                                                if (toDelete.parent is Context.GroupContext) {
+                                                                    println("delete parent={toDelete.parent}");
+                                                                    var par = toDelete.parent;
+                                                                    while (par <> null) {
+                                                                        if (par is Context.ResourceObjectContext) {
+                                                                            const targ = (par as Context.ResourceObjectContext).getTarget();
+                                                                            println("delete targ={targ}");
+                                                                            for (p in targ.programs) {
+                                                                                println("delete checking {p}");
+                                                                                if (p.evalContext.varContext == toDelete) {
+                                                                                    delete p from targ.programs;
+                                                                                    p.parent.undefineVar(p.evalContext.varContext);
+                                                                                    println("deleted VAR {p.evalContext.varContext.varName}");
+                                                                                    break;
+                                                                                }
+                                                                            }
+                                                                            break;
+                                                                        }
+                                                                        par = par.parent;
+                                                                    }
+                                                                    delete toDelete from (toDelete.parent as Context.GroupContext).content;
+                                                                    println("deleted {toDelete} from {toDelete.parent}");
+                                                                }
+                                                            } else super.onKeyDown(e);
+                                                        }                                       
+                                                    }
+                                                }
+                                            },
+                                            Tabview.Tab {
+                                                title: "Cameras";
+                                                content: Tabview {
+                                                    var sn = Scene {
+                                                        content: bind currentScene.root;
+                                                    }
+                                                    var st = StageNode {
+                                                        content: sn;
+                                                    }
+                                                tabs:
+                                                    bind foreach (m in currentScene.currentModels) {
+                                                        var cams = bind foreach (cam in getCamerasFromModel(m.model)) cam;
+                                                        if (cams.size() == 0) then null else
+                                                        Tabview.Tab {
+                                                        title: m.id;
+
+                                                        content: Tabview {
+                                                            tabs:
+                                                             bind foreach ( cam in cams) 
+                                                                Tabview.Tab {
+                                                                title: cam.id;
+                                                                var g is Group = Group {};
+                                                                onSelect: function to () {
+                                                                    g.content = st;
+                                                                    sn.camera = cam;
+                                                                }
+                                                                content: ResizableNode {
+                                                                    override function resize from (w is Number, h is Number) to () 
+                                                                    {
+                                                                        st.resize(w as Integer, h as Integer);
+                                                                    }
+                                                                    override var internalContent = bind g;
+                                                                }
+                                                            }
+                                                        }
+                                                        }
+                                                    }
+                                                }
+                                            }]
+                                        }
+                                    }
+                       },
+                       InternalWindow {
+                        id: "Editor1";            
+			containerBounds: bind Bounds.boundsFromRect(0, 
+                                                                    0, 
+                                                                    width,
+                                                                    height-MENU_HEIGHT)
+		    	height: 400, width: 300;
+			cx: 160, cy: 800-300;	   
+			    content: ResizableStageNode {
+			    
+			      content: Tabview {
+				tabs: 
+				[
+
+				 Tabview.Tab {
+				     title: "Keyable";
+				     content:
+                                         Tabview {
+                                             tabs:
+                                             [Tabview.Tab {
+                                                     title: "Inspector";
+                                                     content: Scrollpane {
+                                                         canZoomVertical: false;
+                                                         content: inspector0 = Inspector {
+                                                             var toInspect = bind { var t = temporalHierarchy2.selectedTimeNode; if t <> temporalHierarchy2.root then t else null };
+                                                             inspecting: bind Inspector.inspect(toInspect, Reflect.getType("f3.media.scene.TimeNode") as f3.reflect.F3ClassType);
+                                                         }
+                                                     }
+                                                 },
+                                                 Tabview.Tab {
+                                                     title: "Hierarchy";
+                                                     content:
+                                                     Scrollpane {
+                                                         canZoomVertical: false;
+                                                         content:
+                                                         Treeview {
+                                                             model: TemporalHierarchy.Model {
+                                                                 h: bind temporalHierarchy2
+                                                             }
+                                                             var dragger is TransformNode;
+                                                             var clip is TimeNode;
+                                                             override function onMouseDrag from (e is MouseEvent) to () {
+                                                                 if (dragger == null) {
+                                                                     clip = (selectedTreenode as TemporalHierarchy.Treenode).n;
+                                                                     dragger = TransformNode {
+                                                                         pickable: false;
+                                                                         content: Group {
+                                                                             transform: translate(-e.sceneLocation.x, 0);
+                                                                             content: getDragCell();
+                                                                         }
+                                                                     }
+                                                                     insert dragger into popupLayer.content;
+                                                                 }
+                                                                 dragger.tx = editorScene.mousePosition.x;
+                                                                 dragger.ty = editorScene.mousePosition.y;
+                                                             }
+                                                             
+                                                             override function onMouseUp from (e is MouseEvent) to () 
+                                                             {
+                                                                 for (j in getUnderMouseInEditor()) {
+                                                                     if (j.node is Expression.Canvas) {
+                                                                         (j.node as Expression.Canvas).onDrop(j, clip);
+                                                                         break;
+                                                                     }
+                                                                 }
+                                                                 delete dragger from popupLayer.content;
+                                                                 clip = null;
+                                                                 dragger = null;
+                                                             }
+                                                         }
+                                                     }
+					     }]; 
+                                           }
+                                         },
+
+
 				 Tabview.Tab {
 				     title: "Spatial";
 				     content:

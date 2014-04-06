@@ -3492,6 +3492,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 		targetTimeline: targetTimeline;
                 instanceSpace: instanceSpace;
             }
+            v.program = prog;
             prog.canvas = newCanvas;
             newCanvas.prog = prog;
             prog.deserialize();
@@ -4610,7 +4611,7 @@ public class VarContextObjNode is ObjNode {
             objectExpr: VarContextExpression { 
                 varContext: c, override function getType to F3Type { typ }
                 inputMembers: foreach (m in members where  m.isObserver) m;
-                outputMembers: foreach (m in members where m.isObservable and m.m is F3FunctionMember) m;
+                //outputMembers: foreach (m in members where m.isObservable and m.m is F3FunctionMember) m;
             }
         }
         for (i in inputs) {
@@ -4762,7 +4763,6 @@ public class Editor is ResizableNode, Focuser {
     {
 	var prog is Program;
         println("TARGET: {target}, programs={target.programs.size()}, targetPath={targetPath}");
-        var parentProg is Program;
         /*
 	for (x in programs) {
             println("PROGRAM {x.event.m}, event={eventContext.member.m}, targetPath={x.targetPath}");
@@ -4779,7 +4779,8 @@ public class Editor is ResizableNode, Focuser {
             }
 	}
         */
-        prog  = eventContext.program;
+        prog = if (varContext <> null) then varContext.program else eventContext.program;
+        var parentProg = if (varContext <> null) then eventContext.program else null;
         const found = prog == null;
 	if (prog == null) {
             if (parentProg == null and varContext <> null) {
@@ -4795,6 +4796,7 @@ public class Editor is ResizableNode, Focuser {
                     }
                 }
                 insert parentProg into target.programs;
+                eventContext.program = parentProg;
             }
 	    insert prog into target.programs;
 	    prog = Program { 
@@ -4814,7 +4816,11 @@ public class Editor is ResizableNode, Focuser {
                 }
             };
 	    insert prog into target.programs;
-            eventContext.program = prog;
+            if (varContext <> null) {
+                varContext.program = prog;
+            } else {
+                eventContext.program = prog;
+            }
 	}
 	if (prog.canvas == null) {
             println("creating canvas with {pathFactory}");
