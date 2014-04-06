@@ -289,7 +289,7 @@ class TimeNodeView is AbstractNode
                      override function onMouseMove from  (event is MouseEvent) to ()
                      {
                          if (trax.graph and target is Channel and not dragging) {
-                             resizing = event.location.y <= rectY + 2;
+                             resizing = event.location.y <= rectY - trax.getViewHeight()/2 + 3;
                          }
                      }
 		     override function onMouseDown from (event is MouseEvent) to ()
