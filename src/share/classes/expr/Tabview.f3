@@ -19,8 +19,8 @@ const TAB_HEIGHT = 15;
 
 public class Tab {
     public var title is String;
-    public var content is ResizableNode;
     protected var index is Integer;
+    public var content is ResizableNode;
     public var onSelect is function from () to ();
 }
 
