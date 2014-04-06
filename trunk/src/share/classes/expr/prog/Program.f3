@@ -154,7 +154,7 @@ public class Program {
     public var canvas is Canvas;
     public var code is ExprScene;
     public var sourceCode is String;
-    public var subtarget is String;
+    public var targetPath is String;
 
     public var parent is Program;
 

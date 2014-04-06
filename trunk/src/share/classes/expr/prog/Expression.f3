@@ -4729,7 +4729,18 @@ public class Editor is ResizableNode, Focuser {
         return (ctx as Context.ResourceNodeContext).resource;
     }
 
-    var canvas is Canvas = bind getCanvas(targetObject, targetObject.programs, eventContext, varContext);
+    function getTargetPath from (ctx is Context) to String 
+    {
+        var parent = ctx.parent;
+        var result is String = null;
+        if (parent is Context.SubResourceNodeContext) {
+            result = (parent as Context.SubResourceNodeContext).node.id;
+        }
+        println("GET TARGET PATH {parent} => {result}");
+        return result;
+    }
+
+    var canvas is Canvas = bind getCanvas(targetObject, getTargetPath(eventContext), targetObject.programs, eventContext, varContext);
 
     override var internalContent = bind sp;
 
@@ -4743,22 +4754,24 @@ public class Editor is ResizableNode, Focuser {
 
     function getCanvas 
         from (target is ResourceTarget, 
+              targetPath is String,
               programs is Program[],
               eventContext is Context.MemberContext, 
               varContext is Context.ClosureVarContext) 
         to Canvas
     {
 	var prog is Program;
-        println("TARGET: {target}, programs={target.programs.size()}");
+        println("TARGET: {target}, programs={target.programs.size()}, targetPath={targetPath}");
         var parentProg is Program;
 	for (x in programs) {
-            println("PROGRAM {x.event.m}, event={eventContext.member.m}");
+            println("PROGRAM {x.event.m}, event={eventContext.member.m}, targetPath={x.targetPath}");
             println("PROGRAM {java.lang.System.identityHashCode(x.event.m)}, event={java.lang.System.identityHashCode(eventContext.member.m)}");
-	    if (x.event == eventContext.member and x.evalContext.varContext == varContext) { // hack
+	    if (x.event == eventContext.member and x.evalContext.varContext == varContext and x.targetPath == targetPath) { // hack
                 println("FOUND IT");
 		prog = x;
+                break;
 	    } else {
-                if (x.event == eventContext.member and varContext <> null and x.evalContext.varContext == null) {
+                if (x.targetPath == targetPath and x.event == eventContext.member and varContext <> null and x.evalContext.varContext == null) {
                     parentProg = x;
                 }
                 println("NO MATCH");
@@ -4770,6 +4783,7 @@ public class Editor is ResizableNode, Focuser {
                 parentProg = Program { 
                     parent: parentProg;
                     event: event;
+                    targetPath: targetPath;
                     evalContext: Program.EvalContext {
                         eventContext: eventContext;
                         varContext: null;
@@ -4788,6 +4802,7 @@ public class Editor is ResizableNode, Focuser {
 	    prog = Program { 
                 parent: parentProg;
                 event: event;
+                targetPath: targetPath;
                 evalContext: Program.EvalContext {
                     eventContext: eventContext;
                     varContext: varContext;

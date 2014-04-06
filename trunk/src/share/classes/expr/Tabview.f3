@@ -123,7 +123,7 @@ public class Tabview is ResizableNode, Focuser {
 	TransformNode {
 	    ty: bind -TAB_HEIGHT/2-2;
 	    content: Content {
-               override var scissorBounds = bind Bounds.boundsFromRect(-contentWidth/2, -height/2-TAB_HEIGHT/2-2, contentWidth, height);
+               override var scissorBounds = bind Bounds.boundsFromRect(-contentWidth/2, -contentHeight/2, contentWidth, contentHeight);
                content: bind selectedTab.content
             }
 	}];

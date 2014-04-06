@@ -127,6 +127,7 @@ class ResourceBuilder {
                 event: p.event.serialize();
                 code: p.code;
                 compiled: p.sourceCode;
+                targetPath: p.targetPath;   
             }
             animation: ChannelBoxResource {
                 blendWeight: n.channelBox.blendWeight;
@@ -178,6 +179,7 @@ class ResourceBuilder {
                 event: p.event.serialize();
                 code: p.code;
                 compiled: p.sourceCode;
+                targetPath: p.targetPath;
             }
         }
     }
@@ -323,6 +325,7 @@ public function save
                     }
                     code: p.code;
                     compiled: p.sourceCode;
+                    targetPath: p.targetPath;
                 }
             }
 	    spatialResources:

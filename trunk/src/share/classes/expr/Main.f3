@@ -818,6 +818,7 @@ public function run from (args is String[]) to ()
                     event: mem;
                     code: prog.code;
                     sourceCode: prog.compiled;
+                    targetPath: prog.targetPath;
                     evalContext: Program.EvalContext {
                         interactive: function from () to Boolean { interactive } 
                         targetNode: (currentTransform as ResourceTarget).findTarget(prog.targetPath);
@@ -843,6 +844,7 @@ public function run from (args is String[]) to ()
                         event: p.event;
                         code: d.code;
                         sourceCode: d.sourceCode;
+                        targetPath: prog.targetPath;
                         evalContext: Program.EvalContext {
                             interactive: function from () to Boolean { interactive } 
                             targetNode: (currentTransform as ResourceTarget).findTarget(prog.targetPath);
@@ -904,6 +906,7 @@ public function run from (args is String[]) to ()
                         event: prog.event.deserialize();
                         code: prog.code;
                         sourceCode: prog.compiled;
+                        targetPath: prog.targetPath;
                         evalContext: Program.EvalContext {
                             interactive: function from () to Boolean { interactive } 
                             targetNode: qt;
@@ -952,6 +955,7 @@ public function run from (args is String[]) to ()
                         event: prog.event.deserialize();
                         code: prog.code;
                         sourceCode: prog.compiled;
+                        targetPath: prog.targetPath;
                         evalContext: Program.EvalContext {
                             interactive: function from () to Boolean { interactive } 
                             targetNode: currentTransform;
@@ -1146,6 +1150,27 @@ public function run from (args is String[]) to ()
                                                     canZoomVertical: false;
                                                     content: contextTree = Treeview {
                                                         model: bind contextModel;
+                                                        override function onMouseDown from (e is MouseEvent) to ()
+                                                        {
+                                                            if (e.isMouseButton3Down()) {
+                                                                const ctx = (contextTree.selectedTreenode as Context.ContextTreenode).context;
+                                                                if (ctx is Context.ResourceObjectContext) {
+                                                                    const r = ctx as Context.ResourceObjectContext;
+                                                                    const menu = Menu {
+                                                                        items: Menu {
+                                                                            label: "Events"
+                                                                            items: 
+                                                                            foreach (j in ctx.getContent() where j is Context.MemberContext) {
+                                                                                MenuItem.CheckBox {
+                                                                                    label: j.name;
+                                                                                }
+                                                                            }
+                                                                        }
+                                                                    };
+                                                                    e.stage.showPopupMenu(e.screenx, e.screeny+contextTree.cellHeight, menu);
+                                                                }
+                                                            }
+                                                        }
                                                         override function onKeyDown from (e is KeyboardEvent) to ()
                                                         {
                                                             if (e.keyCode == Keys.Delete or
