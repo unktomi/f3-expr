@@ -4763,6 +4763,7 @@ public class Editor is ResizableNode, Focuser {
 	var prog is Program;
         println("TARGET: {target}, programs={target.programs.size()}, targetPath={targetPath}");
         var parentProg is Program;
+        /*
 	for (x in programs) {
             println("PROGRAM {x.event.m}, event={eventContext.member.m}, targetPath={x.targetPath}");
             println("PROGRAM {java.lang.System.identityHashCode(x.event.m)}, event={java.lang.System.identityHashCode(eventContext.member.m)}");
@@ -4777,6 +4778,8 @@ public class Editor is ResizableNode, Focuser {
                 println("NO MATCH");
             }
 	}
+        */
+        prog  = eventContext.program;
         const found = prog == null;
 	if (prog == null) {
             if (parentProg == null and varContext <> null) {
@@ -4789,11 +4792,6 @@ public class Editor is ResizableNode, Focuser {
                         varContext: null;
                         interactive: interactive;
                         targetNode: target;
-                        debugger: debugger;
-                        instanceSpace: instanceSpace;
-                        lookupSpatial: targetSpace.lookup;
-                        targetTimeline: targetTimeline;
-                        lookupTemporal: targetTime.lookup;
                     }
                 }
                 insert parentProg into target.programs;
@@ -4816,6 +4814,7 @@ public class Editor is ResizableNode, Focuser {
                 }
             };
 	    insert prog into target.programs;
+            eventContext.program = prog;
 	}
 	if (prog.canvas == null) {
             println("creating canvas with {pathFactory}");
