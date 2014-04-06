@@ -19,10 +19,10 @@ import expr.EventLayer;
 
 public class EvalContext {
     public const eventContext is Context.MemberContext;
-    public const varContext is Context.ClosureVarContext;
+    public var varContext is Context.ClosureVarContext;
     public var interactive is function from () to Boolean;
     public const targetNode is Object;
-    public const debugger is ObservableDebugger = DebuggerEngine {
+    public var debugger is ObservableDebugger = DebuggerEngine {
         override public function step of a from (location is Object, x is a, k is Observer of a) to ()
         {
             if (interactive()) {
@@ -30,11 +30,11 @@ public class EvalContext {
             }
         }
     }
-    public const instanceSpace is Group;
-    public const targetTimeline is Timeline;
-    const lookupVar is function from String to Object;
-    const lookupSpatial is function from String to Node;
-    const lookupTemporal is function from String to TimeNode;
+    public var instanceSpace is Group;
+    public var targetTimeline is Timeline;
+    public var lookupVar is function from String to Object;
+    public var lookupSpatial is function from String to Node;
+    public var lookupTemporal is function from String to TimeNode;
 
     function lookupVarDebug from (name is String) to Object {
         const r = lookupVar(name);

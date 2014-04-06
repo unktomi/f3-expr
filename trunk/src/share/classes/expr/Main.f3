@@ -331,11 +331,11 @@ public function run from (args is String[]) to ()
         if (currentScene == mainScene) {
             viewer.focusCamera(rn);
         }
-        insert Context.ResourceNodeContext { 
+        const ctx = Context.ResourceNodeContext { 
             parent: contextModel.selectedGroupContext; 
             resource: rn;
         } 
-        into contextModel.selectedGroupContext.content;
+        insert ctx into contextModel.selectedGroupContext.content;
         println("added asset to context { contextModel.selectedGroupContext } => {contextModel.selectedGroupContext.content}");
         if (currentScene.camera is Camera2D) {
             rn.tx = pt.x;
@@ -352,11 +352,14 @@ public function run from (args is String[]) to ()
         mainTimeLayer.content = currentAnimResource;
         mainTimeLayer.updateParent();
         println("all bounds = {mainTimeLayer.bounds}");
-        insert Context.ResourceTimeNodeContext { 
+        const ctx = Context.ResourceTimeNodeContext { 
             parent: contextModel.selectedGroupContext; 
             resource: rn;
         } 
-        into contextModel.selectedGroupContext.content;
+        for (p in rn.programs) {
+            ctx.createProgram(p.event).program = p;
+        }
+        insert ctx into contextModel.selectedGroupContext.content;
     }
 
     function doDrop from (url is String, pt is Point3) to () 
@@ -713,7 +716,7 @@ public function run from (args is String[]) to ()
         assetModel.findTypeAsset(t);
     }
 
-    function resolveContext from (n is ResourceNode, event is Expression.Member) to Context.GroupContext
+    function resolveContext from (n is ResourceNode, p is Program) to Context.GroupContext
     {
         var r is Context.GroupContext;
         mainContext.foldLeft((), function from (_ is (), c is Context) to () 
@@ -721,14 +724,9 @@ public function run from (args is String[]) to ()
                                  if (r == null and c is Context.ResourceNodeContext) {
                                      const rc = c as Context.ResourceNodeContext;
                                      if (rc.resource == n) {
-                                         for (ctx in rc.getContent()) {
-                                             if (ctx is Context.MemberContext) {
-                                                 const memCtx = ctx as Context.MemberContext;
-                                                 if (memCtx.member == event) {
-                                                     r = memCtx;
-                                                 }
-                                             }
-                                         }
+                                         const mc is Context.MemberContext = rc.createProgram(p.event);
+                                         mc.program = p;
+                                         r = mc;
                                      }
                                  }
                                  return ();
@@ -829,7 +827,7 @@ public function run from (args is String[]) to ()
                     }
                 }
                 var ps = [p];
-                var targetContext = resolveContext(rn, p.event);
+                var targetContext = resolveContext(rn, p);
                 println("RESOLVED CONTEXT {rn} => {targetContext}");
                 for (d in prog.variables) {
                     const v = Context.ClosureVarContext {
@@ -1160,9 +1158,14 @@ public function run from (args is String[]) to ()
                                                                         items: Menu {
                                                                             label: "Events"
                                                                             items: 
-                                                                            foreach (j in ctx.getContent() where j is Context.MemberContext) {
-                                                                                MenuItem.CheckBox {
+                                                                            foreach (j in r.getMembers()) {
+                                                                                MenuItem {
                                                                                     label: j.name;
+                                                                                    action: function to () 
+                                                                                    {
+                                                                                        println("calling create program {j} on {r}");
+                                                                                        r.createProgram(j);
+                                                                                    }
                                                                                 }
                                                                             }
                                                                         }

@@ -2,6 +2,7 @@ package expr;
 import f3.media.scene.*;
 import expr.Treeview.*;
 import expr.prog.Expression;
+import expr.prog.Program;
 import expr.prog.Expression.Member;
 import expr.prog.Expression.Function;
 import f3.reflect.*;
@@ -124,6 +125,8 @@ public class CallContext is Context {
 
 public interface ResourceObjectContext {
     public bound function getTarget to ResourceTarget;
+    public function createProgram from (member is Member) to MemberContext { null }
+    public function getMembers to Member[] { [] }
 }
 
 // hack
@@ -150,26 +153,42 @@ public class SubResourceNodeContext is ResourceNodeContext {
 
 public class ResourceNodeContext is GroupContext, ResourceObjectContext {
     override bound function getTarget to ResourceTarget { resource }
+    protected function getTargetPath to String { "" }
+    public override function createProgram from (member is Member) to MemberContext
+    {
+        var result = MemberContext { member: member, parent: this};
+        insert result into programs;
+        println("created member => {programs} => {getContent()}");
+        return result;
+    }
+    public override function getMembers to Member[] 
+    {
+        return memberCtxs;
+    }
     public var resource is ResourceNode;
     override var name = bind "{if (resource.useLiteralId) then resource.id else formatName(resource.id)} [Scene]";
     protected var members = bind uniquify(Expression.introspect(Reflect.getType("f3.media.scene.TransformNode") as F3ClassType));
-    public readonly var memberCtxs = bind foreach (x in members) if (not x.name.startsWith("observe")) then null else MemberContext { member: x, parent: this }
+    public readonly var memberCtxs = bind foreach (x in members) if (not x.name.startsWith("observe")) then null else x;
     protected var containedNodes = bind foreach (x in resource.content) SubResourceNodeContext {
         parent: this;
         resource: resource;
         node: x
-    }
+    };
+
+    var programs is MemberContext[];
+
     public override bound function getContent to Context[] { 
-        [memberCtxs, containedNodes, content]
+        [programs, containedNodes, content]
     }
 }
 
 public class ResourceTimeNodeContext is GroupContext, ResourceObjectContext {
     override bound function getTarget to ResourceTarget { resource }
     public var resource is ResourceTimeNode;
+    bound var memberCtxs is Member[] = foreach (x in members) if (not x.name.startsWith("observe")) then null else x;
     override var name = bind "{if (resource.useLiteralId) then resource.id else formatName(resource.id)} [Timeline]";
     var members = bind Expression.introspect(Reflect.getType("f3.media.scene.TimeNode") as F3ClassType);
-    var myContent = bind [if (resource is ResourceTimeNodeWrapper) then { var w = resource as ResourceTimeNodeWrapper; foreach (g in w.unwrapContent()) if (g is ResourceTimeNode) then ResourceTimeNodeContext {  resource: g as ResourceTimeNode} else null } else null, foreach (x in members) if (not x.name.startsWith("observe")) then null else MemberContext { member: x, parent: this }];
+    var myContent = bind [if (resource is ResourceTimeNodeWrapper) then { var w = resource as ResourceTimeNodeWrapper; foreach (g in w.unwrapContent()) if (g is ResourceTimeNode) then ResourceTimeNodeContext {  resource: g as ResourceTimeNode} else null } else null];
 
     public override bound function getContent to Context[] { 
         myContent
@@ -267,6 +286,7 @@ public class MemberContext is GroupContext {
     public var member is Member;
     override var name = bind Names.formatName(member.name);
     override var label = bind "{if hasHandler then "+" else "-"}{name}";
+    public var program is Program;
     public var hasHandler is Boolean;
     postinit {
         var p = parent;

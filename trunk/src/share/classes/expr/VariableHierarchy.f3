@@ -12,7 +12,7 @@ public class Treenode is Treeview.Treenode {
     var content = bind n.getContent();
     override var canOpen = bind content.size() > 0;
     override var children = bind
-        foreach (x in content) Treenode { parent: this, n: bind x };
+        foreach (x in content where not (x is Context.MemberContext)) Treenode { parent: this, n: bind x };
     override function open to () {
 	super.open();
     }
