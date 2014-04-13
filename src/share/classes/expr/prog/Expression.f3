@@ -376,7 +376,7 @@ public function introspect from (clazz is F3ClassType, all is Boolean) to Member
             }
         }
         exprMap.put(clazz, [r, classVars]);
-        return r;
+        return [r, classVars];
     }
     for (f in funs) {
         println("f={f}");
@@ -524,7 +524,7 @@ public class Member {
     public const name = m.getName();
     public var isObservable is Boolean;
     public var isObserver is Boolean;
-    var members = bind Expression.introspect(t);
+    protected var members = bind Expression.introspect(t);
     public function getMembers to Member[]
     {
         members;
@@ -2134,7 +2134,7 @@ public class GetVarView is OutputView {
         bind 
         if (isLabeled) then {
                 [TransformNode {
-                    content: bind label;
+                    content: bind defaultTitle;
                 },
                 TransformNode {
                     ty: bind -cellHeight;
@@ -2153,6 +2153,145 @@ public class GetVarView is OutputView {
         }
     };
     override bound function getLinkPos to Point3 { getWorldPos() }
+
+}
+
+class OutputPort is LinkedView {
+    public var t is F3Type;
+    public var width is Number;
+    public function getOutputType to F3Type { t }
+    override var transform = bind translate(pos);
+    override bound function getLinkPos to Point3 
+    { 
+        canvas.toLocal * (toSceneTransform * new Point3(width/2, 0, 0) );
+    }
+    override var internalContent = Group {
+        content: Rectangle {
+            width: bind width;
+            height: bind cellHeight-2;
+            fillPaint: ColorPaint(Color.color(.4, .4, .4))
+        }
+    }
+    const _onDown = observeMouseDown().subscribe(function from (e is MouseEvent) to () {
+            canvas.viewLinker.onDown(this, e);
+	} );
+    const _onDrag = observeMouseDrag().subscribe(function from (e is MouseEvent) to () {
+            canvas.viewLinker.onDrag(e);
+	});
+    const _onUp = observeMouseUp().subscribe(function from (e is MouseEvent) to () {
+            canvas.viewLinker.onUp(e);
+	});
+}
+
+class SourcePort is InputView {
+    public var width is Number;
+    bound var sourceExpression = links[0].source.expression;
+    override bound function getInputType to F3Type { if sourceExpression == null then UNIT_TYPE else sourceExpression.getType() }
+    override bound function getLinkPos to Point3 
+    { 
+        canvas.toLocal * (toSceneTransform * new Point3(-6, 0, 0) );
+    }
+    override var internalContent = Rectangle {
+        width: bind width;
+        height: bind cellHeight;
+        fillPaint: ColorPaint(Color.color(.4, .4, .4));
+    }
+}
+
+public class ForkView is ExpressionView {
+    override var transform = bind translate(pos);
+    const self = this;
+    const sourcePort is SourcePort = SourcePort {
+        width: bind width;
+        transform: translate(-2, 0, 0);
+        canvas: bind canvas;
+    };
+    override function unlink to ()
+    {
+        sourcePort.unlink();
+        for (x in targetPorts) x.unlink();
+    }
+
+    bound var targetPorts is LinkedView[] = foreach (i in [0..<targetCount]) OutputPort {
+        t: bind sourcePort.getInputType();
+        canvas: bind canvas;
+        width: bind width
+    }
+    var targetCount is Integer = 2;
+    var width is Number = 3;
+    var h = 0.0;
+    bound var height is Number = h+(targetCount) * cellHeight;
+    override function update to ()
+   {
+        super.update();
+        var y = height/2 - cellHeight/2;
+        const x = width;
+        for (j in targetPorts) {
+            j.pos = new Point3(x, y, 0);
+            y -= cellHeight;
+        }
+    }
+    var isResizing is Boolean;
+    var outputCount = 0;
+    function startResize from (e is MouseEvent) to ()
+    {
+        isResizing = true;
+    }
+    function resize from (e is MouseEvent) to ()
+    {
+        const d = (e.picked.dragPoint1-e.picked.dragPoint0);
+        h -= e.drag.y*2;
+    }
+    function finishResize from (e is MouseEvent) to ()
+    {
+        isResizing = false;
+        targetCount = Math.max(Math.max(Math.round(height / cellHeight) as Integer, outputCount), 2);
+        h = 0;
+        canvas.saveCode();
+    }
+    function resizer to Node {
+        Rectangle {
+            fillPaint: ColorPaint(Color.color(.9, .9, .9, 1));
+            height: 2;
+            width: bind width+2;
+            cursor: Cursor.SouthResize;
+            onMouseDown: startResize;
+            onMouseDrag: resize;
+            onMouseUp: finishResize;
+        }
+    }
+    override var internalContent = Group {
+        content:
+        [Rectangle 
+        {
+            width: bind width;
+            height: bind height;
+            fillPaint: ColorPaint(Color.color(.9, .9, .9));
+            var dragging = false;
+            override function onMouseMove from (e is MouseEvent) to ()
+            {
+            }
+            override function onMouseDown from (e is MouseEvent) to ()
+            {
+                println("targetPorts={targetPorts}");
+                dragging = true;//e.location.y >= height/2-2;
+            }
+            override function onMouseDrag from (e is MouseEvent) to ()
+            {
+                if (dragging) {
+                    pos += (canvas.toLocal * e.picked.dragPoint1 - canvas.toLocal * e.picked.dragPoint0);
+                }
+            }
+        },
+        Group { content: bind sourcePort },
+        Group {
+            content: bind targetPorts;
+        },
+        TransformNode {
+            ty: bind -height/2;
+            content: bind resizer();
+        }]
+    };
 
 }
 
@@ -2239,12 +2378,11 @@ public class InputView is LinkedView {
     public bound function getInputType to F3Type { expression.getType() };
     override var transform = bind translate(0, index * -cellHeight);
     override var internalContent = bind label;
-  
-
     var tmpLink is LinkedView = null;
     var link0 is LinkView;
     var dx = 0.0;
     var dy = 0.0;
+    const self = this;
     const onDown1 = observeMouseDown().subscribe(function from (e is MouseEvent) to () {
             dx = 0; dy = 0;
             if (links.size() == 1) {
@@ -2532,12 +2670,13 @@ class TreeGetVar is GetVar {
     }
 }
 
+
 class MemberTreenode is Treenode {
     public var m is Member;
     public var depth is Integer = bind (parent as MemberTreenode).depth + 1;
     public var get is GetVar = bind TreeGetVar { member: m }
     override var label = bind Names.formatName(m.name);
-    readonly var members = bind filterMembers(m.getMembers());
+    bound var members is Member[] = filterMembers(m.getMembers());
     function filterMembers from (xs is Member[]) to Member[] 
     {
         const set = new java.util.HashSet of String;
@@ -2554,8 +2693,7 @@ class MemberTreenode is Treenode {
         }
     }
     override var canOpen = bind { var n = members.size(); n > 0 };
-    override var children = bind foreach (x in members) makeTreeNode(x);
-
+    override var children = bind foreach (x in members) makeTreenode(x);
     readonly var parentValue = bind (parent as MemberTreenode).value;
     public readonly var value is F3Value = bind getValue(parentValue, m.m);
 
@@ -2607,15 +2745,15 @@ class MemberTreenode is Treenode {
         return null;
     }
 
-    function makeTreeNode from (x is Member) to MemberTreenode 
+    function makeTreenode from (x is Member) to Treenode
     {
-	const m = MemberTreenode {
+        const m = MemberTreenode {
             parent: this;
-	    m: x;
-	}
-	insert m.get into get.observers;
-	m.get.observable = get;
-	return m;
+            m: x;
+        }
+        insert m.get into get.observers;
+        m.get.observable = get;
+        return m;
     }
 
     override function open {
@@ -2951,7 +3089,9 @@ class TreeLinker {
             const cell = tv.selectedTreecell as MemberTreecell;
             linkTmpLink();
             dx = 0; dy = 0;
-            cell.linkedView.unlink();
+            if (not e.shiftKey) {
+                cell.linkedView.unlink();
+            }
             startPos = canvas.toLocal * e.sceneLocation;
             insert canvas.targetArrow into canvas.arrows;
             arrowVis = true;
@@ -3035,6 +3175,100 @@ class TreeLinker {
 
 }
 
+class ViewLinker {
+    var canvas is Canvas;
+    var tv is OutputPort;
+    var pathFactory = bind canvas.pathFactory;
+    var layoutEngine = bind canvas.layoutEngine;
+    var imageLoader = bind canvas.imageLoader;
+    var effectLoader = bind canvas.effectLoader;
+
+    function onDown from (tv is OutputPort, e is MouseEvent) to () 
+    {
+        if (e.location.x >= 0) {
+            this.tv = tv;
+            linkTmpLink();
+            dx = 0; dy = 0;
+            if (not e.shiftKey) {
+                tv.unlink();
+            }
+            startPos = canvas.toLocal * e.sceneLocation;
+            insert canvas.targetArrow into canvas.arrows;
+            arrowVis = true;
+            updateArrow();
+        } else {
+        }
+    }
+
+    function onDrag from (e is MouseEvent) to ()
+    {
+        if (tv == null) return;
+        dx += e.drag.x;
+        dy += e.drag.y;
+        updateArrow();
+    }
+
+    function updateArrow to () 
+    {
+        const toLocal = canvas.toLocal;
+        const sourcePos = toLocal * tv.toSceneTransform.getTranslation();
+        linkStart.pos = sourcePos;
+        linkEnd.pos = startPos + new Vec3(dx-1, dy, 0);
+        canvas.targetArrow.tx = linkEnd.pos.x;
+        canvas.targetArrow.ty = linkEnd.pos.y;
+    }
+
+    function onUp from (e is MouseEvent) to ()
+    {
+        if (tv == null) return;
+        arrowVis = false;
+        canvas.pickInput(e, tv.getOutputType(), function from (found is LinkedView) to () {
+                tmpLink = null;
+                delete canvas.targetArrow from canvas.arrows;
+                link.unlink();
+                if (found <> null) {
+                    found.unlink();
+                    const newlink = LinkView { 
+                        canvas: canvas;
+                        source: tv;
+                        target: found;
+                    };
+                    newlink.link();
+                } 
+                canvas.dumpSrc();
+                MasterUndoable.commit();
+            });
+    }
+    var tmpLink is LinkView = null;
+    var dx = 0.0;
+    var dy = 0.0;
+    var arrowVis is Boolean;
+    var startPos is Point3;
+
+    const linkStart is LinkedView = LinkedView {
+        override function serialize to ExprNode { null }
+	override var toSceneTransform = bind translate(pos);
+    };
+    const linkEnd is LinkedView = LinkedView {
+        override function serialize to ExprNode { null }
+	override var toSceneTransform = bind translate(pos);
+    };
+
+    const link is LinkView = LinkView {
+	canvas: bind canvas;
+    };
+
+    function linkTmpLink to () 
+    {
+        link.source = linkStart;
+        link.target = linkEnd;
+        link.link();
+        tmpLink = link;
+    }
+
+}
+
+
 public class LinkInfo {
     override function toString {
 	"source: {source}, {sourceIndex}, {sourcePos}; target: {target}, {targetIndex}, {targetPos}";
@@ -3063,6 +3297,14 @@ public class LinkInfo {
 class Holder is Group, Scissored {
 }
 
+const FORK is Member = Member {
+    override function equals from (obj is Object) to Boolean {
+        return isSameObject(this, obj);
+    }
+    override var name = "Fork";
+    override var members = [];
+}
+
 class MemberListview is Listview of Member {
     public var targetPosition is Point3;
     public var canvas is Canvas;
@@ -3089,6 +3331,9 @@ class MemberListview is Listview of Member {
     var app = observeApply().subscribe(function from (m is Member) to () {
             if (m == null) {
                 k(null);
+            } else if (m == FORK) {
+                const fork = canvas.createFork(targetPosition);
+                k(fork.sourcePort);
             } else {
                 const f = canvas.createMemberView(targetPosition, m, 0) as FunctionView; // hack
                 const i = if (f.fun.funMember.m.isStatic()) then 1 else 0;
@@ -3157,6 +3402,10 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         canvas: this;
     };
 
+    const viewLinker is ViewLinker = ViewLinker {
+        canvas: this;
+    };
+
     var popupDisp is Disposable;
 
     function getPopup from (e is MouseEvent, members is Member[], k is function from LinkedView to ()) to Node 
@@ -3167,7 +3416,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             k: k;
             font: font;
             transform: translate(popupScene.mousePosition.x + 100, popupScene.mousePosition.y, 0);
-            members: members;
+            members: [FORK, members];
             height: 200;
             width: 340; 
         }
@@ -3236,6 +3485,15 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         createMemberView(toLocal * where.scenePoint, m, 0);
     }
 
+    function createFork from (pt is Point3) to ForkView {
+        const r = ForkView {
+            canvas: this;
+        }
+        insert r into views;
+        r.pos = new Point3(pt.x, pt.y, pt.z);
+        return r;
+    }
+
     function createMemberView from (pt is Point3, m is Member, offset is Integer) to ExpressionView
     {
         var r is ExpressionView;
@@ -3247,8 +3505,17 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 canvas: this;
                 fun: fun;
             } into views;
-            r.pos = new Point3(pt.x+r.bounds.extent.x, pt.y + cellHeight*(offset+1), pt.z);
+        } else {
+            insert r = GetVarView {
+                selectable: true;
+                canvas: this;
+                isLabeled: true;
+                get: GetVar {
+                    member: m;
+                }
+            } into views;
         }
+        r.pos = new Point3(pt.x+r.bounds.extent.x, pt.y + cellHeight*(offset+1), pt.z);
         return r;
     }
 
