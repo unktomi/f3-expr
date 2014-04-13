@@ -2168,15 +2168,16 @@ class OutputPort is LinkedOutputView {
     override var internalContent = Group {
         content: 
         [rect1 = Rectangle {
-           width: bind width;     
+           cx: 2;
+           width: bind width+2;     
            height: bind cellHeight-2;
            fillPaint: ColorPaint(Color.color(.2, .2, .2, 0));
         },
         Rectangle {
-            cx: 1
-            visible: bind rect1.containsPointer or links.size() > 0;
-            width: bind width;
-            height: 1;
+            cx: 2
+            visible: bind rect1.containsPointer;
+            width: bind width+2;
+            height: 1.5;
             fillPaint: ColorPaint(Color.color(.2, .2, .2))
         }]
     }
@@ -2201,20 +2202,20 @@ class SourcePort is LinkedInputView {
     override bound function getInputType to F3Type { if src == null then UNIT_TYPE else src.resultType }
     override bound function getLinkPos to Point3 
     { 
-        canvas.toLocal * (toSceneTransform * new Point3(-1, 0, 0) );
+        canvas.toLocal * (toSceneTransform * new Point3(-3, 0, 0) );
     }
     var rect1 is Rectangle;
     override var internalContent = Group {
         content:
         [rect1 = Rectangle {
-           width: bind width;     
+           width: bind width+2;     
            height: bind cellHeight-2;
-           fillPaint: ColorPaint(Color.color(.2, .2, .2, .0));
+           fillPaint: ColorPaint(Color.color(.2, .2, .2, .2));
         },
         Rectangle {
-            cx: -1;
+            cx: -2;
             visible: bind rect1.containsPointer or links.size() > 0;
-            width: bind width;
+            width: bind width+2;
             height: 2;
             fillPaint: ColorPaint(Color.color(.2, .2, .2));
         }]
@@ -2240,7 +2241,7 @@ public class ForkView is ExpressionView {
         for (x in targetPorts) x.unlink();
     }
 
-    bound var targetPorts is LinkedView[] = foreach (i in [0..<targetCount]) OutputPort {
+    bound var targetPorts is LinkedOutputView[] = foreach (i in [0..<targetCount]) OutputPort {
 
         override function getObservable to ObservableExpression 
         {
@@ -2332,6 +2333,29 @@ public class ForkView is ExpressionView {
         }]
     };
 
+
+    override function serialize to ForkNode {
+        const n = ForkNode {
+            id: "{id}";
+            x: pos.x;
+            y: pos.y;
+        }
+        canvas.serializationMap.put(this, n);
+        n.input = TargetNode {
+            targetId: "{id}", links: foreach (link in sourcePort.links) "{link.id}";
+        };
+        n.outputs = 
+            foreach (port in targetPorts) 
+            {
+                foreach (link in port.links) {
+                    SourceNode {
+                        sourceId: "{id}"
+                        links: ["{link.id}"];
+                    }
+                }
+            };
+        return n;
+    } 
 }
 
 public class LinkView is ExpressionView {
@@ -2419,18 +2443,10 @@ abstract class LinkedInputView is LinkedView {
         getObserver().observable = ob;
         insert getObserver() into ob.observers;
     }
-}
-
-public class InputView is LinkedInputView {
-    var index is Integer;
-    override bound function getInputType to F3Type { expression.getType() };
-    override var transform = bind translate(0, index * -cellHeight);
-    override var internalContent = bind label;
     var tmpLink is LinkedInputView = null;
     var link0 is LinkView;
     var dx = 0.0;
     var dy = 0.0;
-
     const onDown1 = observeMouseDown().subscribe(function from (e is MouseEvent) to () {
             dx = 0; dy = 0;
             if (links.size() == 1) {
@@ -2472,6 +2488,14 @@ public class InputView is LinkedInputView {
                     });
             }
         });
+}
+
+public class InputView is LinkedInputView {
+    var index is Integer;
+    override bound function getInputType to F3Type { expression.getType() };
+    override var transform = bind translate(0, index * -cellHeight);
+    override var internalContent = bind label;
+
     override bound function getLinkPos to Point3 { canvas.toLocal * (toSceneTransform * new Point3(-cellWidth/2, 0, 0) ) }
     
     override function getInputLinks to LinkView[] { links }
@@ -4465,8 +4489,8 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 	for (p in e.scene.underMouse) {
 	    const n = p.node;
             if (not hit) { hit = n is ExpressionView }
-	    if (n is InputView) {
-		const pv = n as InputView;
+	    if (n is LinkedInputView) {
+		const pv = n as LinkedInputView;
 		if (pv.getInputType() == UNIT_TYPE or observeType(pv.getInputType()).isConvertibleFrom(t)) {
 		    println("IS ASSIGNABLE {pv.getClass()} {pv.getInputType()} <- {t}");
 		    k(pv);
@@ -4729,6 +4753,42 @@ public class ExprNode {
 public class ExprScene {
     public var views is ExprNode[];
     public var links is LinkNode[];
+}
+
+public class ForkNode is ExprNode {
+    public var input is TargetNode;
+    public var outputs is SourceNode[];
+    public override function createView from (canvas is Canvas) to ForkView {
+        const v = ForkView {
+            canvas: canvas;
+            pathFactory: canvas.pathFactory;
+            layoutEngine: canvas.layoutEngine;
+            imageLoader: canvas.imageLoader;
+            effectLoader: canvas.effectLoader;
+        }
+        {
+            var n = input;
+            const p = v.sourcePort;
+            if (n.links.size() > 0) {
+                for (link in n.links) {
+                    const lnk = canvas.getLink(link);
+                    lnk.target = p;
+                }
+            } 
+        }
+        v.targetCount = outputs.size();
+        for (p in outputs) {
+            if (p.links.size() > 0) {
+                for (link in p.links) {
+                    const lnk = canvas.getLink(link);
+                    lnk.source = v.targetPorts[indexof p];
+                }
+            }
+        }
+        v.pos = new Point3(x, y, 0);
+        insert v into canvas.views;
+        return v;
+    }
 }
 
 public class FunNode is ExprNode {
