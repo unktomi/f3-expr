@@ -2225,7 +2225,7 @@ class SourcePort is LinkedInputView {
 
 public class ForkView is ExpressionView {
     override var transform = bind translate(pos);
-    const self = this;
+    const fork = this;
     const sourcePort is SourcePort = SourcePort {
         width: bind width;
         transform: translate(-4, 0, 0);
@@ -2234,7 +2234,21 @@ public class ForkView is ExpressionView {
         {
             for (x in targetPorts) x.links[0].target.setObservable(ob);
         }
+        override public function assignLinkIds to () {
+            fork.assignLinkIds()
+        }
     };
+
+    public function assignLinkIds to () 
+    {
+        var n = 0;
+        for (i in targetPorts) {
+            for (j in i.links) {
+                j.sourceLinkId = n++;
+            }
+        }
+    }
+
     override function unlink to ()
     {
         sourcePort.unlink();
@@ -2242,6 +2256,10 @@ public class ForkView is ExpressionView {
     }
 
     bound var targetPorts is LinkedOutputView[] = foreach (i in [0..<targetCount]) OutputPort {
+
+        override public function assignLinkIds to () {
+            fork.assignLinkIds()
+        }
 
         override function getObservable to ObservableExpression 
         {
@@ -2326,11 +2344,11 @@ public class ForkView is ExpressionView {
         Group { content: bind sourcePort },
         Group {
             content: bind targetPorts;
-        },
+        }/*,
         TransformNode {
             ty: bind -height/2;
             content: bind resizer();
-        }]
+            }*/]
     };
 
 
