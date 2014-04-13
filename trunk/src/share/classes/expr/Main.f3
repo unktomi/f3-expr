@@ -1193,6 +1193,71 @@ public function run from (args is String[]) to ()
                                         content: Tabview {
                                             tabs: 
                                             [
+                                 Tabview.Tab {
+                                                title: "Events";
+                                                content: Scrollpane {
+                                                    canZoomVertical: false;
+                                                    content: contextTree = Treeview {
+                                                        model: bind contextModel;
+                                                        override function onMouseDown from (e is MouseEvent) to ()
+                                                        {
+                                                            if (e.isMouseButton3Down()) {
+                                                                const ctx = (contextTree.selectedTreenode as Context.ContextTreenode).context;
+                                                                if (ctx is Context.ResourceObjectContext) {
+                                                                    const r = ctx as Context.ResourceObjectContext;
+                                                                    const menu = Menu {
+                                                                        items: Menu {
+                                                                            label: "Events"
+                                                                            items: 
+                                                                            foreach (j in r.getMembers()) {
+                                                                                MenuItem {
+                                                                                    label: Names.formatName(j.name);
+                                                                                    action: function to () 
+                                                                                    {
+                                                                                        println("calling create program {j} on {r}");
+                                                                                        r.createProgram(j);
+                                                                                    }
+                                                                                }
+                                                                            }
+                                                                        }
+                                                                    };
+                                                                    e.stage.showPopupMenu(e.screenx, e.screeny+contextTree.cellHeight, menu);
+                                                                }
+                                                            }
+                                                        }
+                                                        override function onKeyDown from (e is KeyboardEvent) to ()
+                                                        {
+                                                            if (e.keyCode == Keys.Delete or
+                                                                e.keyCode == Keys.Backspace) {
+                                                                const toDelete = contextModel.selectedContext;
+                                                                if (toDelete.parent is Context.GroupContext) {
+                                                                    println("delete parent={toDelete.parent}");
+                                                                    var par = toDelete.parent;
+                                                                    while (par <> null) {
+                                                                        if (par is Context.ResourceObjectContext) {
+                                                                            const targ = (par as Context.ResourceObjectContext).getTarget();
+                                                                            println("delete targ={targ}");
+                                                                            for (p in targ.programs) {
+                                                                                println("delete checking {p}");
+                                                                                if (p.evalContext.varContext == toDelete) {
+                                                                                    delete p from targ.programs;
+                                                                                    p.parent.undefineVar(p.evalContext.varContext);
+                                                                                    println("deleted VAR {p.evalContext.varContext.varName}");
+                                                                                    break;
+                                                                                }
+                                                                            }
+                                                                            break;
+                                                                        }
+                                                                        par = par.parent;
+                                                                    }
+                                                                    delete toDelete from (toDelete.parent as Context.GroupContext).content;
+                                                                    println("deleted {toDelete} from {toDelete.parent}");
+                                                                }
+                                                            } else super.onKeyDown(e);
+                                                        }                                       
+                                                    }
+                                                }
+                                            },
                                     Tabview.Tab {
 				     title: "Assets";
 				     content:
@@ -1330,71 +1395,6 @@ public function run from (args is String[]) to ()
 				       }
                                      }
 				 },
-                                 Tabview.Tab {
-                                                title: "Events";
-                                                content: Scrollpane {
-                                                    canZoomVertical: false;
-                                                    content: contextTree = Treeview {
-                                                        model: bind contextModel;
-                                                        override function onMouseDown from (e is MouseEvent) to ()
-                                                        {
-                                                            if (e.isMouseButton3Down()) {
-                                                                const ctx = (contextTree.selectedTreenode as Context.ContextTreenode).context;
-                                                                if (ctx is Context.ResourceObjectContext) {
-                                                                    const r = ctx as Context.ResourceObjectContext;
-                                                                    const menu = Menu {
-                                                                        items: Menu {
-                                                                            label: "Events"
-                                                                            items: 
-                                                                            foreach (j in r.getMembers()) {
-                                                                                MenuItem {
-                                                                                    label: Names.formatName(j.name);
-                                                                                    action: function to () 
-                                                                                    {
-                                                                                        println("calling create program {j} on {r}");
-                                                                                        r.createProgram(j);
-                                                                                    }
-                                                                                }
-                                                                            }
-                                                                        }
-                                                                    };
-                                                                    e.stage.showPopupMenu(e.screenx, e.screeny+contextTree.cellHeight, menu);
-                                                                }
-                                                            }
-                                                        }
-                                                        override function onKeyDown from (e is KeyboardEvent) to ()
-                                                        {
-                                                            if (e.keyCode == Keys.Delete or
-                                                                e.keyCode == Keys.Backspace) {
-                                                                const toDelete = contextModel.selectedContext;
-                                                                if (toDelete.parent is Context.GroupContext) {
-                                                                    println("delete parent={toDelete.parent}");
-                                                                    var par = toDelete.parent;
-                                                                    while (par <> null) {
-                                                                        if (par is Context.ResourceObjectContext) {
-                                                                            const targ = (par as Context.ResourceObjectContext).getTarget();
-                                                                            println("delete targ={targ}");
-                                                                            for (p in targ.programs) {
-                                                                                println("delete checking {p}");
-                                                                                if (p.evalContext.varContext == toDelete) {
-                                                                                    delete p from targ.programs;
-                                                                                    p.parent.undefineVar(p.evalContext.varContext);
-                                                                                    println("deleted VAR {p.evalContext.varContext.varName}");
-                                                                                    break;
-                                                                                }
-                                                                            }
-                                                                            break;
-                                                                        }
-                                                                        par = par.parent;
-                                                                    }
-                                                                    delete toDelete from (toDelete.parent as Context.GroupContext).content;
-                                                                    println("deleted {toDelete} from {toDelete.parent}");
-                                                                }
-                                                            } else super.onKeyDown(e);
-                                                        }                                       
-                                                    }
-                                                }
-                                            },
                                             Tabview.Tab {
                                                 title: "Cameras";
                                                 content: Tabview {
