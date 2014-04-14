@@ -53,6 +53,24 @@ function observeType from (t is F3Type) to F3Type {
 const exprMap1 = new java.util.HashMap of (F3ClassType, Member[]);
 const exprMap2 = new java.util.HashMap of (F3ClassType, Member[]);
 
+const SelectionPaint = ColorPaint(Color.color(.2, .2, .2));
+
+const FORK is Member = Member {
+    override function equals from (obj is Object) to Boolean {
+        return isSameObject(this, obj);
+    }
+    override var name = "Fork";
+    override var members = [];
+}
+
+const BRANCH is Member = Member {
+    override function equals from (obj is Object) to Boolean {
+        return isSameObject(this, obj);
+    }
+    override var name = "Branch";
+    override var members = [];
+}
+
 function thisMember from (typ is F3Type) to Member 
 {
     if (typ is F3ClassType) {
@@ -242,7 +260,7 @@ const IF_EXPR = Reflect.getFunction("f3.lang.Builtins$BooleanOperators", "If", [
 const NUM_NEGATE = Reflect.getFunction("f3.lang.Builtins$NumberOperators", "negate", ["Number"]);
 const INT_NEGATE = Reflect.getFunction("f3.lang.Builtins$IntegerOperators", "negate", ["Integer"]);
 
-public const BOOL_MEMBERS = 
+public const BOOL_MEMBERS is Member[] = 
     [foreach (op in ["Yes", "No"]) {
         FunctionMember {
             m: Reflect.getFunction("f3.lang.Builtins$BooleanOperators", op, []);
@@ -257,11 +275,9 @@ public const BOOL_MEMBERS =
     FunctionMember {
          m: Reflect.getFunction("f3.lang.Builtins$BooleanOperators", "not", ["Boolean"]);
     },
+        //    BRANCH,
     FunctionMember {
         m: Reflect.getFunction("f3.util.Observables", "If", ["f3.util.Observable"]);
-    }
-    FunctionMember {
-        m: Reflect.getFunction("f3.util.Observables", "IfNot", ["f3.util.Observable"]);
     }
     FunctionMember {
         m: IF_EXPR;
@@ -521,10 +537,10 @@ public class Member {
     public const rt is F3Type;
     public const m is F3Member; 
     public const t is F3Type;
-    public const name = m.getName();
+    public const name is String = m.getName();
     public var isObservable is Boolean;
     public var isObserver is Boolean;
-    protected var members = bind Expression.introspect(t);
+    protected var members is Member[] = bind Expression.introspect(t);
     public function getMembers to Member[]
     {
         members;
@@ -1812,8 +1828,21 @@ class FunctionView is ExpressionView {
 	 }]
     };
 
+    const innerContent = Group { content: bind [title, /* funOutput, */ io] };
+    bound var h = output.bounds.height() + cellHeight+inputs.size()*cellHeight;
     override var internalContent = Group {
-	content: bind [title, /* funOutput, */ io];
+	content: bind [innerContent, 
+        Rectangle {
+                transform: bind translate(0, -h/2+cellHeight/2);
+                visible: bind canvas.selectedExpr == this;
+                pickable: false;
+                width: bind cellWidth;
+                height: bind h;
+                stroke: Stroke {
+                    width: 2;
+                }
+                strokePaint: SelectionPaint;
+        }]
     }
 
     override function update to ()
@@ -2027,8 +2056,20 @@ public class ObjectView is ExpressionView {
 	 }]
     };
 
+    const innerContent = Group { content: bind [title, io] };
     override var internalContent = Group {
-	content: bind [title, io];
+	content: bind [innerContent, 
+        Rectangle {
+                cy: bind innerContent.bounds.center.y + cellHeight / 2;
+                visible: bind canvas.selectedExpr == this;
+                pickable: false;
+                width: bind cellWidth;
+                height: bind innerContent.bounds.height() + cellHeight;
+                stroke: Stroke {
+                    width: 2;
+                }
+                strokePaint: SelectionPaint;
+        }]
     }
 
     override function update {
@@ -2210,7 +2251,7 @@ class SourcePort is LinkedInputView {
         [rect1 = Rectangle {
            width: bind width+2;     
            height: bind cellHeight-2;
-           fillPaint: ColorPaint(Color.color(.2, .2, .2, .2));
+           fillPaint: ColorPaint(Color.color(.2, .2, .2, 0));
         },
         Rectangle {
             cx: -2;
@@ -2375,6 +2416,162 @@ public class ForkView is ExpressionView {
         return n;
     } 
 }
+
+public class BranchView is ExpressionView {
+    override var transform = bind translate(pos);
+    const branch = this;
+    const sourcePort is SourcePort = SourcePort {
+        width: bind width;
+        transform: translate(-4, 0, 0);
+        canvas: bind canvas;
+        override function setObservable from (ob is ObservableExpression) to ()
+        {
+            for (x in targetPorts) x.links[0].target.setObservable(ob);
+        }
+        override public function assignLinkIds to () {
+            branch.assignLinkIds()
+        }
+    };
+
+    public function assignLinkIds to () 
+    {
+        var n = 0;
+        for (i in targetPorts) {
+            for (j in i.links) {
+                j.sourceLinkId = n++;
+            }
+        }
+    }
+
+    override function unlink to ()
+    {
+        sourcePort.unlink();
+        for (x in targetPorts) x.unlink();
+    }
+
+    bound var targetPorts is LinkedOutputView[] = foreach (i in [0..<targetCount]) OutputPort {
+
+        override public function assignLinkIds to () {
+            branch.assignLinkIds()
+        }
+
+        override function getObservable to ObservableExpression 
+        {
+            sourcePort.getObservable();
+        }
+
+        resultType: bind sourcePort.getInputType();
+        canvas: bind canvas;
+        width: bind width
+        override function getInputLinks to LinkView[] 
+        {
+            sourcePort.links;
+        }
+    }
+
+    var targetCount is Integer = 2;
+    var width is Number = 3;
+    var h = 0.0;
+    bound var height is Number = h+(targetCount) * cellHeight;
+    override function update to ()
+   {
+        super.update();
+        var y = height/2 - cellHeight/2;
+        const x = 4;
+        for (j in targetPorts) {
+            j.pos = new Point3(x, y, 0);
+            y -= cellHeight;
+        }
+    }
+    var isResizing is Boolean;
+    var outputCount = 0;
+    function startResize from (e is MouseEvent) to ()
+    {
+        isResizing = true;
+    }
+    function resize from (e is MouseEvent) to ()
+    {
+        const d = (e.picked.dragPoint1-e.picked.dragPoint0);
+        h -= e.drag.y*2;
+    }
+    function finishResize from (e is MouseEvent) to ()
+    {
+        isResizing = false;
+        targetCount = Math.max(Math.max(Math.round(height / cellHeight) as Integer, outputCount), 2);
+        h = 0;
+        canvas.saveCode();
+    }
+    function resizer to Node {
+        Rectangle {
+            fillPaint: ColorPaint(Color.color(.9, .9, .9, 1));
+            height: 2;
+            width: bind width+2;
+            cursor: Cursor.SouthResize;
+            onMouseDown: startResize;
+            onMouseDrag: resize;
+            onMouseUp: finishResize;
+        }
+    }
+    override var internalContent = Group {
+        content:
+        [Rectangle 
+        {
+            override var transform = bind rotate(-45, new Vec3(0, 0, 1));
+            width: bind cellHeight;
+            height: bind cellHeight;
+            fillPaint: ColorPaint(Color.color(.2, .2, .2));
+            var dragging = false;
+            override function onMouseMove from (e is MouseEvent) to ()
+            {
+            }
+            override function onMouseDown from (e is MouseEvent) to ()
+            {
+                println("targetPorts={targetPorts}");
+                dragging = true;//e.location.y >= height/2-2;
+            }
+            override function onMouseDrag from (e is MouseEvent) to ()
+            {
+                if (dragging) {
+                    pos += (canvas.toLocal * e.picked.dragPoint1 - canvas.toLocal * e.picked.dragPoint0);
+                }
+            }
+        },
+        Group { content: bind sourcePort },
+        Group {
+            content: bind targetPorts;
+        }/*,
+        TransformNode {
+            ty: bind -height/2;
+            content: bind resizer();
+            }*/]
+    };
+
+
+    override function serialize to BranchNode {
+        const n = BranchNode {
+            id: "{id}";
+            x: pos.x;
+            y: pos.y;
+        }
+        canvas.serializationMap.put(this, n);
+        n.input = TargetNode {
+            targetId: "{id}", links: foreach (link in sourcePort.links) "{link.id}";
+        };
+        n.outputs = 
+            foreach (port in targetPorts) 
+            {
+                foreach (link in port.links) {
+                    SourceNode {
+                        sourceId: "{id}"
+                        links: ["{link.id}"];
+                    }
+                }
+            };
+        return n;
+    } 
+}
+
+
 
 public class LinkView is ExpressionView {
     override function toString to String {
@@ -3392,14 +3589,6 @@ public class LinkInfo {
 class Holder is Group, Scissored {
 }
 
-const FORK is Member = Member {
-    override function equals from (obj is Object) to Boolean {
-        return isSameObject(this, obj);
-    }
-    override var name = "Fork";
-    override var members = [];
-}
-
 class MemberListview is Listview of Member {
     public var targetPosition is Point3;
     public var canvas is Canvas;
@@ -3428,6 +3617,9 @@ class MemberListview is Listview of Member {
                 k(null);
             } else if (m == FORK) {
                 const fork = canvas.createFork(targetPosition);
+                k(fork.sourcePort);
+            } else if (m == BRANCH) {
+                const fork = canvas.createBranch(targetPosition);
                 k(fork.sourcePort);
             } else {
                 const f = canvas.createMemberView(targetPosition, m, 0) as FunctionView; // hack
@@ -3582,6 +3774,15 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     function createFork from (pt is Point3) to ForkView {
         const r = ForkView {
+            canvas: this;
+        }
+        insert r into views;
+        r.pos = new Point3(pt.x, pt.y, pt.z);
+        return r;
+    }
+
+    function createBranch from (pt is Point3) to BranchView {
+        const r = BranchView {
             canvas: this;
         }
         insert r into views;
@@ -4255,6 +4456,9 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 if (selecting) {
                     beginSelection(e);
                 }
+            } else if (e.isMouseButton2Down()) {
+                panning = true;
+                selecting = false;
             } else if (e.isMouseButton3Down()) {
                 // popup menu
                 const menu = Menu {
@@ -4808,6 +5012,43 @@ public class ForkNode is ExprNode {
         return v;
     }
 }
+
+public class BranchNode is ExprNode {
+    public var input is TargetNode;
+    public var outputs is SourceNode[];
+    public override function createView from (canvas is Canvas) to BranchView {
+        const v = BranchView {
+            canvas: canvas;
+            pathFactory: canvas.pathFactory;
+            layoutEngine: canvas.layoutEngine;
+            imageLoader: canvas.imageLoader;
+            effectLoader: canvas.effectLoader;
+        }
+        {
+            var n = input;
+            const p = v.sourcePort;
+            if (n.links.size() > 0) {
+                for (link in n.links) {
+                    const lnk = canvas.getLink(link);
+                    lnk.target = p;
+                }
+            } 
+        }
+        v.targetCount = outputs.size();
+        for (p in outputs) {
+            if (p.links.size() > 0) {
+                for (link in p.links) {
+                    const lnk = canvas.getLink(link);
+                    lnk.source = v.targetPorts[indexof p];
+                }
+            }
+        }
+        v.pos = new Point3(x, y, 0);
+        insert v into canvas.views;
+        return v;
+    }
+}
+
 
 public class FunNode is ExprNode {
     public var inputs is TargetNode[];
