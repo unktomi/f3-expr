@@ -2060,11 +2060,11 @@ public class ObjectView is ExpressionView {
     override var internalContent = Group {
 	content: bind [innerContent, 
         Rectangle {
-                cy: bind innerContent.bounds.center.y + cellHeight / 2;
+                cy: bind innerContent.bounds.center.y;
                 visible: bind selected
                 pickable: false;
                 width: bind cellWidth;
-                height: bind innerContent.bounds.height() + cellHeight;
+                height: bind innerContent.bounds.height();
                 stroke: Stroke {
                     width: 2;
                 }
@@ -4581,8 +4581,8 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     public function deleteSelection to () 
     {
-        selectedExpr = null;
         const toDelete = views[v | v.selected];
+        selectedExpr = null;
         println("DELETING {toDelete.size()} views");
         if (toDelete <> []) {
             for (n in toDelete) {
