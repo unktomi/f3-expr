@@ -1569,7 +1569,7 @@ public abstract class ExpressionView is AbstractNode {
     public var cellWidth is Number = 180;
     public var cellHeight is Number = bind canvas.cellHeight;
     public var font is Text.Font = bind canvas.font;
-    public readonly var selected is Boolean;
+    public var selected is Boolean;
     public var selectable is Boolean = false;
     public function select to ()
     {
@@ -1613,7 +1613,13 @@ public abstract class ExpressionView is AbstractNode {
     function onDown from (e is MouseEvent) to () 
     {
         if (selectable) {
-            canvas.setSelectedExpr(this);
+            if (e.shiftKey) {
+                selected = true;
+            } else if (e.ctrlKey) {
+                selected = not selected;
+            } else {
+                canvas.setSelection([this]);
+            }
             const menuFactory = canvas.menuFactory;
             if (e.isMouseButton3Down()) {
                 if (this <> canvas.terminalExprView) {
@@ -1662,6 +1668,7 @@ public abstract class ExpressionView is AbstractNode {
 	d2 = label.observeMouseUp().subscribe(onUp);
 	d3 = label.observeMouseDrag().subscribe(onDrag);
         undoList.addTarget("pos", &pos);
+        undoList.addTarget("selected", &selected);
     }
 
     public function serialize to ExprNode {
@@ -2372,7 +2379,13 @@ public class ForkView is ExpressionView {
             }
             override function onMouseDown from (e is MouseEvent) to ()
             {
-                canvas.setSelectedExpr(fork);
+                if (e.shiftKey) {
+                    fork.selected = true;
+                } else if (e.ctrlKey) {
+                    fork.selected = not fork.selected;
+                } else {
+                    canvas.setSelection([fork]);
+                }
                 println("targetPorts={targetPorts}");
                 dragging = true;//e.location.y >= height/2-2;
             }
@@ -2785,7 +2798,7 @@ public class ParameterView is InputView {
 
     function numSlider to SliderField 
     {
-        SliderField {
+        const f = SliderField {
             height: bind cellHeight;
             width: bind cellWidth-100;
             transform: translate(50, 0, 0);
@@ -2793,20 +2806,26 @@ public class ParameterView is InputView {
                 parameter.constantValue = t * 100.0;
                 canvas.dumpSrc();
             }
+            override function onCommit from () to ()
+            {
+                MasterUndoable.commit();
+            }
             override function onCommit from (text is String) to ()
             {
                 t = Number.parseFloat(text) / 100.0;
+                MasterUndoable.commit();
             }
             override function getText from (t is Number) to String
             {
                 "{t * 100.0}";
             }
-        }
+        };
+        return f;
     }
     
     function intSlider to SliderField 
     {
-        SliderField {     
+        const f = SliderField {     
             height: bind cellHeight;
             width: bind cellWidth-100;
             transform: translate(50, 0, 0);
@@ -2818,20 +2837,26 @@ public class ParameterView is InputView {
                 parameter.constantValue = Math.round(t * 100) as Integer;
                 canvas.dumpSrc();
             }
+            override function onCommit from () to ()
+            {
+                MasterUndoable.commit();
+            }
             override function onCommit from (text is String) to ()
             {
                 t = Integer.parseInt(text) / 100.0;
+                MasterUndoable.commit();
             }
             override function getText from (t is Number) to String
             {
                 "{Math.round(t * 100.0) as Integer}";
             }
-        }
+        };
+        return f;
     }
 
     function boolSlider to SliderField 
     {
-        SliderField {     
+        const f = SliderField {     
             height: bind cellHeight;
             width: bind cellWidth-100;
             transform: translate(50, 0, 0);
@@ -2843,15 +2868,20 @@ public class ParameterView is InputView {
             {
                 if (t <= 0.5) then "No" else "Yes";
             }
+            override function onCommit from () to ()
+            {
+                MasterUndoable.commit();
+            }
             override var t on replace {
                 parameter.constantValue = (t > 0.5);
                 canvas.dumpSrc();
             }
-        }
+        };
+        return f;
     } 
 
     function stringField to Text.Field {
-        StringField {
+        const f = StringField {
             width: bind cellWidth - 46;
             transform: translate(23, 0);
             height: bind cellHeight;
@@ -2863,6 +2893,26 @@ public class ParameterView is InputView {
             {
                 parameter.constantValue = "\"{text}\"";
                 canvas.dumpSrc();
+            }
+        }
+        return f;
+    }
+
+    postinit {
+        undoList.addTarget("constValue", &parameter.constantValue);
+    }
+    
+    bound var constValue = parameter.constantValue on replace {
+        if (textField <> null) {
+            textField.setText(constValue.toString())
+        } else if (sliderField <> null) {
+            const f = sliderField;
+            if (Reflect.NUMBER_TYPE.isConvertibleFrom(getInputType())) {
+                f.setT(if (parameter.constantValue is Number) then (parameter.constantValue as Number) / 100.0 else 0.0);
+            } else if (Reflect.INTEGER_TYPE.isConvertibleFrom(getInputType())) {
+                f.setT(if (parameter.constantValue is Integer) then (parameter.constantValue as Integer) / 100.0 else 0.0);
+            } else if (Reflect.BOOLEAN_TYPE.isConvertibleFrom(getInputType())) {
+                f.setT(if parameter.constantValue is Boolean and (parameter.constantValue as Boolean) then 1.0 else 0.5);
             }
         }
     }
@@ -3738,6 +3788,25 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     var prog is Program;
 
+    function setSelection from (vs is ExpressionView[]) to () 
+    {
+        const set = new java.util.HashSet of ExpressionView;
+        for (v in vs) {
+            v.selected = true;
+            set.add(v);
+        }
+        for (v in views) {
+            if (not set.contains(v)) {
+                v.selected = false;
+            }
+        }
+        if (not set.contains(selectedExpr)) {
+            selectedExpr = vs[0];
+        } else {
+            MasterUndoable.commit();
+        }
+    }
+
     function setSelectedExpr from (e is ExpressionView) to ()
     {
         selectionRect.visible = false;
@@ -3832,6 +3901,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         }
         r.pos = new Point3(pt.x+r.bounds.extent.x, pt.y + cellHeight*(offset+1), pt.z);
         setSelectedExpr(r);
+        MasterUndoable.commit();
         return r;
     }
 
@@ -4577,6 +4647,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     public function clearSelection to ()
     {
         selectedExpr = null;
+        for (v in views) v.selected = false;
     }
 
     public function deleteSelection to () 
@@ -4589,8 +4660,8 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 n.unlink();
                 delete n from views;
             }
-            dumpSrc();
             MasterUndoable.commit();
+            dumpSrc();
         }
     }
 
@@ -4937,7 +5008,9 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 eng = "{eng}For each {formatEnglishName(mem.member.name)} event: ";
                 eng = "{eng}{p.getEnglishAccess()}. ";
             }
-            println("ENGLISH={eng}");
+            if (eng == "") {
+                eng = "For each {formatEnglishName(mem.member.name)} event: the event";
+            }
             englishOutput = eng;
             result = "{result}{ret}];\}";
             try {

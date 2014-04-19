@@ -64,6 +64,7 @@ public abstract class Treenode is Foldable of Treenode {
     public var canOpen is Boolean;
     public var parent is Treenode;
     public var label is String;
+    public var visible is Boolean = true;
     protected var children is Treenode[];
 
     function update from (r is Integer, c is Integer) to Integer
@@ -440,12 +441,15 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
 	const i = scrollOffset;
 	const j = scrollOffset + visibleRows;
 	//const newRows = model.getRows(i, j+1);
-	const newRows = model.getRows(0, model.rowCount);
-	if (rows <> newRows) {
-	    rows = newRows;
-	}
+        var newRows = model.getRows(0, model.rowCount);
+        if (filter <> null) {
+           newRows = newRows[tn | filter(tn)]
+        }
+        rows = newRows;
 	super.preupdate();
     }
+
+    public var filter is function from Treenode to Boolean;
 
     var treeBg is Paint = bind bgs[0];
 
