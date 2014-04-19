@@ -53,7 +53,7 @@ function observeType from (t is F3Type) to F3Type {
 const exprMap1 = new java.util.HashMap of (F3ClassType, Member[]);
 const exprMap2 = new java.util.HashMap of (F3ClassType, Member[]);
 
-const SelectionPaint = ColorPaint(Color.color(.2, .2, .2));
+const SelectionPaint = ColorPaint(Color.ORANGE);
 
 const FORK is Member = Member {
     override function equals from (obj is Object) to Boolean {
@@ -2372,6 +2372,7 @@ public class ForkView is ExpressionView {
             }
             override function onMouseDown from (e is MouseEvent) to ()
             {
+                canvas.setSelectedExpr(fork);
                 println("targetPorts={targetPorts}");
                 dragging = true;//e.location.y >= height/2-2;
             }
@@ -2385,11 +2386,24 @@ public class ForkView is ExpressionView {
         Group { content: bind sourcePort },
         Group {
             content: bind targetPorts;
+        }
+        Group {
+            content: Rectangle 
+           {
+               visible: bind canvas.selectedExpr == fork;
+               pickable: false;
+               width: bind width*2;
+               height: bind height;
+               stroke: Stroke {
+                   width: 2;
+               }
+               strokePaint: SelectionPaint;
+           }
         }/*,
         TransformNode {
-            ty: bind -height/2;
-            content: bind resizer();
-            }*/]
+           ty: bind -height/2;
+           content: bind resizer();
+        }*/]
     };
 
 
@@ -3812,6 +3826,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             } into views;
         }
         r.pos = new Point3(pt.x+r.bounds.extent.x, pt.y + cellHeight*(offset+1), pt.z);
+        setSelectedExpr(r);
         return r;
     }
 
@@ -3837,7 +3852,8 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             const names = new java.util.HashSet of String;
             const members = [foreach (m in introspectMembers(v) where not m.name.contains("pdate") and names.add(m.name)) m];
             const typ = v.varType.t;
-            insert ObjectView {
+            var r is ExpressionView;
+            insert r = ObjectView {
                 pos: toLocal * where.scenePoint;
                 objectExpr: VarContextExpression { 
                     varContext: v, override function getType to F3Type { typ }
@@ -3846,6 +3862,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 }
                 canvas: this;
             } into views;
+            setSelectedExpr(r);
             MasterUndoable.commit();
         }
     }
@@ -3859,7 +3876,8 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         for (m in members) {
             println(m);
         }
-	insert ObjectView {
+        var r is ExpressionView;
+	insert r=ObjectView {
 	    pos: toLocal * where.scenePoint;
 	    objectExpr: NodeExpression { 
                 node: clip, override function getType to F3Type { typ }
@@ -3868,6 +3886,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             }
 	    canvas: this;
 	} into views;
+        setSelectedExpr(r);
         MasterUndoable.commit();
     }
 
