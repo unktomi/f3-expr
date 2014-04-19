@@ -734,6 +734,7 @@ public function run from (args is String[]) to ()
         mainTimeLayer.content = [];
         mainTimeLayer.content = currentAnimResource;
         mainContext.programs = [];
+        mainContext.program = null;
         contextModel.reset();
         contextTree.select(contextModel.root);
 	transformHierarchy.clearSelection();

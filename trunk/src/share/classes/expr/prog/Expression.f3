@@ -1569,7 +1569,7 @@ public abstract class ExpressionView is AbstractNode {
     public var cellWidth is Number = 180;
     public var cellHeight is Number = bind canvas.cellHeight;
     public var font is Text.Font = bind canvas.font;
-    public readonly var selected is Boolean = bind canvas.selectedExpr == this;
+    public readonly var selected is Boolean;
     public var selectable is Boolean = false;
     public function select to ()
     {
@@ -1834,7 +1834,7 @@ class FunctionView is ExpressionView {
 	content: bind [innerContent, 
         Rectangle {
                 transform: bind translate(0, -h/2+cellHeight/2);
-                visible: bind canvas.selectedExpr == this;
+                visible: bind selected
                 pickable: false;
                 width: bind cellWidth;
                 height: bind h;
@@ -2061,7 +2061,7 @@ public class ObjectView is ExpressionView {
 	content: bind [innerContent, 
         Rectangle {
                 cy: bind innerContent.bounds.center.y + cellHeight / 2;
-                visible: bind canvas.selectedExpr == this;
+                visible: bind selected
                 pickable: false;
                 width: bind cellWidth;
                 height: bind innerContent.bounds.height() + cellHeight;
@@ -2390,7 +2390,7 @@ public class ForkView is ExpressionView {
         Group {
             content: Rectangle 
            {
-               visible: bind canvas.selectedExpr == fork;
+               visible: bind fork.selected
                pickable: false;
                width: bind width*2;
                height: bind height;
@@ -3744,8 +3744,13 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         selectedExpr = e;
     }
 
-    var selectedExpr is ExpressionView on replace {
-        moveToFront(selectedExpr);
+    var selectedExpr is ExpressionView on replace old {
+        old.selected = false;
+        if (selectedExpr <> null) {
+            for (v in views where v <> selectedExpr) v.selected = false;
+            selectedExpr.selected = true;
+            moveToFront(selectedExpr);
+        }
     };
 
     function moveToFront from (exp is ExpressionView) to ()
@@ -4341,19 +4346,6 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         }
     }
 
-    function deleteViewsInSelection to ()
-    {
-        const bounds = selectionRect.strokeMesh.boundsInScene;
-        const vs = foreach (v in views where bounds.contains(v.boundsInScene)) v;
-        for (v in vs) {
-            v.unlink();
-            delete v from views;
-        }
-        saveCode();
-        MasterUndoable.commit();
-        selectionRect.visible = false;
-    }
-
     function extract from () to () 
     {
         const linked = new java.util.HashSet of ExpressionView();
@@ -4446,6 +4438,17 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         
     function endSelection from (e is MouseEvent) to ()
     {
+        canvas.setSelectedExpr(null);
+        const selected = new java.util.HashSet of ExpressionView;
+        for (v in views) {
+            if (Bounds.intersect(v.bounds, selectionRect.bounds) <> null) {
+                selected.add(v)
+            }
+        }
+        for (v in views) {
+            v.selected = selected.contains(v)
+        }
+        selectionRect.visible = false;
     }
         
     function beginSelection from (e is MouseEvent) to ()
@@ -4488,7 +4491,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                     },
                     MenuItem {
                         label: "Delete";
-                        action: canvas.deleteViewsInSelection;
+                        action: canvas.deleteSelection;
                     }]
                 }
                 println("menu factory => {menuFactory}");
@@ -4578,12 +4581,17 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     public function deleteSelection to () 
     {
-        var n = selectedExpr;
         selectedExpr = null;
-        n.unlink();
-        delete n from views;
-        dumpSrc();
-        MasterUndoable.commit();
+        const toDelete = views[v | v.selected];
+        println("DELETING {toDelete.size()} views");
+        if (toDelete <> []) {
+            for (n in toDelete) {
+                n.unlink();
+                delete n from views;
+            }
+            dumpSrc();
+            MasterUndoable.commit();
+        }
     }
 
     override function onKeyDown from (e is KeyboardEvent) to () 
