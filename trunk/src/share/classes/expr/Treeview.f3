@@ -33,12 +33,37 @@ public class Treemodel is Foldable of Treenode {
 
     public var rowCount is Integer;
 
+    function getAllRows to Treenode[] 
+    {
+	var result is Treenode[];
+	root.getRows(0, Integer.MAX_VALUE, true,
+		     function from (n is Treenode) to ()
+		     {
+			 insert n into result;
+		     });
+        return result;
+    }
+
+    function getRows from (filter is function from Treenode to Boolean) to Treenode[]
+    {
+	var result is Treenode[];
+	root.getRows(0, Integer.MAX_VALUE, true,
+		     function from (n is Treenode) to ()
+		     {
+                         if (filter(n)) {
+                             insert n into result;
+                         }
+		     });
+        for (n in result) n.row = indexof n;
+        return result;
+    }
+
     function getRows 
 	from (low is Integer, hi is Integer) 
 	to Treenode[]
     {
 	var result is Treenode[];
-	root.getRows(low, hi, 
+	root.getRows(low, hi, false,
 		     function from (n is Treenode) to ()
 		     {
 			 insert n into result;
@@ -89,16 +114,17 @@ public abstract class Treenode is Foldable of Treenode {
     function getRows 
 	from (low is Integer, 
 	      hi is Integer, 
+              all is Boolean,
 	      add is function from Treenode to ()) 
 	to () 
     {
 	if (low <= row and hi > row) {
 	    add(this)
 	}
-	if (isOpen) {
+	if (isOpen or all) {
 	    var j = 0;
 	    for (c in children /*where c.getMinRow() > low and c.getMaxRow() < hi*/) {
-		c.getRows(low, hi, add);
+		c.getRows(low, hi, all, add);
 	    }
 	}
     }
@@ -206,16 +232,18 @@ public class Treecell is AbstractNode {
 	     content:
 	     [TransformNode { 
 	         tx: bind -tv.cellWidth / 2;
-		 content: bind if (tn.isOpen) then tv.closeArrow(fg) else if (tn.canOpen) then tv.openArrow(fg) else null;
+		 content: bind if filter <> null then null else if (tn.isOpen) then tv.closeArrow(fg) else if (tn.canOpen) then tv.openArrow(fg) else null;
 	     },
 	     Text.Label {
-		 transform: bind translate(if (tn.canOpen) then 6 else 0, 0);
+		 transform: bind translate(if (filter == null and tn.canOpen) then 6 else 0, 0);
 		 font: bind tv.font;
 		 foreground: bind fg;
 		 background: null;
 		 height: bind tv.cellHeight;
 		 width: bind tv.cellWidth;
 		 text: bind tn.label;
+                 selectionStart: bind tv.getSelectionStart(tn);
+                 selectionEnd: bind tv.getSelectionEnd(tn);
 	     },
              Group {
                  content: bind getValueContent();
@@ -286,16 +314,19 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
 
     var nextSelection is Treenode;
 
+    protected bound function getSelectionStart from (tn is Treenode) to Integer { 0 }
+    protected bound function getSelectionEnd from (tn is Treenode) to Integer { 0 }
+
     override function onKeyDown from (e is KeyboardEvent) to ()
     {
 	if (e.keyCode == Keys.Down) {
-	    selectionRow = Math.min(model.rowCount-1, selectionRow+1);
+	    selectionRow = Math.min((modelRowCount as Integer)-1, selectionRow+1);
 	} else if (e.keyCode == Keys.Up) {
 	    selectionRow = Math.max(0, selectionRow-1);
 	} else if (e.keyCode == Keys.Home) {
 	    selectionRow = 0;
 	} else if (e.keyCode == Keys.End) {
-	    selectionRow = model.rowCount-1;
+	    selectionRow = (modelRowCount as Integer)-1;
 	} else if (e.keyCode == Keys.Left) {
 	    if (selectedTreenode.isOpen) selectedTreenode.close();
 	} else if (e.keyCode == Keys.Right) {
@@ -314,7 +345,7 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
 
     function scroll from (amount is Integer) to ()
     {
-	scrollOffset = Math.max(0, Math.min(scrollOffset + amount, model.rowCount - visibleRows));
+	scrollOffset = Math.max(0, Math.min(scrollOffset + amount, (modelRowCount as Integer) - visibleRows));
     }
 
     bound function closeArrow from (p is Paint) to Node { 
@@ -428,6 +459,8 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
 
     var modelSelection is Treenode on replace { model.selectionObserver.onNext(modelSelection) }
 
+    var modelRowCount is Number;
+
     override function preupdate {
 	model.update();
 	if (nextSelection <> null) {
@@ -440,16 +473,20 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
         modelSelection = selectedTreenode;
 	const i = scrollOffset;
 	const j = scrollOffset + visibleRows;
-	//const newRows = model.getRows(i, j+1);
-        var newRows = model.getRows(0, model.rowCount);
+	var newRows is Treenode[];
         if (filter <> null) {
-           newRows = newRows[tn | filter(tn)]
+            newRows = model.getRows(filter)[0..<filterLimit];
+            modelRowCount = newRows.size();
+        } else {
+            newRows = model.getRows(i, j+1);
+            modelRowCount = model.rowCount;
         }
         rows = newRows;
 	super.preupdate();
     }
 
     public var filter is function from Treenode to Boolean;
+    public var filterLimit is Integer = 100;
 
     var treeBg is Paint = bind bgs[0];
 
@@ -487,17 +524,17 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
     override public bound function getSx to Number { 1.0 }
     override public bound function getTy to Number 
     { 
-        scrollOffset / (model.rowCount as Number);
+        scrollOffset / modelRowCount;
     }
     override public bound function getSy to Number 
     { 
-        Math.min(visibleRows / ((model.rowCount) as Number), 1.0);
+        Math.min(visibleRows / modelRowCount, 1.0);
     }
     override public function setX from (tx is Number, sx is Number) to ()
     {
     }
     override public function setY from (ty is Number, sy is Number) to ()
     {
-        scrollOffset = Math.round(ty * model.rowCount) as Integer;
+        scrollOffset = Math.round(ty * modelRowCount) as Integer;
     }
 }
