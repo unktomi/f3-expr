@@ -258,7 +258,7 @@ function findPackage from (str is String) to PackageAsset {
     return r;
 }
 
-const excluded = ["jogamp", "com/sun", "com/jogamp", "org/", "jogl", "f3/jogl", "f3/animation", "f3/date", "f3/reflect", "f3/f3unit", "f3/lang", "javax"];
+const excluded = ["jogamp", "com/sun", "com/jogamp", "org/", "jogl", "f3/jogl", "f3/animation", "f3/date", "f3/reflect", "f3/f3unit", "f3/lang", "javax", "expr", "com"];
 
 function getPackageAssets to PackageAsset {
     const bcp = java.lang.System.getProperty("boot.class.path");
@@ -339,11 +339,19 @@ function getPackageAssets to PackageAsset {
 
 public class AssetModel is Treemodel {
     public var resources is ResourceGroup;
+    public bound var packageAssets = getPackageAssets();
+    public function getCodeModel to Treemodel {
+        Treemodel {
+            root: AssetTreenode {
+                asset: packageAssets;
+            }
+        }
+    }
     override var root = AssetTreenode {
 	asset: Asset {
 	    name: "Assets";
 	    containedAssets: bind 
-	    [getPackageAssets(), TimeLayerAsset {}, TransitionLayerAsset{}, BlendLayerAsset {}, 
+	    [packageAssets, TimeLayerAsset {}, TransitionLayerAsset{}, BlendLayerAsset {}, 
              Scene2DAsset {}, foreach (r in resources.resources) makeAsset(r)]
 	}
     }

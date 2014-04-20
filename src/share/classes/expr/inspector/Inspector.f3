@@ -319,7 +319,9 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
 	    i.index = indexof i;
 	}
 	super.preupdate();	
+
     }
+    const self = this;
 
     override var internalContent = Group {
         var margin = 1.0;
@@ -353,7 +355,7 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
 	    TransformNode {
 		//tx: bind -width / 2;
 		content: Text.Label {
-		    width: bind width;
+                    width: bind width;
 		    indent: 4;	
 		    text: bind i.label;
 		    font: bind font;

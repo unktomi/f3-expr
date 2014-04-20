@@ -655,7 +655,6 @@ public function run from (args is String[]) to ()
     readonly var toolCursor is Cursor = bind if (interactive) then toolMenu.scriptingCursor else toolMenu.selectingCursor;
 
     const sceneMenu = Tabview {
-          height: 20; width: bind stage.width;
           transform: bind translate(stage.width/2, stage.height-30);
           tabs: bind foreach (scene in transformHierarchy.scenes) Tabview.Tab {
                 title: bind scene.id;
@@ -663,6 +662,11 @@ public function run from (args is String[]) to ()
                 {
                     transformHierarchy.selectScene(scene);                        
                 }
+          }
+          override function update to ()
+          {
+              resize(stage.width, 20);
+              super.update();
           }
     }
     
@@ -1441,6 +1445,28 @@ public function run from (args is String[]) to ()
                                             }]
                                         }
                                     }
+                       },
+                       InternalWindow {
+                           var chooseType = ChooseType {
+                               treeModel: bind assetModel
+                           };
+                           gadget: bind chooseType.searchField;
+                           containerBounds: bind Bounds.boundsFromRect(0, 
+                                                                    0, 
+                                                                    width,
+                                                                    height-MENU_HEIGHT);
+                           content: bind chooseType;
+                           height: 400, width: 300;
+                           cx: 160, cy: 800-300;	   
+                       },
+                       InternalWindow {
+                           containerBounds: bind Bounds.boundsFromRect(0, 
+                                                                    0, 
+                                                                    width,
+                                                                    height-MENU_HEIGHT);
+                           content: CreateVar {}
+                           height: 400, width: 300;
+                           cx: 160, cy: 800-300;	   
                        },
                        InternalWindow {
                         id: "Editor1";            

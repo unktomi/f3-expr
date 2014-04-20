@@ -211,12 +211,7 @@ public class Program {
 
     public function deserialize to () 
     {
-        const idMap = new java.util.HashMap of (String, ExprNode);
-        for (v in code.views) {
-            idMap.put(v.id, v);
-        }
         canvas.deserializationMap.clear();
-        const viewMap = new java.util.HashMap of (String, ExpressionView);
         for (v in code.views) {
             const view = v.createView(canvas);
             println("deserialized {v} into {view}");

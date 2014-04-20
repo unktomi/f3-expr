@@ -48,50 +48,45 @@ public class Tabview is ResizableNode, Focuser {
 	super.resize(w, h);
 	selectedTab.content.resize(contentWidth, contentHeight);
     }
-    public var selectedIndex is Integer;
+    public var selectedIndex is Integer = 0;
     public var tabs is Tab[];
-    public readonly var selectedTab is Tab = bind tabs[selectedIndex];
+    public bound var selectedTab is Tab = tabs[selectedIndex];
 
     var contentWidth is Number = bind width;
     var contentHeight is Number = bind height - TAB_HEIGHT-2;
 
-    readonly var font = bind layoutEngine.createFont("font-size:10;font-family:Lucida Grande;font-weight:bold");
+    bound var font is Text.Font = layoutEngine.createFont("font-size:10;font-family:Lucida Grande;font-weight:bold");
 
     var tabWidth is Number = bind Math.max(minTabWidth, width / Math.max(tabs.size(), 1));
 
     var minTabWidth is Number;
 
-    var labels is Text.Label[] = bind foreach (t in tabs) Text.Label {
+    bound var labels is Text.Label[] = foreach (t in tabs) Text.Label {
+	font: bind font;
 	blocksPointer: false;
 	indent: 5;
 	height: bind TAB_HEIGHT;
-	width: bind tabWidth;
-	background: bind if (t == selectedTab) then FG_PAINT else BG_PAINT;
+        width: bind tabWidth;
+	background: null;
 	foreground: bind TEXT_PAINT;
-	text: bind t.title
-	font: bind font;
+	text: bind t.title;
     };
 
     var lastSelected is Tab;
 
-    override function update {
+    override function update to ()
+    {
 	super.update();
 	if (lastSelected <> selectedTab) {
 	    lastSelected = selectedTab;
             selectedTab.onSelect();
 	}
         selectedTab.content.resize(contentWidth, contentHeight);
-	minTabWidth = width / Math.max(tabs.size(), 1);
 	var maxLabelWidth = 0.0;
-	var x = 0.0;
-	var visibleCount = 0;
 	for (tab in tabs) { tab.index = indexof tab }
 	for (label in labels) {
-	    const w = label.content.textShape.getBounds().width() + 6;
-	    if (x < width) {
-		maxLabelWidth = Math.max(maxLabelWidth, w);
-	    }
-	    x += w;
+	    const w = label.font.width(label.text) + 6;
+            maxLabelWidth = Math.max(maxLabelWidth, w);
 	}
 	minTabWidth = maxLabelWidth;
     }
