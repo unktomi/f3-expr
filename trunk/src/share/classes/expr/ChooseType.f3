@@ -1,0 +1,88 @@
+package expr;
+import f3.media.scene.*;
+import f3.media.input.*;
+import f3.media.scene.Shape2D.*;
+import f3.math.LinearMath.*;
+
+const textFg = ColorPaint(Color.color(.8, .8, .8));
+const textBg = ColorPaint(Color.color(.4, .4, .4));
+
+public class ChooseType is ResizableNode, Focuser {
+    override public function getTargetOfFocus to Focusable {
+	tv
+    }
+    public var treeModel is AssetTree.AssetModel;
+    const tv is Treeview = Treeview {
+        model: treeModel.getCodeModel();
+        override function onKeyInput from (e is KeyboardEvent) to ()
+        {
+            searchField.onKeyInput(e);
+        }
+    };
+    const searchTv is Treeview = tv;
+    readonly var tree is Treeview = bind if filterText <> [] then searchTv else tv;
+    readonly var font = bind layoutEngine.createFont(Names.DEFAULT_FONT);
+    var cellHeight = 18;
+    public const searchField is Text.Field = Text.Field {
+        //visible: bind filterText <> [];
+        width: bind width-20;
+        transform: bind translate(-width/2+5, 2);
+        font: bind font;
+        foreground: bind textFg;
+        background: bind textBg;
+    };
+    const sp = Scrollpane {
+        canZoomVertical: false;
+        content: bind tree;
+    };
+    public var choosePackages is Boolean = false;
+    public var chooseTypes is Boolean = true;
+    public var chooseMembers is Boolean = true;
+    var filterText is String[];
+    function filter from (tn is Treeview.Treenode) to Boolean 
+    {
+        const asset = (tn as AssetTree.AssetTreenode).asset;
+        if (not chooseTypes and asset is AssetTree.TypeAsset) {
+            return false;
+        }
+        if (not chooseMembers and asset is AssetTree.MemberAsset) {
+            return false;
+        }
+        const s = tn.label.toLowerCase();
+        for (j in filterText) {
+            if (not s.contains(j)) return false;
+        }
+        return true;
+    }
+    const d = searchField.observeText().subscribe(function from (text is String) to () 
+                                                  {
+                                                      if (text.trim() == "") {
+                                                          filterText = [];
+                                                      } else {
+                                                          filterText = text.toLowerCase().split(" ");
+                                                      }
+                                                      if (filterText <> []) {
+                                                          tv.filter = filter;
+                                                      } else {
+                                                          tv.filter = null;
+                                                      }
+                                                  });
+    override function resize from (w is Number, h is Number) to ()
+    {
+        super.resize(w, h);
+        sp.resize(w, h);
+    }
+    override var internalContent = Group {
+        content: bind 
+        [/*
+        TransformNode {
+            ty: bind height / 2 - cellHeight / 2
+            content: bind searchField;
+        },
+        */
+        TransformNode {
+            //            ty: bind -cellHeight/2;
+            content: bind sp;
+        }]
+    }
+}
