@@ -29,7 +29,7 @@ public abstract class Listview of a is ResizableNode, Focusable, KeyboardInputHa
 
     public var model is Listmodel of a;
 
-    public var cellHeight = 15;
+    public var cellHeight is Number = 16;
 
     public var selectedRow = 0 on replace {
         const lastVisible = scrollOffset + visibleRows;

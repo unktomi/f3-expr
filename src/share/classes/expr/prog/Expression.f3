@@ -1591,22 +1591,35 @@ public abstract class ExpressionView is AbstractNode {
             width: bind cellWidth;
             font: bind font;
             foreground: bind canvas.textFg;
-            background: bind if (selected) then canvas.cellSelectedBg else canvas.cellBg;
-            pickable: true;
+            background: null;
+            pickable: false;
             indent: 4;
         };
     }
+    const titleRect = Rectangle {
+        height: bind cellHeight;
+        width: bind cellWidth;
+        fillPaint: bind canvas.cellBg;
+    }
     public var defaultTitle is Node = Group {
            content: bind
-           [label,
-           Rectangle {
-                height: 1;
-                width: bind cellWidth;
-                fillPaint: bind canvas.textFg;
-                pickable: false;
-                cy: bind -cellHeight/2;
-            }];
+           [titleRect,
+           label];
     };
+    function borderedTitle to Node {
+        Group {
+            content:
+            bind 
+                [defaultTitle,
+                 Rectangle {
+                        height: 1;
+                        width: bind cellWidth;
+                        fillPaint: bind canvas.textFg;
+                        pickable: false;
+                        transform: bind translate(0, Math.round(-cellHeight/2.0));
+                    }]; 
+        }
+    } 
     public var title is Node = bind defaultTitle;
     var dragging = false;
     protected var dragFilter is Tuple3 = Tuple3.<<1>>;
@@ -1664,9 +1677,9 @@ public abstract class ExpressionView is AbstractNode {
     var d2;
     var d3;
     postinit {
-	d1 = label.observeMouseDown().subscribe(onDown);
-	d2 = label.observeMouseUp().subscribe(onUp);
-	d3 = label.observeMouseDrag().subscribe(onDrag);
+	d1 = titleRect.observeMouseDown().subscribe(onDown);
+	d2 = titleRect.observeMouseUp().subscribe(onUp);
+	d3 = titleRect.observeMouseDrag().subscribe(onDrag);
         undoList.addTarget("pos", &pos);
         undoList.addTarget("selected", &selected);
     }
@@ -1682,6 +1695,8 @@ public abstract class ExpressionView is AbstractNode {
 
 
 class FunctionView is ExpressionView {
+
+    override var title = bind borderedTitle();
 
     override public function unlink from () to () {
         for (x in inputs) {
@@ -1959,6 +1974,8 @@ class ObjectOutputView is OutputView {
 
 public class ObjectView is ExpressionView {
 
+    override var title = bind borderedTitle();
+
     override var transform = bind translate(pos);
     override var selectable = true;
     public var objectExpr is ObjectExpression;
@@ -2182,7 +2199,7 @@ public class GetVarView is OutputView {
         bind 
         if (isLabeled) then {
                 [TransformNode {
-                    content: bind defaultTitle;
+                   content: bind title;
                 },
                 TransformNode {
                     ty: bind -cellHeight;
@@ -2926,7 +2943,7 @@ public class ParameterView is InputView {
                 then intSlider()
                 else if (Reflect.BOOLEAN_TYPE.isConvertibleFrom(getInputType())) 
                     then boolSlider() else null;
-    override var internalContent = Group { content: bind [label, if links.size() == 0 then [sliderField, textField] else null] };
+    override var internalContent = Group { content: bind [title, if links.size() == 0 then [sliderField, textField] else null] };
 }
 
 abstract class StringField is Text.Field {
@@ -3667,13 +3684,21 @@ class MemberListview is Listview of Member {
     };
     override function render from (elem is Listview.Element of Member) to Node {
         var m = elem.value;
-        Text.Label {
-            font: bind font;
-            text: bind m.name;
-            foreground: bind if elem.index == selectedRow then selectionForeground else foreground;
-            background: bind if elem.index == selectedRow then selectionBackground else background;
-            height: bind cellHeight;
-            width: bind width;
+        Group {
+            content:
+            [Rectangle {
+                height: bind cellHeight;
+                width: bind width;
+                fillPaint: bind if elem.index == selectedRow then selectionBackground else background;
+            },
+            Text.Label {
+                font: bind font;
+                text: bind m.name;
+                foreground: bind if elem.index == selectedRow then selectionForeground else foreground;
+                background: null;
+                height: bind cellHeight;
+                width: bind width;
+            }]
         }
     }
     var app = observeApply().subscribe(function from (m is Member) to () {
@@ -4159,7 +4184,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         }
     }
 
-    readonly var font = bind layoutEngine.createFont("font-size:10;font-family:Lucida Grande;font-weight:bold;");
+    readonly var font = bind layoutEngine.createFont(Names.DEFAULT_FONT);
 
     var portPaint is Paint;
 
@@ -4176,7 +4201,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     const ARROW_COLOR = Color.color(.2, .2, .2);
 
-    var cellHeight = 16;
+    const cellHeight is Number = 16;
 
     const portArrow is Polygon = Polygon {
 	points: [-3.5, -4.5, -3.5, 4.5, 3.5, 0];
@@ -4641,7 +4666,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     const sourceCode = XHTML.Text {
         width: bind width;
-        style: "font-family:Lucida Grande; font-weight:normal; font-size: 12px; color: #101010E0;";
+        style: "font-family:Lucida Grande; font-weight:normal; font-size: 11pt; color: #101010E0;";
         transform: bind translate(-width/2, -height/2);
         content: bind if not showSource then "<a href='source://'>Source Code</a>" else "<a href='graph://'>Hide</a><p/><div>{englishOutput}</div>";
         visible: bind englishOutput <> "";

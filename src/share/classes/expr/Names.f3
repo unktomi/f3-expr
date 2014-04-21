@@ -1,5 +1,7 @@
 package expr;
 
+public const DEFAULT_FONT = "font-size:11;font-family:Lucida Grande;font-weight:bold";
+
 public function formatClassName from (className is String) to String
 {
     const dollar = className.lastIndexOf("$");
