@@ -1,0 +1,66 @@
+package expr;
+import f3.media.scene.*;
+import f3.media.input.*;
+import f3.media.scene.Text.*;
+import f3.media.scene.Shape2D.*;
+import f3.math.LinearMath.*;
+import java.lang.Math;
+
+const textFg = ColorPaint(Color.color(.8, .8, .8));
+const textBg = ColorPaint(Color.color(.4, .4, .4));
+
+public class CreateVar is ResizableNode {
+    bound var font is Font = layoutEngine.createFont(Names.DEFAULT_FONT);
+    bound var cellHeight = font.height()+2;
+    bound var labelWidth is Number = Math.max(font.width("Name:"), font.width("Type:"));
+    bound var fieldOffset is Number = labelWidth + 1;
+    const nameLabel is Text.Label = Text.Label {
+          text: "Name:"
+          font: bind font;
+          height: bind cellHeight;
+          width: bind labelWidth;
+          foreground: bind textFg;
+          background: null;
+          transform: bind translate(-width/2+labelWidth, 0);
+          rightJustified: true;
+    }
+    const typeLabel is Text.Label = Text.Label {
+          text: "Type:"
+          font: bind font;
+          height: bind cellHeight;
+          width: bind labelWidth;
+          foreground: bind textFg;
+          background: null;
+          transform: bind translate(-width/2+labelWidth, 0);
+          rightJustified: true;
+    }
+    const nameField is Text.Field = Text.Field {
+        transform: bind translate(fieldOffset-10, 0);
+        width: bind width-20-fieldOffset;
+        height: bind cellHeight;      
+        font: bind font;
+        foreground: bind textFg;
+        background: bind textBg;
+    };
+    const typeField is Text.Field = Text.Field {
+        transform: bind translate(fieldOffset-10, 0);
+        width: bind width-20-fieldOffset;
+        height: bind cellHeight;      
+        font: bind font;
+        foreground: bind textFg;
+        background: bind textBg;
+    };
+    override var internalContent = Group {
+        content: bind 
+        [TransformNode {
+            ty: bind cellHeight/2 + 1;
+            content:             
+            bind [nameLabel, nameField]
+        },
+        TransformNode {
+            ty: bind -cellHeight/2 - 1;
+            content:             
+            bind [typeLabel, typeField]
+        }]
+    }
+}
