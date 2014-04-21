@@ -817,7 +817,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
     var visibleDuration is Duration = bind visibleInterval.duration();
     var labels is Node[] = bind drawLabels(width, height, scrollOffset, frameRate);
     var font = bind layoutEngine.createFont("font-size:8;font-family:Lucida Grande");
-    var timeNodeViewFont = bind layoutEngine.createFont("font-size:10;font-family:Lucida Grande;font-weight:bold");
+    var timeNodeViewFont = bind layoutEngine.createFont(Names.DEFAULT_FONT);
 
     function makeTimeNodeView from (parent is TimeNodeView, t0 is TimeNode) to TimeNodeView 
     {
@@ -840,14 +840,13 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
         }
     }
 
-    readonly var gadgetFont = bind layoutEngine.createFont("font-size:10;font-family:Lucida Grande");
+    readonly var gadgetFont = bind layoutEngine.createFont(Names.DEFAULT_FONT);
     readonly var gadgetFg = ColorPaint(Color.color(.8, .8, .8));
     readonly var gadgetBg = ColorPaint(Color.color(.4, .4, .4));
         
 
     public var frameGadget is Text.Field = Text.Field {
         width: bind 64;
-        height: 13;
         rightJustified: true;
         font: bind gadgetFont;
         foreground: bind gadgetFg;
@@ -862,7 +861,6 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 
     public var frameRateGadget is Text.Field = Text.Field {
         width: 48
-        height: 13;
         rightJustified: true;
         font: bind gadgetFont;
         foreground: bind gadgetFg;
@@ -875,6 +873,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
         });
 
     public var combinedGadget is Node = Group {
+        transform: translate(0, 2)
         content: 
         [TransformNode {
             tx: -64
@@ -888,8 +887,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
             content: Text.Label {
                 text: "fps";
                 font: bind gadgetFont;
-                width: 15;
-                height: 13;
+                width: 19;
                 foreground: bind gadgetFg;
                 background: bind gadgetBg;
             }

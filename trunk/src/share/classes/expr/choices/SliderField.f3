@@ -7,6 +7,7 @@ import f3.math.LinearMath.*;
 import f3.util.*;
 import f3.util.Observer.*;
 import java.lang.Math;
+import expr.*;
 
 function clamp from (n is Number, lo is Number, hi is Number) to Number
 {
@@ -49,7 +50,7 @@ public class SliderField is AbstractNode
 	width: bind width+4;
 	transform: translate(0, 1);
 	rightJustified: true;
-        font: layoutEngine.createFont("font-size:10;font-family:Lucida Grande;font-weight:bold");
+        font: layoutEngine.createFont(Names.DEFAULT_FONT);
         pickable: bind textAreaEnabled and textInputEnabled;
         editable: bind textInputEnabled;
     };
