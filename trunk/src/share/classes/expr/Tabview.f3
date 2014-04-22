@@ -22,6 +22,7 @@ public class Tab {
     protected var index is Integer;
     public var content is ResizableNode;
     public var onSelect is function from () to ();
+    public var onLoseSelection is function from () to ();
 }
 
 class TabImpl is TransformNode, MouseInputHandler, Focuser {
@@ -78,6 +79,7 @@ public class Tabview is ResizableNode, Focuser {
     {
 	super.update();
 	if (lastSelected <> selectedTab) {
+            lastSelected.onLoseSelection();
 	    lastSelected = selectedTab;
             selectedTab.onSelect();
 	}
