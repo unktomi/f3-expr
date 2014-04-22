@@ -15,8 +15,11 @@ class ContentHolder is Group, Scissored {
 const selectedTitlePaint = ColorPaint(Color.color(.2, .2, .2));
 const titlePaint = ColorPaint(Color.color(.3, .3, .3));
 
-public class InternalWindow is ResizableNode, Focuser {
+public interface HasGadget {
+    public function getGadget to Node;
+}
 
+public class InternalWindow is ResizableNode, Focuser {
 
     public var containerBounds is Bounds;
     public var cx is Number;
@@ -60,7 +63,9 @@ public class InternalWindow is ResizableNode, Focuser {
 	fillPaint: ColorPaint(Color.color(.44, .44, .44));
     }
 
-    public var gadget is Node;
+   public var gadget is Node;
+
+    var hasGadget is HasGadget;
 
     const buttonBar is Node = Group {
         transform: bind translate(0, self.height / 2 - 9 - 10);
@@ -114,7 +119,9 @@ public class InternalWindow is ResizableNode, Focuser {
 	content: bind [Group { cursor: Cursor.Default; content: [titleBar, buttonBar, line] },
                        TransformNode { ty: -14, content: bind contentHolder }, 
                        resizeCorner, leftSide, rightSide];
-    }
+    };
+
+    public var debugGadget is Boolean;
     
     override function update to ()
     {
@@ -124,7 +131,26 @@ public class InternalWindow is ResizableNode, Focuser {
 	}
         var g = parent as Group;
         selected = g.content[g.content.size()-1] == this;
+        var hasGadget is HasGadget = null;
 	super.update();
+        content.foldLeft((), function from (_ is (), n is Node) to () {
+                if (debugGadget) {
+                    println("checking {n} => {n is HasGadget}");
+                }
+                if (hasGadget == null and n is HasGadget) {
+                    hasGadget = n as HasGadget;
+                    println("found has gadget: {n}");
+                }
+            });
+        if (hasGadget == null) {
+            if (this.hasGadget <> null) {
+                gadget = null;
+                this.hasGadget = null;
+            }
+        }  else {
+            gadget = (this.hasGadget = hasGadget).getGadget();
+        }
+        
     }
 
     var dx = 0.0;
