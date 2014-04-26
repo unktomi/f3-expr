@@ -265,7 +265,7 @@ public class Treecell is AbstractNode {
 		if (tn.canOpen and e.location.x < limit) {
 		    if (not tn.isOpen) tn.open() else tn.close();
 		}
-                println("tn={tn} canOpen={tn.canOpen} children={tn.children.size()}");
+                println("tn={tn} row={tn.row} canOpen={tn.canOpen} children={tn.children.size()}");
 		tv.selectionRow = tn.row;
 		tv.onMouseDown(e);
 	    });
@@ -310,7 +310,8 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
 	fillPaint: ColorPaint(Color.WHITE);
     };
 
-    public readonly var selectedTreenode is Treenode = bind rows[selectionRow];
+    public readonly var selectedTreenode is Treenode = 
+       bind rows[selectionRow];
 
     var nextSelection is Treenode;
 
@@ -414,7 +415,7 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
 
     public function select from (t is Treenode) to ()
     {
-        println("SELECTING TREE NODE {t.label}");
+        println("SELECTING TREE NODE {t.label} {t.row}");
         if (selectedTreenode <> t) {
             nextSelection = t;
         }
@@ -474,7 +475,7 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
             newRows = model.getRows(filter)[0..<filterLimit];
             model.rowCount = newRows.size();
         } else {
-            newRows = model.getRows(i, j+1);
+            newRows = model.getRows(0, j+1);
         }
         rows = newRows;
 	super.preupdate();

@@ -672,6 +672,17 @@ function formatClassName from (t is F3Type) to String
     }
 }
 
+function argName from (fun is FunctionMember,
+                       ft is F3FunctionType, i is Integer) to String 
+{
+    if (fun.m == null) {
+        return argName(ft, i);
+    }
+    const names is String[] = Reflect.getParameterNames(fun.m as F3FunctionMember);
+    println("names for {fun.m} =>{names}");
+    if names == [] then argName(ft, i) else names[i];
+}
+
 function argName from (ft is F3FunctionType, i is Integer) to String 
 {
     const t = ft.getArgumentType(i);
@@ -1283,7 +1294,7 @@ public class Function is MemberExpression {
          },           
          foreach (i in [0..<argCount1]) {
              Parameter {
-                 name: bind argName(ft, i);
+                 name: bind argName(funMember, ft, i);
                  target: this;
                  t: bind ft.getArgumentType(i);
              }
@@ -1584,13 +1595,14 @@ public abstract class ExpressionView is AbstractNode {
         canvas.dumpSrc();
     }
     public readonly var label is Text.Label = bind constructLabel();
+    protected var labelVisible is Boolean = true;
     bound function constructLabel to Text.Label {
         Text.Label {
             text: bind getLabel();
             height: bind cellHeight;
             width: bind cellWidth;
             font: bind font;
-            foreground: bind canvas.textFg;
+            foreground: bind if labelVisible then canvas.textFg else canvas.disabledTextFg;
             background: null;
             pickable: false;
             indent: 4;
@@ -1662,7 +1674,7 @@ public abstract class ExpressionView is AbstractNode {
     function onDrag from (e is MouseEvent) to () 
     {
         if (dragging) {
-            pos += dragFilter * (canvas.toLocal * e.picked.dragPoint1 - canvas.toLocal * e.picked.dragPoint0);
+            canvas.moveSelection(dragFilter * (canvas.toLocal * e.picked.dragPoint1 - canvas.toLocal * e.picked.dragPoint0));
         }
     }
     function onUp from (e is MouseEvent) to () 
@@ -2721,6 +2733,7 @@ abstract class LinkedInputView is LinkedView {
                 link0.source = source;
                 link0.target = tmpLink;
                 link0.link();
+                canvas.dropType = observeType(getInputType());
             }
         });
     const onDrag1 = observeMouseDrag().subscribe(function from (e is MouseEvent) to () {
@@ -2745,6 +2758,7 @@ abstract class LinkedInputView is LinkedView {
                         tmpLink = null;
                         link0 = null;
                     });
+                canvas.dropType = null;
             }
         });
 }
@@ -2753,7 +2767,7 @@ public class InputView is LinkedInputView {
     var index is Integer;
     override bound function getInputType to F3Type { expression.getType() };
     override var transform = bind translate(0, index * -cellHeight);
-    override var internalContent = bind label;
+    override var internalContent = bind title;
 
     override bound function getLinkPos to Point3 { canvas.toLocal * (toSceneTransform * new Point3(-cellWidth/2, 0, 0) ) }
     
@@ -2791,7 +2805,7 @@ public class ParameterView is InputView {
     override var expression = bind parameter;    
     public var inputType is F3Type;
     public var inferred is ParameterView[];
-
+    override var labelVisible = bind canvas.canAssignTo(getInputType());
     override bound function getLabel to String 
     {
         makeLabel(if (inputType <> null) then inputType else parameter.t)
@@ -2799,8 +2813,9 @@ public class ParameterView is InputView {
 
     function makeLabel from (t is F3Type) to String
     {
-        println("making label for type {t}");
-        formatClassName(t)
+        println("making label for type {t} pname={parameter.name}");
+        //formatClassName(t)
+        parameter.name
     }
 
     override public bound function getInputType to F3Type 
@@ -3488,6 +3503,7 @@ class TreeLinker {
     {
         const cell = tv.selectedTreecell as MemberTreecell;
         const tn = tv.selectedTreenode as MemberTreenode;
+        canvas.dropType = tn.m.t;
         const toLocal = canvas.toLocal;
         const sourcePos = canvas.toLocal * cell.toSceneTransform.getTranslation();
         linkStart.pos = sourcePos + new Vec3(cell.bounds.extent.x, 0, 0);
@@ -3502,6 +3518,7 @@ class TreeLinker {
         const tn = tv.selectedTreenode as MemberTreenode;
         const cell = tv.selectedTreecell as MemberTreecell;
         arrowVis = false;
+        e.scene.setFocus(canvas);
         canvas.pickInput(e, tn.m.t, function from (found is LinkedInputView) to () {
                 tmpLink = null;
                 tv = null;
@@ -3520,6 +3537,7 @@ class TreeLinker {
                     MasterUndoable.commit();
                 } 
             });
+        canvas.dropType = null;
     }
     var tmpLink is LinkView = null;
     var dx = 0.0;
@@ -3611,6 +3629,7 @@ class ViewLinker {
                 canvas.dumpSrc();
                 MasterUndoable.commit();
             });
+        canvas.dropType = null;
     }
     var tmpLink is LinkView = null;
     var dx = 0.0;
@@ -3767,6 +3786,13 @@ var showSource is Boolean;
 public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollable, MouseInputHandler {
 
     public const menuFactory is MenuFactory;
+
+    var dropType is F3Type;
+    
+    bound function canAssignTo from (t is F3Type) to Boolean 
+    {
+        dropType == null or (t == UNIT_TYPE or observeType(t).isConvertibleFrom(dropType))
+    }
 
     public var stepping is Boolean;
 
@@ -4196,6 +4222,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     const cellSelectedBg = ColorPaint(Color.color(.80, .80, .80));
     const cellBg = ColorPaint(Color.color(.7, .7, .7));
     const textFg = ColorPaint(Color.color(.2, .2, .2));
+    const disabledTextFg = ColorPaint(Color.color(.6, .6, .6));
     const textBg = ColorPaint(Color.color(.85, .85, .85));
     const titleBg = ColorPaint(Color.color(.9, .9, .9));
 
@@ -4716,10 +4743,21 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     var zoomx = 1.0;
     var zoomy = 1.0;
 
+    override function loseFocus to Boolean {
+        clearSelection();
+        return Focusable.loseFocus();
+    }
+
     public function clearSelection to ()
     {
         selectedExpr = null;
         for (v in views) v.selected = false;
+    }
+
+    
+    function moveSelection from (amount is Tuple3) to ()
+    {
+        for (v in views where v.selected) v.pos += amount;
     }
 
     public function deleteSelection to () 
@@ -4871,6 +4909,11 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 	    }
 	}
 	null;
+    }
+
+    function endPickInput to ()
+    {
+        dropType = null;
     }
 
     function pickInput 
