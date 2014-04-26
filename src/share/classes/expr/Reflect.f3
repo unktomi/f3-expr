@@ -1,7 +1,7 @@
 package expr;
 import f3.reflect.*;
 import com.google.common.reflect.TypeToken;
-
+public const paranamer = new com.thoughtworks.paranamer.CachingParanamer(new com.thoughtworks.paranamer.BytecodeReadingParanamer());
 public const ctx = F3Local.getContext();
 
 public const STRING_TYPE = Reflect.findClass("java.lang.String");
@@ -26,6 +26,19 @@ public const classes = new java.util.HashMap of (String, F3ClassType);
 
 public function isObservableType from (t is F3Type) to Boolean {
     return OBSERVABLE_TYPE.isAssignableFrom(t);
+}
+
+public function getParameterNames from (fun is F3FunctionMember) to String[] 
+{
+    if (fun is F3Local.MethodFunctionMember) {
+        const j = fun as F3Local.MethodFunctionMember;
+        try {
+            return paranamer.lookupParameterNames(j.getUnderlying());
+        } catch (e is java.lang.Exception) {
+            e.printStackTrace();
+        }
+    }
+    return [];
 }
 
 public function getTypeParameters from (t is F3ClassType) to F3Type[] {

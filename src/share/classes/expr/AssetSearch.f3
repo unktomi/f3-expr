@@ -11,11 +11,11 @@ public class AssetSearch is AbstractNode {
     public readonly var tree is Treeview;
     readonly var font = bind layoutEngine.createFont(Names.DEFAULT_FONT);
     var cellHeight = 18;
-    public var width is Number = 200;
+    var fieldWidth = bind tree.width - 20;
     public const searchField is Text.Field = Text.Field {
         //visible: bind filterText <> [];
-        width: bind width-20;
-        transform: bind translate(-20, 2);
+        width: bind fieldWidth;
+        transform: bind translate(0, 2);
         font: bind font;
         foreground: bind textFg;
         background: bind textBg;
