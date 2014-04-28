@@ -873,7 +873,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
         });
 
     public var combinedGadget is Node = Group {
-        transform: translate(0, 2)
+        transform: bind translate(width / 2-64, 2)
         content: 
         [TransformNode {
             tx: -64

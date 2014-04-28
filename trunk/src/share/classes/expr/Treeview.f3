@@ -475,7 +475,7 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
             newRows = model.getRows(filter)[0..<filterLimit];
             model.rowCount = newRows.size();
         } else {
-            newRows = model.getRows(0, j+1);
+            newRows = model.getRows(0, model.rowCount);
         }
         rows = newRows;
 	super.preupdate();

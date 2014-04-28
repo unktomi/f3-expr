@@ -76,7 +76,7 @@ public class InternalWindow is ResizableNode, Focuser {
             fillPaint: bind titlePaint;
         },
         TransformNode {
-            transform: bind translate(width / 2.0 - gadget.bounds.width() / 2.0, 0);
+            //transform: bind translate(width / 2.0 - gadget.bounds.width() / 2.0, 0);
             content: bind gadget
         }]
     };
