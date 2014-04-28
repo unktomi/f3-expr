@@ -212,8 +212,29 @@ function typeApply from (target is F3Type,
 
 function makeFunMember from (name is String, params is F3Type[], ret is F3Type) to FunctionMember 
 {
+    const ft = ctx.makeFunctionType(params, ret);
+    println("Make fun member {name} => {ft}");
     FunctionMember {
-	ft: ctx.makeFunctionType(params, ret);
+        m: F3FunctionMember {
+            override function getName to String {
+                name;
+            }
+            override function getDeclaringClass to F3ClassType {
+               null;
+            }
+            override function isStatic to Boolean { false }
+            override function isPublic to Boolean { true }
+            override function isPackage to Boolean { false }
+            override function isProtected to Boolean { false }
+            override function getType to F3FunctionType { return ft }
+            override function invoke from (owner is F3ObjectValue, args is nativearray of F3Value) to F3Value
+            {
+                null;
+            }
+        }
+    }
+    /*
+	ft: ft;
 	name: name;
 	t: ret;
         override function equals from (obj is Object) to Boolean {
@@ -223,6 +244,7 @@ function makeFunMember from (name is String, params is F3Type[], ret is F3Type) 
             }
         }
     }
+    */
 }
 
 public const OBSVB_MEMBERS = {
@@ -675,7 +697,7 @@ function formatClassName from (t is F3Type) to String
 function argName from (fun is FunctionMember,
                        ft is F3FunctionType, i is Integer) to String 
 {
-    if (fun.m == null) {
+    if (fun.m == null or fun.m.getDeclaringClass() == null) {
         return argName(ft, i);
     }
     const names is String[] = Reflect.getParameterNames(fun.m as F3FunctionMember);
@@ -769,13 +791,25 @@ abstract class TimeNodeExpression is ObjectExpression {
     }
 }
 
+function formatURL from (url is String) to String
+{
+    try {
+        const u = new java.net.URL(url);
+        const f = u.getFile();
+        const slash = f.lastIndexOf("/");
+        return f.substring(slash+1);
+    } catch (e is java.lang.Exception) {
+    }
+    return url;
+}
+
 abstract class NodeExpression is ObjectExpression {
     public var node is Node;
     override bound function getName to String { node.id }
     override function toSource from (context is IContext) to String { "(getNode(\"{node.id}\") as {getType().getName()})" }
     override function toEnglish to String {
         //formatEnglishName(getName())
-        "<code>\"{getName()}\"</code>"
+        "<code>\"{formatURL(getName())}\"</code>"
     }
 }
 
@@ -868,6 +902,10 @@ public class IPath {
 
     // Observable of a => a
     function needsLower to Boolean {
+        if (observer is GetVar) {
+            const g = observer as GetVar;
+            if (g.member.rt is F3SequenceType) return true;
+        }
         if (observer is Parameter) {
             const p = observer as Parameter;
             const observable = observer.observable;
@@ -878,6 +916,7 @@ public class IPath {
                 }
                 var result = exp as Result;
                 if (OBSERVABLE_TYPE.isAssignableFrom(result.t)) return true;
+                if (result.t is F3SequenceType) return true;
             }
         }
         return false;
@@ -892,7 +931,9 @@ public class IPath {
         if (needsLift() and parents <> []) {
             count++;
         }
-        return count + id;
+        var result = count;//
+        //println("result {observer} id={id} => {result}");
+        return result;
     }
 
     function getDepth to Integer {
@@ -1004,10 +1045,6 @@ public class IPath {
                 const p = observer as Parameter;
                 return "{p.constantValue}";
             }
-            if (observer is Parameter) {
-                const p = observer as Parameter;
-                return "{p.constantValue}";
-            }
             if (observer.observable is OutputMemberExpression) {
                 const n = observer.observable as OutputMemberExpression;
                 const src = n.source;
@@ -1082,6 +1119,9 @@ public class IPath {
         }
         if (observer is GetVar) {
             const g = observer as GetVar;
+            if (needsLower()) {
+                return "foreach (i{getDepth()} in {parents[0].getWorldAccess()}.{g.member.toApply()})";
+            }
             return "{parents[0].getWorldAccess()}.{g.member.toApply()}";
         }
         if (observer is Parameter) {
@@ -1282,7 +1322,7 @@ public class Function is MemberExpression {
     override function getType { ft }
     var isStatic = bind fun.isStatic();
     var clazz = bind fun.getDeclaringClass();
-    var isNull = bind fun == null;
+    var isNull = bind clazz == null;
     var argCount1 = bind ft.minArgs();
     public var inputs is Parameter[] =
 	bind 
@@ -1904,8 +1944,10 @@ public class SetterNode is ExprNode {
 public class SetterView is FunctionView {
     override var selectable = true;
     public var variable is Context.ClosureVarContext;
-    override var output = null;
-    override var fun = Function { funMember: bind makeFunMember(variable.varName, [variable.varType.t], UNIT_TYPE) };
+    //override var output = null;
+    override var fun = bind Function { 
+        funMember: makeFunMember(variable.varName, [variable.varType.t], UNIT_TYPE) 
+    };
     override var dragFilter = new Tuple3(1.0, 0.0, 0.0);
     public override function serialize to ExprNode 
     {
@@ -1916,6 +1958,16 @@ public class SetterView is FunctionView {
         }
     }
 }
+/*
+class SetterView is ObjectView {
+    public var variable is Context.ClosureVarContext;
+    override var objectExpr = bind VarContextExpression { 
+        varContext: variable, override function getType to F3Type { variable.type.t }
+        inputMembers: bind introspectMembers(variable);
+        //outputMembers: foreach (x1 in members where x1.isObservable) x1;
+    }
+}
+*/
 
 public class InputMemberExpression is MemberExpression, ObserverExpression {
     override function getType to F3Type { member.t }
@@ -2046,7 +2098,7 @@ public class ObjectView is ExpressionView {
     }
 
     const self = this;
-    var inputViews is InputView[] = bind foreach (p in objectExpr.inputs) InputView {
+    protected var inputViews is InputView[] = bind foreach (p in objectExpr.inputs) InputView {
 	canvas: bind canvas;
 	cellWidth: bind cellWidth;
 	expression: p;
@@ -2056,7 +2108,7 @@ public class ObjectView is ExpressionView {
         }
     };
 
-    var outputViews is OutputView[] = bind foreach (p in objectExpr.outputs) ObjectOutputView {
+    protected var outputViews is OutputView[] = bind foreach (p in objectExpr.outputs) ObjectOutputView {
 	canvas: bind canvas;
 	cellWidth: bind cellWidth;
 	expression: p;
@@ -2303,6 +2355,7 @@ class SourcePort is LinkedInputView {
 public class ForkView is ExpressionView {
     override var transform = bind translate(pos);
     const fork = this;
+    override var selectable = true;
     const sourcePort is SourcePort = SourcePort {
         width: bind width;
         transform: translate(-4, 0, 0);
@@ -3266,7 +3319,7 @@ public class MemberTreecell is Treeview.Treecell
 	{
             var me = getLinkBounds();
             var container = self.canvas.toLocal * self.tv.boundsInScene;
-            new Point3(me.right(), 
+            new Point3(me.right()-4, 
                        Math.min(container.top(), Math.max(container.bottom(), me.center.y)),
                        0);
         }
@@ -3441,13 +3494,14 @@ class GetTreeview is AbstractNode {
     };
 
     override var internalContent = Group {
-        content: bind  [tv/*, Rectangle {
-                strokePaint: ColorPaint(Color.RED);
-                transform: bind translate(tv.bounds.center);
-                width: bind tv.bounds.extent.x * 2;
-                height: bind tv.bounds.extent.y * 2;
+        content: bind  [tv, Rectangle {
+                visible: bind tv.model.rowCount > 1;
+                fillPaint: bind canvas.textFg;
+                transform: bind translate(0, Math.round(exprView.cellHeight/2.0))
                 pickable: false;
-                }*/]
+                width: bind width;
+                height: 1;
+                }]
     }
 
     // fix me: move this stuff to canvas
@@ -3787,6 +3841,8 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     public const menuFactory is MenuFactory;
 
+    public var assetModel is AssetTree.AssetModel;
+
     var dropType is F3Type;
     
     bound function canAssignTo from (t is F3Type) to Boolean 
@@ -3983,7 +4039,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 pos: toLocal * where.scenePoint;
                 objectExpr: VarContextExpression { 
                     varContext: v, override function getType to F3Type { typ }
-                    inputMembers: foreach (x in members where x.isObserver) x;
+                    inputMembers: [];//foreach (x in members where x.isObserver) x;
                     outputMembers: foreach (x in members where x.isObservable) x;
                 }
                 canvas: this;
@@ -4109,11 +4165,8 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             }
             const t = f.fun.ft.getReturnType();
             const v = ClosureVarContext {
-                varType: TypeAsset {
-                    t: t;
-                    name: t.getName();
-                }
-                isEvent: true;
+                varType: assetModel.findTypeAsset(t.getName());
+                isEvent: false;
                 varName: "shortcut";    
                 parent: eventContext;
             }
@@ -4130,7 +4183,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 ObjectView {
                     objectExpr: VarContextExpression { 
                         varContext: v, override function getType to F3Type { typ }
-                        inputMembers: foreach (x1 in members where x1.isObserver) x1;
+                        //inputMembers: foreach (x1 in members where x1.isObserver) x1;
                         outputMembers: foreach (x1 in members where x1.isObservable) x1;
                     }
                     canvas: this;
@@ -4181,6 +4234,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 code: todo;
             }
             const newCanvas = Canvas {
+                assetModel: assetModel;
                 menuFactory: menuFactory;
                 interactive: interactive;
                 stepping: bind stepping;
@@ -4210,7 +4264,11 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         }
     }
 
-    readonly var font = bind layoutEngine.createFont(Names.DEFAULT_FONT);
+    bound var defaultFont = layoutEngine.createFont(Names.DEFAULT_FONT);
+
+    readonly var font = bind defaultFont;
+
+    var fontSize is Number = -1;
 
     var portPaint is Paint;
 
@@ -4775,6 +4833,13 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         }
     }
 
+    function selectAll to ()
+    {
+        for (v in views where v.selectable) {
+            v.selected = true;
+        }
+    }
+
     override function onKeyDown from (e is KeyboardEvent) to () 
     {
         if (e.keyCode == Keys.Delete or e.keyCode == Keys.Backspace) {
@@ -4783,7 +4848,41 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             frameContent();
         } else if (e.keyCode == Keys.W and e.ctrlKey) {
             duplicateSelection(mousePosition);
+        } else if ((e.keyCode == Keys.Equals and e.metaKey) or (e.keyCode == Keys.Plus)) {
+            resetZoom();
+        } else if (e.keyCode == Keys.Equals and not e.metaKey and e.shiftKey) {
+            zoomOut();
+        } else if (e.keyCode == Keys.Minus) {
+            zoomIn();
+        } else if (e.keyCode == Keys.A and e.metaKey) {
+            selectAll();
         }
+    }
+
+    function zoomIn to ()
+    {
+        if (fontSize < 0) {
+            fontSize = font.height();
+        }
+        const smaller = fontSize-1.0;
+        zoomx = zoomy = smaller / font.height();
+        fontSize = smaller;
+    }
+
+    function resetZoom to ()
+    {
+        fontSize = font.height();
+        zoomx = zoomy = 1.0;
+    }
+
+    function zoomOut to ()
+    {
+        if (fontSize < 0) {
+            fontSize = font.height();
+        }
+        const bigger = fontSize+1.0;
+        zoomx = zoomy = bigger / font.height();
+        fontSize = bigger;
     }
 
     function frameContent to ()
@@ -5071,7 +5170,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         const mem = e as MemberExpression;
 	var itype = if mem.member.m.isStatic() then OBJECT_TYPE else mem.member.m.getDeclaringClass();
         if (itype == null) return "";
-	var result = "var _ = function from (debugger is f3.util.ObservableDebugger, i$ is Object, getVar is function from String to Object, getNode is function from String to f3.media.scene.Node, getClip is function from String to f3.media.scene.TimeNode) to (f3.util.Observable of ?)[] \{ var i0 = i$ as {itype.getName()};  ";
+	var result = "var _ = function from (debugger is f3.util.ObservableDebugger, i$ is Object, getVar is function from String to Object, getNode is function from String to f3.media.scene.Node, getClip is function from String to f3.media.scene.TimeNode) to (f3.util.Observable of ?)[] \{ var i0 = i$ as {itype.getName()};  var obsvbs$ is f3.util.Observable[]; \{ ";
         if (terms == []) {
             var rs = foreach (x in eventContext.content) {
                 if (x is Context.ResourceNodeContext) {
@@ -5084,7 +5183,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         }
         var context = IContext {};
         println("IPath");
-        var ret = " return [";
+        var ret = " \} return obsvbs$;";
         var sep = "";
         for (term in terms) {
             var t = term;
@@ -5123,8 +5222,9 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 if (not mem.member.m.isStatic()) {
                     app = "i0.{app}";
                 }
-                result = "{result} const obs{p.getRootId()} = foreach (i in {app}) \{ %VARS%; {p.getWorldAccess()} \}";
-                ret = "{ret}{sep}obs{p.getContainingObservableDepth()}";
+                //                result = "{result} const obs{p.getRootId()} = foreach (i in {app}) \{ %VARS%; {p.getWorldAccess()} \}";
+                result = "{result} \{ const obs0 = foreach (i in {app}) \{ %VARS%; {p.getWorldAccess()} \}";
+                result = "{result} insert obs{p.getContainingObservableDepth()} into obsvbs$; \} ";
                 sep = ", ";
                 println(p.getWorldAccess());
                 eng = "{eng}For each {formatEnglishName(mem.member.name)} event: ";
@@ -5134,7 +5234,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 eng = "For each {formatEnglishName(mem.member.name)} event: the event";
             }
             englishOutput = eng;
-            result = "{result}{ret}];\}";
+            result = "{result}{ret};\}";
             try {
                 const toCompile = result;
                 println("compiling: {toCompile}");
@@ -5473,7 +5573,7 @@ public class VarContextObjNode is ObjNode {
             objectExpr: VarContextExpression { 
                 varContext: c, override function getType to F3Type { typ }
                 inputMembers: foreach (m in members where  m.isObserver) m;
-                //outputMembers: foreach (m in members where m.isObservable and m.m is F3FunctionMember) m;
+                outputMembers: foreach (m in members where m.isObservable and m.m is F3FunctionMember) m;
             }
         }
         for (i in inputs) {
@@ -5563,6 +5663,8 @@ public class Editor is ResizableNode, Focuser {
     public var menuFactory is MenuFactory;
     public var popupLayer is PopupLayer;
     public var popupScene is Scene;
+
+    public var assetModel is AssetTree.AssetModel;
 
     public var stepping is Boolean;
 
@@ -5687,6 +5789,7 @@ public class Editor is ResizableNode, Focuser {
 	if (prog.canvas == null) {
             println("creating canvas with {pathFactory}");
 	    prog.canvas = Canvas {
+                assetModel: assetModel;
                 menuFactory: menuFactory;
                 interactive: interactive;
                 stepping: bind stepping;
