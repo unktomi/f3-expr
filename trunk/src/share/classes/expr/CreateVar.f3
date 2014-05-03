@@ -14,6 +14,7 @@ public class CreateVar is ResizableNode {
     bound var cellHeight = font.height()+2;
     bound var labelWidth is Number = Math.max(font.width("Name:"), font.width("Type:"));
     bound var fieldOffset is Number = labelWidth + 1;
+    bound var fieldWidth is Number = width - 40 - labelWidth;
     const nameLabel is Text.Label = Text.Label {
           text: "Name:"
           font: bind font;
@@ -36,7 +37,7 @@ public class CreateVar is ResizableNode {
     }
     const nameField is Text.Field = Text.Field {
         transform: bind translate(fieldOffset-10, 0);
-        width: bind width-20-fieldOffset;
+        width: bind fieldWidth;
         height: bind cellHeight;      
         font: bind font;
         foreground: bind textFg;
@@ -44,15 +45,23 @@ public class CreateVar is ResizableNode {
     };
     const typeField is Text.Field = Text.Field {
         transform: bind translate(fieldOffset-10, 0);
-        width: bind width-20-fieldOffset;
+        width: bind fieldWidth;
         height: bind cellHeight;      
         font: bind font;
         foreground: bind textFg;
         background: bind textBg;
     };
+    public var onApply is function from () to ();
+    public var onCancel is function from () to ();
     override var internalContent = Group {
         content: bind 
-        [TransformNode {
+        
+        [Rectangle {
+                height: bind height;
+                width: bind width;
+                fillPaint: ColorPaint(Color.GRAY);
+        },
+        TransformNode {
             ty: bind cellHeight/2 + 1;
             content:             
             bind [nameLabel, nameField]
