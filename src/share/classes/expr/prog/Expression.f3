@@ -161,13 +161,27 @@ function sourceFunName from (fun is F3FunctionMember) to String
 
 function formatEnglishName from (name is String) to String 
 {
+    formatEnglishName(name, "");
+    
+}
+
+function formatEnglishName from (name is String, id is String) to String 
+{
     const n = Names.formatName(name);
     const isOp = operatorMap.containsKey(n);
     const m = if isOp then operatorMap.get(n) else n;
     if (m.startsWith("Get ") and not m.endsWith(" of")) {
-        "<a href='tbd'><i>{m}</i></a> of";
+        if (id == "") {
+            "<i>{m}</i> of";
+        } else {
+            "<a href='expr:{id}'><i>{m}</i></a> of";
+        }
     } else {
-        if (isOp) then "<b>{m}</b>" else "<a href='tbd'><i>{m}</i></a>";
+        if (id == "") {
+            "<i>{m}</i>";
+        } else {
+            "<a href='expr:{id}'><i>{m}</i></a>";
+        }
     }
 }
 
@@ -737,7 +751,7 @@ public interface Expression {
     override function toString { "{getClass()}: {getName()} / {getType()}" }
     public function toSource from (context is IContext) to String { "" }
     public function isObservable to Boolean { false }
-    public function toEnglish to String { formatEnglishName(getName()) }
+    public function toEnglish to String { formatEnglishName(getName(), id) }
     public function getTerminals to Expression[] { 
         [] 
     }
@@ -981,14 +995,14 @@ public class IPath {
             const infix = func.funMember.isInfix;
             const fun = func.fun;
             if (fun == IF_EXPR) {
-                return "if ({parents[1].getEnglishAccess()}) then {parents[2].getEnglishAccess()} else {parents[3].getEnglishAccess()}";
+                return "{formatEnglishName("if", func.id)} ({parents[1].getEnglishAccess()}) then {parents[2].getEnglishAccess()} else {parents[3].getEnglishAccess()}";
             } else if (fun == NUM_NEGATE or fun == INT_NEGATE) {
-                return "-{parents[1].getEnglishAccess()}";
+                return "{formatEnglishName("-", func.id)}{parents[1].getEnglishAccess()}";
             } else if (infix) {
                 if (fun.isStatic()) {
-                    return "({parents[1].getEnglishAccess()} {formatEnglishName(fun.getName())} {parents[2].getEnglishAccess()})";
+                    return "({parents[1].getEnglishAccess()} {formatEnglishName(fun.getName(), func.id)} {parents[2].getEnglishAccess()})";
                 }
-                return "({parents[0].getEnglishAccess()} {formatEnglishName(fun.getName())} {parents[1].getEnglishAccess()})";
+                return "({parents[0].getEnglishAccess()} {formatEnglishName(fun.getName(), func.id)} {parents[1].getEnglishAccess()})";
             } else {
                 if (fun.isStatic()) {
                     var args = "";
@@ -1001,7 +1015,7 @@ public class IPath {
                     if (parents.size() > 2) {
                         args = "({args})";
                     }
-                    return "{formatEnglishName(sourceFunName(fun))} {args}";
+                    return "{formatEnglishName(sourceFunName(fun), func.id)} {args}";
                 } else {
                     var args = "";
                     var sep = "";
@@ -1012,13 +1026,13 @@ public class IPath {
                     if (parents.size() > 1) {
                         args = "({args})";
                     }
-                    return "{formatEnglishName(sourceFunName(fun))} {args}";
+                    return "{formatEnglishName(sourceFunName(fun), func.id)} {args}";
                 }
             }
         }
         if (observer is GetVar) {
             const g = observer as GetVar;
-            return "the {formatEnglishName(g.member.toApply())} of {parents[0].getEnglishAccess()}";
+            return "the {formatEnglishName(g.member.toApply(), g.id)} of {parents[0].getEnglishAccess()}";
         }
         if (observer is Parameter) {
             return parents[0].getEnglishAccess();
@@ -1803,7 +1817,7 @@ class FunctionView is ExpressionView {
 
     public function assignLinkIds to () {
         var j = 0;
-        for (x in inputs) {
+        for (x in inputs.reverse()) {
             for (y in x.links) {
                 y.targetLinkId = j++;
             }
@@ -2986,10 +3000,6 @@ public class ParameterView is InputView {
         return f;
     }
 
-    postinit {
-        undoList.addTarget("constValue", &parameter.constantValue);
-    }
-    
     bound var constValue = parameter.constantValue on replace {
         if (textField <> null) {
             textField.setText(constValue.toString())
@@ -3015,6 +3025,11 @@ public class ParameterView is InputView {
                 else if (Reflect.BOOLEAN_TYPE.isConvertibleFrom(getInputType())) 
                     then boolSlider() else null;
     override var internalContent = Group { content: bind [title, if links.size() == 0 then [sliderField, textField] else null] };
+
+    postinit {
+        undoList.addTarget("constValue", &parameter.constantValue);
+    }
+    
 }
 
 abstract class StringField is Text.Field {
@@ -4357,8 +4372,8 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     };
 
     const initialView is TransformNode = TransformNode { 
-        tx: bind -width / 2.0 + 120; 
-        ty: bind height / 2 - 20; 
+        tx: bind (1.0/zoomx)*(-width / 2.0 + 120-cx); 
+        ty: bind (1.0/zoomy)*(height / 2 - 20-cy); 
         content: bind initialExprView;  
     };
 
@@ -4764,17 +4779,31 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         visible: bind englishOutput <> "";
     };
 
-    const undoList = expr.undo.UndoList {} on replace {
-	undoList.addTarget("links", &links);
-	undoList.addTarget("views", &views);
-    }
+    var zoomx = 1.0;
+    var zoomy = 1.0;
 
     const linkHandler = sourceCode.observeLinkClicked().subscribe(function from (u is String) to () 
                                                                   {
                                                                       println("link clicked: {u}");
                                                                       println("prog={prog}");
                                                                       println("prog.sourceCode={prog.sourceCode}");
-                                                                      showSource = (u == "source://");
+                                                                      if (u.startsWith("expr:")) {
+                                                                          const id = u.substring(5);
+                                                                          var target is ExpressionView;
+                                                                          for (v in views) {
+                                                                              if (v.expression.id == id) {
+                                                                                  target = v;
+                                                                                  break;
+                                                                              }
+                                                                          }
+                                                                          if (target <> null) {
+                                                                              clearSelection();
+                                                                              target.selected = true;
+                                                                              MasterUndoable.commit();
+                                                                          }
+                                                                      } else {
+                                                                          showSource = (u == "source://");
+                                                                      }
                                                                   });
     
     readonly var selectionTransform = bind translate(cx, cy) * scale(zoomx, zoomy);
@@ -4804,9 +4833,6 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
            }]
         };
     };
-
-    var zoomx = 1.0;
-    var zoomy = 1.0;
 
     override function loseFocus to Boolean {
         clearSelection();
@@ -4874,12 +4900,14 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         const smaller = fontSize-1.0;
         zoomx = zoomy = smaller / font.height();
         fontSize = smaller;
+        MasterUndoable.commit();
     }
 
     function resetZoom to ()
     {
         fontSize = font.height();
         zoomx = zoomy = 1.0;
+        MasterUndoable.commit();
     }
 
     function zoomOut to ()
@@ -4890,10 +4918,29 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         const bigger = fontSize+1.0;
         zoomx = zoomy = bigger / font.height();
         fontSize = bigger;
+        MasterUndoable.commit();
     }
 
     function frameContent to ()
     {
+        
+        var bounds is Bounds;
+        for (v in views where v.selected) bounds = Bounds.merge(bounds, v.boundsInScene);
+        if (bounds == null) {
+            for (v in views) bounds = Bounds.merge(bounds, v.boundsInScene);
+        }
+        bounds = toSceneTransform.inverse() * bounds;
+        bounds = selectionTransformInverse * bounds;
+        println("BOUNDS ==> {bounds}");
+        const w = bounds.width();
+        const h = bounds.height();
+        println("width={width}, height={height}, w={w}, h={h}");
+        const zoom = Math.min(height / (h + 100), width / (w + 100));
+        cx = -bounds.center.x + 120;
+        cy = -bounds.center.y - 20;
+        zoomx = zoom;
+        zoomy = zoom;
+        MasterUndoable.commit();
     }
 
     override function onMouseWheel from (e is MouseWheelEvent) to ()
@@ -4901,6 +4948,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         if (e.metaKey) {
             zoomy *= 1.0 + e.scroll.y * 0.1;
             zoomx = zoomy;
+            MasterUndoable.commit();
         }
     }
 
@@ -5259,6 +5307,14 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         prog.reset();
     }
 
+    const undoList = expr.undo.UndoList {} on replace {
+	undoList.addTarget("links", &links);
+	undoList.addTarget("views", &views);
+	undoList.addTarget("cx", &cx);
+	undoList.addTarget("cy", &cy);
+	undoList.addTarget("zoomx", &zoomx);
+	undoList.addTarget("zoomy", &zoomy);
+    }
 }
 
 public class MemberNode {
@@ -5651,6 +5707,7 @@ public class GetNode is ExprNode {
     }
 }
 
+
 public class TargetNode is ExprNode {
     public var targetId is String;
     public var links is String[];
@@ -5832,6 +5889,7 @@ public class Editor is ResizableNode, Focuser {
 	return prog.canvas;
     }
     
+
 }
 
 
