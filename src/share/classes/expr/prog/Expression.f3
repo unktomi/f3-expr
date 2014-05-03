@@ -146,7 +146,8 @@ const reverseOperatorMap = {
 
 const MAT4_TYPE = Reflect.findClass("f3.math.Mat4");
 
-function sourceFunName from (fun is F3FunctionMember) to String {
+function sourceFunName from (fun is F3FunctionMember) to String 
+{
     if (fun.isStatic()) {
         if (fun.getName().startsWith("new")) {
             fun.getName();
@@ -158,13 +159,15 @@ function sourceFunName from (fun is F3FunctionMember) to String {
     }
 }
 
-function formatEnglishName from (name is String) to String {
+function formatEnglishName from (name is String) to String 
+{
     const n = Names.formatName(name);
-    const m = if operatorMap.containsKey(n) then operatorMap.get(n) else n;
+    const isOp = operatorMap.containsKey(n);
+    const m = if isOp then operatorMap.get(n) else n;
     if (m.startsWith("Get ") and not m.endsWith(" of")) {
-        "<i>{m}</i> of";
+        "<a href='tbd'><i>{m}</i></a> of";
     } else {
-        "<i>{m}</i>";
+        if (isOp) then "<b>{m}</b>" else "<a href='tbd'><i>{m}</i></a>";
     }
 }
 
@@ -1863,8 +1866,8 @@ class FunctionView is ExpressionView {
             }
         }
     }
-    /*
-    const funOutput is OutputView = if true then null else OutputView {
+
+    const funOutput is OutputView = OutputView {
         canvas: bind canvas;
         cellWidth: 16;
         expression: bind fun;
@@ -1875,7 +1878,7 @@ class FunctionView is ExpressionView {
         override function assignLinkIds to () {
         }
     }
-    */
+
     bound var inputs is ParameterView[] = foreach (p in fun.inputs) ParameterView {
         targetView: this;
 	canvas: bind canvas;
@@ -1902,7 +1905,7 @@ class FunctionView is ExpressionView {
 	 }]
     };
 
-    const innerContent = Group { content: bind [title, /* funOutput, */ io] };
+    const innerContent = Group { content: bind [title, funOutput, io] };
     bound var h = output.bounds.height() + cellHeight+inputs.size()*cellHeight;
     override var internalContent = Group {
 	content: bind [innerContent, 
@@ -3038,7 +3041,7 @@ public abstract class LinkedOutputView is LinkedView {
 public class OutputView is LinkedOutputView {
     public var index is Integer;
     override readonly var transform = bind translate(0, index * -cellHeight);
-    public readonly var outputName = bind expression.getName();
+    public readonly var outputName is String = bind formatType(resultType);
     override function unlink to () 
     {
         for (link in getTree.getLinks()) link.unlink();
@@ -3394,7 +3397,7 @@ class GetTreeview is AbstractNode {
 
     var debugValue is F3Value;
 
-    public var rootName is String = bind formatType(get.member.t);
+    public var rootName is String = bind exprView.outputName; //formatType(get.member.t);
 
     const treeModel = MemberTreemodel {
 	root: MemberTreenode {
@@ -3720,10 +3723,10 @@ public class LinkInfo {
 	"source: {source}, {sourceIndex}, {sourcePos}; target: {target}, {targetIndex}, {targetPos}";
     }
     public var link is LinkView;
-    public var source is Object;
+    public var source is LinkedView;
     public var sourcePos is Point3;
     public var sourceIndex is Integer;
-    public var target is Object;
+    public var target is LinkedView;
     public var targetPos is Point3;
     public var targetIndex is Integer;
     override function equals from (obj is Object) to Boolean {
@@ -4459,7 +4462,11 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
               links is java.util.Set of LinkView) 
         to Function
     {
-        const bounds = canvas.toLocal * selectionRect.strokeMesh.boundsInScene;
+        var bounds is Bounds;
+        for (v in views where v.selected) {
+            bounds = Bounds.merge(bounds, v.boundsInScene);
+        }
+        bounds = canvas.toLocal * bounds;
         var inputTypes is F3Type[];
         var outputTypes is F3Type[];
         for (link in canvas.links) {
@@ -4751,7 +4758,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     const sourceCode = XHTML.Text {
         width: bind width;
-        style: "font-family:Lucida Grande; font-weight:normal; font-size: 11pt; color: #101010E0;";
+        style: "body \{ font-family:Lucida Grande; font-weight:normal; font-size: 11pt; color: #101010E0; \} a:link \{ text-decoration:none; \} a:hover \{text-decoration:underline;\}";
         transform: bind translate(-width/2, -height/2);
         content: bind if not showSource then "<a href='source://'>Source Code</a>" else "<a href='graph://'>Hide</a><p/><div>{englishOutput}</div>";
         visible: bind englishOutput <> "";
@@ -4937,10 +4944,10 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     function makeLinkInfo 
 	from (link is LinkView,
-	      source is Object,
+	      source is LinkedView,
 	      sourceIndex is Integer,
 	      sourcePos is Point3,
-	      target is Object,
+	      target is LinkedView,
 	      targetIndex is Integer,
 	      targetPos is Point3) 
 	to LinkInfo
@@ -4971,8 +4978,10 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 	for (i in links) {
 	    const p0 = i.sourcePos;
 	    const sourceOff = lineOff*(i.sourceIndex+1);
+            const srcCount = i.source.links.size();
 	    const p1 = p0 + sourceOff;
 	    const p5 = i.targetPos-lineOff1*(i.targetIndex);
+            const targetCount = i.target.links.size();
 	    const targetOff = lineOff*(i.targetIndex+1);
 	    const p4 = i.targetPos - targetOff;
 	    const mid = p1.lerp(0.5, p4);
@@ -5116,9 +5125,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         if (links.size() == 0 and views.size() <= 1) {
             prog.code = null;
             prog.sourceCode = "";
-            eventContext.hasHandler = false;
         } else {
-            eventContext.hasHandler = true;
             serializationMap.clear();
             serialize(initialExprView);
             const w = new java.io.StringWriter();

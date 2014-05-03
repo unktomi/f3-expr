@@ -286,22 +286,8 @@ public class LocalVarContext is Context {
 public class MemberContext is GroupContext {
     public var member is Member;
     override var name = bind Names.formatName(member.name);
-    override var label = bind "{if hasHandler then "+" else "-"}{name}";
+    override var label = bind name;
     public var program is Program;
-    public var hasHandler is Boolean;
-    postinit {
-        var p = parent;
-        while (p <> null and not (p is ResourceObjectContext)) {
-            p = p.parent;
-        }
-        const target = (p as ResourceObjectContext).getTarget();
-        for (prog in target.programs) {
-            if (member == prog.event) {
-                hasHandler = prog.sourceCode <> "";
-                break;
-            }
-        }
-    }
 }
 
 public class ContextTreemodel is Treemodel {
