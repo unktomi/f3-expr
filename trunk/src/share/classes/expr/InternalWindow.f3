@@ -212,8 +212,19 @@ public class InternalWindow is ResizableNode, Focuser {
 	    resize(width, height);
 	    cx += v.x/2;
 	    cy += v.y/2;
+            const w = Math.min(containerBounds.width() - marginx, width);
+            const h = Math.min(containerBounds.height() - marginy, height);
+            const dx = w - width;
+            const dy = h - height;
+            cx += dx/2;
+            cy -= dy/2;
+            width = w;
+            height = h;
 	}
     };
+    
+    const marginx = 20;
+    const marginy = 20;
 
     postinit {
 	internalContent.observeMouseDown().subscribe(onDown);

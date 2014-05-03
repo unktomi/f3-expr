@@ -170,7 +170,7 @@ public class Manipulator is AbstractNode
         const startPos is Point3 = 
             camera.toScreen(sceneStartPos);
         const endPos is Point3 = 
-            camera.toScreen(worldTransform*(Point3.<<0>> + axis));
+            camera.toScreen(worldTransform * (Point3.<<0>> + axis));
         const screenDir = (endPos - startPos).normalize();
         const dragDir = new Vec3(event.screenDrag.x, 
                                  -event.screenDrag.y, 
