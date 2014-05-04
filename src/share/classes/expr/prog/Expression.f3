@@ -757,6 +757,11 @@ public interface Expression {
     }
 }
 
+function nil from (t is F3Type) to String
+{
+    if (t == Reflect.STRING_TYPE) then "\"\"" else if (t == Reflect.INTEGER_TYPE) then "0" else if (t == Reflect.NUMBER_TYPE) then "0.0" else if (t == Reflect.BOOLEAN_TYPE) then "false" else "null";
+}
+
 public abstract class ObjectExpression is Expression {
     public var inputMembers is Member[];
     public var outputMembers is Member[];
@@ -775,7 +780,7 @@ public abstract class ObjectExpression is Expression {
 public class VarContextExpression is ObjectExpression {
     public var varContext is Context.ClosureVarContext;
     override bound function getName to String { varContext.varName }
-    override function toSource from (context is IContext) to String { "(getVar(\"{varContext.varName}\") as f3.lang.ref of {getType().getName()})" }
+    override function toSource from (context is IContext) to String { "(getVar(\"{varContext.varName}\") as f3.lang.Ref of {getType().getName()})" }
     override function toEnglish to String { varContext.varName }
     override function getType to F3Type {
         varContext.varType.t;
@@ -1149,7 +1154,8 @@ public class IPath {
             if (i.member.m is F3VarMember and i.member.isObserver) {
                 return "\{ {i.target.toSource(null)}.{i.member.toApply()} = {parents[0].getWorldAccess()}; \}";
             } else if (i.target is VarContextExpression) {
-                return "{i.target.toSource(null)}.set({parents[0].getWorldAccess()})";
+                //return "{i.target.toSource(null)}.set({parents[0].getWorldAccess()})";
+                return "{parents[0].getWorldAccess()}";
             } else { 
                 if (i.member.isObserver and is1ArgFunction(i.member)) {
                     return "{i.target.toSource(null)}.{i.member.toApply("{parents[0].getWorldAccess()}")}";
@@ -1710,11 +1716,8 @@ public abstract class ExpressionView is AbstractNode {
                         [MenuItem {
                                 label: "Shortcut";
                                 action: canvas.factor.apply(this);
+                                enabled: this is FunctionView and (this as FunctionView).output.getTree.getLinks().size() == 1
                             },
-                            MenuItem {
-                                label: "Parameterize";
-                                action: canvas.parameterize.apply(this);
-                            }
                             MenuItem {
                                 label: "Delete";
                                 action: canvas.deleteSelection;
@@ -1950,20 +1953,13 @@ class FunctionView is ExpressionView {
     }
 }
 
-public class SetterNode is ExprNode {
-    public var funNode is FunNode;
-    public override function createView from (canvas is Canvas) to FunctionView 
-    {
-        funNode.linkView(canvas, canvas.terminalExprView); 
-    }
-}
-
+/*
 public class SetterView is FunctionView {
     override var selectable = true;
     public var variable is Context.ClosureVarContext;
     //override var output = null;
     override var fun = bind Function { 
-        funMember: makeFunMember(variable.varName, [variable.varType.t], UNIT_TYPE) 
+        funMember: makeFunMember(variable.varName, [variable.varType.t, Reflect.STRING_TYPE], UNIT_TYPE) 
     };
     override var dragFilter = new Tuple3(1.0, 0.0, 0.0);
     public override function serialize to ExprNode 
@@ -1975,16 +1971,18 @@ public class SetterView is FunctionView {
         }
     }
 }
-/*
+*/
+
 class SetterView is ObjectView {
     public var variable is Context.ClosureVarContext;
     override var objectExpr = bind VarContextExpression { 
-        varContext: variable, override function getType to F3Type { variable.type.t }
+        varContext: variable, override function getType to F3Type { variable.varType.t }
         inputMembers: bind introspectMembers(variable);
         //outputMembers: foreach (x1 in members where x1.isObservable) x1;
+        override function toSource from (context is IContext) to String { variable.varName }
     }
 }
-*/
+
 
 public class InputMemberExpression is MemberExpression, ObserverExpression {
     override function getType to F3Type { member.t }
@@ -2084,7 +2082,6 @@ public class ObjectView is ExpressionView {
         n.y = pos.y;
         canvas.serializationMap.put(this, n);
         n.inputs = foreach (i in inputViews) TargetNode { targetId: "{i.id}", links: foreach (link in i.links) "{link.id}" };
-        //n.outputs = foreach (i in outputViews) SourceNode { sourceId: "{i.id}", links: foreach (link in i.links) "{link.id}" };
         const tv = outputViews[0].getTree;
         n.outputs = 
             foreach (link in tv.getLinks() /*where not (link.target is TreecellGetVarView)*/) 
@@ -2096,6 +2093,9 @@ public class ObjectView is ExpressionView {
                     links: ["{link.id}"];
                 }
             }
+        println("inputViews={inputViews}");
+        println("n.inputs={n.inputs}");
+        println("SERIALIZED {this} => {IO.dumpOutput(n)}");
         return n;
     }
 
@@ -2883,7 +2883,7 @@ public class ParameterView is InputView {
 
     function makeLabel from (t is F3Type) to String
     {
-        println("making label for type {t} pname={parameter.name}");
+        println("making label for type {t} pname={parameter.name} target={parameter.target}");
         //formatClassName(t)
         parameter.name
     }
@@ -4159,6 +4159,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             var paths is String[];
             var srcs is LinkedOutputView[];
             var targets is LinkedInputView[];
+
             const ctx = IContext {}
             var evExp = ev.expression;
             if (evExp is Function) {
@@ -4182,8 +4183,13 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 }
             }
             const t = f.fun.ft.getReturnType();
+            const asset = assetModel.findTypeAsset(t.getName());
+            println("ASSET {t.getName()} => {asset}");
+            if (asset == null) {
+                throw new java.lang.RuntimeException("asset not found: {t.getName()}");
+            }
             const v = ClosureVarContext {
-                varType: assetModel.findTypeAsset(t.getName());
+                varType: asset;
                 isEvent: false;
                 varName: "shortcut";    
                 parent: eventContext;
@@ -4372,8 +4378,8 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     };
 
     const initialView is TransformNode = TransformNode { 
-        tx: bind (1.0/zoomx)*(-width / 2.0 + 120-cx); 
-        ty: bind (1.0/zoomy)*(height / 2 - 20-cy); 
+        tx: bind (1.0/zoomx)*(-width / 2.0 - cx) + 120;
+        ty: bind (1.0/zoomy)*(height / 2 - cy) - 20;
         content: bind initialExprView;  
     };
 
@@ -4394,12 +4400,18 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                                                                         {
                                                                             dumpSrc();
                                                                         });
+        var canvas = this;
         const result = SetterView {
-            canvas: this;
+            parent: terminalView;
+            pathFactory: pathFactory;
+            layoutEngine: layoutEngine;
+            imageLoader: imageLoader;
+            effectLoader: effectLoader;
             variable: c;
+            canvas: bind canvas;
         }
         result.updateParent();
-        subjectExp = result.fun;
+        subjectExp = result.expression;
         return result;
     }
 
@@ -4731,7 +4743,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 const menu = Menu {
                     items: 
                     [MenuItem {
-                        label: "Shortcut";
+                        label: "Parameterize";
                         action: canvas.extract
                     },
                     MenuItem {
@@ -4936,8 +4948,8 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         const h = bounds.height();
         println("width={width}, height={height}, w={w}, h={h}");
         const zoom = Math.min(height / (h + 100), width / (w + 100));
-        cx = -bounds.center.x + 120;
-        cy = -bounds.center.y - 20;
+        cx = -bounds.center.x;
+        cy = -bounds.center.y;
         zoomx = zoom;
         zoomy = zoom;
         MasterUndoable.commit();
@@ -5176,6 +5188,9 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         } else {
             serializationMap.clear();
             serialize(initialExprView);
+            if (terminalExprView <> null) {
+                serialize(terminalExprView);
+            }
             const w = new java.io.StringWriter();
             //println("root={initialExprView} => {serializationMap.get(initialExprView)}");
             foreach (obj in views) {
@@ -5256,12 +5271,12 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             if (t <> null) {
                 const p = context.getIPath(t);
                 const j = p.getWorldAccess();
-                eng = "<i>{subject.varName}</i> = {p.getEnglishAccess()}";
+                eng = "{p.getEnglishAccess()}";
                 println("code => {j}");
                 prog.defineVar(subject, "var <<{subject.varName}>> is <<{subject.varType.t}>> = {j}; ");
             } else {
-                eng = "<i>{subject.varName}</i> = {terminalExprView.inputs[0].parameter.toEnglish()}";
-                prog.defineVar(subject, "var <<{subject.varName}>> is <<{subject.varType.t}>> = {terminalExprView.inputs[0].parameter.toSource(context)}; ");
+                eng = "assign {nil(subject.varType.t)} to <i>{subject.varName}</i>";
+                prog.defineVar(subject, "var <<{subject.varName}>> is <<{subject.varType.t}>> = {nil(subject.varType.t)}; ");
             }
             englishOutput = eng;
         } else {
@@ -5617,7 +5632,7 @@ public class VarContextObjNode is ObjNode {
                 if (i.links.size() > 0) {
                     for (link in i.links) {
                         const lnk = canvas.getLink(link);
-                        lnk.target = r.inputs[0];
+                        lnk.target = r.inputViews[0];
                     }
                 }
             }
