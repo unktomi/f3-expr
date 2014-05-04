@@ -79,7 +79,7 @@ public class Context is Foldable of Context {
                 return this;
             }
             if (path.startsWith("|{name}|")) {
-                path = path.substring(name.length()+1);
+                path = path.substring(name.length()+2);
             }
         } else if (path.startsWith("|")) {
             return getRoot().resolve(path);
