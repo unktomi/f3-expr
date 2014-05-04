@@ -358,23 +358,39 @@ public class AssetModel is Treemodel {
 
     public function findTypeAsset from (t is String) to TypeAsset 
     {
-        var r is TypeAsset;
-        root.foldLeft((), function from (_ is (), tn is Treenode) to () {
-                const n = tn as AssetTreenode;
-                if (n.asset is PrimitiveTypeAsset) {
-                   if (n.asset.name == t) {
-                       const ta = n.asset as TypeAsset;      
-                       r = ta;
-                   }              
-                }
+        const comps is String[] = t.split("[.]");
+        const slashName = t.replace(".", "/");
+        function applyPath from (comps is String[], tn is Treenode) to TypeAsset
+        {
+            const n = tn as AssetTreenode;
+            if (comps == []) {
                 if (n.asset is TypeAsset) {
-                    const ta = n.asset as TypeAsset;
-                    if (ta.t.getName() == t) {
-                        r = ta;
+                    return n.asset as TypeAsset;
+                }
+                return null;
+            }
+            println("comps=>{comps}");
+            for (c in n.children) {
+                const cn = c as AssetTreenode;
+                println("asset: {cn.asset.name} = {cn.asset}");
+                if (cn.asset is PackageAsset) {
+                    if (cn.asset.name == comps[0]) {
+                        return applyPath(comps[1..], c);
+                    }
+                } else if (cn.asset is ClassAsset) {
+                    const clazzAsset = cn.asset as ClassAsset;
+                    if (clazzAsset.className == slashName) {
+                        return clazzAsset;
+                    }
+                } else if (cn.asset is PrimitiveTypeAsset) {
+                    const prim = cn.asset as PrimitiveTypeAsset;
+                    if  (prim.t.getName() == t) {
+                        return prim;
                     }
                 }
-                return ();
-            });
-        return r;
+            }
+            return null;
+        }
+        return applyPath(["Code", comps], root);
     }
 }
