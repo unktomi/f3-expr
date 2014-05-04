@@ -2305,6 +2305,7 @@ public class GetVarView is OutputView {
 class OutputPort is LinkedOutputView {
     public var width is Number;
     public function getOutputType to F3Type { resultType }
+    public var target is ForkView;
     override var transform = bind translate(pos);
     override bound function getLinkPos to Point3 
     { 
@@ -2339,6 +2340,7 @@ class OutputPort is LinkedOutputView {
 }
 
 class SourcePort is LinkedInputView {
+    public var target is ForkView;
     public var width is Number;
     bound var src is LinkedOutputView = links[0].source;
     bound var sourceExpression = src.expression;
@@ -2374,6 +2376,7 @@ public class ForkView is ExpressionView {
     const fork = this;
     override var selectable = true;
     const sourcePort is SourcePort = SourcePort {
+        target: this;
         width: bind width;
         transform: translate(-4, 0, 0);
         canvas: bind canvas;
@@ -2407,6 +2410,8 @@ public class ForkView is ExpressionView {
         override public function assignLinkIds to () {
             fork.assignLinkIds()
         }
+
+        target: this;
 
         override function getObservable to ObservableExpression 
         {
@@ -4120,6 +4125,9 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         } else if (src is ObjectOutputView) {
             src = (src as ObjectOutputView).sourceView;
             result.add(src);
+        } else if (src is OutputPort) {
+            src = (src as OutputPort).target;
+            result.add(src);
         } else {
             result.add(src);
             links.add(link);
@@ -4186,7 +4194,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             const asset = assetModel.findTypeAsset(t.getName());
             println("ASSET {t.getName()} => {asset}");
             if (asset == null) {
-                throw new java.lang.RuntimeException("asset not found: {t.getName()}");
+               println("asset not found: {t.getName()}");
             }
             const v = ClosureVarContext {
                 varType: asset;
