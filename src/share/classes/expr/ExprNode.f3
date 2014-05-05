@@ -12,6 +12,11 @@ public class ModelContent {
 public const Start is Subject of (()) = Subject of (()) {};
 public const Console is Subject of Object = Subject of Object {};
 
+public function printLine from (obj is Object) to ()
+{
+     Console.onNext(obj);
+}
+
 public class ExprNode is AbstractNode {
     public const soundLoader is SoundLoader = the SoundLoader;
     public const movieLoader is MovieLoader = the MovieLoader;
