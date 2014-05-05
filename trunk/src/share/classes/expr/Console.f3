@@ -1,6 +1,65 @@
 package expr;
+import java.lang.Math;
+import f3.math.*;
+import f3.math.LinearMath.*;
+import expr.*;
+import f3.media.xhtml.XHTML;
+import f3.media.input.*;
+import f3.media.scene.*;
+import f3.media.scene.Shape2D.*;
 
-public function println from (obj is Object) to () {
-    java.lang.System.out.print("Console: ");
-    java.lang.System.out.println(obj);
+public class Console is ResizableNode, Scrollable {
+
+    var lines is String;
+    const margin is Integer = 10;
+    const htmlContent = XHTML.Text {
+        width: bind width - margin;
+        height: bind height;
+        style: "body \{ background-color: white; font-family:Lucida Grande; font-weight:normal; font-size: 11pt; color: #101010E0; \} a:link \{ text-decoration:none; \} a:hover \{text-decoration:underline;\}";
+        transform: bind translate(-width/2+margin/2, height/2-8.9);
+        content: bind lines;
+    };
+
+    bound var font = layoutEngine.createFont("font-size:12;font-family:Monospaced");
+    const textArea = Text.Area {
+        font: bind font;
+        width: bind width - margin;
+        height: bind height;
+        //        editable: false;
+    }
+
+    override public bound function getTx to Number { 0.0 }
+    override public bound function getSx to Number { 1.0 }
+    override public bound function getTy to Number { 0.0 }
+    override public bound function getSy to Number { 1.0 }
+
+    override public function setX from (tx is Number, sx is Number) to ()
+    {
+    }
+
+    override public function setY from (ty is Number, sy is Number) to ()
+    {
+    }
+
+    override var internalContent = Group {
+        content: bind
+        [Rectangle {
+            height: bind height;
+            width: bind width;
+            fillPaint: bind textArea.background;
+            pickable: false;
+         },
+         textArea];
+    }
+
+    var lineCount = 0;
+
+    function listener from (line is Object) to ()
+    {
+        lineCount++;
+        textArea.insertText("{line}\n");
+    }
+
+    const disp = ExprNode.Console.subscribe(listener);
+       
 }

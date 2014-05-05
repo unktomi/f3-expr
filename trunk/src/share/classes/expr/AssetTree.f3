@@ -161,7 +161,7 @@ public class PackageAsset is Asset {
 public class RootPackageAsset is PackageAsset {
     const println = MemberAsset {
           name: "Print Line"
-          member: FunctionMember {m: Reflect.getFunction("f3.lang.Builtins", "printLine", ["Object"]) }
+          member: FunctionMember {m: Reflect.getFunction("expr.ExprNode", "printLine", ["Object"]) }
     };
     public const primitives is TypeAsset[] = 
         [PrimitiveTypeAsset {

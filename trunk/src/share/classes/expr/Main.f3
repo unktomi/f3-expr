@@ -1429,6 +1429,14 @@ public function run from (args is String[]) to ()
                                      }
                                     },
                                             Tabview.Tab {
+                                                title: "Console";
+                                                content:
+                                                Scrollpane { 
+                                                    canZoomVertical: false;
+                                                    content: Console {}
+                                                }
+                                            },
+                                            Tabview.Tab {
                                                 title: "Cameras";
                                                 content: Tabview {
                                                     var sn = Scene {
