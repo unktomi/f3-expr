@@ -50,14 +50,35 @@ public class Console is ResizableNode, Scrollable {
             pickable: false;
          },
          textArea];
+    };
+
+    const NL = "\n".charAt(0);
+
+    override var height on replace {
+        checkHeight();
     }
 
-    var lineCount = 0;
-
+    function checkHeight to ()
+    {
+        const lineCount = height / font.height();
+        const t = textArea.text;
+        var lines = 0;
+        for (i in [0..<t.length()].reverse()) {
+            const ch = t.charAt(i);
+            if (ch == NL) {
+                lines++;
+                if (lines >= lineCount) {
+                    println("DELETING 0..{i}");
+                    textArea.deleteRange(0, i);
+                    break;
+                }
+            }
+        }
+    }
+    
     function listener from (line is Object) to ()
     {
-        lineCount++;
-        textArea.insertText("{line}\n");
+        textArea.appendText("{line}\n");
     }
 
     const disp = ExprNode.Console.subscribe(listener);

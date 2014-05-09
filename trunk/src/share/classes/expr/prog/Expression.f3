@@ -185,12 +185,27 @@ function formatEnglishName from (name is String, id is String) to String
     }
 }
 
+function isSameTypeArgument from (target is F3Type, src is F3Type) to Boolean {
+    if (target is F3Local.JVMLocalType) {
+        if (src is F3Local.JVMLocalType) {
+            const x = (target as F3Local.JVMLocalType);
+            const y = (src as F3Local.JVMLocalType);
+            println("checking type args {target}, {src} => {x}, {y}");
+            return x.getType().equals(y.getType())
+        }
+    }
+    return false;
+}
+
 function typeApply from (target is F3Type, 
                          srcType is F3Type,
                          subst is F3Type) 
     to F3Type 
 {
-    if (target == srcType) return subst;
+    println("TYPE APPLY {target}, {srcType}, {subst}");
+    if (target.isTypeVariable()) {
+        return if (isSameTypeArgument(target, srcType)) then subst else target;
+    }
     if (target is F3FunctionType) {
         const funType = target as F3FunctionType;
         const retType = typeApply(funType.getReturnType(), srcType, subst);
@@ -222,7 +237,13 @@ function typeApply from (target is F3Type,
             const rt = ctx.instantiateType(clsType, parms);
             println("result={formatClassName(rt)}");
             return rt;
+        } else {
+            if (parms <> []) {
+                return target;
+            }
         }
+    } else {
+        if (target == srcType) return subst;
     }
     return target;
 }
@@ -401,6 +422,32 @@ class Instantiator {
     }
 }
 
+function isMappable from (t is F3Type) to Boolean {
+    if (t is F3ClassType) {
+        const ct = t as F3ClassType;
+        if (ct.getTypeArguments().length == 1) {
+            const funs = Reflect.getFunctions(ct, true);
+            println("CHECKING MAPPABLE {funs}");
+            for (x in funs where x.getName() == "map") {
+                // map(f is function from x to y)
+                println("found map: {x}");
+                const ft = x.getType();
+                if (ft.minArgs() == 1) {
+                    const arg = ft.getArgumentType(0);
+                    println("arg={arg}");
+                    if (arg is F3FunctionType) {
+                        const ft1 = arg as F3FunctionType;
+                        if (ft1.minArgs() == 1) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return false;
+}
+
 public function introspect from (clazz is F3ClassType, all is Boolean) to Member[]
 {
     if (clazz == null) return [];
@@ -410,15 +457,16 @@ public function introspect from (clazz is F3ClassType, all is Boolean) to Member
     }
     const I = Instantiator {clazz: clazz};
     var result is Member[];
-    const funs = Reflect.getFunctions(clazz, not all);
+    const funs = Reflect.getFunctions(clazz, all);
     if (all) {
         var r = 
             foreach (f in funs where f.isPublic() and not f.getName().contains("$") and 
                      OBJECT_TYPE <> f.getDeclaringClass() 
                      ) { 
+            var rt = I.G(f.getType().getReturnType());
             FunctionMember {
                 m: f;
-                t: I.G(f.getType().getReturnType());
+                t: rt;
                 ft: I.G(f.getType());
                 isInfix: ((f.isStatic() and f.getType().minArgs() == 2) or f.getType().minArgs() == 1) and operatorSet.contains(f.getName())
             }
@@ -450,6 +498,9 @@ public function introspect from (clazz is F3ClassType, all is Boolean) to Member
 	    if (SUBJECT_TYPE.isAssignableFrom(rt) or OBSERVABLE_TYPE.isAssignableFrom(rt) or OBSERVER_TYPE.isAssignableFrom(rt)) {
 		rt_t = getTypeArguments(rt)[0];
 	    } else {
+                if (isMappable(rt)) {
+                    rt_t = getTypeArguments(rt)[0];
+                }
 	    }	
             if (rt_t is F3SequenceType) {
                 rt_t = (rt_t as F3SequenceType).getComponentType();
@@ -634,6 +685,11 @@ public class FunctionMember is Member {
         }
     }
     override var name = formatName(m as F3FunctionMember);
+
+    public function getFullName to String
+    {
+        if (m.isStatic()) then "{m.getDeclaringClass().getName()}.{m.getName()}" else m.getName();
+    }
 }
 
 function formatType from (t is F3Type) to String 
@@ -661,6 +717,34 @@ function formatFunctionType from (clazz is F3ClassType, ft is F3FunctionType) to
     }
     "{r}) \u2192 {formatType(ft.getReturnType())}";
 }
+
+
+function formatTypeHtml from (t is F3Type) to String 
+{
+    if t.isTypeVariable() then "Any<sup>{t.getTypeVariable()}</sup>" else if (t is F3SequenceType) 
+        then "{formatTypeHtml((t as F3SequenceType).getComponentType())}[]" 
+        else if (t is F3FunctionType) then formatFunctionTypeHtml(null, t as F3FunctionType) 
+            else if (t is F3ClassType) then { 
+                    const ct = t as F3ClassType; 
+                    //const dot = t.getName().lastIndexOf("."); 
+                    //if (dot >= 0) then t.getName().substring(dot+1) else t.getName();
+                    formatClassNameHtml(t)
+                }
+            else t.getName();
+}
+
+function formatFunctionTypeHtml from (clazz is F3ClassType, ft is F3FunctionType) to String 
+{
+     
+    var r = if clazz == null then "(" else "({formatTypeHtml(clazz)}";
+    var sep = if clazz == null then "" else ", ";
+    for (i in [0..<ft.minArgs()]) {
+        r = "{r}{sep}{formatTypeHtml(ft.getArgumentType(i))}";
+        sep = ", ";
+    }
+    "{r}) \u2192 {formatTypeHtml(ft.getReturnType())}";
+}
+
 
 function argCount from (f is F3FunctionMember) to Integer 
 {
@@ -710,6 +794,45 @@ function formatClassName from (t is F3Type) to String
         return "{result})";
     }
 }
+
+function formatClassNameHtml from (t is F3Type) to String 
+{
+    if (t == UNIT_TYPE) {
+        return "()"
+    }
+    if (t == OBJECT_TYPE and not t.isTypeVariable()) {
+        return "Any"
+    }
+    if (t is F3FunctionType) {
+        return formatFunctionTypeHtml(null, t as F3FunctionType)
+    }
+    if (not (t is F3ClassType)) {
+        return t.getName();
+    }
+    if (Reflect.isObservableType(t)) {
+        const targs = getTypeArguments(t as F3ClassType);
+        const v = if targs == [] then (t as F3ClassType).getTypeParameters()[0] else targs[0];
+        return formatClassNameHtml(v);
+    }
+    const n = if (t.isTypeVariable()) then "Any<sup>{t.getTypeVariable()}</sup>" else t.getName();
+    const dot = n.lastIndexOf(".");
+    const base = n.substring(dot+1);
+    const parms is F3Type[] = (t as F3ClassType).getTypeArguments();
+    if (parms.size() == 0) {
+        return base;
+    }  else if (parms.size() == 1) {
+        return "{base} of {formatClassNameHtml(parms[0])}";
+    } else {
+        var result = "{base} of (";
+        var sep = "";
+        for (x in parms) {
+            result = "{result}{sep}{formatClassNameHtml(x)}";
+            sep = ", ";
+        }
+        return "{result})";
+    }
+}
+
 
 function argName from (fun is FunctionMember,
                        ft is F3FunctionType, i is Integer) to String 
@@ -933,12 +1056,19 @@ public class IPath {
             const observable = observer.observable;
             if (observable is GetVarResult) {
                 var exp is Expression = observable;
-                while (not (exp is Result)) {
+                while (exp is GetVarResult) {
                     exp = (exp as GetVarResult).observable;
                 }
-                var result = exp as Result;
-                if (OBSERVABLE_TYPE.isAssignableFrom(result.t)) return true;
-                if (result.t is F3SequenceType) return true;
+                if (exp is Result) {
+                    var result = exp as Result;
+                    if (OBSERVABLE_TYPE.isAssignableFrom(result.t)) return true;
+                    if (result.t is F3SequenceType) return true;
+                    if (isMappable(result.t)) {
+                        return true;
+                    }
+                } else {
+                    println("Needs lower EXP=>{exp}");
+                }
             }
         }
         return false;
@@ -987,6 +1117,9 @@ public class IPath {
             }
             if (observer is TreeGetVar) {
                 return (observer as TreeGetVar).toEnglish();
+            }
+            if (observer.observable is Function) {
+                return (observer.observable as Function).funMember.m.getName();
             }
             println("PARENTS SIZE is ZERO {observer.getClass()} {observer}, observable={observer.observable.getClass()} {observer.observable}");
             return "the event";
@@ -1077,6 +1210,9 @@ public class IPath {
             }
             if (observer is TreeGetVar) {
                 return (observer as TreeGetVar).getLocalAccess();
+            }
+            if (observer.observable is Function) {
+                return (observer.observable as Function).funMember.getFullName();
             }
             return "i";
         }
@@ -1337,7 +1473,7 @@ function descendsFromObservableRoot from (p is Expression) to Boolean {
     return false;
 }
 
-public class Function is MemberExpression {
+public class Function is MemberExpression, ObservableExpression {
     public var funMember is FunctionMember;
     override var member = bind funMember;
     public var ft is F3FunctionType = bind funMember.ft;
@@ -1766,6 +1902,21 @@ public abstract class ExpressionView is AbstractNode {
 }
 
 
+function unifyInputs from (i is LinkedView, visited is java.util.Set of ExpressionView) to () 
+{
+    for (link in i.getInputLinks()) {
+        const v = link.source;
+        unifyInputs(v, visited);
+    }
+    if (i is ParameterView) {
+        const f =
+            (i as ParameterView).targetView;
+        if (visited.add(f)) {
+            f.unify();
+        }
+    }
+}
+
 class FunctionView is ExpressionView {
 
     override var title = bind borderedTitle();
@@ -1825,25 +1976,37 @@ class FunctionView is ExpressionView {
                 y.targetLinkId = j++;
             }
         }
-        unify();
     }
 
-    function unify {
+
+    function unify to () {
         for (x in inputs) {
             var t = x.parameter.t;
             if (true or t.isTypeVariable()) {
                 if (x.links.size() > 0) {
                     var infer is F3Type = null;
                     for (link in x.links) {
-                        infer = (link.source as LinkedOutputView).resultType;
+                        infer = (link.source as LinkedOutputView).getResultType()
                     }
+                    println("INFERRED {infer} for {x.inputType}");
                     if (infer <> x.inputType) {
                         x.inputType = infer;
+                        var targs is F3Type[];
+                        var tparms is F3Type[];
+                        if (infer is F3ClassType) {
+                            const ct = infer as F3ClassType;
+                            targs = ct.getTypeArguments();
+                            tparms = ct.getTypeParameters();
+                        }
                         for (j in inputs) {
                             if (j <> x and j.links.size() == 0) {
-                                const t1 = typeApply(j.parameter.t, x.parameter.t, x.inputType);
+                                var t1 = typeApply(j.parameter.t, x.parameter.t, x.inputType);
+                                for (q in targs) {
+                                    const r = tparms[indexof q];
+                                    t1 = typeApply(t1, r, q);
+                                }
+                                println("t1={t1} for {j.parameter.t}");
                                 if (t1 <> j.parameter.t) {
-                                    println("t1={formatClassName(t1)} for {formatClassName(j.parameter.t)}");
                                     j.inputType = t1;
                                     insert x into j.inferred;
                                     println("label={j.getLabel()}");
@@ -2880,7 +3043,14 @@ public class ParameterView is InputView {
     override var expression = bind parameter;    
     public var inputType is F3Type;
     public var inferred is ParameterView[];
-    override var labelVisible = bind canvas.canAssignTo(getInputType());
+    override var labelVisible = bind checkLabel(canvas.dropType, getInputType());
+    function checkLabel from (dt is F3Type, t is F3Type) to Boolean
+    {
+        const result = canvas.canAssignTo(t);
+        println("{parameter.name} of {targetView.fun.funMember.name} {dt} =>{result} => {t}");
+        return result;
+    }
+
     override bound function getLabel to String 
     {
         makeLabel(if (inputType <> null) then inputType else parameter.t)
@@ -2889,8 +3059,8 @@ public class ParameterView is InputView {
     function makeLabel from (t is F3Type) to String
     {
         println("making label for type {t} pname={parameter.name} target={parameter.target}");
-        //formatClassName(t)
-        parameter.name
+        formatClassNameHtml(t)
+            //parameter.name
     }
 
     override public bound function getInputType to F3Type 
@@ -3029,7 +3199,17 @@ public class ParameterView is InputView {
                 then intSlider()
                 else if (Reflect.BOOLEAN_TYPE.isConvertibleFrom(getInputType())) 
                     then boolSlider() else null;
-    override var internalContent = Group { content: bind [title, if links.size() == 0 then [sliderField, textField] else null] };
+    override var internalContent = Group { content: bind [title1, if links.size() == 0 then [sliderField, textField] else null] };
+    const titleText = XHTML.Text {
+        width: bind cellWidth;
+        height: bind cellHeight;
+        override var transform = bind translate(-width/2, 0);
+        style: "body \{ font-family:Lucida Grande; font-weight:bold; font-size: 11pt; color: #333333; \} a:link \{ text-decoration:none; \} a:hover \{text-decoration:underline;\}";
+        content: bind "<span>{getLabel()}</span>";
+    };
+    const title1 = Group {
+        content: bind [titleRect, titleText];
+    }
 
     postinit {
         undoList.addTarget("constValue", &parameter.constantValue);
@@ -3056,6 +3236,10 @@ public abstract class LinkedOutputView is LinkedView {
         (expression as ObservableExpression) 
     }
     public var resultType is F3Type;
+    public function getResultType to F3Type 
+    {
+        resultType
+    }
 }
 
 public class OutputView is LinkedOutputView {
@@ -3067,6 +3251,7 @@ public class OutputView is LinkedOutputView {
         for (link in getTree.getLinks()) link.unlink();
         super.unlink();
     }
+
     protected var getter = GetVar {
         member: bind Member {
             m: null;
@@ -3114,16 +3299,26 @@ class ResultView is OutputView {
     public var sourceView is FunctionView;
     override var expression = bind result;
     override var resultType = bind if (unifiedType <> null) then unifiedType else result.getType();
-    override var getter = bind constructGetVarResult();
-    bound function constructGetVarResult to GetVarResult {
-        var self = this;
+    public override function getResultType to F3Type 
+    {
+        println("GET RESULT TYPE {sourceView.fun.funMember.name} {unifiedType} {result.getType()}");
+        if (unifiedType == null) then result.getType() else unifiedType;
+    }
+    override var getter = bind constructGetVarResult(unifiedType, result.getType(), outputName);
+    bound function constructGetVarResult from (unifiedType is F3Type, resultType is F3Type, outputName is String) to GetVarResult 
+    {
         GetVarResult {
-            member: bind Member {
-               m: null;
-               t: this.resultType;
-               name: this.outputName;
-            }
+            member: bind constructMember(if (unifiedType == null) then resultType else unifiedType, outputName);
        }
+    }
+    function constructMember from (t is F3Type, name is String) to Member 
+    {
+        println("CREATING GET VAR for {sourceView.fun.funMember.name} => {t}, {name}");
+        Member {
+            m: null;
+            t: t;
+            name: name;
+        }
     }
     public var unifiedType is F3Type;
     public var inferred is ParameterView[];
@@ -3226,6 +3421,8 @@ class MemberTreenode is Treenode {
     	children;
 	super.open();
     }
+
+    public function getType to F3Type { m.t }
 }
 
 public class MemberTreemodel is Treemodel {
@@ -3323,6 +3520,9 @@ public class MemberTreecell is Treeview.Treecell
 
     const linkedView is GetVarView = TreecellGetVarView {
         parentLink: bind parentLink;
+        override function getResultType to F3Type {
+            return (tn as MemberTreenode).getType();
+        }
 	get: bind (tn as MemberTreenode).get;
         override function assignLinkIds to ()
         {
@@ -3425,6 +3625,10 @@ class GetTreeview is AbstractNode {
 	    m: bind get.member;
             override var label = bind rootName;
             value: bind debugValue;
+            override function getType to F3Type
+            {
+                exprView.getResultType();
+            }
 	}
     };
 
@@ -4793,7 +4997,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     const sourceCode = XHTML.Text {
         width: bind width;
-        style: "body \{ font-family:Lucida Grande; font-weight:normal; font-size: 11pt; color: #101010E0; \} a:link \{ text-decoration:none; \} a:hover \{text-decoration:underline;\}";
+        style: "body \{ font-family:Lucida Grande; font-weight:normal; font-size: 11pt; color: #333333; \} a:link \{ text-decoration:none; \} a:hover \{text-decoration:underline;\}";
         transform: bind translate(-width/2, -height/2);
         content: bind if not showSource then "<a href='source://'>Source Code</a>" else "<a href='graph://'>Hide</a><p/><div>{englishOutput}</div>";
         visible: bind englishOutput <> "";
@@ -5119,6 +5323,12 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         }
         println("introspecting: {t}");
         var members = introspect(t, true);
+        if (isMappable(t)) {
+            const t1 = getTypeArguments(t)[0];
+            println("is mappable {t} => {t1}");
+            members = [introspect(t1, true), members];
+        }
+        members = members[m | m.m == null or not m.m.isStatic()];
         if (members <> []) {
             var popup is Node = getPopup(e, members, function (j is LinkedInputView) to () {
                     delete popupLayer.content;
@@ -5135,6 +5345,11 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     function dumpSrc to () {
         sourceVersion++;
         sourceUpdateTime = java.lang.System.currentTimeMillis()+1000;
+        const x = new java.util.HashSet of ExpressionView();
+        for (v in views where v is FunctionView) {
+            const f = v as FunctionView;
+            unifyInputs(f.inputs[0], x);
+        }
     }
 
     function genSource to () {

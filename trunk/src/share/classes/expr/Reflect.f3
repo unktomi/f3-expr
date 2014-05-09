@@ -127,6 +127,7 @@ public function getTypeArguments from (c is F3Type) to F3Type[]
 {
     if (c is F3Local.ClassType) {
 	const t = (c as F3Local.ClassType).getType();
+        println("get Type Arguments {c} => {t}");
 	if (t is java.lang.reflect.ParameterizedType) {
 	    const p = t as java.lang.reflect.ParameterizedType;
 	    const targs is java.lang.reflect.Type[] = p.getActualTypeArguments();
