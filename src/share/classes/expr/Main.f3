@@ -806,7 +806,7 @@ public function run from (args is String[]) to ()
         function rebaseURL from (u is String) to String {
             if (u.startsWith("timenode://") or u.contains("#")) then u else new java.net.URL(baseURL, u).toString();
         }
-        const topLevels = foreach (prog in sceneRes.programs) {
+        const topLevels = foreach (prog in sceneRes.programs where prog.code <> null) {
             const p = Program {
                 event: mainContext.member,
                 code: prog.code;
@@ -1798,7 +1798,7 @@ Tabview.Tab {
                                                 }
                                             },
 				 Tabview.Tab {
-				    title: bind if (contextModel.selectedVarContext <> null) then "Definition: {contextModel.selectedVarContext.name}" else "Event Handler: {contextModel.selectedContext.name}"
+				    title: bind if (contextModel.selectedVarContext <> null) then "Definition: {contextModel.selectedVarContext.name}" else "Event: {contextModel.selectedContext.name}"
 				    content: expr.prog.Expression.Editor {
                                          assetModel: bind assetModel;
                                          menuFactory: THE_MENU_FACTORY;
