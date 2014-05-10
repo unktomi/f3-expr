@@ -15,12 +15,12 @@ public class Console is ResizableNode, Scrollable {
     const htmlContent = XHTML.Text {
         width: bind width - margin;
         height: bind height;
-        style: "body \{ background-color: white; font-family:Lucida Grande; font-weight:normal; font-size: 11pt; color: #101010E0; \} a:link \{ text-decoration:none; \} a:hover \{text-decoration:underline;\}";
+        style: "body \{ background-color: white; font-family:Lucida Grande; font-weight:normal; font-size: 11pt; color: #B3B3B3; \} a:link \{ text-decoration:none; \} a:hover \{text-decoration:underline;\}";
         transform: bind translate(-width/2+margin/2, height/2-8.9);
         content: bind lines;
     };
 
-    bound var font = layoutEngine.createFont("font-size:12;font-family:Monospaced");
+    bound var font = layoutEngine.createFont("font-size:11;font-family:Menlo");
     const textArea = Text.Area {
         font: bind font;
         width: bind width - margin;

@@ -105,6 +105,11 @@ public abstract class GroupContext is Context {
     }
     public override bound function getContent to Context[]  { content }
 
+    public function deleteContent from (c is Context) to ()
+    {
+        delete c from content;
+    }
+
 }
 
 public class CallContext is Context {
@@ -154,9 +159,17 @@ public class SubResourceNodeContext is ResourceNodeContext {
 public class ResourceNodeContext is GroupContext, ResourceObjectContext {
     override bound function getTarget to ResourceTarget { resource }
     protected function getTargetPath to String { "" }
+    public override function deleteContent from (c is Context) to ()
+    {
+        if (c is MemberContext) {
+            delete (c as MemberContext) from programs;
+        }
+        super.deleteContent(c);
+        
+    }
     public override function createProgram from (member is Member) to MemberContext
     {
-        var result = MemberContext { member: member, parent: this};
+        var result = MemberContext { member: member, parent: this };
         insert result into programs;
         println("created member => {programs} => {getContent()}");
         return result;

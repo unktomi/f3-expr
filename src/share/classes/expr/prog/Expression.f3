@@ -1065,6 +1065,29 @@ public class IPath {
                 if (exp is Result) {
                     var result = exp as Result;
                     if (OBSERVABLE_TYPE.isAssignableFrom(result.t)) return true;
+                } else {
+                    println("Needs lower EXP=>{exp}");
+                }
+            }
+        }
+        return false;
+    }
+
+    function needsMappableLower to Boolean {
+        if (observer is GetVar) {
+            const g = observer as GetVar;
+            if (g.member.rt is F3SequenceType) return true;
+        }
+        if (observer is Parameter) {
+            const p = observer as Parameter;
+            const observable = observer.observable;
+            if (observable is GetVarResult) {
+                var exp is Expression = observable;
+                while (exp is GetVarResult) {
+                    exp = (exp as GetVarResult).observable;
+                }
+                if (exp is Result) {
+                    var result = exp as Result;
                     if (result.t is F3SequenceType) return true;
                     if (isMappable(result.t)) {
                         return true;
@@ -1235,13 +1258,16 @@ public class IPath {
                 for (p in parents[1..]) {
                     var j = p.getWorldAccess();
                     if (p.needsLift()) {
-                        println("NON STATIC LIFT: {p}");
+                        println("STATIC LIFT: {p}");
                         obDepth = p.getContainingObservableDepth();
                         prefix = j;
                         j = "obs{p.getContainingObservableDepth()-1}";
                     } else if (p.needsLower()) {
                         println("STATIC LOWER: {p}");
                         println("STATIC LOWER j: {j}");
+                        prefix = j;
+                        j = "i{p.getDepth()-1}";
+                    } else if (p.needsMappableLower()) {
                         prefix = j;
                         lowered = p.getDepth()-1;
                         j = "i{p.getDepth()-1}";
@@ -3182,9 +3208,14 @@ public class ParameterView is InputView {
         return f;
     }
 
+    function removeQuotes from (str is String) to String 
+    {
+        if (str.startsWith("\"") and str.endsWith("\"")) then str.substring(1, str.length()-1) else str;
+    }
+
     bound var constValue = parameter.constantValue on replace {
         if (textField <> null) {
-            textField.setText(constValue.toString())
+            textField.setText(removeQuotes(constValue.toString()));
         } else if (sliderField <> null) {
             const f = sliderField;
             if (Reflect.NUMBER_TYPE.isConvertibleFrom(getInputType())) {
@@ -5058,7 +5089,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                        id: "lines"
                        pickable: false;
                        override var mesh = bind linkMesh;
-                       shader: effectLoader.loadPaintShader(ColorPaint(Color.color(.25, .25, .25)));
+                       shader: effectLoader.loadPaintShader(ColorPaint(Color.color(.20, .20, .20)));
                    },
                    Group { content: bind arrows},
                    Group { content: bind selectionRect}, 
