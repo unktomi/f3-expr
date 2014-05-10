@@ -1268,7 +1268,8 @@ public function run from (args is String[]) to ()
                                                                         }
                                                                         par = par.parent;
                                                                     }
-                                                                    delete toDelete from (toDelete.parent as Context.GroupContext).content;
+                                                                    const gp = (par as Context.GroupContext);
+                                                                    gp.deleteContent(toDelete);
                                                                     println("deleted {toDelete} from {toDelete.parent}");
                                                                 }
                                                             } else super.onKeyDown(e);
