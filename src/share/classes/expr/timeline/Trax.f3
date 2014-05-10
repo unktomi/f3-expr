@@ -1051,6 +1051,14 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 
     protected bound function getRootContent to Node { root }
 
+    protected function advanceToNextKey to ()
+    {
+    }
+
+    protected function advanceToPreviousKey to ()
+    {
+    }
+
     override function onKeyDown from (e is KeyboardEvent) to () {
 	var i = selectedTimeNodeView.row;
 	if (e.keyCode == Keys.F) {
@@ -1087,6 +1095,18 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	    }
 	} else if (e.keyCode == Keys.S) {
             setKeys();
+        } else if (e.keyCode == Keys.Period) {
+            if (e.altKey) {
+                advancePlayhead(1);
+            } else {
+                advanceToNextKey();
+            }
+        } else if (e.keyCode == Keys.Comma) {
+            if (e.altKey) {
+                advancePlayhead(-1);
+            } else {
+                advanceToPreviousKey();
+            }
 	} else if (e.keyCode == Keys.Right) {
 	    if (e.metaKey) {
 		advancePlayhead(1);
