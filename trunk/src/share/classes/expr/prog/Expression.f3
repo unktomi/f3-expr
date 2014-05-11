@@ -379,6 +379,14 @@ public function introspect from (t is F3Type, all is Boolean) to Member[]
     }
 }
 
+function getLoweredType from (t is F3Type) to F3Type 
+{
+    if (isMappable(t)) {
+        return (t as F3ClassType).getTypeArguments()[0];
+    }
+    return null;
+}
+
 function isMappable from (t is F3Type) to Boolean {
     if (t is F3ClassType) {
         const ct = t as F3ClassType;
@@ -590,7 +598,7 @@ public class TypeMember is Member {
     override var rt = bind classType;
     override var m = bind classType;
     override var t = bind classType;
-    public override const name is String = bind m.getName();
+    public override var name is String = bind formatType(classType);
     override var members is Member[] = bind getTypeMembers(classType);
 }
 
@@ -680,9 +688,24 @@ public class FunctionMember is Member {
     override var name = formatName(m as F3FunctionMember);
 }
 
+function formatTypeVar from (t is F3Type) to String
+{
+    "Any{sub(t.getTypeVariable())}";
+}
+
+function sub from (t is String) to String {
+    // "<sup>{t}</sup>";
+    var chs = t.toCharArray();
+    const delta = "\u2080".charAt(0) - "a".charAt(0) + 1;
+    for (i in [0..<chs.length]) {
+        chs[i] = delta + chs[i];
+    }
+    return new String(chs, 0, chs.length);
+}
+
 function formatType from (t is F3Type) to String 
 {
-    if t.isTypeVariable() then "Any" else if (t is F3SequenceType) 
+    if t.isTypeVariable() then formatTypeVar(t) else if (t is F3SequenceType) 
         then "{formatType((t as F3SequenceType).getComponentType())}[]" 
         else if (t is F3FunctionType) then formatFunctionType(null, t as F3FunctionType) 
             else if (t is F3ClassType) then { 
@@ -736,7 +759,7 @@ function formatClassName from (t is F3Type) to String
         const v = if targs == [] then (t as F3ClassType).getTypeParameters()[0] else targs[0];
         return formatClassName(v);
     }
-    const n = if (t.isTypeVariable()) then t.getTypeVariable() else t.getName();
+    const n = if (t.isTypeVariable()) then formatTypeVar(t) else t.getName();
     const dot = n.lastIndexOf(".");
     const base = n.substring(dot+1);
     const parms is F3Type[] = (t as F3ClassType).getTypeArguments();
@@ -770,7 +793,7 @@ function argName from (ft is F3FunctionType, i is Integer) to String
 {
     const t = ft.getArgumentType(i);
     if (t.isTypeVariable()) {
-        return t.getTypeVariable();
+        return formatTypeVar(t);
     }
     const n = formatClassName(t);
     const dot = n.lastIndexOf(".");
@@ -824,7 +847,7 @@ public abstract class ObjectExpression is Expression {
 class TypeVariableExpression is Expression {
     const typevar is F3Type;
     override function getType { typevar }
-    override bound function getName to String { typevar.getTypeVariable() }
+    override bound function getName to String { formatTypeVar(typevar) }
 }
 
 class ClassTypeExpression is ObjectExpression {
@@ -845,7 +868,7 @@ public class VarContextExpression is ObjectExpression {
     public var varContext is Context.ClosureVarContext;
     override bound function getName to String { varContext.varName }
     override function toSource from (context is IContext) to String { "(getVar(\"{varContext.varName}\") as f3.lang.ref of {getType().getName()})" }
-    override function toEnglish to String { varContext.varName }
+    override function toEnglish to String { formatEnglishName(varContext.varName, id) }
     override function getType to F3Type {
         varContext.varType.t;
     }
@@ -1008,6 +1031,33 @@ public class IPath {
         return false;
     }
 
+    function needsMappableLower to Boolean {
+        if (observer is GetVar) {
+            const g = observer as GetVar;
+            if (g.member.rt is F3SequenceType) return true;
+        }
+        if (observer is Parameter) {
+            const p = observer as Parameter;
+            const observable = observer.observable;
+            if (observable is GetVarResult) {
+                var exp is Expression = observable;
+                while (exp is GetVarResult) {
+                    exp = (exp as GetVarResult).observable;
+                }
+                if (exp is Result) {
+                    var result = exp as Result;
+                    if (result.t is F3SequenceType) return true;
+                    if (isMappable(result.t)) {
+                        return true;
+                    }
+                } else {
+                    println("Needs lower EXP=>{exp}");
+                }
+            }
+        }
+        return false;
+    }
+
     function getContainingObservableDepth to Integer 
     {
         var count = 0;
@@ -1076,13 +1126,24 @@ public class IPath {
                 if (fun.isStatic()) {
                     var args = "";
                     var sep = "";
+                    var lowered = -1;
+                    var prefix = "";
                     for (p in parents[1..]) {
-                        const j = p.getEnglishAccess();
+                        var j = p.getEnglishAccess();
+                        if (p.needsMappableLower()) {
+                            prefix = j;
+                            lowered = p.getDepth()-1;
+                            j = "each<sub>{lowered}</sub>";
+                            println("TO ENG: lowered {lowered} prefix={prefix}, j={j}");
+                        }
                         args = "{args}{sep}{j}";
                         sep = ", ";
                     }
                     if (parents.size() > 2) {
                         args = "({args})";
+                    }
+                    if (lowered >= 0) {
+                        return "For each<sub>{lowered}</sub> in {prefix}, {formatEnglishName(sourceFunName(fun), func.id)} {args}";
                     }
                     return "{formatEnglishName(sourceFunName(fun), func.id)} {args}";
                 } else {
@@ -1153,6 +1214,7 @@ public class IPath {
             const fun = func.fun;
             var obDepth = -1;
             var prefix = "";
+            var lowered = -1;
             if (fun.isStatic()) {
                 var args = "";
                 var sep = "";
@@ -1168,6 +1230,10 @@ public class IPath {
                         println("NON STATIC LOWER j: {j}");
                         prefix = j;
                         j = "i{p.getDepth()-1}";
+                    } else if (p.needsMappableLower()) {
+                        prefix = j;
+                        lowered = p.getDepth()-1;
+                        j = "i{p.getDepth()-1}";
                     }
                     args = "{args}{sep}{j}";
                     sep = ", ";
@@ -1175,6 +1241,8 @@ public class IPath {
                 const app = formStaticMethodCall(fun);
                 if (obDepth >= 0) {
                     return "{prefix} \}; const obs{obDepth} = foreach (i{getDepth()} in {app}({args})) \{";
+                } else if (lowered >= 0) {
+                    return "foreach (i{lowered} in {prefix}) {app}({args})";
                 }
                 return "{prefix} {app}({args})";
             } else {
@@ -1218,7 +1286,8 @@ public class IPath {
             if (i.member.m is F3VarMember and i.member.isObserver) {
                 return "\{ {i.target.toSource(null)}.{i.member.toApply()} = {parents[0].getWorldAccess()}; \}";
             } else if (i.target is VarContextExpression) {
-                return "{i.target.toSource(null)}.set({parents[0].getWorldAccess()})";
+                // return "{i.target.toSource(null)}.set({parents[0].getWorldAccess()})";
+                return parents[0].getWorldAccess();
             } else { 
                 if (i.member.isObserver and is1ArgFunction(i.member)) {
                     return "{i.target.toSource(null)}.{i.member.toApply("{parents[0].getWorldAccess()}")}";
@@ -1703,7 +1772,7 @@ public abstract class ExpressionView is AbstractNode {
     public bound function getPos to Point3 { getWorldPos() }
     bound function getWorldPos to Point3 { (toSceneTransform * canvas.toLocal).getTranslation() }
     public var pos is Point3;
-    public var cellWidth is Number = 180;
+    public var cellWidth is Number = bind canvas.cellWidth;;
     public var cellHeight is Number = bind canvas.cellHeight;
     public var font is Text.Font = bind canvas.font;
     public var selected is Boolean;
@@ -1746,19 +1815,23 @@ public abstract class ExpressionView is AbstractNode {
            [titleRect,
            label];
     };
+
     protected var titleSeparatorRow is Integer = 0;
+
+    function titleSeparator to Node {
+        Rectangle {
+            height: 1;
+            width: bind cellWidth;
+            fillPaint: bind canvas.textFg;
+            pickable: false;
+            transform: bind translate(0, -titleSeparatorRow * cellHeight + Math.round(-cellHeight/2.0));
+        }
+    }
+
     function borderedTitle to Node {
         Group {
             content:
-            bind 
-                [defaultTitle,
-                 Rectangle {
-                        height: 1;
-                        width: bind cellWidth;
-                        fillPaint: bind canvas.textFg;
-                        pickable: false;
-                        transform: bind translate(0, -titleSeparatorRow * cellHeight + Math.round(-cellHeight/2.0));
-                    }]; 
+            bind [defaultTitle, titleSeparator()]; 
         }
     } 
     public var title is Node = bind defaultTitle;
@@ -1915,14 +1988,15 @@ class FunctionView is ExpressionView {
     {
         for (x in inputs) {
             var t = x.parameter.t;
-            if (true or t.isTypeVariable()) {
+            if (true) {
                 if (x.links.size() > 0) {
                     var infer is F3Type = null;
                     for (link in x.links) {
                         infer = (link.source as LinkedOutputView).getResultType()
                     }
-                    println("INFERRED {infer} for {x.inputType}");
-                    if (infer <> x.inputType) {
+                    const canAssign = observeType(t).isConvertibleFrom(infer);
+                    println("INFERRED {infer} for {t} => {canAssign}");
+                    if (canAssign and infer <> x.inputType) {
                         x.inputType = infer;
                         var targs is F3Type[];
                         var tparms is F3Type[];
@@ -2020,10 +2094,7 @@ class FunctionView is ExpressionView {
     const io = Group {
 	transform: bind translate(0, -cellHeight);
 	content: 
-	[
-	 Group {
-	     content: bind typeInputs
-	 }
+	[	 
 	 Group {
 	     content: bind inputs
 	 }
@@ -2033,7 +2104,10 @@ class FunctionView is ExpressionView {
 	 }]
     };
 
-    const innerContent = Group { content: bind [title, funOutput, io] };
+    const innerContent = Group { content: bind [Group {
+	transform: bind translate(0, -cellHeight);
+	     content: bind typeInputs
+	 } title, funOutput, io] };
     bound var h = output.bounds.height() + cellHeight+(typeInputs.size()+inputs.size())*cellHeight;
     override var internalContent = Group {
 	content: bind [innerContent, 
@@ -4072,6 +4146,11 @@ public class ExprDebugger is DebuggerEngine {
 
 var showSource is Boolean;
 
+function canConvert from (target is F3Type, src is F3Type) to Boolean {
+    src == null or (target == UNIT_TYPE or observeType(target).isConvertibleFrom(src)) or
+        (isMappable(src) and canConvert(target, getLoweredType(src)));
+}
+
 public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollable, MouseInputHandler {
 
     public const menuFactory is MenuFactory;
@@ -4082,7 +4161,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     
     bound function canAssignTo from (t is F3Type) to Boolean 
     {
-        dropType == null or (t == UNIT_TYPE or observeType(t).isConvertibleFrom(dropType))
+        canConvert(t, dropType);
     }
 
     public var stepping is Boolean;
@@ -4564,6 +4643,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     const ARROW_COLOR = Color.color(.2, .2, .2);
 
     const cellHeight is Number = 16;
+    const cellWidth is Number = 180;
 
     const portArrow is Polygon = Polygon {
 	points: [-3.5, -4.5, -3.5, 4.5, 3.5, 0];
@@ -4625,8 +4705,8 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     }
 
     const terminalView is TransformNode = TransformNode { 
-        tx: bind width / 2.0 - 120; 
-        ty: bind height / 2 - 20; 
+        tx: bind (1.0/zoomx)*(width / 2.0 - cx) - 120;
+        ty: bind (1.0/zoomy)*(height / 2 - cy) - 20;
         content: bind terminalExprView;
     };
 
@@ -5044,7 +5124,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         visible: bind englishOutput <> "";
     };
 
-    var zoomx = 1.0;
+    var zoomx = 1.0 on replace { println("ZOOM => {zoomx}") }
     var zoomy = 1.0;
 
     const linkHandler = sourceCode.observeLinkClicked().subscribe(function from (u is String) to () 
@@ -5206,7 +5286,8 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         bounds = toSceneTransform.inverse() * bounds;
         const w = bounds.width();
         const h = bounds.height();
-        const zoom = Math.min(height / (h+100), width / (w+100));
+        const max_zoom = Math.max(1.0, (width-100) / ((if terminalExprView <> null then 2  else 1) * cellWidth + 20));
+        const zoom = Math.min(max_zoom, Math.min(height / (h+100), width / (w+100)));
         frameBounds = bounds;
         cx = -bounds.center.x * zoom;
         cy = -bounds.center.y * zoom;
@@ -5358,7 +5439,8 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             if (not hit) { hit = n is ExpressionView }
 	    if (n is LinkedInputView) {
 		const pv = n as LinkedInputView;
-		if (pv.getInputType() == UNIT_TYPE or observeType(pv.getInputType()).isConvertibleFrom(t)) {
+		if (pv.getInputType() == UNIT_TYPE or observeType(pv.getInputType()).isConvertibleFrom(t) 
+                    or (isMappable(t) and observeType(pv.getInputType()).isConvertibleFrom(getLoweredType(t)))) {
 		    println("IS ASSIGNABLE {pv.getClass()} {pv.getInputType()} <- {t}");
 		    k(pv);
                     return;
@@ -5407,9 +5489,10 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         }
     }
 
-    function genSource to () {
+    public function genSource to () {
 	println("DUMP SRC:");
 	unsubscribe();
+        prog.parent.canvas.genSource();
 	println(visit(varRoot, foreach (v in views where v.expression <> varRoot and v is GetVarView) v.expression));
     }
 
