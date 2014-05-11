@@ -185,27 +185,12 @@ function formatEnglishName from (name is String, id is String) to String
     }
 }
 
-function isSameTypeArgument from (target is F3Type, src is F3Type) to Boolean {
-    if (target is F3Local.JVMLocalType) {
-        if (src is F3Local.JVMLocalType) {
-            const x = (target as F3Local.JVMLocalType);
-            const y = (src as F3Local.JVMLocalType);
-            println("checking type args {target}, {src} => {x}, {y}");
-            return x.getType().equals(y.getType())
-        }
-    }
-    return false;
-}
-
 function typeApply from (target is F3Type, 
                          srcType is F3Type,
                          subst is F3Type) 
     to F3Type 
 {
-    println("TYPE APPLY {target}, {srcType}, {subst}");
-    if (target.isTypeVariable()) {
-        return if (isSameTypeArgument(target, srcType)) then subst else target;
-    }
+    if (target == srcType) return subst;
     if (target is F3FunctionType) {
         const funType = target as F3FunctionType;
         const retType = typeApply(funType.getReturnType(), srcType, subst);
@@ -237,13 +222,7 @@ function typeApply from (target is F3Type,
             const rt = ctx.instantiateType(clsType, parms);
             println("result={formatClassName(rt)}");
             return rt;
-        } else {
-            if (parms <> []) {
-                return target;
-            }
         }
-    } else {
-        if (target == srcType) return subst;
     }
     return target;
 }
@@ -400,28 +379,6 @@ public function introspect from (t is F3Type, all is Boolean) to Member[]
     }
 }
 
-public function introspect from (clazz is F3ClassType) to Member[]
-{
-    introspect(clazz, false);
-}
-
-class Instantiator {
-
-    public const clazz is F3ClassType;
-
-    public function G of (T is F3Type) from (t is T) to T 
-    {
-        if (clazz.isGenericInstance()) 
-            then 
-                {
-                    const r = typeApply(t, clazz.getGenericBase(), clazz) as T;
-                    println("G {t}, {clazz.getGenericBase()}, {clazz} => {r}");
-                    r;
-                } 
-        else t;
-    }
-}
-
 function isMappable from (t is F3Type) to Boolean {
     if (t is F3ClassType) {
         const ct = t as F3ClassType;
@@ -448,6 +405,28 @@ function isMappable from (t is F3Type) to Boolean {
     return false;
 }
 
+public function introspect from (clazz is F3ClassType) to Member[]
+{
+    introspect(clazz, false);
+}
+
+class Instantiator {
+
+    public const clazz is F3ClassType;
+
+    public function G of (T is F3Type) from (t is T) to T 
+    {
+        if (clazz.isGenericInstance()) 
+            then 
+                {
+                    const r = typeApply(t, clazz.getGenericBase(), clazz) as T;
+                    println("G {t}, {clazz.getGenericBase()}, {clazz} => {r}");
+                    r;
+                } 
+        else t;
+    }
+}
+
 public function introspect from (clazz is F3ClassType, all is Boolean) to Member[]
 {
     if (clazz == null) return [];
@@ -457,16 +436,15 @@ public function introspect from (clazz is F3ClassType, all is Boolean) to Member
     }
     const I = Instantiator {clazz: clazz};
     var result is Member[];
-    const funs = Reflect.getFunctions(clazz, all);
+    const funs = Reflect.getFunctions(clazz, not all);
     if (all) {
         var r = 
             foreach (f in funs where f.isPublic() and not f.getName().contains("$") and 
                      OBJECT_TYPE <> f.getDeclaringClass() 
                      ) { 
-            var rt = I.G(f.getType().getReturnType());
             FunctionMember {
                 m: f;
-                t: rt;
+                t: I.G(f.getType().getReturnType());
                 ft: I.G(f.getType());
                 isInfix: ((f.isStatic() and f.getType().minArgs() == 2) or f.getType().minArgs() == 1) and operatorSet.contains(f.getName())
             }
@@ -498,12 +476,6 @@ public function introspect from (clazz is F3ClassType, all is Boolean) to Member
 	    if (SUBJECT_TYPE.isAssignableFrom(rt) or OBSERVABLE_TYPE.isAssignableFrom(rt) or OBSERVER_TYPE.isAssignableFrom(rt)) {
 		rt_t = getTypeArguments(rt)[0];
 	    } else {
-                if (isMappable(rt)) {
-                    rt_t = getTypeArguments(rt)[0];
-                    println("map => {rt} => {rt_t}");
-                } else {
-                    println("not mappable: {rt}");
-                }
 	    }	
             if (rt_t is F3SequenceType) {
                 rt_t = (rt_t as F3SequenceType).getComponentType();
@@ -613,6 +585,24 @@ public function introspect from (clazz is F3ClassType, all is Boolean) to Member
     return result;
 }
 
+public class TypeMember is Member {
+    public const classType is F3ClassType;
+    override var rt = bind classType;
+    override var m = bind classType;
+    override var t = bind classType;
+    public override const name is String = bind m.getName();
+    override var members is Member[] = bind getTypeMembers(classType);
+}
+
+function getTypeMembers from (classType is F3ClassType) to Member[] 
+{
+    const xs is F3Type[] = classType.getTypeParameters();
+    foreach (x in xs) {
+        TypeMember {
+            classType: x as F3ClassType;
+        }
+    }
+}
 
 public class Member {
     override function equals from (obj is Object) to Boolean {
@@ -688,11 +678,6 @@ public class FunctionMember is Member {
         }
     }
     override var name = formatName(m as F3FunctionMember);
-
-    public function getFullName to String
-    {
-        if (m.isStatic()) then "{m.getDeclaringClass().getName()}.{m.getName()}" else m.getName();
-    }
 }
 
 function formatType from (t is F3Type) to String 
@@ -721,34 +706,6 @@ function formatFunctionType from (clazz is F3ClassType, ft is F3FunctionType) to
     "{r}) \u2192 {formatType(ft.getReturnType())}";
 }
 
-
-function formatTypeHtml from (t is F3Type) to String 
-{
-    if t.isTypeVariable() then "Any<sup>{t.getTypeVariable()}</sup>" else if (t is F3SequenceType) 
-        then "{formatTypeHtml((t as F3SequenceType).getComponentType())}[]" 
-        else if (t is F3FunctionType) then formatFunctionTypeHtml(null, t as F3FunctionType) 
-            else if (t is F3ClassType) then { 
-                    const ct = t as F3ClassType; 
-                    //const dot = t.getName().lastIndexOf("."); 
-                    //if (dot >= 0) then t.getName().substring(dot+1) else t.getName();
-                    formatClassNameHtml(t)
-                }
-            else t.getName();
-}
-
-function formatFunctionTypeHtml from (clazz is F3ClassType, ft is F3FunctionType) to String 
-{
-     
-    var r = if clazz == null then "(" else "({formatTypeHtml(clazz)}";
-    var sep = if clazz == null then "" else ", ";
-    for (i in [0..<ft.minArgs()]) {
-        r = "{r}{sep}{formatTypeHtml(ft.getArgumentType(i))}";
-        sep = ", ";
-    }
-    "{r}) \u2192 {formatTypeHtml(ft.getReturnType())}";
-}
-
-
 function argCount from (f is F3FunctionMember) to Integer 
 {
     (if f.isStatic() then 0 else 1) + f.getType().minArgs();
@@ -765,7 +722,7 @@ function formatClassName from (t is F3Type) to String
     if (t == UNIT_TYPE) {
         return "()"
     }
-    if (t == OBJECT_TYPE) {
+    if (t == OBJECT_TYPE and not t.isTypeVariable()) {
         return "Any"
     }
     if (t is F3FunctionType) {
@@ -779,7 +736,7 @@ function formatClassName from (t is F3Type) to String
         const v = if targs == [] then (t as F3ClassType).getTypeParameters()[0] else targs[0];
         return formatClassName(v);
     }
-    const n = if (t.isTypeVariable()) then "Any" else t.getName();
+    const n = if (t.isTypeVariable()) then t.getTypeVariable() else t.getName();
     const dot = n.lastIndexOf(".");
     const base = n.substring(dot+1);
     const parms is F3Type[] = (t as F3ClassType).getTypeArguments();
@@ -798,45 +755,6 @@ function formatClassName from (t is F3Type) to String
     }
 }
 
-function formatClassNameHtml from (t is F3Type) to String 
-{
-    if (t == UNIT_TYPE) {
-        return "()"
-    }
-    if (t == OBJECT_TYPE and not t.isTypeVariable()) {
-        return "Any"
-    }
-    if (t is F3FunctionType) {
-        return formatFunctionTypeHtml(null, t as F3FunctionType)
-    }
-    if (not (t is F3ClassType)) {
-        return t.getName();
-    }
-    if (Reflect.isObservableType(t)) {
-        const targs = getTypeArguments(t as F3ClassType);
-        const v = if targs == [] then (t as F3ClassType).getTypeParameters()[0] else targs[0];
-        return formatClassNameHtml(v);
-    }
-    const n = if (t.isTypeVariable()) then "Any<sup>{t.getTypeVariable()}</sup>" else t.getName();
-    const dot = n.lastIndexOf(".");
-    const base = n.substring(dot+1);
-    const parms is F3Type[] = (t as F3ClassType).getTypeArguments();
-    if (parms.size() == 0) {
-        return base;
-    }  else if (parms.size() == 1) {
-        return "{base} of {formatClassNameHtml(parms[0])}";
-    } else {
-        var result = "{base} of (";
-        var sep = "";
-        for (x in parms) {
-            result = "{result}{sep}{formatClassNameHtml(x)}";
-            sep = ", ";
-        }
-        return "{result})";
-    }
-}
-
-
 function argName from (fun is FunctionMember,
                        ft is F3FunctionType, i is Integer) to String 
 {
@@ -852,7 +770,7 @@ function argName from (ft is F3FunctionType, i is Integer) to String
 {
     const t = ft.getArgumentType(i);
     if (t.isTypeVariable()) {
-        return "Any";
+        return t.getTypeVariable();
     }
     const n = formatClassName(t);
     const dot = n.lastIndexOf(".");
@@ -903,10 +821,30 @@ public abstract class ObjectExpression is Expression {
     }
 }
 
+class TypeVariableExpression is Expression {
+    const typevar is F3Type;
+    override function getType { typevar }
+    override bound function getName to String { typevar.getTypeVariable() }
+}
+
+class ClassTypeExpression is ObjectExpression {
+    public const classType is F3ClassType;
+    override var inputMembers = bind getTypeMembers(classType);
+    override var outputMembers = TypeMember { classType: bind classType };
+    override function getType { classType }
+    override bound function getName to String { formatClassName(classType) }
+}
+
+class TypeExpression is Expression {
+    public const typeref is F3Type;
+    override function getType { typeref }
+    override bound function getName to String { formatType(typeref) }
+}
+
 public class VarContextExpression is ObjectExpression {
     public var varContext is Context.ClosureVarContext;
     override bound function getName to String { varContext.varName }
-    override function toSource from (context is IContext) to String { "(getVar(\"{varContext.varName}\") as f3.lang.Ref of {getType().getName()})" }
+    override function toSource from (context is IContext) to String { "(getVar(\"{varContext.varName}\") as f3.lang.ref of {getType().getName()})" }
     override function toEnglish to String { varContext.varName }
     override function getType to F3Type {
         varContext.varType.t;
@@ -1059,42 +997,12 @@ public class IPath {
             const observable = observer.observable;
             if (observable is GetVarResult) {
                 var exp is Expression = observable;
-                while (exp is GetVarResult) {
+                while (not (exp is Result)) {
                     exp = (exp as GetVarResult).observable;
                 }
-                if (exp is Result) {
-                    var result = exp as Result;
-                    if (OBSERVABLE_TYPE.isAssignableFrom(result.t)) return true;
-                } else {
-                    println("Needs lower EXP=>{exp}");
-                }
-            }
-        }
-        return false;
-    }
-
-    function needsMappableLower to Boolean {
-        if (observer is GetVar) {
-            const g = observer as GetVar;
-            if (g.member.rt is F3SequenceType) return true;
-        }
-        if (observer is Parameter) {
-            const p = observer as Parameter;
-            const observable = observer.observable;
-            if (observable is GetVarResult) {
-                var exp is Expression = observable;
-                while (exp is GetVarResult) {
-                    exp = (exp as GetVarResult).observable;
-                }
-                if (exp is Result) {
-                    var result = exp as Result;
-                    if (result.t is F3SequenceType) return true;
-                    if (isMappable(result.t)) {
-                        return true;
-                    }
-                } else {
-                    println("Needs lower EXP=>{exp}");
-                }
+                var result = exp as Result;
+                if (OBSERVABLE_TYPE.isAssignableFrom(result.t)) return true;
+                if (result.t is F3SequenceType) return true;
             }
         }
         return false;
@@ -1143,9 +1051,6 @@ public class IPath {
             }
             if (observer is TreeGetVar) {
                 return (observer as TreeGetVar).toEnglish();
-            }
-            if (observer.observable is Function) {
-                return (observer.observable as Function).funMember.m.getName();
             }
             println("PARENTS SIZE is ZERO {observer.getClass()} {observer}, observable={observer.observable.getClass()} {observer.observable}");
             return "the event";
@@ -1237,9 +1142,6 @@ public class IPath {
             if (observer is TreeGetVar) {
                 return (observer as TreeGetVar).getLocalAccess();
             }
-            if (observer.observable is Function) {
-                return (observer.observable as Function).funMember.getFullName();
-            }
             return "i";
         }
         if (observer is GetVarResult) {
@@ -1251,25 +1153,20 @@ public class IPath {
             const fun = func.fun;
             var obDepth = -1;
             var prefix = "";
-            var lowered = -1;
             if (fun.isStatic()) {
                 var args = "";
                 var sep = "";
                 for (p in parents[1..]) {
                     var j = p.getWorldAccess();
                     if (p.needsLift()) {
-                        println("STATIC LIFT: {p}");
+                        println("NON STATIC LIFT: {p}");
                         obDepth = p.getContainingObservableDepth();
                         prefix = j;
                         j = "obs{p.getContainingObservableDepth()-1}";
                     } else if (p.needsLower()) {
-                        println("STATIC LOWER: {p}");
-                        println("STATIC LOWER j: {j}");
+                        println("NON STATIC LOWER: {p}");
+                        println("NON STATIC LOWER j: {j}");
                         prefix = j;
-                        j = "i{p.getDepth()-1}";
-                    } else if (p.needsMappableLower()) {
-                        prefix = j;
-                        lowered = p.getDepth()-1;
                         j = "i{p.getDepth()-1}";
                     }
                     args = "{args}{sep}{j}";
@@ -1278,8 +1175,6 @@ public class IPath {
                 const app = formStaticMethodCall(fun);
                 if (obDepth >= 0) {
                     return "{prefix} \}; const obs{obDepth} = foreach (i{getDepth()} in {app}({args})) \{";
-                } else if (lowered >= 0) {
-                    return "foreach (i{lowered} in {prefix}) {app}({args})";
                 }
                 return "{prefix} {app}({args})";
             } else {
@@ -1323,8 +1218,7 @@ public class IPath {
             if (i.member.m is F3VarMember and i.member.isObserver) {
                 return "\{ {i.target.toSource(null)}.{i.member.toApply()} = {parents[0].getWorldAccess()}; \}";
             } else if (i.target is VarContextExpression) {
-                //return "{i.target.toSource(null)}.set({parents[0].getWorldAccess()})";
-                return "{parents[0].getWorldAccess()}";
+                return "{i.target.toSource(null)}.set({parents[0].getWorldAccess()})";
             } else { 
                 if (i.member.isObserver and is1ArgFunction(i.member)) {
                     return "{i.target.toSource(null)}.{i.member.toApply("{parents[0].getWorldAccess()}")}";
@@ -1506,7 +1400,7 @@ function descendsFromObservableRoot from (p is Expression) to Boolean {
     return false;
 }
 
-public class Function is MemberExpression, ObservableExpression {
+public class Function is MemberExpression {
     public var funMember is FunctionMember;
     override var member = bind funMember;
     public var ft is F3FunctionType = bind funMember.ft;
@@ -1840,6 +1734,8 @@ public abstract class ExpressionView is AbstractNode {
             indent: 4;
         };
     }
+
+
     const titleRect = Rectangle {
         height: bind cellHeight;
         width: bind cellWidth;
@@ -1850,6 +1746,7 @@ public abstract class ExpressionView is AbstractNode {
            [titleRect,
            label];
     };
+    protected var titleSeparatorRow is Integer = 0;
     function borderedTitle to Node {
         Group {
             content:
@@ -1860,7 +1757,7 @@ public abstract class ExpressionView is AbstractNode {
                         width: bind cellWidth;
                         fillPaint: bind canvas.textFg;
                         pickable: false;
-                        transform: bind translate(0, Math.round(-cellHeight/2.0));
+                        transform: bind translate(0, -titleSeparatorRow * cellHeight + Math.round(-cellHeight/2.0));
                     }]; 
         }
     } 
@@ -1954,22 +1851,25 @@ class FunctionView is ExpressionView {
 
     override var title = bind borderedTitle();
 
-    override public function unlink from () to () {
+    override public function unlink from () to () 
+    {
         for (x in inputs) {
             x.unlink();
         }
-        foreach (link in output.getTree.getLinks()) {
+        for (link in output.getTree.getLinks()) {
             link.unlink();
         }
     }
 
     override var selectable = true;
 
-    public override function serialize to ExprNode {
+    public override function serialize to ExprNode 
+    {
         serializeFunction();
     }
 
-    public function serializeFunction to FunNode {
+    public function serializeFunction to FunNode 
+    {
         const n = FunNode {
             id: "{id}";
             x: pos.x;
@@ -2011,8 +1911,8 @@ class FunctionView is ExpressionView {
         }
     }
 
-
-    function unify to () {
+    function unify to () 
+    {
         for (x in inputs) {
             var t = x.parameter.t;
             if (true or t.isTypeVariable()) {
@@ -2090,7 +1990,19 @@ class FunctionView is ExpressionView {
         override var outputName = "";
         override function assignLinkIds to () {
         }
+    };
+
+    bound function getTypeArgs from (xs is ParameterView[]) to TypeParameterView[] 
+    {
+        foreach (x in xs) {
+            var t = x.getInputType();
+            if (t.isTypeVariable()) then TypeParameterView { canvas: canvas, parameter: TypeVariableExpression { typevar: t } } else null;
+        }
     }
+
+    override var titleSeparatorRow is Integer = bind typeInputs.size();
+
+    bound var typeInputs is TypeParameterView[] = getTypeArgs(inputs);
 
     bound var inputs is ParameterView[] = foreach (p in fun.inputs) ParameterView {
         targetView: this;
@@ -2110,16 +2022,19 @@ class FunctionView is ExpressionView {
 	content: 
 	[
 	 Group {
+	     content: bind typeInputs
+	 }
+	 Group {
 	     content: bind inputs
 	 }
 	 Group {
-	     transform: bind translate(0, -inputs.size() * cellHeight);
+	     transform: bind translate(0, -(typeInputs.size() + inputs.size()) * cellHeight);
 	     content: bind output;
 	 }]
     };
 
     const innerContent = Group { content: bind [title, funOutput, io] };
-    bound var h = output.bounds.height() + cellHeight+inputs.size()*cellHeight;
+    bound var h = output.bounds.height() + cellHeight+(typeInputs.size()+inputs.size())*cellHeight;
     override var internalContent = Group {
 	content: bind [innerContent, 
         Rectangle {
@@ -2138,8 +2053,12 @@ class FunctionView is ExpressionView {
     override function update to ()
     {
 	super.update();
+        var j = 0;
+	for (i in typeInputs) {
+	    i.index = j++;
+	}
 	for (i in inputs) {
-	    i.index = indexof i;
+	    i.index = j++;
 	}
     }
 
@@ -2245,6 +2164,9 @@ public class OutputMemberExpression is MemberExpression, ObservableExpression {
 
 class ObjectOutputView is OutputView {
     public var sourceView is ObjectView;
+}
+
+class ClassView is ObjectView {
 }
 
 public class ObjectView is ExpressionView {
@@ -2471,7 +2393,7 @@ public class GetVarView is OutputView {
             treeHeight = tv.treeHeight;
         }
     }
-    override var internalContent = Group {
+    const innerContent = Group {
 	content: 
         bind 
         if (isLabeled) then {
@@ -2494,6 +2416,22 @@ public class GetVarView is OutputView {
             }]
         }
     };
+    bound var h = innerContent.bounds.height();
+    override var internalContent = Group {
+        content: bind 
+        [innerContent,
+         Rectangle {
+                transform: bind translate(0, -h/2+cellHeight/2);
+                visible: bind selected
+                pickable: false;
+                width: bind cellWidth;
+                height: bind h;
+                stroke: Stroke {
+                    width: 2;
+                }
+                strokePaint: SelectionPaint;
+        }]
+    }
     override bound function getLinkPos to Point3 { getWorldPos() }
 
 }
@@ -2508,17 +2446,18 @@ class OutputPort is LinkedOutputView {
         canvas.toLocal * (toSceneTransform * new Point3(width/2, 0, 0) );
     }
     var rect1 is Rectangle;
+    var rect2 is Rectangle;
     override var internalContent = Group {
         content: 
         [rect1 = Rectangle {
-           cx: 2;
-           width: bind width+2;     
-           height: bind cellHeight-2;
+           cx: 3;
+           width: bind width+3;     
+           height: bind cellHeight-3;
            fillPaint: ColorPaint(Color.color(.2, .2, .2, 0));
         },
-        Rectangle {
+        rect2 = Rectangle {
             cx: 2
-            visible: bind rect1.containsPointer;
+            visible: bind rect1.containsPointer or rect2.containsPointer;
             width: bind width+2;
             height: 1.5;
             fillPaint: ColorPaint(Color.color(.2, .2, .2))
@@ -2549,18 +2488,20 @@ class SourcePort is LinkedInputView {
         canvas.toLocal * (toSceneTransform * new Point3(-3, 0, 0) );
     }
     var rect1 is Rectangle;
+    var rect2 is Rectangle;
     override var internalContent = Group {
         content:
         [rect1 = Rectangle {
-           width: bind width+2;     
+           cx: -3;
+           width: bind width+3;     
            height: bind cellHeight-2;
            fillPaint: ColorPaint(Color.color(.2, .2, .2, 0));
         },
-        Rectangle {
+        rect2 = Rectangle {
             cx: -2;
-            visible: bind rect1.containsPointer or links.size() > 0;
+            visible: bind rect2.containsPointer or rect1.containsPointer or links.size() > 0;
             width: bind width+2;
-            height: 2;
+            height: 1.5;
             fillPaint: ColorPaint(Color.color(.2, .2, .2));
         }]
     }
@@ -2936,16 +2877,17 @@ public class LinkView is ExpressionView {
         source.assignLinkIds();
     }
 
+
+    override var internalContent = Group {
+	override var transform = bind translate(target.getLinkPos())
+	content: bind canvas.makeArrow(canvas.ARROW_COLOR);
+    }
+
     postinit {
         undoList.addTarget("target", &target);
         undoList.addTarget("source", &source);
         undoList.addTarget("targetLinkId", &targetLinkId);
         undoList.addTarget("sourceLinkId", &sourceLinkId);
-    }
-
-    override var internalContent = Group {
-	override var transform = bind translate(target.getLinkPos())
-	content: bind canvas.makeArrow(canvas.ARROW_COLOR);
     }
 }
 
@@ -3070,6 +3012,24 @@ class BooleanConstant is Constant {
     override bound function getName to String { "{value}" }
 }
 
+class TypeParameterView is InputView {
+    public var parameter is TypeVariableExpression;
+    override var expression = bind parameter;    
+    override var internalContent = Group { content: bind title }
+    public override bound function getLabel to String { expression.getName() }
+}
+
+class TypeRefView is OutputView {
+    public var ref is TypeExpression;
+    override var expression = bind ref;    
+    override var treeWidth = 16;
+    override var internalContent = Group { content: bind [title, TransformNode { tx: bind cellWidth/2-8, content: bind getTree }] }
+    public override bound function getLabel to String { expression.getName() }
+    override var outputName = "";
+    override var resultType = bind ref.typeref;
+    override var transform = bind translate(pos);
+}
+
 public class ParameterView is InputView {
     const parameter is Parameter;
     public var targetView is FunctionView;
@@ -3092,7 +3052,7 @@ public class ParameterView is InputView {
     function makeLabel from (t is F3Type) to String
     {
         println("making label for type {t} pname={parameter.name} target={parameter.target}");
-        formatClassNameHtml(t)
+        formatClassName(t)
             //parameter.name
     }
 
@@ -3300,9 +3260,13 @@ public class OutputView is LinkedOutputView {
         }
     };
 
+    protected var treeWidth = bind cellWidth;
+    protected var isStatic is Boolean = false;
+
     const getTree is GetTreeview = GetTreeview {
+        isStatic: bind isStatic;
         canvas: bind canvas;
-        width: bind cellWidth;
+        width: bind treeWidth;
         get: bind getter;
         exprView: this;
     };
@@ -3374,6 +3338,7 @@ class TreeGetVar is GetVar {
 
 class MemberTreenode is Treenode {
     public var m is Member;
+    public const isStatic is Boolean;
     public var depth is Integer = bind (parent as MemberTreenode).depth + 1;
     public var get is GetVar = bind TreeGetVar { member: m }
     override var label = bind Names.formatName(m.name);
@@ -3390,7 +3355,7 @@ class MemberTreenode is Treenode {
             if (r <> null) {
                 println("member is {x.getClass()} {x}");
             }
-            r;
+            if x.m.isStatic() == isStatic then r else null;
         }
     }
     override var canOpen = bind { var n = members.size(); n > 0 };
@@ -3451,6 +3416,7 @@ class MemberTreenode is Treenode {
         const m = MemberTreenode {
             parent: this;
             m: x;
+            isStatic: isStatic;
         }
         insert m.get into get.observers;
         m.get.observable = get;
@@ -3641,6 +3607,7 @@ public class MemberTreecell is Treeview.Treecell
 }
 
 class GetTreeview is AbstractNode {
+    public var isStatic is Boolean;
     public var event is Member;
     public var canvas is Canvas;
     public var exprView is OutputView;
@@ -3663,6 +3630,7 @@ class GetTreeview is AbstractNode {
 	root: MemberTreenode {
 	    get: bind get;
 	    m: bind get.member;
+            isStatic: bind isStatic;
             override var label = bind rootName;
             value: bind debugValue;
             override function getType to F3Type
@@ -4236,6 +4204,13 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         MasterUndoable.commit();
     }
 
+    public function onDrop from (where is Pick, t is F3Type) to ()
+    {
+        const r = createTypeView(toLocal * where.scenePoint, t, 0);
+        setSelectedExpr(r);
+        MasterUndoable.commit();
+    }
+
     function createFork from (pt is Point3) to ForkView {
         const r = ForkView {
             canvas: this;
@@ -4251,6 +4226,32 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         }
         insert r into views;
         r.pos = new Point3(pt.x, pt.y, pt.z);
+        return r;
+    }
+
+    function createTypeView from (pt is Point3, t is F3Type, offset is Integer) to ExpressionView
+    {
+        var r is ExpressionView;
+        if (t is F3ClassType) {
+            const classType = t as F3ClassType;
+            if (classType.getTypeParameters() <> []) {
+                r = ClassView {
+                    canvas: this;
+                    objectExpr: ClassTypeExpression {
+                        classType: classType;
+                    }
+                }
+            }
+        }
+        if (r == null) {
+            r = TypeRefView {
+                selectable: true;
+                canvas: this;
+                ref: TypeExpression { typeref: t }
+            };
+        }
+        insert r into views;
+        r.pos = new Point3(pt.x+r.bounds.extent.x, pt.y + cellHeight*(offset+1), pt.z);
         return r;
     }
 
@@ -5089,7 +5090,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                        id: "lines"
                        pickable: false;
                        override var mesh = bind linkMesh;
-                       shader: effectLoader.loadPaintShader(ColorPaint(Color.color(.20, .20, .20)));
+                       shader: effectLoader.loadPaintShader(ColorPaint(Color.color(.1, .1, .1)));
                    },
                    Group { content: bind arrows},
                    Group { content: bind selectionRect}, 

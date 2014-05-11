@@ -1223,11 +1223,13 @@ public function run from (args is String[]) to ()
                                                                 const ctx = (contextTree.selectedTreenode as Context.ContextTreenode).context;
                                                                 if (ctx is Context.ResourceObjectContext) {
                                                                     const r = ctx as Context.ResourceObjectContext;
+                                                                    const members = r.getMembers();
                                                                     const menu = Menu {
-                                                                        items: Menu {
+                                                                        items: 
+                                                                        [if (members == []) then null else Menu {
                                                                             label: "Events"
                                                                             items: 
-                                                                            foreach (j in r.getMembers()) {
+                                                                            foreach (j in members) {
                                                                                 MenuItem {
                                                                                     label: Names.formatName(j.name);
                                                                                     action: function to () 
@@ -1237,7 +1239,13 @@ public function run from (args is String[]) to ()
                                                                                     }
                                                                                 }
                                                                             }
-                                                                        }
+                                                                        },
+                                                                        MenuItem {
+                                                                            label: "Variable"
+                                                                        },
+                                                                        MenuItem {
+                                                                            label: "Function"
+                                                                        }]
                                                                     };
                                                                     e.stage.showPopupMenu(e.screenx, e.screeny+contextTree.cellHeight, menu);
                                                                 }
@@ -1415,6 +1423,15 @@ public function run from (args is String[]) to ()
                                                      if (j.node is Expression.Canvas) {
                                                          const ma = asset as AssetTree.MemberAsset;
                                                          (j.node as Expression.Canvas).onDrop(j, ma.member);
+                                                         break;
+                                                     } 
+                                                 }
+                                             } else if (asset is AssetTree.TypeAsset) {
+                                                 const picked = getUnderMouseInEditor();
+						 for (j in picked) {
+                                                     if (j.node is Expression.Canvas) {
+                                                         const ma = asset as AssetTree.TypeAsset;
+                                                         (j.node as Expression.Canvas).onDrop(j, ma.t);
                                                          break;
                                                      } 
                                                  }
