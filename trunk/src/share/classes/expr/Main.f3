@@ -748,6 +748,7 @@ public function run from (args is String[]) to ()
         mainTimeLayer.content = currentAnimResource;
         mainContext.programs = [];
         mainContext.program = null;
+        ExprNode.Start.disposeAll();
         contextModel.reset();
         contextTree.select(contextModel.root);
 	transformHierarchy.clearSelection();
@@ -822,7 +823,9 @@ public function run from (args is String[]) to ()
                 }
             }
             println("CREATED PROGRAM {p.event}");
+            println("code=>{p.sourceCode}");
             var ps = [p];
+            mainContext.program = p;
             for (d in prog.variables) {
                 const v = Context.ClosureVarContext {
                     parent: mainContext,
@@ -1266,6 +1269,7 @@ public function run from (args is String[]) to ()
                                                                             for (p in targ.programs) {
                                                                                 println("delete checking {p}");
                                                                                 if (p.evalContext.varContext == toDelete) {
+                                                                                    p.reset();
                                                                                     delete p from targ.programs;
                                                                                     p.parent.undefineVar(p.evalContext.varContext);
                                                                                     println("deleted VAR {p.evalContext.varContext.varName}");

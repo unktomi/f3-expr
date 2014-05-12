@@ -162,7 +162,9 @@ public class ResourceNodeContext is GroupContext, ResourceObjectContext {
     public override function deleteContent from (c is Context) to ()
     {
         if (c is MemberContext) {
-            delete (c as MemberContext) from programs;
+            const pc = c as MemberContext;
+            pc.program.reset();
+            delete pc from programs;
         }
         super.deleteContent(c);
         
