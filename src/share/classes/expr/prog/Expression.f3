@@ -1170,12 +1170,12 @@ public class IPath {
         if (observer is InputMemberExpression) {
             const i = observer as InputMemberExpression;
             if (i.member.m is F3VarMember and i.member.isObserver) {
-                return "assign {parents[0].getEnglishAccess()} to the {formatEnglishName(i.member.name)} of {i.target.toEnglish()}"
+                return "Assign {parents[0].getEnglishAccess()} to the {formatEnglishName(i.member.name)} of {i.target.toEnglish()}"
             } 
             if (i.member.isObserver and is1ArgFunction(i.member)) {
                 return "{formatEnglishName(i.member.name)} of {i.target.toEnglish()} {parents[0].getEnglishAccess()}";
             } else if (i.target is VarContextExpression) {
-                return "assign {parents[0].getEnglishAccess()} to {i.target.toEnglish()} "
+                return "Assign {parents[0].getEnglishAccess()} to {i.target.toEnglish()} "
             } else {
                 const sep = if (i.member.m is F3VarMember) then " of " else " ";
                 return "{parents[0].getEnglishAccess()}, {formatEnglishName(i.member.name)}{sep}{i.target.toEnglish()}";
@@ -2257,7 +2257,8 @@ public class ObjectView is ExpressionView {
         for (i in outputViews) i.unlink();
     }
 
-    public override function serialize to ExprNode {
+    public override function serialize to ExprNode 
+    {
         var n is ObjNode;
         if (objectExpr is NodeExpression) {
             n = NodeObjNode {nodeId: (objectExpr as NodeExpression).node.id};
@@ -2394,6 +2395,9 @@ function getPath from (v is LinkView) to String {
 public class GetVarView is OutputView {
 
     public override function serialize to ExprNode {
+        if (get.member == null) {
+            println("Get node member is null: {this}");
+        }
         const n = GetNode {
             id: "{id}";
             x: pos.x;
@@ -4378,6 +4382,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 }
             }
             if (p == null) return;
+            if (v == subject) return;
             const names = new java.util.HashSet of String;
             const members = [foreach (m in introspectMembers(v) where not m.name.contains("pdate") and names.add(m.name)) m];
             const typ = v.varType.t;
@@ -5260,6 +5265,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     {
         fontSize = font.height();
         zoomx = zoomy = 1.0;
+        cx = cy = 0;
         MasterUndoable.commit();
     }
 
@@ -5492,8 +5498,8 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     public function genSource to () {
 	println("DUMP SRC:");
 	unsubscribe();
-        prog.parent.canvas.genSource();
 	println(visit(varRoot, foreach (v in views where v.expression <> varRoot and v is GetVarView) v.expression));
+        prog.parent.canvas.genSource();
     }
 
     const serializationMap = new java.util.IdentityHashMap of (ExpressionView, ExprNode);
@@ -5636,7 +5642,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 println("code => {j}");
                 prog.defineVar(subject, "var <<{subject.varName}>> is <<{subject.varType.t}>> = {j}; ");
             } else {
-                eng = "assign {nil(subject.varType.t)} to <i>{subject.varName}</i>";
+                eng = "Assign {nil(subject.varType.t)} to <i>{subject.varName}</i>";
                 prog.defineVar(subject, "var <<{subject.varName}>> is <<{subject.varType.t}>> = {nil(subject.varType.t)}; ");
             }
             englishOutput = eng;
@@ -6001,7 +6007,7 @@ public class VarContextObjNode is ObjNode {
         }
         const typ = c.varType.t;
         const names = new java.util.HashSet of String;
-        const members = foreach (m in introspect(typ) where not m.name.contains("pdate") and names.add(m.name)) m;
+        const members = foreach (m in introspectMembers(c) where not m.name.contains("pdate") and names.add(m.name)) m;
         const result = ObjectView {
             pathFactory: canvas.pathFactory;
             layoutEngine: canvas.layoutEngine;
@@ -6011,15 +6017,24 @@ public class VarContextObjNode is ObjNode {
             pos: new Point3(x, y, 0);
             objectExpr: VarContextExpression { 
                 varContext: c, override function getType to F3Type { typ }
-                inputMembers: foreach (m in members where  m.isObserver) m;
-                outputMembers: foreach (m in members where m.isObservable and m.m is F3FunctionMember) m;
+                inputMembers: [];
+                outputMembers: foreach (x in members where x.isObservable) x;
             }
         }
-        for (i in inputs) {
-            if (i.links.size() > 0) {
-                for (link in i.links) {
+        for (p in outputs) {
+            const tv = result.outputViews[0].getTree;
+            if (p.links.size() > 0) {
+                const path = p.sourceId;
+                const tn = tv.treeModel.resolvePath(path);
+                if (tn.parent <> null) {
+                    tn.open();
+                }
+                for (link in p.links) {
                     const lnk = canvas.getLink(link);
-                    lnk.target = result.inputViews[indexof i];
+                    const cell = tv.getCell(tn);
+                    const t = cell.linkedView;
+                    lnk.source = t;
+                    cell.link();
                 }
             }
         }
@@ -6034,13 +6049,19 @@ public class GetNode is ExprNode {
     public var visibleRowCount is Number = 10;
     public override function createView from (canvas is Canvas) to GetVarView 
     {
-        const m = member.deserialize();
+        var m = member.deserialize();
         var v is GetVarView;
+        println("CREATING GET VAR: m={m}");
+        if (m == null) {
+            m = canvas.event;
+        }
         if (m == canvas.event) {
+            println("Matched event");
             v = canvas.initialExprView;
             v.visibleRowCount = visibleRowCount;
             v.pos = new Point3(x, y, 0);
         } else {
+            println("Didn't match event: {canvas.event}");
             v = GetVarView {
                 visibleRowCount: visibleRowCount;
                 pathFactory: canvas.pathFactory;
@@ -6050,7 +6071,7 @@ public class GetNode is ExprNode {
                 canvas: canvas;
                 pos: new Point3(x, y, 0);
                 get: GetVar {
-                    member: member.deserialize();
+                    member: m;
                 }
             }
             insert v into canvas.views;

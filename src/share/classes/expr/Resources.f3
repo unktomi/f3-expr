@@ -306,6 +306,7 @@ public function save
 {
     var scene = mainScene;
     if (url.startsWith("file:")) {
+    println("TOP LEVELS: {topLevel}");
 	const file = new java.io.File(url.substring(5));
         const builder = ResourceBuilder {};
 	const sceneRes = SceneResource {
