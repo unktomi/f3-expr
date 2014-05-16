@@ -327,10 +327,18 @@ public const UNIT_MEMBERS = [FunctionMember { m: Reflect.getFunction("f3.util.Ob
 public function introspectMembers from (v is Context.ClosureVarContext) to Member[] 
 {
     const t = v.varType.t;
-    const mems = introspect(t);
-    if (mems == []) {
-        const name = t.getName();
-        const newMember = Member {
+    const name = t.getName();
+    const newMember = if (t is F3ClassType) then {
+        Member {
+            name: name;
+            rt: t;
+            t: t;
+            m: t as F3ClassType;
+            isObservable: true;
+            isObserver: true;
+        }
+     } else {
+        Member {
             name: name;
             rt: t;
             t: t;
@@ -340,7 +348,7 @@ public function introspectMembers from (v is Context.ClosureVarContext) to Membe
                 }
                 override function getDeclaringClass to F3ClassType {
                     null
-                }
+                        }
                 override function isStatic to Boolean { false }
                 override function isPublic to Boolean { true }
                 override function isPackage to Boolean { false }
@@ -349,9 +357,8 @@ public function introspectMembers from (v is Context.ClosureVarContext) to Membe
             isObservable: true;
             isObserver: true;
         }
-        return [newMember]
-    }
-    return mems;
+    };
+    return [newMember]
 }
 
 public function introspect from (t is F3Type) to Member[]
@@ -867,7 +874,7 @@ class TypeExpression is Expression {
 public class VarContextExpression is ObjectExpression {
     public var varContext is Context.ClosureVarContext;
     override bound function getName to String { varContext.varName }
-    override function toSource from (context is IContext) to String { "(getVar(\"{varContext.varName}\") as f3.lang.ref of {getType().getName()})" }
+    override function toSource from (context is IContext) to String { "(getVar(\"{varContext.varName}\") as f3.lang.Ref of {getType().getName()})" }
     override function toEnglish to String { formatEnglishName(varContext.varName, id) }
     override function getType to F3Type {
         varContext.varType.t;
@@ -4533,7 +4540,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             }
             insert VarContextObjNode {
                 varId: v.varName;
-                varType: "{v.varType.t}";
+                varType: v.varType.t.getName();
                 inputs: TargetNode { targetId: targets[0].id, links: linkIds }
             } into todo.views;
             insert v into eventContext.content;
@@ -5640,10 +5647,10 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 const j = p.getWorldAccess();
                 eng = "{p.getEnglishAccess()}";
                 println("code => {j}");
-                prog.defineVar(subject, "var <<{subject.varName}>> is <<{subject.varType.t}>> = {j}; ");
+                prog.defineVar(subject, "var <<{subject.varName}>> is {subject.varType.t.getName()} = {j}; ");
             } else {
                 eng = "Assign {nil(subject.varType.t)} to <i>{subject.varName}</i>";
-                prog.defineVar(subject, "var <<{subject.varName}>> is <<{subject.varType.t}>> = {nil(subject.varType.t)}; ");
+                prog.defineVar(subject, "var <<{subject.varName}>> is <<{subject.varType.t.getName()}>> = {nil(subject.varType.t)}; ");
             }
             englishOutput = eng;
         } else {
