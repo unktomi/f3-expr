@@ -119,7 +119,7 @@ class ResourceBuilder {
                 variables: foreach (x in p.varSources.entrySet()) {
                     VarDecl {
                         varName: x.getKey().varName;
-                        varType: "{x.getKey().varType.t}";
+                        varType: x.getKey().varType.t.getName();
                         sourceCode: x.getValue().sourceCode;
                         code: x.getValue().code;
                     }
@@ -171,7 +171,7 @@ class ResourceBuilder {
                 variables: foreach (x in p.varSources.entrySet()) {
                     VarDecl {
                         varName: x.getKey().varName;
-                        varType: "{x.getKey().varType.t}";
+                        varType: x.getKey().varType.t.getName();
                         sourceCode: x.getValue().sourceCode;
                         code: x.getValue().code;
                     }
@@ -319,7 +319,7 @@ public function save
                     variables: foreach (x in p.varSources.entrySet()) {
                         VarDecl {
                             varName: x.getKey().varName;
-                            varType: "{x.getKey().varType.t}";
+                            varType: x.getKey().varType.t.getName();
                             sourceCode: x.getValue().sourceCode;
                             code: x.getValue().code;
                         }

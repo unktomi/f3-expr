@@ -55,7 +55,7 @@ public class EvalContext {
     }
     
     public var evaluator = bind
-        new org.f3.tools.script.ScriptShell(java.lang.Thread.currentThread().getContextClassLoader());
+        new org.f3.tools.script.ScriptShell(getClass().getClassLoader());
 
     public function evaluate from (prog is Program) to ()
     {
