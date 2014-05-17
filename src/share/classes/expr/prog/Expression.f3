@@ -1195,7 +1195,7 @@ public class IPath {
         }
         if (observer is GetVar) {
             const g = observer as GetVar;
-            return "the {formatEnglishName(g.member.toApply(), g.id, html)} of {parents[0].getEnglishAccess()}";
+            return "the {formatEnglishName(g.member.name, g.id, html)} of {parents[0].getEnglishAccess()}";
         }
         if (observer is Parameter) {
             return parents[0].getEnglishAccess();
@@ -1487,7 +1487,7 @@ public class GetVar is VarExpression, ObservableExpression, ObserverExpression {
     }
 
     override public function toEnglish to String {
-        member.toEnglish();
+        member.name;
     }
 }
 
