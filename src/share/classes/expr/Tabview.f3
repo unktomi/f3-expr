@@ -20,6 +20,8 @@ const TAB_HEIGHT = 15;
 public class Tab {
     public var title is String;
     protected var index is Integer;
+    protected var row is Integer;
+    protected var column is Integer;
     public var content is ResizableNode;
     public var onSelect is function from () to ();
     public var onLoseSelection is function from () to ();
@@ -54,13 +56,14 @@ public class Tabview is ResizableNode, Focuser {
     public bound var selectedTab is Tab = tabs[selectedIndex];
 
     var contentWidth is Number = bind width;
-    var contentHeight is Number = bind height - TAB_HEIGHT-2;
+    var contentHeight is Number = bind height - tabHeight -2;
 
     bound var font is Text.Font = layoutEngine.createFont(Names.DEFAULT_FONT);
 
     var tabWidth is Number = bind Math.max(minTabWidth, width / Math.max(tabs.size(), 1));
 
     var minTabWidth is Number;
+    var tabHeight is Number = TAB_HEIGHT;
 
     bound var labels is Text.Label[] = foreach (t in tabs) Text.Label {
 	font: bind font;
@@ -83,24 +86,45 @@ public class Tabview is ResizableNode, Focuser {
 	    lastSelected = selectedTab;
             selectedTab.onSelect();
 	}
+	var maxLabelWidth = 0.0;
+        var row = 0;
+        var col = 0;
+        var x = 0.0;
+        var h = TAB_HEIGHT;
+	for (label in labels) {
+            const i = indexof label;
+            const tab = tabs[i];
+            tab.index = i;
+            if (i == selectedIndex) {
+            }
+	    const w = label.font.width(label.text) + 6;
+            maxLabelWidth = Math.max(maxLabelWidth, w);
+            if (x + w + 10 > width) {
+                row++;
+                x = 0;
+                col = 0;
+                h += TAB_HEIGHT+2;
+            } else {
+                x += w;
+            }
+            tab.row = row;
+            tab.column = col;
+            col++;
+	}
+        tabHeight = h;
+	minTabWidth = maxLabelWidth + 10;
         for (t in tabs) {
             t.content.resize(contentWidth, contentHeight);
         }
         selectedTab.content.resize(contentWidth, contentHeight);
-	var maxLabelWidth = 0.0;
-	for (tab in tabs) { tab.index = indexof tab }
-	for (label in labels) {
-	    const w = label.font.width(label.text) + 6;
-            maxLabelWidth = Math.max(maxLabelWidth, w);
-	}
-	minTabWidth = maxLabelWidth;
     }
 
     var tabLabels is TabImpl[] = bind foreach (t in tabs) {
 	TabImpl {
 	    tabview: this;
 	    tab: t;
-	    tx: bind tabWidth * t.index
+	    tx: bind tabWidth * t.column;
+            ty: bind -(TAB_HEIGHT+2) * t.row;
 	    content: 
 	    [Rectangle {
 		    height: TAB_HEIGHT+2;
@@ -117,11 +141,11 @@ public class Tabview is ResizableNode, Focuser {
 	[TransformNode {
             tx: bind -width / 2 + tabWidth/2;
 	    //tx: bind -tabWidth/2;
-	    ty: bind contentHeight / 2-1;
+	    ty: bind contentHeight / 2-1 + tabHeight/2 - TAB_HEIGHT/2;
             content: bind tabLabels;
 	},
 	TransformNode {
-	    ty: bind -TAB_HEIGHT/2-2;
+	    ty: bind -tabHeight/2-2;
 	    content: Content {
                override var scissorBounds = bind Bounds.boundsFromRect(-contentWidth/2, -contentHeight/2, contentWidth, contentHeight);
                content: bind selectedTab.content

@@ -118,7 +118,7 @@ public class InternalWindow is ResizableNode, Focuser {
     override var internalContent = Group {
 	content: bind [Group { cursor: Cursor.Default; content: [titleBar, buttonBar, line] },
                        TransformNode { ty: -14, content: bind contentHolder }, 
-                       resizeCorner, leftSide, rightSide];
+                       TransformNode { content: resizeCorner}, leftSide, rightSide];
     };
 
     public var debugGadget is Boolean;
