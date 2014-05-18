@@ -219,7 +219,15 @@ public class ClassAsset is TypeAsset {
     public const className is String;
     public var classes is ClassAsset[];
     override var name = bind Names.formatClassName(className);
-    public var clazz is F3ClassType = bind Reflect.getType(className.replace("/", ".")) as F3ClassType;
+    public var clazz is F3ClassType = bind getClassType();
+    function getClassType to F3ClassType {
+        const t = Reflect.getType(className.replace("/", "."));
+        if (t is F3ClassType) {
+            return t;
+        }
+        println("NOT a class: {className}");
+        return null;
+    }
     override var t = bind clazz;
     override var containedAssets = bind [classes, foreach (m in Expression.introspect(clazz, true)) MemberAsset {
         member: m;
@@ -258,11 +266,101 @@ function findPackage from (str is String) to PackageAsset {
     return r;
 }
 
+const java_included = [
+"java/io",
+"java/lang",
+"java/lang/annotation",
+"java/lang/ref",
+"java/lang/reflect",
+"java/math",
+"java/net",
+"java/nio",
+"java/nio/channels",
+"java/nio/channels/spi",
+"java/nio/charset",
+"java/nio/charset/spi",
+"java/security",
+"java/security/spec",
+"java/sql",
+"java/text",
+"java/util",
+"java/util/concurrent",
+"java/util/concurrent/atomic",
+"java/util/concurrent/locks",
+"java/util/jar",
+"java/util/logging",
+"java/util/prefs",
+"java/util/regex",
+"java/util/zip",
+"javax/crypto",
+"javax/crypto/interfaces",
+"javax/crypto/spec",
+"javax/net",
+"javax/net/ssl",
+"javax/security/auth",
+"javax/security/auth/callback",
+"javax/security/auth/login",
+"javax/security/auth/x500",
+"javax/security/cert",
+"javax/xml",
+"javax/xml/datatype",
+"javax/xml/namespace",
+"javax/xml/parsers",
+"javax/xml/transform",
+"javax/xml/transform/dom",
+"javax/xml/transform/sax",
+"javax/xml/transform/stream",
+"javax/xml/validation",
+"javax/xml/xpath"];
+
+
 const excluded = ["jogamp", "com/sun", "com/jogamp", "org/", "jogl", "f3/jogl", "f3/animation", "f3/date", "f3/reflect", "f3/f3unit", "f3/lang", "javax", "expr", "com"];
+
 
 function getPackageAssets to PackageAsset {
     const bcp = java.lang.System.getProperty("boot.class.path");
     const cp = java.lang.System.getProperty("java.class.path");
+    const u = new java.net.URL("{__DIR__}classlist.txt");
+    const reader = new java.io.BufferedReader(new java.io.InputStreamReader(u.openStream()));
+    var line is Object;
+    while ((line = reader.readLine()) <> null) {
+        const name = line.toString();
+        const slash = name.lastIndexOf("/");
+        if (slash < 0) continue;
+        const parentName = name.substring(0, slash);
+        var bad = true;
+        println("classname=>{name}.");
+        println("parentName=>{parentName}.");
+        for (i in java_included) {
+            if (i == parentName) {
+                bad = false;
+                break;
+            }
+        }
+        if (bad) continue;
+        const pack = findPackage(parentName);
+        var className = name;
+        const dollar = className.lastIndexOf("$");
+        var containedClassName is String;
+        if (dollar > 0) {
+            containedClassName = className;
+            className = className.substring(0, dollar);
+            continue; // screw it...
+        }
+        var target is ClassAsset = null;
+        for (clazz in pack.classes) {
+            if (clazz.className == className) {
+                target = clazz;
+                break;
+            }
+        }
+        if (target == null) {
+            insert (target = ClassAsset { className: className }) into pack.classes;
+        }
+        if (dollar > 0) {
+            insert ClassAsset { className: containedClassName} into target.classes;
+        }
+    }
     for (x in [bcp.split(java.io.File.pathSeparator), cp.split(java.io.File.pathSeparator)]) {
         println("CLASSPATH: {x}");
         const f = new java.io.File(x);
@@ -291,6 +389,7 @@ function getPackageAssets to PackageAsset {
                 if (name.contains("$Mixin") or name.contains("BFunc$") or name.contains("$ObjLit") or name.contains("Local$") or name.contains("$Script")) {
                     continue;
                 }
+                println("class asset: {name}");
                 var bad = false;
                 for (i in [0..9]) {
                     if (name.contains("${i}")) {
@@ -299,14 +398,23 @@ function getPackageAssets to PackageAsset {
                     }
                 }
                 if (bad) continue;
-                for (i in excluded) {
-                    if (name.startsWith(i)) {
-                        bad = true;
-                        break;
+                if (name.startsWith("java/")) {
+                    bad = true;
+                    for (i in java_included) {
+                        if (name == i) {
+                            bad = false;
+                            break;
+                        }
+                    }
+                } else {
+                    for (i in excluded) {
+                        if (name.startsWith(i)) {
+                            bad = true;
+                            break;
+                        }
                     }
                 }
                 if (bad) continue;
-                println("class asset: {name}");
                 const slash = name.lastIndexOf("/");
                 if (slash < 0) continue;
                 const parentName = name.substring(0, slash);
