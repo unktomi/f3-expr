@@ -44,7 +44,7 @@ public function redo
 
 public function commit 
 {
-    java.lang.Thread.currentThread().dumpStack();
+    //java.lang.Thread.currentThread().dumpStack();
     commits++;
     now++;
     for (t in getUndoables()) t.commit();
