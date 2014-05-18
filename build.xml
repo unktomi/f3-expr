@@ -43,6 +43,7 @@
       <fileset dir="src/share/classes" includes="**/*.cgfx"/>
       <fileset dir="src/share/classes" includes="**/*.png"/>
       <fileset dir="src/share/classes" includes="**/*.ma"/>
+      <fileset dir="src/share/classes" includes="**/*.txt"/>
     </copy>
   </target>
   <target name="compile" depends="init">
