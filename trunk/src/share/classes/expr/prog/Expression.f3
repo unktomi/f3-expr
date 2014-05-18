@@ -2115,17 +2115,53 @@ class FunctionView is ExpressionView {
         }
     };
 
-    bound function getTypeArgs from (xs is ParameterView[]) to TypeParameterView[] 
+    function getTypeVars from (t is F3Type) to F3Type[] 
     {
-        foreach (x in xs) {
-            var t = x.getInputType();
-            if (t.isTypeVariable()) then TypeParameterView { canvas: canvas, parameter: TypeVariableExpression { typevar: t } } else null;
+        const list = new java.util.ArrayList of F3Type;
+        getTypeVars(t, list);
+        foreach (x in list) x;
+    }
+
+    function getTypeVars from (t is F3Type, result is java.util.List of F3Type) to ()
+    {
+        getTypeVars0(t, result);
+        println("get type vars {t} => {result}");
+    }
+
+    function getTypeVars0 from (t is F3Type, result is java.util.List of F3Type) to ()
+    {
+        if (t.isTypeVariable()) {
+            if (not result.contains(t)) {
+                result.add(t);
+            }
+        } else {
+            if (t is F3ClassType) {
+                const ct = t as F3ClassType;
+                for (x in ct.getTypeArguments()) {
+                    getTypeVars(x, result);
+                }
+            }
         }
+    }
+        
+
+    function getTypeArgs from (fun is Function, resultType is F3Type) to TypeParameterView[] 
+    {
+        if (fun.inputs.size() > 1 or not fun.isStatic and fun.inputs.size() > 0) then [] 
+            else foreach (t in getTypeVars(resultType)) 
+                     {
+                         TypeParameterView {
+                             canvas: bind canvas;
+                             parameter: TypeVariableExpression {
+                                 typevar: t;
+                             }
+                         }
+                     }
     }
 
     override var titleSeparatorRow is Integer = bind typeInputs.size();
 
-    bound var typeInputs is TypeParameterView[] = bind getTypeArgs(inputs);
+    bound var typeInputs is TypeParameterView[] = bind getTypeArgs(fun, output.resultType);
 
     bound var inputs is ParameterView[] = foreach (p in fun.inputs) ParameterView {
         targetView: this;
