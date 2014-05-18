@@ -5002,6 +5002,8 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         for (v in views) {
             v.selected = newSelection.contains(v);
         }
+        this.links = [this.links];
+        this.views = [this.views];
         MasterUndoable.commit();
     }
 

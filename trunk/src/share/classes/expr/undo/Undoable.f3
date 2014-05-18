@@ -3,17 +3,19 @@ import f3.lang.Ref;
 
 public class Undoable of a 
 {
-    public var target is Ref of a;
-    public var value is a;
-    public var tag is String;
+    public const target is Ref of a;
+    public const value is a;
+    public const tag is String;
     public function apply
     {
-        println("undo {tag} to {value}");
+        //println("undo {tag} from {target.get()} => {value}");
 	target.set(value);
     }
     public function isDirty to Boolean 
-    {
-	value <> target.get();
+    {      
+	const result = value <> target.get();
+        // println("checkDirty {tag} {target.get()} == {value} => {result}");
+        return result;
     }
 }
 
@@ -22,10 +24,12 @@ public function make of a from (tag is String, ptr is Ref of a) to Undoable of a
     if (tag == "sx" and (ptr.get() as Number) == 0) {
         throw new java.lang.Error("bad undo of sx");
     }
+    const value = ptr.get();
+    //println("commit: {tag} => {value}");
     Undoable of a {
 	tag: tag;
 	target: ptr;
-	value: ptr.get();
+	value: value;
     }
 }
 

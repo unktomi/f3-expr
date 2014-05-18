@@ -70,12 +70,14 @@ public class UndoList
         delete history[now+1..];
 	var list = history[now];
 	var dirty = list == null;
-	for (x in list.todo) {
-	    if (x.isDirty()) {
-		dirty = true;
-		break;
-	    }
-	}
+	if (not dirty) {
+            for (x in list.todo) {
+                if (x.isDirty()) {
+                    dirty = true;
+                    break;
+                }
+            }
+        }
 	if (dirty) {
 	    list = UndoableList {
 		todo: foreach (t in targets) Undoable.make(tags[indexof t], t)
