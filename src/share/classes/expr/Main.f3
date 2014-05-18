@@ -1280,9 +1280,16 @@ public function run from (args is String[]) to ()
                                                                         }
                                                                         par = par.parent;
                                                                     }
+                                                                    if (par == null) par = toDelete.parent;
                                                                     const gp = (par as Context.GroupContext);
                                                                     gp.deleteContent(toDelete);
                                                                     println("deleted {toDelete} from {toDelete.parent}");
+                                                                    toDelete.foldLeft((), function from (_ is (), c is Context) to () 
+                                                                                      {
+                                                                                          if (c is Context.ProgramContext) {
+                                                                                              (c as Context.ProgramContext).program.reset();
+                                                                                          }
+                                                                                      });
                                                                 }
                                                             } else super.onKeyDown(e);
                                                         }                                       

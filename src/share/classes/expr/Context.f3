@@ -12,6 +12,11 @@ import expr.Names.*;
 import expr.undo.*;
 import org.f3.runtime.Foldable;
 
+
+public interface ProgramContext {
+    public var program is Program;
+}
+
 public class Context is Foldable of Context {
     public var parent is Context;
     public readonly var name is String;
@@ -223,12 +228,11 @@ public class FunctionDefinitionContext is MemberContext, ResourceObjectContext {
     override bound function getTarget to ResourceTarget { null }
 }
 
-public class ClosureVarContext is GroupContext {
+public class ClosureVarContext is GroupContext, ProgramContext {
     public var varType is TypeAsset;
     public var varName is String = "variable";
     public var value is Object;
     public var isEvent is Boolean;
-    public var program is Program;
     override var name = bind varName;
     override var label = bind "{varName} [{varType.name}]";
     override function fullName to String 
@@ -298,11 +302,10 @@ public class ThisContext is VarContext {
 public class LocalVarContext is Context {
 }
 
-public class MemberContext is GroupContext {
+public class MemberContext is GroupContext, ProgramContext {
     public var member is Member;
     override var name = bind Names.formatName(member.name);
     override var label = bind name;
-    public var program is Program;
 }
 
 public class ContextTreemodel is Treemodel {
