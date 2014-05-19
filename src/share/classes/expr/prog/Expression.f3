@@ -194,7 +194,7 @@ function typeApply from (target is F3Type,
                          subst is F3Type) 
     to F3Type 
 {
-    if (target == srcType) return subst;
+    if (isSameTypeVariable(target, srcType)) return subst;
     if (target is F3FunctionType) {
         const funType = target as F3FunctionType;
         const retType = typeApply(funType.getReturnType(), srcType, subst);
@@ -728,7 +728,7 @@ function formatType from (t is F3Type) to String
                     const ct = t as F3ClassType; 
                     //const dot = t.getName().lastIndexOf("."); 
                     //if (dot >= 0) then t.getName().substring(dot+1) else t.getName();
-                    formatClassName(t)
+                    formatEnglishName(formatClassName(t))
                 }
             else t.getName();
 }
@@ -2035,6 +2035,12 @@ class FunctionView is ExpressionView {
 
     function unify to () 
     {
+        for (x in inputs) {
+            x.inputType = null;
+            x.inferred = [];
+        }
+        output.unifiedType = null;
+        output.inferred = [];
         for (x in inputs) {
             var t = x.parameter.t;
             if (true) {

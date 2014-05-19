@@ -33,7 +33,7 @@ public function uncamelCase from (str is String) to String
             buf.append(" ");
             forceUpper = true;
         } else { 
-            if (i > 0 and Character.isUpperCase(c) and not Character.isUpperCase(c1)) {
+            if (i > 0 and Character.isUpperCase(c) and (seps.indexOf(c1) < 0 and not Character.isUpperCase(c1))) {
                 if (not Character.isWhitespace(last)) {
                     buf.append(" ");
                 }

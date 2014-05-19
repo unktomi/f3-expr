@@ -137,6 +137,18 @@ public function getTypeArguments from (c is F3Type) to F3Type[]
     return [];
 }
 
+public function isSameTypeVariable (x is F3Type, y is F3Type) to Boolean 
+{
+    if (x.isTypeVariable() and y.isTypeVariable()) {
+        if (x is F3Local.ClassType and y is F3Local.ClassType) {
+            const x1 = x as F3Local.ClassType;
+            const y1 = y as F3Local.ClassType;
+            return x1.getType().equals(y1.getType());
+        }
+    }
+    return false;
+}
+
 public function getType from (t is java.lang.reflect.Type) to F3Type {
     ctx.makeTypeRef(t);
 }
