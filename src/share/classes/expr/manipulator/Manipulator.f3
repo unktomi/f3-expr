@@ -235,8 +235,8 @@ public class Manipulator is AbstractNode
         lastMouse = [endRay];
         const sceneToLocal = worldTransform.inverse();
         const localAxis = sceneToLocal * worldAxis;
-        const currentRotation = Quat.Quat(target.rx, target.ry, target.rz);
-        const localRotation = Quat.Quat(angle, localAxis.normalize());
+        const currentRotation = quat(target.rx, target.ry, target.rz);
+        const localRotation = quat(angle, localAxis.normalize());
         const angles = (currentRotation * localRotation).toAngles();
         target.rx = angles.x;
         target.ry = angles.y;
