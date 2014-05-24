@@ -1,0 +1,28 @@
+package expr;
+import f3.math.*;
+import f3.media.scene.*;
+
+public interface NodeAPI {
+    public function setTranslation from (point is Point3) to (); 
+    public function setScale from (t is Tuple3) to ();
+    public function setPivot from (point is Point3) to (); 
+    public function setRotation from (t is Tuple3) to (); 
+    // translation
+    public var tx is Number;
+    public var ty is Number;
+    public var tz is Number;
+    // rotation
+    public var rx is Number;
+    public var ry is Number;
+    public var rz is Number;
+    // scale
+    public var sx is Number = 1.0;
+    public var sy is Number = 1.0;
+    public var sz is Number = 1.0;
+    // rotation/scale pivot
+    public var px is Number;
+    public var py is Number;
+    public var pz is Number;
+    public readonly var visibleInScene is Boolean;
+    public var visible is Boolean;
+}
