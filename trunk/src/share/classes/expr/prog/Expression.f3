@@ -23,6 +23,76 @@ import expr.inspector.*;
 import expr.Context.ClosureVarContext;
 import expr.AssetTree.TypeAsset;
 
+public class NumberField is SliderField {
+
+    public var min is Number = 0.0;
+    public var max is Number = 1.0;
+
+    protected function onChange from (n is Number) to () 
+    {
+        if (n < min) {
+            min = n;
+        }
+        if (n > max) {
+            max = n;
+        }
+	t = (n-min) / (max-min);
+    }
+
+    override function onCommit from (text is String) to () {
+        try {
+            onChange(java.lang.Float.parseFloat(text));
+        } catch (e is java.lang.Exception) {
+        }
+    }
+
+    override function onCommit to () 
+    {
+        onChange(min + (max - min)*t);
+    }
+
+    override function getText from (t is Number) to String
+    {
+	"{%.04f (min + (max - min)*t)}"
+    }
+}
+
+public class IntegerField is SliderField {
+
+    public var min is Integer = 0;
+    public var max is Integer = 100;
+
+    protected function onChange from (n is Integer) to () 
+    {
+        if (n < min) {
+            min = n;
+        }
+        if (n > max) {
+            max = n;
+        }
+	t = (n-min as Number) / (max-min as Number);
+    }
+
+    override function onCommit from (text is String) to () {
+        try {
+            onChange(Integer.parseInt(text));
+        } catch (e is java.lang.Exception) {
+        }
+    }
+
+    override function onCommit to () 
+    {
+        const n = java.lang.Math.round(min + (max - min)*t);
+        onChange(n as Integer);
+    }
+
+    override function getText from (t is Number) to String
+    {
+	"{Math.round(min + (max - min)*t) as Integer}"
+    }
+}
+
+
 function staticify from (fun is F3FunctionMember) to F3FunctionType {
     if (fun.isStatic()) then fun.getType() else {
             const f = fun.getType();
@@ -3250,26 +3320,18 @@ public class ParameterView is InputView {
 
     function numSlider to SliderField 
     {
-        const f = SliderField {
+        const f = NumberField {
             height: bind cellHeight;
             width: bind cellWidth-100;
             transform: translate(50, 0, 0);
-            override var t on replace {
-                parameter.constantValue = t * 100.0;
+            min: 0.0;
+            max: 100.0;
+            override function onChange from (n is Number) to () 
+            {
+                super.onChange(n);
+                parameter.constantValue = n;
                 canvas.dumpSrc();
-            }
-            override function onCommit from () to ()
-            {
                 MasterUndoable.commit();
-            }
-            override function onCommit from (text is String) to ()
-            {
-                t = Number.parseFloat(text) / 100.0;
-                MasterUndoable.commit();
-            }
-            override function getText from (t is Number) to String
-            {
-                "{t * 100.0}";
             }
         };
         return f;
@@ -3277,30 +3339,18 @@ public class ParameterView is InputView {
     
     function intSlider to SliderField 
     {
-        const f = SliderField {     
+        const f = IntegerField {
             height: bind cellHeight;
             width: bind cellWidth-100;
             transform: translate(50, 0, 0);
-            override function setT from (t is Number) to ()
-            {       
-                this.t = t;
-            }
-            override var t on replace {
-                parameter.constantValue = Math.round(t * 100) as Integer;
+            min: 0;
+            max: 100;
+            override function onChange from (n is Integer) to () 
+            {
+                super.onChange(n);
+                parameter.constantValue = n;
+                MasterUndoable.commit();
                 canvas.dumpSrc();
-            }
-            override function onCommit from () to ()
-            {
-                MasterUndoable.commit();
-            }
-            override function onCommit from (text is String) to ()
-            {
-                t = Integer.parseInt(text) / 100.0;
-                MasterUndoable.commit();
-            }
-            override function getText from (t is Number) to String
-            {
-                "{Math.round(t * 100.0) as Integer}";
             }
         };
         return f;
@@ -3361,9 +3411,11 @@ public class ParameterView is InputView {
         } else if (sliderField <> null) {
             const f = sliderField;
             if (Reflect.NUMBER_TYPE.isConvertibleFrom(getInputType())) {
-                f.setT(if (parameter.constantValue is Number) then (parameter.constantValue as Number) / 100.0 else 0.0);
+                const nf = f as NumberField;
+                nf.onChange(parameter.constantValue as Number);
             } else if (Reflect.INTEGER_TYPE.isConvertibleFrom(getInputType())) {
-                f.setT(if (parameter.constantValue is Integer) then (parameter.constantValue as Integer) / 100.0 else 0.0);
+                const nf = f as IntegerField;
+                nf.onChange(parameter.constantValue as Integer);
             } else if (Reflect.BOOLEAN_TYPE.isConvertibleFrom(getInputType())) {
                 f.setT(if parameter.constantValue is Boolean and (parameter.constantValue as Boolean) then 1.0 else 0.5);
             }
@@ -4171,13 +4223,15 @@ class MemberListview is Listview of Member {
     public var k is function from LinkedInputView to ();
     public var font is Text.Font;
     public var members is Member[];
-    override var model =  Listmodel of Member {
+    override var model = Listmodel of Member {
         size: bind members.size();
-        override function getValue from (i is Integer) to Member {
+        override function getValue from (i is Integer) to Member 
+        {
             members[i];
         }
     };
-    override function render from (elem is Listview.Element of Member) to Node {
+    override function render from (elem is Listview.Element of Member) to Node 
+    {
         var m = elem.value;
         Group {
             content:
@@ -4196,7 +4250,7 @@ class MemberListview is Listview of Member {
             }]
         }
     }
-    var app = observeApply().subscribe(function from (m is Member) to () {
+    const app = observeApply().subscribe(function from (m is Member) to () {
             if (m == null) {
                 k(null);
             } else if (m == FORK) {
@@ -4259,7 +4313,8 @@ public class ExprDebugger is DebuggerEngine {
 
 var showSource is Boolean;
 
-function canConvert from (target is F3Type, src is F3Type) to Boolean {
+function canConvert from (target is F3Type, src is F3Type) to Boolean 
+{
     src == null or (target == UNIT_TYPE or observeType(target).isConvertibleFrom(src)) or
         (isMappable(src) and canConvert(target, getLoweredType(src)));
 }
@@ -4515,7 +4570,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     public function onDrop from (where is Pick, clip is Node) to ()
     {
 	println("ON DROP {where.scenePoint}, {where.dragPoint1} {clip}");
-	const typ = if (clip is SceneAPI) then Reflect.getType("expr.SceneAPI") else Reflect.getType("f3.media.scene.TransformNode");
+	const typ = if (clip is SceneAPI) then Reflect.getType("expr.SceneAPI") else Reflect.getType("expr.NodeAPI");
         var names = new java.util.HashSet of String;
 	const members = foreach (m in introspect(typ) where not m.name.contains("pdate") and names.add(m.name)) m;
         for (m in members) {
