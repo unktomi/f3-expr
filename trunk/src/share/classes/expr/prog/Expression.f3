@@ -259,6 +259,18 @@ function formatEnglishName from (name is String, id is String, html is Boolean) 
     }
 }
 
+public function isSameTypeVariable (x is F3Type, y is F3Type) to Boolean 
+{
+    if (x.isTypeVariable() and y.isTypeVariable()) {
+        if (x is F3Local.ClassType and y is F3Local.ClassType) {
+            const x1 = x as F3Local.ClassType;
+            const y1 = y as F3Local.ClassType;
+            return x1.getType().equals(y1.getType());
+        }
+    }
+    return false;
+}
+
 function typeApply from (target is F3Type, 
                          srcType is F3Type,
                          subst is F3Type) 
@@ -872,7 +884,7 @@ function argName from (fun is FunctionMember,
     }
     const names is String[] = Reflect.getParameterNames(fun.m as F3FunctionMember);
     println("names for {fun.m} =>{names}");
-    if names == [] then argName(ft, i) else names[i];
+    if names == [] then "" else names[i];
 }
 
 function argName from (ft is F3FunctionType, i is Integer) to String 
@@ -1078,6 +1090,7 @@ public class IPath {
     public var id is Integer;
     public var parents is IPath[];
     public const html is Boolean;
+    public const showHoles is Boolean;
 
     public function getRootExpression to Expression 
     {
@@ -1193,6 +1206,9 @@ public class IPath {
         if (parents.size() == 0) {
             if (observer is Parameter) {
                 const p = observer as Parameter;
+                if (showHoles) {
+                    return p.toEnglishParameter();
+                }
                 return p.toEnglish();
             }
             if (observer.observable is OutputMemberExpression) {
@@ -1457,12 +1473,14 @@ class IContext {
     var pathCount = 0;
 
     public const html is Boolean = true;
+    public const showHoles is Boolean = false;
 
     function getIPath from (ob is ObserverExpression) to IPath {
         var result = map.get(ob);
         //if (result <> null) return result;
         result = IPath {
             html: html;
+            showHoles: showHoles;
             observer: ob;
         }
         map.put(ob, result);
@@ -1594,7 +1612,7 @@ public class Function is MemberExpression {
 	bind 
         [if (isNull) then null else 
          Parameter {
-             name: bind if (isStatic) then "()" else formatClassName(clazz);
+             name: "";
              target: this;
              t: bind if (isStatic) then UNIT_TYPE else clazz;
          },           
@@ -1815,17 +1833,38 @@ public class Function is MemberExpression {
 
 public class Parameter is ObserverExpression {
     public var name is String;
-    public var t is F3Type;
+    public var t is F3Type on replace {
+        if (Reflect.NUMBER_TYPE.isConvertibleFrom(t)) {
+            constantValue = 0.0;
+        } else if (Reflect.INTEGER_TYPE.isConvertibleFrom(t)) {
+            constantValue = 0;
+        } else if (Reflect.BOOLEAN_TYPE.isConvertibleFrom(t)) {
+            constantValue = false;
+        } else if (Reflect.STRING_TYPE.isConvertibleFrom(t)) {
+            constantValue = ""
+        } else {
+        }
+    }
     public var target is Function;
     override bound function getName to String { name }
     override function getType to F3Type { t }
     public function isTypeVariable to Boolean {
         t.isTypeVariable();
     }
-    public var constantValue is Object = "(null as {t.getName()})";
+
+    public var constantValue is Object;
+
+    public function toEnglishParameter to String
+    {
+        return "_";
+    }
+
     override public function toEnglish to String 
     {
-        if (observable == null) then { const v = "{constantValue}";  if (v.startsWith("(null as")) then "null" else { if (v == "true") then "Yes" else if v == "false" then "No" else v } } else observable.toEnglish();
+        if (observable == null) then { 
+                const v = "{constantValue}";  
+                if (v.startsWith("(null as")) then "_" else { if (v == "true") then "Yes" else if v == "false" then "No" else v } 
+            } else observable.toEnglish();
     }
     override public function toSource from (context is IContext) to String 
     {
@@ -2019,17 +2058,17 @@ public abstract class ExpressionView is AbstractNode {
 }
 
 
-function unifyInputs from (i is LinkedView, visited is java.util.Set of ExpressionView) to () 
+function unifyInputs from (i is LinkedView, visited is java.util.Set of ExpressionView, result is java.util.List of FunctionView) to () 
 {
     for (link in i.getInputLinks()) {
         const v = link.source;
-        unifyInputs(v, visited);
+        unifyInputs(v, visited, result);
     }
     if (i is ParameterView) {
         const f =
             (i as ParameterView).targetView;
         if (visited.add(f)) {
-            f.unify();
+            result.add(f);
         }
     }
 }
@@ -2113,67 +2152,46 @@ class FunctionView is ExpressionView {
         output.inferred = [];
         for (x in inputs) {
             var t = x.parameter.t;
-            if (true) {
-                if (x.links.size() > 0) {
-                    var infer is F3Type = null;
-                    for (link in x.links) {
-                        infer = (link.source as LinkedOutputView).getResultType()
+            if (x.links.size() > 0) {
+                var infer is F3Type = null;
+                for (link in x.links) {
+                    infer = (link.source as LinkedOutputView).getResultType();
+                }
+                const canAssign = observeType(t).isConvertibleFrom(infer);
+                println("INFERRED {infer} for {t} => {canAssign}");
+                if (canAssign) {
+                    x.inputType = infer;
+                    var targs is F3Type[];
+                    var tparms is F3Type[];
+                    if (infer is F3ClassType) {
+                        const ct = infer as F3ClassType;
+                        targs = ct.getTypeArguments();
+                        tparms = ct.getTypeParameters();
                     }
-                    const canAssign = observeType(t).isConvertibleFrom(infer);
-                    println("INFERRED {infer} for {t} => {canAssign}");
-                    if (canAssign and infer <> x.inputType) {
-                        x.inputType = infer;
-                        var targs is F3Type[];
-                        var tparms is F3Type[];
-                        if (infer is F3ClassType) {
-                            const ct = infer as F3ClassType;
-                            targs = ct.getTypeArguments();
-                            tparms = ct.getTypeParameters();
-                        }
-                        for (j in inputs) {
-                            if (j <> x and j.links.size() == 0) {
-                                var t1 = typeApply(j.parameter.t, x.parameter.t, x.inputType);
-                                for (q in targs) {
-                                    const r = tparms[indexof q];
-                                    t1 = typeApply(t1, r, q);
-                                }
-                                println("t1={t1} for {j.parameter.t}");
-                                if (t1 <> j.parameter.t) {
-                                    j.inputType = t1;
-                                    insert x into j.inferred;
-                                    println("label={j.getLabel()}");
-                                }
+                    for (j in inputs) {
+                        if (j <> x and j.links.size() == 0) {
+                            var t1 = typeApply(j.parameter.t, x.parameter.t, x.inputType);
+                            for (q in targs) {
+                                const r = tparms[indexof q];
+                                t1 = typeApply(t1, r, q);
+                            }
+                            println("t1={t1} for {j.parameter.t}");
+                            if (t1 <> j.parameter.t and j.inputType == null) {
+                                println("SETTING type of {j} to {t1}");
+                                j.inputType = t1;
+                                insert x into j.inferred;
+                                println("label={j.getLabel()}");
                             }
                         }
-                        const t0 = typeApply(output.result.getType(), x.parameter.t, x.inputType);
-                        if (t0 <> output.result.getType()) {
-                            println("t0={formatClassName(t0)} for {formatClassName(output.result.getType())}");
-                            output.unifiedType = t0;
-                            insert x into output.inferred;
-                            println("output resultType={output.resultType}");
-                            println("output member={output.getter.member}");
-                        } 
                     }
-                } else {
-                    if (x.inputType <> null) {
-                        x.inputType = null;
-                        for (j in inputs) {
-                            for (y in j.inferred) {
-                                if (y == x) {
-                                    delete y from j.inferred;
-                                    j.inputType = null;
-                                    break;
-                                }
-                            }
-                        }
-                        for (y in output.inferred) {
-                            if (y == x) {
-                                delete y from output.inferred;
-                                output.unifiedType = null;
-                                break;
-                            }
-                        } 
-                    }
+                    const t0 = typeApply(output.result.getType(), x.parameter.t, x.inputType);
+                    if (t0 <> output.result.getType()) {
+                        println("t0={formatClassName(t0)} for {formatClassName(output.result.getType())}");
+                        output.unifiedType = t0;
+                        insert x into output.inferred;
+                        println("output resultType={output.resultType}");
+                        println("output member={output.getter.member}");
+                    } 
                 }
             }
         }
@@ -3298,19 +3316,19 @@ public class ParameterView is InputView {
 
     override bound function getLabel to String 
     {
-        makeLabel(if (inputType <> null) then inputType else parameter.t)
+        makeLabel(getInputType())
     }
 
     function makeLabel from (t is F3Type) to String
     {
         println("making label for type {t} pname={parameter.name} target={parameter.target}");
-        formatClassName(t)
-            //parameter.name
+        //        java.lang.Thread.currentThread().dumpStack();
+        "{formatClassName(t)}{if (parameter.name == "") then "" else ": {formatEnglishName(parameter.name)}"}";
     }
 
     override public bound function getInputType to F3Type 
     {
-        return if inputType <> null then inputType else parameter.t;
+        if inputType <> null then inputType else parameter.t;
     }
 
     override public function assignLinkIds to () 
@@ -3431,7 +3449,7 @@ public class ParameterView is InputView {
                 then intSlider()
                 else if (Reflect.BOOLEAN_TYPE.isConvertibleFrom(getInputType())) 
                     then boolSlider() else null;
-    override var internalContent = Group { content: bind [title, if links.size() == 0 then [sliderField, textField] else null] };
+    override var internalContent = Group { content: bind [title, if links.size() == 0 then Group { content: bind [sliderField, textField] } else null] };
     /*
     const titleText = XHTML.Text {
         width: bind cellWidth;
@@ -5387,7 +5405,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         var allOutputs is OutputView[];
 	const termset = new java.util.HashSet of Expression();
         var terms is Expression[];
-        const context = IContext {html: false};
+        const context = IContext {html: false, showHoles: true};
         for (v in views where v.selected) {
             const inputs = v.getOpenInputs();
             const outputs = v.getOpenOutputs();
@@ -5417,10 +5435,10 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         }
         const objExpr = CollapsedExpression {
             synthName: eng;
-            inputMembers: foreach (i in allInputs) {
+            inputMembers: [ typeToMember(UNIT_TYPE), foreach (i in allInputs) {
                 const exp = i.expression;
                 if (exp is MemberExpression) then (exp as MemberExpression).member else typeToMember(exp.getType());
-            }
+            } ]
             outputMembers: foreach (i in allOutputs) {
                 const exp = i.expression;
                 if (exp is MemberExpression) then (exp as MemberExpression).member else typeToMember(exp.getType());
@@ -5722,9 +5740,13 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         sourceVersion++;
         sourceUpdateTime = java.lang.System.currentTimeMillis()+1000;
         const x = new java.util.HashSet of ExpressionView();
+        const y = new java.util.ArrayList of FunctionView;
         for (v in views where v is FunctionView) {
             const f = v as FunctionView;
-            unifyInputs(f.inputs[0], x);
+            unifyInputs(f.inputs[0], x, y);
+        }
+        for (v in y) {
+            v.unify();
         }
     }
 
@@ -6081,11 +6103,11 @@ public class FunNode is ExprNode {
             } 
             println("parameter {i} type is {p.parameter.getType()}");
             if (Reflect.INTEGER_TYPE == p.parameter.getType()) {
-                println("int value is {n.intValue}");
-                p.sliderField.t = n.intValue / 100.0; // hack
+                const nf = p.sliderField as IntegerField;
+                nf.onChange(n.intValue);
             } else if (Reflect.NUMBER_TYPE == p.parameter.getType()) {
-                println("num value is {n.numberValue}");
-                p.sliderField.t = n.numberValue / 100.0;
+                const nf = p.sliderField as NumberField;
+                nf.onChange(n.numberValue);
              } else if (Reflect.BOOLEAN_TYPE == p.parameter.getType()) {
                 println("bool value is {n.booleanValue}");
                 p.sliderField.t = if n.booleanValue then 1.0 else 0.5;

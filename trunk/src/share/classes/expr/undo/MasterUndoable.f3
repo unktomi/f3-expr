@@ -30,22 +30,33 @@ public function reset from () to () {
     now = -1;
 }
 
-public function undo 
+var in_undo = 0;
+public function undo to ()
 {   
-    if (now > 0) now--;
-    for (t in getUndoables()) t.undo();
+    in_undo++;
+    if (in_undo == 1) {
+        if (now > 0) now--;
+        for (t in getUndoables()) t.undo();
+    }
+    in_undo--;
 }
 
-public function redo 
+public function redo to ()
 {
-    if (now < commits-1) now++;
-    for (t in getUndoables()) t.redo();
+    in_undo++;
+    if (in_undo == 1) {
+        if (now < commits-1) now++;
+        for (t in getUndoables()) t.redo();
+    }
+    in_undo--;
 }
 
-public function commit 
+public function commit to ()
 {
     //java.lang.Thread.currentThread().dumpStack();
-    commits++;
-    now++;
-    for (t in getUndoables()) t.commit();
+    if (in_undo == 0) {
+        commits++;
+        now++;
+        for (t in getUndoables()) t.commit();
+    }
 }
