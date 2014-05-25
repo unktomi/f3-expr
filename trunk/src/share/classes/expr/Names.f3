@@ -8,11 +8,17 @@ public function formatClassName from (className is String) to String
     formatName(if dollar >= 0 then className.substring(dollar+1) else className);
 }
 
+const LT = "<".charAt(0);
+
 public function formatName from (str is String) to String 
 {
     for (ch in ["$", "#", "/", "."]) {
         const slash = str.lastIndexOf(ch);
-        if (slash > 0) return uncamelCase(str.substring(slash+1));
+        if (slash > 0) {
+            if (str.charAt(slash-1) <> LT) {
+                return uncamelCase(str.substring(slash+1));
+            }
+        }
     }
     const result = uncamelCase(str);
     if result == "" then str else result;
@@ -22,10 +28,19 @@ public function uncamelCase from (str is String) to String
 {
     const buf = new java.lang.StringBuffer();
     const seps = "_.$";
+    const backslash = "\\".charAt(0);
     var last is Character = "a".charAt(0);
     var forceUpper = true;
     for (i in [0..<str.length()]) {
         const c0 = str.charAt(i);
+        if (c0 == backslash) {
+            if (i+1 < str.length()) {
+                const cn = str.charAt(i+1);
+                buf.append(cn);
+                last = cn;
+                continue;
+            }
+        }
         const c1 = if str.length() > i+1 then str.charAt(i+1) else "A".charAt(0);
         const c = if (forceUpper) then Character.toUpperCase(c0) else c0;
         forceUpper = false;
