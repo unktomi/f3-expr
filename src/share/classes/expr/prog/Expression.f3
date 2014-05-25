@@ -792,9 +792,20 @@ function formatTypeVar from (t is F3Type) to String
 }
 
 function sub from (t is String) to String {
-    // "<sup>{t}</sup>";
+    "<sup>{t}</sup>";
+    /*
     var chs = t.toCharArray();
     const delta = "\u2080".charAt(0) - "a".charAt(0) + 1;
+    for (i in [0..<chs.length]) {
+        chs[i] = delta + chs[i];
+    }
+    return new String(chs, 0, chs.length);
+    */
+}
+
+function sub2 from (t is String) to String {
+    var chs = t.toCharArray();
+    const delta = "\u2080".charAt(0) - "0".charAt(0) + 1;
     for (i in [0..<chs.length]) {
         chs[i] = delta + chs[i];
     }
@@ -857,10 +868,32 @@ function formatClassName from (t is F3Type) to String
         const v = if targs == [] then (t as F3ClassType).getTypeParameters()[0] else targs[0];
         return formatClassName(v);
     }
-    const n = if (t.isTypeVariable()) then formatTypeVar(t) else t.getName();
+    var baseType = t;
+    var parms is F3Type[] = (t as F3ClassType).getTypeArguments();
+    var typeCons = 0;
+    for (i in [0..<TYPE_CONS.size()]) {
+        if (baseType == TYPE_CONS[i]) {
+            baseType = parms[0];
+            parms = parms[1..];
+            typeCons = i+1;
+            break;
+        }
+    }
+    const n = if (baseType.isTypeVariable()) then formatTypeVar(baseType) else baseType.getName();
     const dot = n.lastIndexOf(".");
-    const base = n.substring(dot+1);
-    const parms is F3Type[] = (t as F3ClassType).getTypeArguments();
+    var base = n.substring(dot+1);
+    if (false and typeCons > 0) {
+        base = "Any<sup>{baseType.getTypeVariable()} of ";
+        var sep = "(";
+        for (i in [1..typeCons]) {
+            base = "{base}{sep}Any{sub2("{i}")}";
+            sep = ", ";
+        }
+        if (typeCons > 1) {
+            base = "{base})";
+        }
+        base = "{base}</sup>";
+    }
     if (parms.size() == 0) {
         return base;
     }  else if (parms.size() == 1) {
@@ -1934,7 +1967,7 @@ public abstract class ExpressionView is AbstractNode {
         }
     }
     public bound function getLabel to String {
-        Names.formatName(expression.getName());
+        expression.getName();
     }
     var exprName = bind expression.getName() on replace {
         canvas.dumpSrc();
@@ -3598,7 +3631,7 @@ class MemberTreenode is Treenode {
     public const isStatic is Boolean;
     public var depth is Integer = bind (parent as MemberTreenode).depth + 1;
     public var get is GetVar = bind TreeGetVar { member: m }
-    override var label = bind Names.formatName(m.name);
+    override var label = bind m.name;
     bound var members is Member[] = filterMembers(m.getMembers());
     function filterMembers from (xs is Member[]) to Member[] 
     {
@@ -4945,7 +4978,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 		    parent: initialView;
 		    canvas: this;
                     isLabeled: true;
-                    override bound function getLabel to String { Names.formatName(event.name) }
+                    override bound function getLabel to String { event.name }
 		    get: varRoot = TreeGetVar {
                         override function toEnglish to String { "the event" }
                         override function getLocalAccess to String { "i" }
