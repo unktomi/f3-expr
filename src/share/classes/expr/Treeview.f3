@@ -65,11 +65,11 @@ public class Treemodel is Foldable of Treenode {
 	to Treenode[]
     {
 	var result is Treenode[];
-	root.getRows(low, hi, false,
-		     function from (n is Treenode) to ()
-		     {
-			 insert n into result;
-		     });
+	root.getRows(low, hi, false, | n | { insert n into result });
+		     //function from (n is Treenode) to ()
+		     //{
+                     //	 insert n into result;
+		     //});
 	return result;
     }
 
