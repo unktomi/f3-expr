@@ -1969,7 +1969,7 @@ public abstract class ExpressionView is AbstractNode {
         }
     }
     public bound function getLabel to String {
-        expression.getName();
+        Names.formatName(expression.getName());
     }
     var exprName = bind expression.getName() on replace {
         canvas.dumpSrc();
@@ -3633,7 +3633,7 @@ class MemberTreenode is Treenode {
     public const isStatic is Boolean;
     public var depth is Integer = bind (parent as MemberTreenode).depth + 1;
     public var get is GetVar = bind TreeGetVar { member: m }
-    override var label = bind m.name;
+    override var label = bind m.toEnglish();
     bound var members is Member[] = filterMembers(m.getMembers());
     function filterMembers from (xs is Member[]) to Member[] 
     {
