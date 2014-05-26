@@ -273,20 +273,27 @@ public function isSameTypeVariable (x is F3Type, y is F3Type) to Boolean
 
 function typeApply from (target is F3Type, 
                          srcType is F3Type,
-                         subst is F3Type) 
+                         subst is F3Type,
+                         substs is java.util.Map of (F3Type, F3Type)) 
     to F3Type 
 {
+    const p = substs.get(target);
+    if (p <> null) return p;
     if (target.isTypeVariable() and srcType.isTypeVariable()) {
-        return if (isSameTypeVariable(target, srcType)) then subst else target;
+        if (isSameTypeVariable(target, srcType)) {
+            substs.put(target, subst);
+            return subst;
+        }
+        return target;
     } 
     if (target is F3FunctionType) {
         const funType = target as F3FunctionType;
-        const retType = typeApply(funType.getReturnType(), srcType, subst);
+        const retType = typeApply(funType.getReturnType(), srcType, subst, substs);
         var matches = retType <> funType.getReturnType();
         const parms = 
             foreach (i in [0..<funType.minArgs()]) 
             {
-                const pt = typeApply(funType.getArgumentType(i), srcType, subst);
+                const pt = typeApply(funType.getArgumentType(i), srcType, subst, substs);
                 if (not matches) matches = pt <> funType.getArgumentType(i);
                 pt
             };
@@ -300,7 +307,7 @@ function typeApply from (target is F3Type,
         const parms = 
             foreach (x in targs) 
             {
-                const pt = typeApply(x, srcType, subst);
+                const pt = typeApply(x, srcType, subst, substs);
                 println("target={clsType}: checking type arg {srcType} against {x}, {subst} => {pt}");
                 if (not matches) matches = pt <> x;
                 pt;
@@ -521,14 +528,14 @@ public function introspect from (clazz is F3ClassType) to Member[]
 class Instantiator {
 
     public const clazz is F3ClassType;
+    const substs = new java.util.HashMap of (F3Type, F3Type);
 
     public function G of (T is F3Type) from (t is T) to T 
     {
         if (clazz.isGenericInstance()) 
             then 
                 {
-                    const r = typeApply(t, clazz.getGenericBase(), clazz) as T;
-                    println("G {t}, {clazz.getGenericBase()}, {clazz} => {r}");
+                    const r = typeApply(t, clazz.getGenericBase(), clazz, substs) as T;
                     r;
                 } 
         else t;
@@ -539,7 +546,7 @@ public function introspect from (clazz is F3ClassType, all is Boolean) to Member
 {
     if (clazz == null) return [];
     const exprMap = if all then exprMap2 else exprMap1;
-    if (exprMap.containsKey(clazz)) {
+    if (false and exprMap.containsKey(clazz)) {
 	return exprMap.get(clazz);
     }
     const I = Instantiator {clazz: clazz};
@@ -566,12 +573,6 @@ public function introspect from (clazz is F3ClassType, all is Boolean) to Member
         }
         exprMap.put(clazz, [r, classVars]);
         return [r, classVars];
-    }
-    for (f in funs) {
-        println("f={f}");
-    }
-    for (f in Reflect.getFunctions(clazz, yes)) {
-        println("f'={f}");
     }
     for (f in funs where f.isPublic() and not f.getName().contains("$") and 
 	     OBJECT_TYPE <> f.getDeclaringClass() 
@@ -715,7 +716,10 @@ function getTypeMembers from (classType is F3ClassType) to Member[]
 public class Member {
     override function equals from (obj is Object) to Boolean {
         (obj is Member)  and {
-            (obj as Member).m == m or (obj as Member).m.toString() == m.toString(); // hack!!
+            const objm = obj as Member;
+            if (m == null) then {
+                    objm == null and objm.t == t and objm.name == name;
+            } else objm.m == m 
         }
     }
     public function serialize to MemberNode {
@@ -883,7 +887,7 @@ function formatClassName from (t is F3Type) to String
     }
     const n = if (baseType.isTypeVariable()) then formatTypeVar(baseType) else baseType.getName();
     const dot = n.lastIndexOf(".");
-    var base = n.substring(dot+1);
+    var base = formatEnglishName(n.substring(dot+1));
     if (false and typeCons > 0) {
         base = "Any<sup>{baseType.getTypeVariable()} of ";
         var sep = "(";
@@ -918,7 +922,6 @@ function argName from (fun is FunctionMember,
         return argName(ft, i);
     }
     const names is String[] = Reflect.getParameterNames(fun.m as F3FunctionMember);
-    println("names for {fun.m} =>{names}");
     if names == [] then "" else names[i];
 }
 
@@ -2177,7 +2180,7 @@ class FunctionView is ExpressionView {
         }
     }
 
-    function unify to () 
+    function ununify to () 
     {
         for (x in inputs) {
             x.inputType = null;
@@ -2185,6 +2188,23 @@ class FunctionView is ExpressionView {
         }
         output.unifiedType = null;
         output.inferred = [];
+    }
+
+    function unify2 to () 
+    {
+        const substs = new java.util.HashMap of (F3Type, F3Type);
+        unify(substs);
+        unify(substs);
+    }
+
+    function unify to () 
+    {
+        const substs = new java.util.HashMap of (F3Type, F3Type);
+        unify(substs);
+    }
+
+    function unify from (substs is java.util.Map of (F3Type, F3Type)) to () 
+    {
         for (x in inputs) {
             var t = x.parameter.t;
             if (x.links.size() > 0) {
@@ -2205,10 +2225,10 @@ class FunctionView is ExpressionView {
                     }
                     for (j in inputs) {
                         if (j <> x and j.links.size() == 0) {
-                            var t1 = typeApply(j.parameter.t, x.parameter.t, x.inputType);
+                            var t1 = typeApply(j.parameter.t, x.parameter.t, x.inputType, substs);
                             for (q in targs) {
                                 const r = tparms[indexof q];
-                                t1 = typeApply(t1, r, q);
+                                t1 = typeApply(t1, r, q, substs);
                             }
                             println("t1={t1} for {j.parameter.t}");
                             if (t1 <> j.parameter.t and j.inputType == null) {
@@ -2219,7 +2239,7 @@ class FunctionView is ExpressionView {
                             }
                         }
                     }
-                    const t0 = typeApply(output.result.getType(), x.parameter.t, x.inputType);
+                    const t0 = typeApply(output.result.getType(), x.parameter.t, x.inputType, substs);
                     if (t0 <> output.result.getType()) {
                         println("t0={formatClassName(t0)} for {formatClassName(output.result.getType())}");
                         output.unifiedType = t0;
@@ -5778,10 +5798,11 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         const y = new java.util.ArrayList of FunctionView;
         for (v in views where v is FunctionView) {
             const f = v as FunctionView;
+            f.ununify();
             unifyInputs(f.inputs[0], x, y);
         }
         for (v in y) {
-            v.unify();
+            v.unify2();
         }
     }
 
@@ -5867,9 +5888,6 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             }
             IO.writeObject(w, todo);
             //println("serialize => {w}");
-            for (link in links) {
-                println("Link {link.id} {link.source.expression.getName()}: {link.source.id} => {link.target.expression.getName()}: {link.target.id}");
-            }
             prog.code = todo;
         }
     }

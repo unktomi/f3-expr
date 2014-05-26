@@ -88,12 +88,12 @@ public function getFunctions from (clazz0 is F3ClassType, all is Boolean) to F3F
     } catch (exc is java.lang.Throwable) {
         println(exc);
     }
-    println("FUNS={funs}");
     if (not funMap.containsKey(clazz)) {
         funMap.put(clazz, funs);
     } else {
         funs = funMap.get(clazz);
     }
+    println("FUNS={funs}");
     if (not all) then funs[f | f.getDeclaringClass() == clazz] else funs;
 }
 
