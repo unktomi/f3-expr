@@ -276,7 +276,9 @@ function typeApply from (target is F3Type,
                          subst is F3Type) 
     to F3Type 
 {
-    if (isSameTypeVariable(target, srcType)) return subst;
+    if (target.isTypeVariable() and srcType.isTypeVariable()) {
+        return if (isSameTypeVariable(target, srcType)) then subst else target;
+    } 
     if (target is F3FunctionType) {
         const funType = target as F3FunctionType;
         const retType = typeApply(funType.getReturnType(), srcType, subst);
