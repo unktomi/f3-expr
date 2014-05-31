@@ -210,8 +210,21 @@ public class ResourceTimeNodeContext is GroupContext, ResourceObjectContext {
     var members = bind Expression.introspect(Reflect.getType("f3.media.scene.TimeNode") as F3ClassType);
     var myContent = bind [if (resource is ResourceTimeNodeWrapper) then { var w = resource as ResourceTimeNodeWrapper; foreach (g in w.unwrapContent()) if (g is ResourceTimeNode) then ResourceTimeNodeContext {  resource: g as ResourceTimeNode} else null } else null];
 
+    var programs is MemberContext[];
+    public override function createProgram from (member is Member) to MemberContext
+    {
+        var result = MemberContext { member: member, parent: this };
+        insert result into programs;
+        println("created member => {programs} => {getContent()}");
+        return result;
+    }
+    public override function getMembers to Member[] 
+    {
+        return memberCtxs;
+    }
+
     public override bound function getContent to Context[] { 
-        myContent
+        [programs, myContent, content];
     }
 }
 
