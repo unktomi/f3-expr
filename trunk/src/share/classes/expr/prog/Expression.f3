@@ -5015,7 +5015,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 		    parent: initialView;
 		    canvas: this;
                     isLabeled: true;
-                    override bound function getLabel to String { event.name }
+                    override bound function getLabel to String { Names.formatName(event.name) }
 		    get: varRoot = TreeGetVar {
                         override function toEnglish to String { "the event" }
                         override function getLocalAccess to String { "i" }
