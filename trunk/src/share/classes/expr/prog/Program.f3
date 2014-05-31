@@ -93,7 +93,7 @@ public class EvalContext {
 
     public function subscribe of a from (obsvb is Observable of a, src is String) to ()
     {
-	println("SUBSCRIBE {obsvb} / {src}");
+	println("SUBSCRIBE {targetNode} {obsvb} / {src}");
         var count = 0;
         const rs = foreach (x in eventContext.content) {
             if (x is Context.ResourceNodeContext) {
