@@ -1,7 +1,12 @@
 package expr;
 import f3.reflect.*;
 import com.google.common.reflect.TypeToken;
-public const paranamer = new com.thoughtworks.paranamer.CachingParanamer(new com.thoughtworks.paranamer.BytecodeReadingParanamer());
+public const jdk_paranamer = 
+       new com.thoughtworks.paranamer.JavadocParanamer(new java.net.URL("http://docs.oracle.com/javase/6/docs/api/"));
+public const paranamer = 
+       new com.thoughtworks.paranamer.CachingParanamer(
+       new com.thoughtworks.paranamer.AdaptiveParanamer(jdk_paranamer, new com.thoughtworks.paranamer.BytecodeReadingParanamer()));
+
 public const ctx = F3Local.getContext();
 
 public const TYPE_CONS is F3ClassType[] = foreach (i in [1..5]) Reflect.findClass("org.f3.runtime.TypeCons{i}") as F3ClassType;
@@ -80,20 +85,19 @@ public function getFunctions from (clazz0 is F3ClassType, all is Boolean) to F3F
     }
     if (clazz <> clazz0) {
         println("HUH? {clazz0} {clazz}");
-        clazz = clazz0;
+        //clazz = clazz0;
     }
     var funs is F3FunctionMember[];
     try {
         funs = foreach (c in clazz.getFunctions(true)) c;
     } catch (exc is java.lang.Throwable) {
-        println(exc);
+        exc.printStackTrace();
     }
     if (not funMap.containsKey(clazz)) {
         funMap.put(clazz, funs);
     } else {
         funs = funMap.get(clazz);
     }
-    println("FUNS={funs}");
     if (not all) then funs[f | f.getDeclaringClass() == clazz] else funs;
 }
 
@@ -167,7 +171,7 @@ public function getType from (name is String) to F3Type
                             try { 
                                 cls = Reflect.findClass(name); 
                             } catch (e is java.lang.Throwable) {
-                                println(e);
+                                e.printStackTrace();
                                 cls = null
                             } 
                             cls;

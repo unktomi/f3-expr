@@ -308,14 +308,14 @@ function typeApply from (target is F3Type,
             foreach (x in targs) 
             {
                 const pt = typeApply(x, srcType, subst, substs);
-                println("target={clsType}: checking type arg {srcType} against {x}, {subst} => {pt}");
+                //println("target={clsType}: checking type arg {srcType} against {x}, {subst} => {pt}");
                 if (not matches) matches = pt <> x;
                 pt;
             };
         if (matches) {
-            println("instantiating {clsType} with {parms}");
+            //println("instantiating {clsType} with {parms}");
             const rt = ctx.instantiateType(clsType, parms);
-            println("result={formatClassName(rt)}");
+            //println("result={formatClassName(rt)}");
             return rt;
         }
     }
@@ -495,6 +495,7 @@ function getLoweredType from (t is F3Type) to F3Type
 }
 
 function isMappable from (t is F3Type) to Boolean {
+    if (true) { return false; }
     if (t is F3ClassType) {
         const ct = t as F3ClassType;
         if (ct.getTypeArguments().length == 1) {
@@ -546,7 +547,7 @@ public function introspect from (clazz is F3ClassType, all is Boolean) to Member
 {
     if (clazz == null) return [];
     const exprMap = if all then exprMap2 else exprMap1;
-    if (false and exprMap.containsKey(clazz)) {
+    if (exprMap.containsKey(clazz)) {
 	return exprMap.get(clazz);
     }
     const I = Instantiator {clazz: clazz};
@@ -1901,7 +1902,7 @@ public class Parameter is ObserverExpression {
     {
         if (observable == null) then { 
                 const v = "{constantValue}";  
-                if (v.startsWith("(null as")) then "_" else { if (v == "true") then "Yes" else if v == "false" then "No" else v } 
+                if (Reflect.STRING_TYPE.isConvertibleFrom(t)) then (if v == "" then "\"\"" else v) else if (v.startsWith("(null as")) then "_" else { if (v == "true") then "Yes" else if v == "false" then "No" else v } 
             } else observable.toEnglish();
     }
     override public function toSource from (context is IContext) to String 
@@ -2095,8 +2096,11 @@ public abstract class ExpressionView is AbstractNode {
     public function getOpenOutputs to OutputView[] { [] }
 }
 
-
-function unifyInputs from (i is LinkedView, visited is java.util.Set of ExpressionView, result is java.util.List of FunctionView) to () 
+function unifyInputs 
+    from (i is LinkedView, 
+          visited is java.util.Set of ExpressionView, 
+          result is java.util.List of FunctionView) 
+    to () 
 {
     for (link in i.getInputLinks()) {
         const v = link.source;
@@ -2194,7 +2198,9 @@ class FunctionView is ExpressionView {
     {
         const substs = new java.util.HashMap of (F3Type, F3Type);
         unify(substs);
+        println("unify1: {this} => {substs}");
         unify(substs);
+        println("unify2: {this} => {substs}");
     }
 
     function unify to () 
@@ -2676,7 +2682,7 @@ public class GetVarView is OutputView {
     public var visibleRowCount is Number = 10;
     const tv is GetTreeview = GetTreeview {
         canvas: bind canvas;
-        width: 180;
+        width: bind cellWidth;
         visibleRowCount: bind visibleRowCount;
         get: bind get;
         exprView: bind this;
@@ -3393,10 +3399,11 @@ public class ParameterView is InputView {
 
     function numSlider to SliderField 
     {
+        var w = bind cellWidth-120;
         const f = NumberField {
             height: bind cellHeight;
-            width: bind cellWidth-100;
-            transform: translate(50, 0, 0);
+            width: bind w;
+            transform: bind translate(cellWidth/2-w/2, 0, 0);
             min: 0.0;
             max: 100.0;
             override function onChange from (n is Number) to () 
@@ -3412,10 +3419,11 @@ public class ParameterView is InputView {
     
     function intSlider to SliderField 
     {
+        var w = bind cellWidth-120;
         const f = IntegerField {
             height: bind cellHeight;
-            width: bind cellWidth-100;
-            transform: translate(50, 0, 0);
+            width: bind w;
+            transform: bind translate(cellWidth/2-w/2, 0, 0);
             min: 0;
             max: 100;
             override function onChange from (n is Integer) to () 
@@ -3431,10 +3439,11 @@ public class ParameterView is InputView {
 
     function boolSlider to SliderField 
     {
+        var w = bind cellWidth-130;
         const f = SliderField {     
             height: bind cellHeight;
-            width: bind cellWidth-100;
-            transform: translate(50, 0, 0);
+            width: bind w;
+            transform: bind translate(cellWidth/2-w/2, 0, 0);
             override function setT from (t is Number) to ()
             {       
                 this.t = if (t > 0.5) then 1.0 else 0.5;
@@ -3456,9 +3465,10 @@ public class ParameterView is InputView {
     } 
 
     function stringField to Text.Field {
+        var w = bind cellWidth/2;
         const f = StringField {
-            width: bind cellWidth - 46;
-            transform: translate(23, 0);
+            width: bind w
+            transform: bind translate(cellWidth/2-w/2, 0);
             height: bind cellHeight;
             font: bind font;
             foreground: bind canvas.textFg;
@@ -3563,7 +3573,8 @@ public class OutputView is LinkedOutputView {
         member: bind Member {
             m: null;
             t: resultType;
-            name: bind outputName;
+            rt: resultType,
+            name: outputName;
         }
     };
 
@@ -3633,6 +3644,7 @@ class ResultView is OutputView {
         Member {
             m: null;
             t: t;
+            rt: t;
             name: name;
         }
     }
@@ -4105,6 +4117,9 @@ class TreeLinker {
         const cell = tv.selectedTreecell as MemberTreecell;
         const tn = tv.selectedTreenode as MemberTreenode;
         canvas.dropType = tn.m.t;
+        if (canvas.dropType == null) {
+            println("BAD DROP TYPE: {tn}");
+        }
         const toLocal = canvas.toLocal;
         const sourcePos = canvas.toLocal * cell.toSceneTransform.getTranslation();
         linkStart.pos = sourcePos + new Vec3(cell.bounds.extent.x, 0, 0);
@@ -4887,7 +4902,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     const ARROW_COLOR = Color.color(.2, .2, .2);
 
     const cellHeight is Number = 16;
-    const cellWidth is Number = 180;
+    const cellWidth is Number = 200;
 
     const portArrow is Polygon = Polygon {
 	points: [-3.5, -4.5, -3.5, 4.5, 3.5, 0];
@@ -5767,6 +5782,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         }
         println("introspecting: {t}");
         var members = introspect(t, true);
+        println("members=>{members}");
         if (t is F3ClassType) {
             members = members[m | m.m == null or not m.m.isStatic()];
         }
@@ -5801,6 +5817,8 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             f.ununify();
             unifyInputs(f.inputs[0], x, y);
         }
+        println("UNIFICATION ORDER:");
+        for (v in y) { println(v) }
         for (v in y) {
             v.unify2();
         }
