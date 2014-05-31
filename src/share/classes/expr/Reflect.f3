@@ -2,7 +2,8 @@ package expr;
 import f3.reflect.*;
 import com.google.common.reflect.TypeToken;
 public const jdk_paranamer = 
-       new com.thoughtworks.paranamer.JavadocParanamer(new java.net.URL("http://docs.oracle.com/javase/6/docs/api/"));
+    new com.thoughtworks.paranamer.JavadocParanamer(new java.net.URL("http://docs.oracle.com/javase/6/docs/api/"));
+
 public const paranamer = 
        new com.thoughtworks.paranamer.CachingParanamer(
        new com.thoughtworks.paranamer.AdaptiveParanamer(jdk_paranamer, new com.thoughtworks.paranamer.BytecodeReadingParanamer()));
