@@ -1184,7 +1184,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
             const p2Delta = -inTan * oneThirdDelta;
             x1 = oneThirdDelta;
             y1 = p1Delta;
-            x2 = oneThirdDelta;
+            x2 = frame2-oneThirdDelta;
             y2 = -p2Delta;
         } else {
             const frame1 = (k.prev.position / (1s/24))  as Integer;
@@ -1218,7 +1218,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
             outLength: outLength;
             isPointOnly: k.prev == null and k.next == null;
         }
-        tool.valueScale = new Vec2(1.0, 1.0 / sy);
+        //tool.valueScale = new Vec2(1.0, 1.0 / sy);
         return tool;
     }
 
