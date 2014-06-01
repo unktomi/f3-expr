@@ -6,7 +6,7 @@ import f3.util.Observer.*;
 import expr.Names.*;
 
 function shouldFormat from (n is TimeNode) to Boolean {
-    not (n is ResourceTimeNode and (n as ResourceTimeNode).useLiteralId);
+    not (n is ResourceTimeNode and (n as ResourceTimeNode).$useLiteralId);
 }
 
 public class Treenode is Treeview.Treenode {

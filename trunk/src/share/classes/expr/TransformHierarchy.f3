@@ -22,7 +22,7 @@ bound function makeTreeNode from (parent is Treeview.Treenode, n is Node) to Tre
 }
 
 function shouldFormat from (n is Node) to Boolean {
-    not (n is ResourceNode and (n as ResourceNode).useLiteralId);
+    not (n is ResourceNode and (n as ResourceNode).$useLiteralId);
 }
 
 public class Treenode is Treeview.Treenode {

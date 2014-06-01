@@ -71,22 +71,22 @@ public class SliderField is AbstractNode
     }
 
     const self = this;
-    var w = bind runWidth*self.t;
+    bound var w = runWidth * t;
 
     var dragw is Number;
     var runWidth = bind width + dragw;
 
     const darkRect is Rectangle = Rectangle {
 	fillPaint: bind ColorPaint(dark);
-	override var transform = bind translate(-runWidth/2 + self.w/2, 0);
+	transform: bind translate(-runWidth/2 + w/2, 0);
 	height: bind height;
-	override var width = bind self.w;
+	width: bind w;
         pickable: false;
     }
 
     const borderRect is Rectangle = Rectangle {
 	fillPaint: bind ColorPaint(border);
-	override var transform = bind translate(-runWidth/2 + runWidth * self.t - 0.5, 0, 0)
+	transform: bind translate(-runWidth/2 + runWidth * t - 0.5, 0, 0)
 	height: bind height;
 	width: 1
     }
