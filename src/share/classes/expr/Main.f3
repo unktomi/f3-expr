@@ -516,7 +516,7 @@ public function run from (args is String[]) to ()
 		url: url
 	    }
 	    const rn = ResourceNode {
-                useLiteralId: true;
+                $useLiteralId: true;
 		url: url;
                 id: url;
 		content: browser;
@@ -526,7 +526,7 @@ public function run from (args is String[]) to ()
                 }
 	    }
 	    const rtn = ResourceTimeNode {
-                useLiteralId: true;
+                $useLiteralId: true;
                 id: url;
 		url: url;
 		spatial: rn;

@@ -248,8 +248,8 @@ class TimeNodeView is AbstractNode
     override var transform = bind translate(playX + w / 2.0, 0);
     function getTrackName from (target is TimeNode) to String
     {
-        const shouldFormat1 = not (target is ResourceTimeNode) or not (target as ResourceTimeNode).useLiteralId;
-        const shouldFormat2 = not (target is ResourceTarget.ChannelBoxGroup) or not (target as ResourceTarget.ChannelBoxGroup).useLiteralId;
+        const shouldFormat1 = not (target is ResourceTimeNode) or not (target as ResourceTimeNode).$useLiteralId;
+        const shouldFormat2 = not (target is ResourceTarget.ChannelBoxGroup) or not (target as ResourceTarget.ChannelBoxGroup).$useLiteralId;
         const shouldFormat = shouldFormat1 and shouldFormat2;
         if ((target.parent is ResourceTimeNode and not (target.parent is ResourceTimeNodeWrapper)) and target.parent.id == target.id) then "Main Timeline" else if shouldFormat then formatName(target.id) else target.id;
     }   

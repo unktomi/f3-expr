@@ -275,7 +275,8 @@ public class ChoiceField of a is SliderField {
         disp = i.observable.subscribe(onChange);
     }
 
-    override var t on replace {
+    override function setT from (t is Number) to () 
+    {
         i.setFromT(t);
     }
 
@@ -567,7 +568,7 @@ function inspect0 from (obj is Object, classType is F3ClassType) to (Inspected o
     println("INSPECTING => {obj}");
     if (obj == null) then [] else {
 	    const members = Expression.introspect(classType);
-	    foreach (m in members) {
+	    foreach (m in members where not m.name.contains("$")) {
 		println("m={m} {m.m} t={m.t}");
                 var result is Inspected of ?;
                 try {
