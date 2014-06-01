@@ -854,8 +854,8 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
         text: "0"
     };
 
-    const onGadgetCommit = frameGadget.observeCommit().subscribe(function from (_ is ()) to () {
-           const currentFrame = Integer.parseInt(frameGadget.text);
+    const onGadgetCommit = frameGadget.observeCommit().subscribe(function from (text is String) to () {
+           const currentFrame = Integer.parseInt(text);
            target.setPlayhead(1s / frameRate * currentFrame);
         });
 
@@ -868,8 +868,8 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
         text: "24"
     };
 
-    const onRateGadgetCommit = frameRateGadget.observeCommit().subscribe(function from (_ is ()) to () {
-            frameRateN = Math.max(Integer.parseInt(frameRateGadget.text), 1);
+    const onRateGadgetCommit = frameRateGadget.observeCommit().subscribe(function from (text is String) to () {
+            frameRateN = Math.max(Integer.parseInt(text), 1);
         });
 
     public var combinedGadget is Node = Group {
