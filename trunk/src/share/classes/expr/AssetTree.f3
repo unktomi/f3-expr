@@ -70,6 +70,7 @@ public class TextFieldAsset is Asset {
         to ResourceTextField 
     {
 	ResourceTextField {
+            override var url = bind "text-input://{id}"
 	    id: "Text Input {count++}";
 	}
     }

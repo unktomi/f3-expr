@@ -478,18 +478,6 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
 		 height: bind cellHeight;   
 		 fillPaint: bind if (i.index <> selectedIndex) BG_PAINT else SELECTED_BG_PAINT;
 	    },
-	    TransformNode {
-		//tx: bind -width / 2;
-		content: Text.Label {
-                    width: bind width;
-		    indent: 4;	
-		    text: bind Names.formatName(i.label);
-		    font: bind font;
-		    foreground: bind if (i.index <> selectedIndex) FG_PAINT else SELECTED_FG_PAINT;
-		    background: bind if (i.index <> selectedIndex) BG_PAINT else SELECTED_BG_PAINT;
-		    height: bind cellHeight;	    
-		}
-	    },
 	    if (i is InspectedNumber) then
 	    TransformNode {
 		tx: bind width / 2 - fieldWidth / 2-indent;
@@ -538,6 +526,19 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
 	    } else if (i is InspectedObservable) {
 		null
             } else null,
+	    TransformNode {
+		//tx: bind -width / 2;
+		content: Text.Label {
+                    width: bind width;
+		    indent: 4;	
+		    text: bind Names.formatName(i.label);
+		    font: bind font;
+		    foreground: bind if (i.index <> selectedIndex) FG_PAINT else SELECTED_FG_PAINT;
+                    background: null;//bind if (i.index <> selectedIndex) BG_PAINT else SELECTED_BG_PAINT;
+		    height: bind cellHeight;	    
+                    pickable: false;
+		}
+	    },
             Rectangle {
 		 pickable: false;
 		 width: bind width;
