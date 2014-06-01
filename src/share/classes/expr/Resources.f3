@@ -56,6 +56,18 @@ public class SpatialResource is Resource {
     public var pz is Number;
 }
 
+public class TextFieldResource is SpatialResource {
+    public var fontFamily is String = "Helvetica";
+    public var fontWeight is String = "normal";
+    public var fontStyle is String = "normal";
+    public var fontSize is Integer = 16;
+    public var text is String = "";
+    public var width is Number = 100;
+}
+
+
+
+
 public interface Temporal {
     public var blendWeight is Number = 1.0;
     public var playTime is Duration = 0s;
@@ -98,24 +110,7 @@ class ResourceBuilder {
                 convertUrl(x);
             }
         }
-        SpatialResource {
-            url: convertUrl(n.url);
-            tx: n.tx;
-            ty: n.ty;
-            tz: n.tz;
-            
-            sx: n.sx;
-            sy: n.sy;
-            sz: n.sz;
-            
-            rx: n.rx;
-            ry: n.ry;
-            rz: n.rz;
-            
-            px: n.px;
-            py: n.py;
-            pz: n.pz;
-            programs: foreach (p in n.programs where (p.code <> null or p.varSources.size() > 0) and p.parent == null) ProgramResource {
+        const progs = foreach (p in n.programs where (p.code <> null or p.varSources.size() > 0) and p.parent == null) ProgramResource {
                 variables: foreach (x in p.varSources.entrySet()) {
                     VarDecl {
                         varName: x.getKey().varName;
@@ -128,8 +123,8 @@ class ResourceBuilder {
                 code: p.code;
                 compiled: p.sourceCode;
                 targetPath: p.targetPath;   
-            }
-            animation: ChannelBoxResource {
+        };
+        const anims = ChannelBoxResource {
                 blendWeight: n.channelBox.blendWeight;
                 playTime: n.channelBox.playTime;
                 playRate: n.channelBox.playRate;
@@ -152,6 +147,55 @@ class ResourceBuilder {
                         }
                     }
                 }
+            }
+        if (n is ResourceTextField) {
+            const f = n as ResourceTextField;
+            TextFieldResource {
+                id: f.id;
+                fontFamily: f.fontFamily.selection;
+                fontWeight: f.fontWeight.selection;
+                fontStyle: f.fontStyle.selection;
+                fontSize: f.fontSize.selection;
+                width: f.width;
+                text: f.text;
+                tx: n.tx;
+                ty: n.ty;
+                tz: n.tz;
+                
+                sx: n.sx;
+                sy: n.sy;
+                sz: n.sz;
+                
+                rx: n.rx;
+                ry: n.ry;
+                rz: n.rz;
+                
+                px: n.px;
+                py: n.py;
+                pz: n.pz;
+                programs: progs;
+                animation: anims;
+            }
+        } else {
+            SpatialResource {
+                url: convertUrl(n.url);
+                tx: n.tx;
+                ty: n.ty;
+                tz: n.tz;
+                
+                sx: n.sx;
+                sy: n.sy;
+                sz: n.sz;
+                
+                rx: n.rx;
+                ry: n.ry;
+                rz: n.rz;
+                
+                px: n.px;
+                py: n.py;
+                pz: n.pz;
+                programs: progs;
+                animation: anims;
             }
         }
     }

@@ -358,8 +358,8 @@ class StringField is ResizableNode {
         //background: bind if (not selected) then TEXT_BG_PAINT else SELECTED_BG_PAINT;
         background: TRANSPARENT_PAINT;
     };
-    const d = area.observeCommit().subscribe(function from (_ is ()) to () {
-            try { string.set(area.text) } catch (e is org.f3.runtime.AssignToBoundException) { } // hack  
+    const d = area.observeCommit().subscribe(function from (text is String) to () {
+            try { string.set(text) } catch (e is org.f3.runtime.AssignToBoundException) { } // hack  
         });
     override var internalContent = bind area;
     postinit {

@@ -17,6 +17,8 @@ import expr.undo.*;
 import expr.inspector.*;
 import expr.inspector.Inspector.*;
 import expr.ResourceNode.*;
+import expr.ResourceTextField.*;
+import expr.Resources.TextFieldResource;
 import expr.ResourceTimeNode.*;
 import expr.AssetTree.*;
 import expr.timeline.*;
@@ -761,6 +763,7 @@ public function run from (args is String[]) to ()
         contextModel.reset();
         contextTree.select(contextModel.root);
 	transformHierarchy.clearSelection();
+        transformHierarchy.selectScene(mainScene);
         temporalHierarchy.clearSelection();
         temporalHierarchy2.clearSelection();
         playerUrl = "";
@@ -868,7 +871,21 @@ public function run from (args is String[]) to ()
         }
         mainContext.programs = topLevels;
 	for (i in sceneRes.spatialResources) {
-	    doDrop(rebaseURL(i.url), new Point3(i.tx, i.ty, i.tz));
+            if (i instanceof TextFieldResource) {
+                const r = i as TextFieldResource;
+                const tf = ResourceTextField {
+                    id: r.id;
+                    fontSize: new FontSizeSelection(r.fontSize);
+                    fontFamily: new FontFamilySelection(r.fontFamily);
+                    fontStyle: new FontStyleSelection(r.fontStyle);
+                    fontWeight: new FontWeightSelection(r.fontWeight);
+                    width: r.width;
+                };
+                tf.setText(r.text);
+                addResource(tf, new Point3(i.tx, i.ty, i.tz));
+            } else {
+                doDrop(rebaseURL(i.url), new Point3(i.tx, i.ty, i.tz));
+            }
 	    currentTransform.tx = i.tx;
 	    currentTransform.ty = i.ty;
 	    currentTransform.tz = i.tz;
@@ -1010,7 +1027,21 @@ public function run from (args is String[]) to ()
             insert scene into currentScenes;
             transformHierarchy.selectScene(scene);
             foreach (i in j.spatialResources) {
-                doDrop(rebaseURL(i.url), new Point3(i.tx, i.ty, i.tz));
+                if (i instanceof TextFieldResource) {
+                    const r = i as TextFieldResource;
+                    const tf = ResourceTextField {
+                        id: r.id;
+                        fontSize: new FontSizeSelection(r.fontSize);
+                        fontFamily: new FontFamilySelection(r.fontFamily);
+                        fontStyle: new FontStyleSelection(r.fontStyle);
+                        fontWeight: new FontWeightSelection(r.fontWeight);
+                        width: r.width;
+                    };
+                    tf.setText(r.text);
+                    addResource(tf, new Point3(i.tx, i.ty, i.tz));
+                } else {
+                    doDrop(rebaseURL(i.url), new Point3(i.tx, i.ty, i.tz));
+                }
                 currentTransform.tx = i.tx;
                 currentTransform.ty = i.ty;
                 currentTransform.tz = i.tz;
@@ -1026,7 +1057,8 @@ public function run from (args is String[]) to ()
                 currentTransform.px = i.px;
                 currentTransform.py = i.py;
                 currentTransform.pz = i.pz;
-                (currentTransform as ResourceNode).programs = foreach (prog in i.programs) {
+                const rn = (currentTransform as ResourceNode);
+                rn.programs = foreach (prog in i.programs) {
                     const p = Program {
                         event: prog.event.deserialize();
                         code: prog.code;
@@ -1041,9 +1073,41 @@ public function run from (args is String[]) to ()
                             lookupTemporal: mainTimeLayer.lookup;
                         }
                     }
+                    var ps = [p];
+                    var targetContext = resolveContext(rn, p);
+                    println("RESOLVED CONTEXT {rn} => {targetContext}");
+                    for (d in prog.variables) {
+                        const v = Context.ClosureVarContext {
+                            parent: targetContext;
+                            varName: d.varName;
+                            varType: findTypeAsset(d.varType);
+                        }
+                        insert v into targetContext.content;
+                        println("CREATED VAR: {v}");
+                        const vp = Program {
+                            parent: p;
+                            event: p.event;
+                            code: d.code;
+                            sourceCode: d.sourceCode;
+                            targetPath: prog.targetPath;
+                            evalContext: Program.EvalContext {
+                                eventContext: targetContext as Context.MemberContext;
+                                varContext: v;
+                                interactive: function from () to Boolean { interactive } 
+                                targetNode: (currentTransform as ResourceTarget).findTarget(prog.targetPath);
+                                instanceSpace: currentScene.instanceSpace;
+                                lookupSpatial: currentScene.root.lookup;
+                                targetTimeline: player;
+                                lookupTemporal: mainTimeLayer.lookup;
+                            }
+                        }
+                        v.program = vp;
+                        p.defineVar(v, vp);
+                        insert vp into ps;
+                    }
                     println("CREATING PROGRAM**** {prog} => {p.sourceCode}");
                     insert p into allPrograms;
-                    p;
+                    ps;
                 }
             }
         }
@@ -1407,8 +1471,12 @@ public function run from (args is String[]) to ()
                                                  }
                                              }
                                              if (asset is AssetTree.TextFieldAsset) {
-                                                 const f = (asset as AssetTree.TextFieldAsset).getTextField();
-                                                 addResource(f, currentScene.mousePosition);
+                                                 const picked = getUnderMouseInEditor();
+                                                 if (picked == []) {
+                                                     const f = (asset as AssetTree.TextFieldAsset).getTextField();
+                                                     addResource(f, currentScene.mousePosition);
+                                                     MasterUndoable.commit();
+                                                 }
                                              }
                                              if (asset is AssetTree.SceneAsset) {
                                                  const picked = getUnderMouseInEditor();

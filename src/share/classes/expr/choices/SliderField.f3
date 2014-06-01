@@ -55,9 +55,9 @@ public class SliderField is AbstractNode
         editable: bind textInputEnabled;
     };
 
-    var textAreaCommit = textArea.observeCommit().subscribe(function from (_ is ()) to () {
+    var textAreaCommit = textArea.observeCommit().subscribe(function from (text is String) to () {
             textAreaEnabled = false;
-            onCommit(textArea.text);
+            onCommit(text);
         });
 
     const dark = Color.color(0.77, 0.77, 0.77, 0.77);

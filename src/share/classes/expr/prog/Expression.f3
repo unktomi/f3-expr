@@ -2381,12 +2381,12 @@ class FunctionView is ExpressionView {
         foreach (i in inputs) i.links 
     }
 
-    public function getOpenInputs to InputView[] 
+    override public function getOpenInputs to InputView[] 
     { 
         inputs[(if fun.isStatic then 1 else 0)..][i | i.links == []];
     }
 
-    public function getOpenOutputs to OutputView[] 
+    override public function getOpenOutputs to OutputView[] 
     { 
         if (getOutputLinks() == []) then output else []
     }
@@ -3474,7 +3474,7 @@ public class ParameterView is InputView {
             foreground: bind canvas.textFg;
             background: bind canvas.textBg;
             rightJustified: true;
-            override function handleCommit from (_ is ()) to ()
+            override function handleCommit from (text is String) to ()
             {
                 parameter.constantValue = "\"{text}\"";
                 canvas.dumpSrc();
@@ -3535,7 +3535,7 @@ public class ParameterView is InputView {
 }
 
 abstract class StringField is Text.Field {
-    protected function handleCommit from (_ is ()) to ();
+    protected function handleCommit from (text is String) to ();
     const onCommit = observeCommit().subscribe(handleCommit);
 }
 
