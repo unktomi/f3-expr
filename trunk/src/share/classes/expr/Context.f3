@@ -187,7 +187,10 @@ public class ResourceNodeContext is GroupContext, ResourceObjectContext {
     }
     public var resource is ResourceNode;
     override var name = bind "{if (resource.useLiteralId) then resource.id else formatName(resource.id)} [Scene]";
-    protected var members = bind uniquify(Expression.introspect(Reflect.getType("f3.media.scene.TransformNode") as F3ClassType));
+    protected var typeName = "f3.media.scene.TransformNode";
+    protected var members = 
+        bind uniquify(Expression.introspect(Reflect.getType(typeName) as F3ClassType));
+
     public readonly var memberCtxs = bind foreach (x in members) if (not x.name.startsWith("observe")) then null else x;
     protected var containedNodes = bind foreach (x in resource.content) SubResourceNodeContext {
         parent: this;
@@ -199,6 +202,17 @@ public class ResourceNodeContext is GroupContext, ResourceObjectContext {
 
     public override bound function getContent to Context[] { 
         [programs, containedNodes, content]
+    }
+}
+
+public class ResourceTextFieldContext is ResourceNodeContext {
+    override var typeName = "expr.ResourceTextField";
+    override var containedNodes = [];
+    override var name = bind "{resource.id} [Text Input]";
+    override var members = 
+        bind foreach (m in uniquify(Expression.introspect(Reflect.getType(typeName) as F3ClassType))) 
+    {
+        if (m.m.getDeclaringClass().getName().equals(typeName)) then m else null
     }
 }
 

@@ -110,6 +110,7 @@ class CachedScene is Scene {
     public var scene is Scene[];
     override var camera = Camera2D {tx: bind -width/2, ty: bind -height/2}
     var stageNode is StageNode = StageNode {
+        superSample: 1;
 	content: bind scene;
     }
     override function update {
@@ -334,9 +335,17 @@ public function run from (args is String[]) to ()
         if (currentScene == mainScene) {
             viewer.focusCamera(rn);
         }
-        const ctx = Context.ResourceNodeContext { 
-            parent: contextModel.selectedGroupContext; 
-            resource: rn;
+        var ctx is Context.ResourceNodeContext;
+        if (rn is ResourceTextField) {
+            ctx = Context.ResourceTextFieldContext { 
+                parent: contextModel.selectedGroupContext; 
+                resource: rn;
+            }
+        } else {
+            ctx = Context.ResourceNodeContext { 
+                parent: contextModel.selectedGroupContext; 
+                resource: rn;
+            }
         } 
         insert ctx into contextModel.selectedGroupContext.content;
         println("added asset to context { contextModel.selectedGroupContext } => {contextModel.selectedGroupContext.content}");
@@ -1336,6 +1345,13 @@ public function run from (args is String[]) to ()
 
 					 override function onMouseUp from (e is MouseEvent) to () 
 					 {
+                                             if (dragger == null) {
+                                                 return;
+                                             }
+                                             for (q in getUnderMouseInEditor()) {
+                                                 if (q.node == this) return ();
+                                             }
+                                             
 					     var asset = tn.asset;
 					     if (asset is AssetTree.MaAsset) {
 						 const t = (asset as AssetTree.MaAsset).model.getTemporalRoot();
@@ -1389,6 +1405,10 @@ public function run from (args is String[]) to ()
                                                          }
                                                      }
                                                  }
+                                             }
+                                             if (asset is AssetTree.TextFieldAsset) {
+                                                 const f = (asset as AssetTree.TextFieldAsset).getTextField();
+                                                 addResource(f, currentScene.mousePosition);
                                              }
                                              if (asset is AssetTree.SceneAsset) {
                                                  const picked = getUnderMouseInEditor();
@@ -1472,6 +1492,7 @@ public function run from (args is String[]) to ()
                                                         content: bind currentScene.root;
                                                     }
                                                     var st = StageNode {
+                                                        superSample: 1
                                                         content: sn;
                                                     }
                                                 tabs:
@@ -2153,6 +2174,7 @@ Tabview.Tab {
             }
         }
     };
+    Inspector.allFontFamilies = (the Text.LayoutEngine).allFontFamilies;
     currentScenes = [mainScene];
     undoList.addTarget("currentScenes", &currentScenes);
     transformHierarchy.selectedScene = mainScene;

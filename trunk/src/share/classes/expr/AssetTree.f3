@@ -56,6 +56,25 @@ public class Scene2DAsset is SceneAsset {
     }
 }
 
+public class TextFieldAsset is Asset {
+    override var name = "Text Input";
+    var count = 1;
+    public const webBrowserFactory is AbstractWebBrowserFactory = the AbstractWebBrowserFactory;
+    public const pathFactory is Shape2D.Path2DFactory = the Shape2D.Path2DFactory;
+    public const layoutEngine is Text.LayoutEngine = the Text.LayoutEngine;
+    public const effectLoader is CGEffectLoader = the CGEffectLoader;
+    public const soundLoader is SoundLoader = the SoundLoader;
+    public const movieLoader is MovieLoader = the MovieLoader;
+    public const imageLoader is ImageLoader = the ImageLoader;
+    public function getTextField 
+        to ResourceTextField 
+    {
+	ResourceTextField {
+	    id: "Text Input {count++}";
+	}
+    }
+}
+
 public class CameraAsset is Asset {
     public const camera is Camera;
 }
@@ -446,6 +465,14 @@ function getPackageAssets to PackageAsset {
 }
 
 public class AssetModel is Treemodel {
+    public const webBrowserFactory is AbstractWebBrowserFactory = the AbstractWebBrowserFactory;
+    public const pathFactory is Shape2D.Path2DFactory = the Shape2D.Path2DFactory;
+    public const layoutEngine is Text.LayoutEngine = the Text.LayoutEngine;
+    public const effectLoader is CGEffectLoader = the CGEffectLoader;
+    public const soundLoader is SoundLoader = the SoundLoader;
+    public const movieLoader is MovieLoader = the MovieLoader;
+    public const imageLoader is ImageLoader = the ImageLoader;
+
     public var resources is ResourceGroup;
     public bound var packageAssets = getPackageAssets();
     public function getCodeModel to Treemodel {
@@ -455,12 +482,20 @@ public class AssetModel is Treemodel {
             }
         }
     }
+    const textFieldAsset = TextFieldAsset {
+        pathFactory: bind pathFactory;
+        layoutEngine: bind layoutEngine;
+        imageLoader: bind imageLoader;
+        effectLoader: bind effectLoader;
+        soundLoader: bind soundLoader; 
+        movieLoader: bind movieLoader;
+    }
     override var root = AssetTreenode {
 	asset: Asset {
 	    name: "Assets";
 	    containedAssets: bind 
 	    [packageAssets, TimeLayerAsset {}, TransitionLayerAsset{}, BlendLayerAsset {}, 
-             Scene2DAsset {}, foreach (r in resources.resources) makeAsset(r)]
+             Scene2DAsset {}, textFieldAsset, foreach (r in resources.resources) makeAsset(r)]
 	}
     }
 

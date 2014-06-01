@@ -1,6 +1,7 @@
 package expr.inspector;
 import f3.media.input.*;
 import f3.media.scene.*;
+import f3.media.scene.Text.LayoutEngine;
 import f3.media.scene.Shape2D.*;
 import expr.choices.*;
 import f3.lang.*;
@@ -16,6 +17,87 @@ import f3.math.*;
 import f3.math.LinearMath.*;
 import java.lang.Math;
 import expr.undo.*;
+import expr.ResourceTextField.*;
+
+public var allFontFamilies is String[];
+
+function inspectedFontFamily from (ptr is ObservableRef of FontFamilySelection,
+                                   member is Member,
+                                   label is String,
+                                   families is String[]) to InspectedChoice of FontFamilySelection
+{
+    InspectedChoice of FontFamilySelection {
+        fieldWidth: 512;
+        label: label;
+        member: member;
+        choices: foreach (x in families) new FontFamilySelection(x);
+        observable: Observables.observe(ptr);
+        override function get to FontFamilySelection { 
+            ptr.get() ;
+        }
+        override function set from (x is FontFamilySelection) to () { 
+            ptr.set(x);
+        }
+    }
+}
+
+function inspectedFontWeight from (ptr is ObservableRef of FontWeightSelection,
+                                   member is Member,
+                                   label is String,
+                                   weights is String[]) to InspectedChoice of FontWeightSelection
+{
+    InspectedChoice of FontWeightSelection {
+        label: label;
+        member: member;
+        choices: foreach (x in weights) new FontWeightSelection(x);
+        observable: Observables.observe(ptr);
+        override function get to FontWeightSelection { 
+            ptr.get() ;
+        }
+        override function set from (x is FontWeightSelection) to () { 
+            ptr.set(x);
+        }
+    }
+}
+
+function inspectedFontStyle from (ptr is ObservableRef of FontStyleSelection,
+                                   member is Member,
+                                   label is String,
+                                   styles is String[]) to InspectedChoice of FontStyleSelection
+{
+    InspectedChoice of FontStyleSelection {
+        label: label;
+        member: member;
+        choices: foreach (x in styles) new FontStyleSelection(x);
+        observable: Observables.observe(ptr);
+        override function get to FontStyleSelection { 
+            ptr.get() ;
+        }
+        override function set from (x is FontStyleSelection) to () { 
+            ptr.set(x);
+        }
+    }
+}
+
+
+function inspectedFontSize from (ptr is ObservableRef of FontSizeSelection,
+                                 member is Member,
+                                 label is String,
+                                 sizes is Integer[]) to InspectedChoice of FontSizeSelection
+{
+    InspectedChoice of FontSizeSelection {
+        label: label;
+        member: member;
+        choices: foreach (x in sizes) new FontSizeSelection(x);
+        observable: Observables.observe(ptr);
+        override function get to FontSizeSelection { 
+            ptr.get() ;
+        }
+        override function set from (x is FontSizeSelection) to () { 
+            ptr.set(x);
+        }
+    }
+}
 
 public abstract class Inspected of a 
 {
@@ -23,7 +105,7 @@ public abstract class Inspected of a
     public var label is String;
     public var observable is Observable of a;
     protected var index is Integer;
-    public function get to a { null} 
+    public function get to a { null } 
     public function set from (x is a) to () {}
 }
 
@@ -61,12 +143,14 @@ public class InspectedDuration is InspectedRange of Duration
 
 public class InspectedChoice of a is InspectedRange of a 
 {
+    public const fieldWidth is Number = 64;
     public const choices is (..a)[];
     public const labels is String[] = foreach (choice in choices) "{choice}";
 
     function getIndex from (t is Number) to Integer 
     {
-	(t * choices.size()) as Integer
+	const i = (Math.round(t * choices.size()) as Integer);
+        return Math.min(Math.max(i, 0), choices.size()-1);
     }
 
     override function getAsString from (t is Number) to String
@@ -77,6 +161,19 @@ public class InspectedChoice of a is InspectedRange of a
     override function getFromT from (t is Number) to a
     { 
 	choices[getIndex(t)];
+    }
+
+    public function getT to Number
+    {
+        const v = get();
+        for (x in choices) {
+            if (x == v) {
+                const t = indexof x / (choices.size() as Number);
+                return t;
+            }
+        }
+        println("no match: {v.getClass()}, {v} on {foreach (x in choices) "{x.getClass()}, {x}"}");
+        return 0;
     }
 }
 
@@ -162,6 +259,33 @@ public class NumberField is SliderField {
     }
 }
 
+public class ChoiceField of a is SliderField {
+    public var i is InspectedChoice of a;
+    override var textInputEnabled = false;
+    var disp is Disposable;
+    var invalid = true;
+    var lastT is Number;
+    function onChange from (n is a) to () 
+    {
+        t = i.getT();
+    }
+
+    postinit {
+        onChange(i.get());
+        disp = i.observable.subscribe(onChange);
+    }
+
+    override var t on replace {
+        i.setFromT(t);
+    }
+
+    override function getText from (t is Number) to String
+    {
+        const j is Integer = i.getIndex(t);
+	if (j >= 0 and j < i.labels.size()) i.labels[j] else "";
+    }
+}
+
 public class BooleanField is SliderField {
     public var i is InspectedBoolean;
     var disp is Disposable;
@@ -244,6 +368,7 @@ class StringField is ResizableNode {
 }
 
 public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scrollable {
+
     override public bound function getTx to Number { 0.0 }
     override public bound function getSx to Number { 1.0 }
     override public bound function getTy to Number 
@@ -357,7 +482,7 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
 		content: Text.Label {
                     width: bind width;
 		    indent: 4;	
-		    text: bind i.label;
+		    text: bind Names.formatName(i.label);
 		    font: bind font;
 		    foreground: bind if (i.index <> selectedIndex) FG_PAINT else SELECTED_FG_PAINT;
 		    background: bind if (i.index <> selectedIndex) BG_PAINT else SELECTED_BG_PAINT;
@@ -380,6 +505,16 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
 	            width: bind fieldWidth;
 		    height: bind cellHeight-margin;
 		}
+                } else if (i is InspectedChoice of ?) then {
+                    var q = i as InspectedChoice of Object;                                 
+                    TransformNode {
+                        tx: bind width / 2 - q.fieldWidth / 2-indent;
+                        content: ChoiceField of Object {
+                            i: bind q;
+                            width: bind q.fieldWidth;
+                            height: bind cellHeight-margin;
+                        }
+                    }
 	    } else if (i is InspectedDuration) then
 	    TransformNode {
 		tx: bind width / 2 - fieldWidth / 2-indent;
@@ -462,6 +597,18 @@ function inspect0 from (obj is Object, classType is F3ClassType) to (Inspected o
                                     override function get to Boolean { ptr.get() }
                                     override function set from (x is Boolean) to () { ptr.set(x) }
                                 }
+                            } else if (m.m is F3VarMember and m.t == FONT_STYLE_TYPE) {
+                                const ptr = (m.m as F3Local.VarMember).getPointer(obj as F3Object) as ObservableRef of FontStyleSelection;
+                                inspectedFontStyle(ptr, m, m.m.getName(), ["normal", "italic"]);
+                            } else if (m.m is F3VarMember and m.t == FONT_WEIGHT_TYPE) {
+                                const ptr = (m.m as F3Local.VarMember).getPointer(obj as F3Object) as ObservableRef of FontWeightSelection;
+                                inspectedFontWeight(ptr, m, m.m.getName(), ["normal", "bold"]);
+                            } else if (m.m is F3VarMember and m.t == FONT_FAMILY_TYPE) {
+                                const ptr = (m.m as F3Local.VarMember).getPointer(obj as F3Object) as ObservableRef of FontFamilySelection;
+                                inspectedFontFamily(ptr, m, m.m.getName(), allFontFamilies);
+                            } else if (m.m is F3VarMember and m.t == FONT_SIZE_TYPE) {
+                                const ptr = (m.m as F3Local.VarMember).getPointer(obj as F3Object) as ObservableRef of FontSizeSelection;
+                                inspectedFontSize(ptr, m, m.m.getName(), [8..128]);
                             } else if (m.m is F3VarMember and m.t == DURATION_TYPE) {
                                 const ptr = (m.m as F3Local.VarMember).getPointer(obj as F3Object) as ObservableRef of Duration;
                                 InspectedDuration {
