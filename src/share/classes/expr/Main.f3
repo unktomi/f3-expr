@@ -19,6 +19,7 @@ import expr.inspector.Inspector.*;
 import expr.ResourceNode.*;
 import expr.ResourceTextField.*;
 import expr.Resources.TextFieldResource;
+import expr.Resources.parseColor;
 import expr.ResourceTimeNode.*;
 import expr.AssetTree.*;
 import expr.timeline.*;
@@ -879,6 +880,8 @@ public function run from (args is String[]) to ()
                     fontFamily: new FontFamilySelection(r.fontFamily);
                     fontStyle: new FontStyleSelection(r.fontStyle);
                     fontWeight: new FontWeightSelection(r.fontWeight);
+                    foreground: parseColor(r.foreground);
+                    background: parseColor(r.background);
                     width: r.width;
                 };
                 tf.setText(r.text);
@@ -1035,6 +1038,8 @@ public function run from (args is String[]) to ()
                         fontFamily: new FontFamilySelection(r.fontFamily);
                         fontStyle: new FontStyleSelection(r.fontStyle);
                         fontWeight: new FontWeightSelection(r.fontWeight);
+                        foreground: parseColor(r.foreground);
+                        background: parseColor(r.background);
                         width: r.width;
                     };
                     tf.setText(r.text);
