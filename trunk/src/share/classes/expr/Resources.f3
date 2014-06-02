@@ -7,6 +7,7 @@ import expr.prog.Expression.ExprScene;
 import expr.prog.Program;
 import expr.prog.Expression.MemberNode;
 import expr.ResourceNode.MaResourceNode;
+import f3.util.Bits;
 
 public class Resource {
     public var id is String;
@@ -63,10 +64,31 @@ public class TextFieldResource is SpatialResource {
     public var fontSize is Integer = 16;
     public var text is String = "";
     public var width is Number = 100;
+    public var foreground is Integer = 0xffffffff;
+    public var background is Integer = 0xff000000;
 }
 
+function formatColor from (c is Color) to Integer
+{
+    const r = (c.red * 255 + 0.5) as Integer;
+    const g = (c.green * 255 + 0.5) as Integer;
+    const b = (c.blue * 255 + 0.5) as Integer;
+    const a = (c.opacity * 255 + 0.5) as Integer;
+    var value = Bits.shiftLeft(Bits.bitAnd(a, 0xff), 24);
+    value = Bits.bitOr(value, Bits.shiftLeft(Bits.bitAnd(r, 0xff), 16));
+    value = Bits.bitOr(value, Bits.shiftLeft(Bits.bitAnd(g, 0xff), 8));
+    value = Bits.bitOr(value, Bits.shiftLeft(Bits.bitAnd(b, 0xff), 0));
+    return value;
+}
 
-
+function parseColor from (argb is Integer) to Color
+{
+    const a = Bits.bitAnd(Bits.shiftRight(argb, 24), 0xff);
+    const r = Bits.bitAnd(Bits.shiftRight(argb, 16), 0xff);
+    const g = Bits.bitAnd(Bits.shiftRight(argb, 8), 0xff);
+    const b = Bits.bitAnd(Bits.shiftRight(argb, 0), 0xff);
+    Color.color(r / 255.0, g / 255.0, b / 255.0, a / 255.0);
+}
 
 public interface Temporal {
     public var blendWeight is Number = 1.0;
@@ -156,6 +178,8 @@ class ResourceBuilder {
                 fontWeight: f.fontWeight.selection;
                 fontStyle: f.fontStyle.selection;
                 fontSize: f.fontSize.selection;
+                foreground: formatColor(f.foreground);
+                background: formatColor(f.background);
                 width: f.width;
                 text: f.text;
                 tx: n.tx;

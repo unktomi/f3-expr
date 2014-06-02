@@ -51,12 +51,14 @@ public class NumericSliderField is SliderField {
     override function onCommit to () 
     {
         onChange(min + (max - min)*t);
+        MasterUndoable.commit();
     }
 
     override function getText from (t is Number) to String
     {
 	"{%.02f (min + (max - min)*t)}"
     }
+
 }
 
 
@@ -82,6 +84,18 @@ public class ColorInspector extends AbstractNode {
             i.set(selection);
         }
         super.update();
+    }
+    var disp is Disposable;
+
+    function onChange from (c is Color) to ()
+    {
+        if (c <> selection) {
+            firstTime = true;
+        }
+    }
+
+    postinit {
+        disp = i.observable.subscribe(onChange);
     }
     const colorSelection = Rectangle {
         height: bind height;
@@ -411,7 +425,7 @@ public class NumberField is SliderField {
     }
 }
 
-public class ChoiceField of a is SliderField {
+public class ChoiceField of a is SliderField, KeyboardInputHandler {
     public var i is InspectedChoice of a;
     override var textInputEnabled = false;
     var disp is Disposable;
@@ -432,10 +446,44 @@ public class ChoiceField of a is SliderField {
         i.setFromT(t);
     }
 
+    override function onCommit to ()
+    {
+        MasterUndoable.commit();
+    }
+
     override function getText from (t is Number) to String
     {
         const j is Integer = i.getIndex(t);
 	if (j >= 0 and j < i.labels.size()) i.labels[j] else "";
+    }
+
+    override function onKeyDown from (e is KeyboardEvent) to () 
+    {
+        var j is Integer = i.getIndex(t);
+        if (e.keyCode == Keys.Left) {
+            j--;
+            if (j < 0) {
+                j = sizeof i.choices-1;
+            }
+            i.set(i.choices[j]);
+        }
+        else if (e.keyCode == Keys.Right) {
+            j++;
+            if (j >= sizeof i.choices) {
+                j = 0;
+            }
+            i.set(i.choices[j]);
+        }
+        else if (e.keyCode == Keys.Home) {
+            i.set(i.choices[0]);
+        }
+        else if (e.keyCode == Keys.End) {
+            i.set(i.choices[sizeof i.choices-1]);
+        }
+    }
+
+    override function onKeyInput from (e is KeyboardEvent) to () 
+    {
     }
 }
 
