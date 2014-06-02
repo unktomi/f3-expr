@@ -15,6 +15,11 @@ public abstract class Asset {
     public readonly var containedAssets is Asset[];
 }
 
+public class AssetGroup is Asset {
+    public var content is Asset[];
+    override var containedAssets = bind content;
+}
+
 public class MaAsset is Asset {
     public const model is Ma.Model;
     override var url = bind model.url;
@@ -268,7 +273,7 @@ function findPackage from (str is String) to PackageAsset {
         println("FIND PACK: {str}");
         if (str == "") {
             r = RootPackageAsset {
-                name: "Code";
+                name: "Eventual";
             }
             packMap.put(str, r);
             return r;
@@ -490,13 +495,26 @@ public class AssetModel is Treemodel {
         effectLoader: bind effectLoader;
         soundLoader: bind soundLoader; 
         movieLoader: bind movieLoader;
-    }
+    };
+
+    const temporal = AssetGroup {
+        name: "Temporal";
+        content: [TimeLayerAsset {}, TransitionLayerAsset{}, BlendLayerAsset {}];
+    };
+
+    const spatial = AssetGroup { 
+        name: "Spatial", 
+        content: [Scene2DAsset {}, textFieldAsset];
+    } 
+
     override var root = AssetTreenode {
 	asset: Asset {
 	    name: "Assets";
 	    containedAssets: bind 
-	    [packageAssets, TimeLayerAsset {}, TransitionLayerAsset{}, BlendLayerAsset {}, 
-             Scene2DAsset {}, textFieldAsset, foreach (r in resources.resources) makeAsset(r)]
+	    [packageAssets,
+             temporal,
+             spatial, 
+             foreach (r in resources.resources) makeAsset(r)]
 	}
     }
 
@@ -535,6 +553,6 @@ public class AssetModel is Treemodel {
             }
             return null;
         }
-        return applyPath(["Code", comps], root);
+        return applyPath(["Eventual", comps], root);
     }
 }

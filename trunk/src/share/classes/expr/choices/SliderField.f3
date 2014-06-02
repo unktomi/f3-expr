@@ -111,6 +111,8 @@ public class SliderField is AbstractNode
             if (event.clickCount > 1) {
                 textAreaEnabled = true;
                 textArea.selectAll();
+                textAreaEnabled = true;
+                textInputEnabled = true;
                 event.scene.setFocus(textArea);
                 event.stopPropagation();
             }
