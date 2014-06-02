@@ -17,7 +17,123 @@ import f3.math.*;
 import f3.math.LinearMath.*;
 import java.lang.Math;
 import expr.undo.*;
-import expr.ResourceTextField.*;
+import expr.AbstractResourceText.*;
+
+public class NumericSliderField is SliderField {
+
+    public var min is Number = 0.0;
+    public var max is Number = 1.0;
+
+    protected function onChange from (n is Number) to () 
+    {
+        if (n < min) {
+            min = n;
+        }
+        if (n > max) {
+            max = n;
+        }
+	t = (n-min) / (max-min);
+    }
+
+    override function onCommit from (text is String) to () {
+        try {
+            onChange(java.lang.Float.parseFloat(text));
+        } catch (e is java.lang.Exception) {
+        }
+    }
+
+    override function onCommit to () 
+    {
+        onChange(min + (max - min)*t);
+    }
+
+    override function getText from (t is Number) to String
+    {
+	"{%.04f (min + (max - min)*t)}"
+    }
+}
+
+
+public class ColorInspector extends AbstractNode {
+    public var height is Number = 16;
+    var fieldWidth = 30;
+    public var r is Number;
+    public var g is Number;
+    public var b is Number;
+    public var a is Number;
+    public readonly var selection is Color = bind Color.color(r, g, b, a);
+    const colorSelection = Rectangle {
+        height: bind height;
+        width: bind height;
+        fillPaint: bind ColorPaint(selection);
+    };
+    const red = NumericSliderField {
+        min: 0.0;
+        max: 1.0;
+        height: bind height;
+        width: bind fieldWidth;
+        override function setT from (t is Number) to ()
+        {
+            r = t;
+        }
+    }
+    const green = NumericSliderField {
+        min: 0.0;
+        max: 1.0;
+        height: bind height;
+        width: bind fieldWidth;
+        override function setT from (t is Number) to ()
+        {
+            g = t;
+        }
+    }
+    const blue = NumericSliderField {
+        min: 0.0;
+        max: 1.0;
+        height: bind height;
+        width: bind fieldWidth;
+        override function setT from (t is Number) to ()
+        {
+            b = t;
+        }
+    }
+    const alpha = NumericSliderField {
+        min: 0.0;
+        max: 1.0;
+        height: bind height;
+        width: bind fieldWidth;
+        override function setT from (t is Number) to ()
+        {
+            a = t;
+        }
+    }
+    const contentGroup = Group {
+        content:
+        [TransformNode {
+                content: bind colorSelection;
+        },
+        TransformNode {
+            tx: bind height + 1
+            content: bind red;
+        },
+        TransformNode {
+            tx: bind (height + 1) + fieldWidth
+            content: bind green;
+        },
+        TransformNode {
+            tx: bind (height + 1) + fieldWidth + 1 + fieldWidth
+                content: bind blue;
+        },
+        TransformNode {
+            tx: bind (height + 1) + fieldWidth + 1 + fieldWidth + 1 + fieldWidth
+            content: bind alpha;
+        }]
+    };
+    override var internalContent = TransformNode {
+        tx: bind -contentGroup.bounds.width()/2;
+        content: bind contentGroup;
+    }
+}
 
 public var allFontFamilies is String[];
 

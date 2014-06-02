@@ -1,0 +1,48 @@
+package expr;
+import f3.util.*;
+import f3.media.scene.*;
+
+public const FONT_WEIGHT_TYPE = Reflect.getType("expr.AbstractResourceText.FontWeightSelection");
+public const FONT_STYLE_TYPE = Reflect.getType("expr.AbstractResourceText.FontStyleSelection");
+public const FONT_SIZE_TYPE = Reflect.getType("expr.AbstractResourceText.FontSizeSelection");
+public const FONT_FAMILY_TYPE = Reflect.getType("expr.AbstractResourceText.FontFamilySelection");
+
+public class Selection of a {
+    public const selection is a;
+    override function toString to String
+    {
+        "{selection}"
+    }
+
+    override function equals from (obj is Object) to Boolean 
+    {
+        if (obj is Selection) {
+            const j = obj as Selection of Object;
+            const result = selection == j.selection;
+            return result;
+        }
+        return false;
+    }
+}
+
+public class FontFamilySelection is Selection of String {
+}
+
+public class FontSizeSelection is Selection of Integer {
+}
+
+public class FontWeightSelection is Selection of String {
+}
+
+public class FontStyleSelection is Selection of String {
+}
+
+public abstract class AbstractResourceText is ResourceNode {
+    public var fontSize is FontSizeSelection = new FontSizeSelection(16);
+    public var fontFamily is FontFamilySelection = new FontFamilySelection("Helvetica");
+    public var fontWeight is FontWeightSelection = new FontWeightSelection("normal");
+    public var fontStyle is FontStyleSelection = new FontStyleSelection("normal");
+    public var width is Number = 100;
+    override var id = "";
+    public function setText from (text is String) to ();
+}
