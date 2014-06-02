@@ -1,0 +1,18 @@
+package expr;
+import f3.util.*;
+import f3.media.scene.*;
+
+public class ResourceLabel is AbstractResourceText {
+    public var text is String;
+    override public function setText from (text is String) to ()
+    {
+        this.text = text;
+    }
+    const impl is Text.Label = Text.Label {
+        text: bind text;
+        font: bind layoutEngine.createFont("font-size:{fontSize.selection};font-family:{fontFamily.selection};font-weight:{fontWeight.selection};font-style:{fontStyle.selection}");
+        width: bind width;
+    };
+    override var content = bind [impl];
+}
+
