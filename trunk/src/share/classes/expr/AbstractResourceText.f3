@@ -42,6 +42,8 @@ public abstract class AbstractResourceText is ResourceNode {
     public var fontFamily is FontFamilySelection = new FontFamilySelection("Helvetica");
     public var fontWeight is FontWeightSelection = new FontWeightSelection("normal");
     public var fontStyle is FontStyleSelection = new FontStyleSelection("normal");
+    public var foreground is Color = new Color(.1, .1, .1, 1);
+    public var background is Color = new Color(.9, .9, .9, 1);
     public var width is Number = 100;
     override var id = "";
     public function setText from (text is String) to ();

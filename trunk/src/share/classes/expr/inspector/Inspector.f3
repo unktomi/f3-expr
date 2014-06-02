@@ -19,20 +19,26 @@ import java.lang.Math;
 import expr.undo.*;
 import expr.AbstractResourceText.*;
 
+function clamp from (n is Number, lo is Number, hi is Number) to Number
+{
+    Math.min(Math.max(n, lo), hi);
+}
+
 public class NumericSliderField is SliderField {
 
     public var min is Number = 0.0;
     public var max is Number = 1.0;
 
-    protected function onChange from (n is Number) to () 
+    protected function onChange from (n0 is Number) to () 
     {
+        var n = n0;
         if (n < min) {
-            min = n;
+            n = min;
         }
         if (n > max) {
-            max = n;
+            n = max;
         }
-	t = (n-min) / (max-min);
+	setT((n-min) / (max-min));
     }
 
     override function onCommit from (text is String) to () {
@@ -49,23 +55,39 @@ public class NumericSliderField is SliderField {
 
     override function getText from (t is Number) to String
     {
-	"{%.04f (min + (max - min)*t)}"
+	"{%.02f (min + (max - min)*t)}"
     }
 }
 
 
 public class ColorInspector extends AbstractNode {
-    public var height is Number = 16;
+    public var i is InspectedColor;
+    public var height is Number = 15;
     var fieldWidth = 30;
     public var r is Number;
     public var g is Number;
     public var b is Number;
     public var a is Number;
+    var firstTime is Boolean = true;
     public readonly var selection is Color = bind Color.color(r, g, b, a);
+    override function update to () {
+        if (firstTime) {
+            firstTime = false;
+            const c = i.get();
+            red.setT(c.red);
+            green.setT(c.green);
+            blue.setT(c.blue);
+            alpha.setT(c.opacity);
+        } else {
+            i.set(selection);
+        }
+        super.update();
+    }
     const colorSelection = Rectangle {
         height: bind height;
         width: bind height;
         fillPaint: bind ColorPaint(selection);
+        strokePaint: bind ColorPaint(Color.color(.2, .2, .2));
     };
     const red = NumericSliderField {
         min: 0.0;
@@ -74,7 +96,8 @@ public class ColorInspector extends AbstractNode {
         width: bind fieldWidth;
         override function setT from (t is Number) to ()
         {
-            r = t;
+            r = clamp(t, min, max);
+            super.setT(r);
         }
     }
     const green = NumericSliderField {
@@ -84,7 +107,8 @@ public class ColorInspector extends AbstractNode {
         width: bind fieldWidth;
         override function setT from (t is Number) to ()
         {
-            g = t;
+            g = clamp(t, min, max);
+            super.setT(g);
         }
     }
     const blue = NumericSliderField {
@@ -94,7 +118,8 @@ public class ColorInspector extends AbstractNode {
         width: bind fieldWidth;
         override function setT from (t is Number) to ()
         {
-            b = t;
+            b = clamp(t, min, max);
+            super.setT(b);
         }
     }
     const alpha = NumericSliderField {
@@ -104,28 +129,36 @@ public class ColorInspector extends AbstractNode {
         width: bind fieldWidth;
         override function setT from (t is Number) to ()
         {
-            a = t;
+            a = clamp(t, min, max);
+            super.setT(a);
         }
-    }
+    };
+    var t1 is TransformNode;
+    var t2 is TransformNode;
+    var t3 is TransformNode;
+    var t4 is TransformNode;
+
+    const margin = 5;
+
     const contentGroup = Group {
         content:
-        [TransformNode {
-                content: bind colorSelection;
+        [t1=TransformNode {
+            content: bind colorSelection;
         },
-        TransformNode {
-            tx: bind height + 1
+        t2=TransformNode {
+            tx: bind t1.bounds.right() + margin + fieldWidth/2;
             content: bind red;
         },
-        TransformNode {
-            tx: bind (height + 1) + fieldWidth
+        t3=TransformNode {
+            tx: bind t2.bounds.right() + margin + fieldWidth/2;
             content: bind green;
         },
-        TransformNode {
-            tx: bind (height + 1) + fieldWidth + 1 + fieldWidth
-                content: bind blue;
+        t4=TransformNode {
+            tx: bind t3.bounds.right() + margin + fieldWidth/2;
+            content: bind blue;
         },
         TransformNode {
-            tx: bind (height + 1) + fieldWidth + 1 + fieldWidth + 1 + fieldWidth
+            tx: bind t4.bounds.right() + margin + fieldWidth/2;
             content: bind alpha;
         }]
     };
@@ -235,6 +268,9 @@ public class InspectedRange of a is Inspected of a {
     { 
 	set(getFromT(t)); 
     }
+}
+
+public class InspectedColor is Inspected of Color {
 }
 
 public class InspectedNumber is InspectedRange of Number 
@@ -602,6 +638,14 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
 	            width: bind fieldWidth;
 		    height: bind cellHeight-margin;
 		}
+	    } else if (i is InspectedColor) then
+	    TransformNode {
+                var  widget = ColorInspector {
+		    i: bind i as InspectedColor;
+		    height: bind cellHeight-margin;
+		};
+                tx: bind width / 2 - widget.bounds.width() / 2-indent + 8;
+                content: bind widget;
 	    } else if (i is InspectedBoolean) then
 	    TransformNode {
 		tx: bind width / 2 - fieldWidth / 2-indent;
@@ -705,6 +749,15 @@ function inspect0 from (obj is Object, classType is F3ClassType) to (Inspected o
                                         ptr.set(x);
                                         println("set {m.m.getName()} => {x} => {ptr.get()}");
                                     }
+                                }
+                            } else if (m.m is F3VarMember and m.t == COLOR_TYPE) {
+                                const ptr = (m.m as F3Local.VarMember).getPointer(obj as F3Object) as ObservableRef of Color;
+                                InspectedColor {
+                                    member: m;
+                                    label: m.m.getName();
+                                    observable: Observables.observe(ptr);
+                                    override function get to Color { ptr.get() }
+                                    override function set from (x is Color) to () { ptr.set(x) }
                                 }
                             } else if (m.m is F3VarMember and m.t == BOOLEAN_TYPE) {
                                 const ptr = (m.m as F3Local.VarMember).getPointer(obj as F3Object) as ObservableRef of Boolean;
