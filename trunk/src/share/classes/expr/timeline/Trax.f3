@@ -1165,35 +1165,49 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
         var y1 is Number;
         var x2 is Number;
         var y2 is Number;
+        var kix is Number;
+        var kiy is Number;
+        var kox is Number;
+        var koy is Number;
+
+        const frame1 = (k.prev.position / (1s/24))  as Integer;
+        const frame2 = (k.position / (1s/24))  as Integer;
+
         if (interp is KeyFrame.Tangent) {
             const t = interp as KeyFrame.Tangent;
-            const kix = t.kix;
-            const kiy = t.kiy;
-            const kox = t.kox;
-            const koy = t.koy;
-            const value1 = k.prev.value;
-            const value2 =  k.value;
-            const p0 = value1;
-            const p3 = value2;
-            const frame1 = (k.prev.position / (1s/24))  as Integer;
-            const frame2 = (k.position / (1s/24))  as Integer;
-            const outTan = if (kox == 0) then 0 else koy / (kox * 24.0);
-            const inTan = if (kix == 0) then 0 else  kiy / (kix * 24.0);
-            const oneThirdDelta = (frame2 - frame1) / 3.0;
-            const p1Delta = outTan * oneThirdDelta;
-            const p2Delta = -inTan * oneThirdDelta;
-            x1 = oneThirdDelta;
-            y1 = p1Delta;
-            x2 = frame2-oneThirdDelta;
-            y2 = -p2Delta;
-        } else {
-            const frame1 = (k.prev.position / (1s/24))  as Integer;
-            const frame2 = (k.position / (1s/24))  as Integer;
-            x1 = frame1;
-            x2 = frame2;
-            y1 = k.prev.value;
-            y2 = k.value;
+            kix = t.kix;
+            kiy = t.kiy;
+            kox = t.kox;
+            koy = t.koy;
+        } else { // Linear
+            const frame0 = (k.prev.prev.position / (1s/24))  as Integer;
+            const y0 = k.prev.prev.value;
+            kox = frame1 - frame0;
+            kix = frame2 - frame1;
+            koy = k.prev.value - y0;
+            kiy = k.value - k.prev.value;
+            if (kox == 0) kox = 1.0;
+            if (kix == 0) kix = 1.0;
+            const len1 = Math.sqrt(kix*kix + kiy*kiy);
+            kix /= len1;
+            kiy /= len1;
+            const len2 = Math.sqrt(kox*kox + koy*koy);
+            kox /= len2;
+            koy /= len2;
         }
+        const value1 = k.prev.value;
+        const value2 =  k.value;
+        const p0 = value1;
+        const p3 = value2;
+        const outTan = if (kox == 0) then 0 else koy / (kox * 24.0);
+        const inTan = if (kix == 0) then 0 else  kiy / (kix * 24.0);
+        const oneThirdDelta = (frame2 - frame1) / 3.0;
+        const p1Delta = outTan * oneThirdDelta;
+        const p2Delta = -inTan * oneThirdDelta;
+        x1 = oneThirdDelta;
+        y1 = p1Delta;
+        x2 = frame2-oneThirdDelta;
+        y2 = -p2Delta;
 
         y1 -= ty;
         y2 -= ty;
@@ -1223,12 +1237,17 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
     }
 
     protected function getValueBounds from (keys is (Key of Number)[]) to Vec2 {
-        var min = Number.MAX_VALUE;
-        var max = Number.MIN_VALUE;
+        var min is Number = Number.MAX_VALUE;
+        var max is Number = Number.MIN_VALUE;
         for (k in keys) {
             const n is Number = k.value;
-            if (n > max) max = n;
-            if (n < min) min = n;
+            if (n > max) { 
+                max = n;
+            }
+            if (n < min) { 
+                min = n;
+            }
+            println("key={k.position},{n} min={min}, max={max}");
         }
         return new Vec2(min, max);
     }
