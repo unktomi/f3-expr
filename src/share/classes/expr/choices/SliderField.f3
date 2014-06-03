@@ -113,7 +113,6 @@ public class SliderField is AbstractNode
         println("HANDLE TEXT FOCUS => {isFocused}");
         if (not isFocused) {
             textAreaEnabled = false;
-            textInputEnabled = false;
         }
     }
 
@@ -123,7 +122,6 @@ public class SliderField is AbstractNode
             println("text area enabled: {textAreaEnabled}");
             if (event.clickCount > 1) {
                 textAreaEnabled = true;
-                textInputEnabled = true;
                 event.scene.setFocus(textArea);
                 textArea.selectAll();
                 event.stopPropagation();
