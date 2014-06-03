@@ -19,7 +19,7 @@ const BG = ColorPaint(Color.color(.85, .85, .85, 1));
 
 public class SliderField is AbstractNode
 {
-    public var height is Number = bind textArea.height;
+    public var height is Number = bind textArea.font.height();
     public var width is Number = 64;
 
     public var t is Number on replace {
@@ -48,6 +48,7 @@ public class SliderField is AbstractNode
 	foreground: FG;
         background: null;
 	width: bind width+4;
+        height: bind height;
 	transform: translate(0, 1);
 	rightJustified: true;
         font: layoutEngine.createFont(Names.DEFAULT_FONT);
@@ -104,16 +105,27 @@ public class SliderField is AbstractNode
     {
         this.t = t;
     }     
+    
+    const onFocus = (textArea as Focusable).observeFocused().subscribe(handleTextFocus);
+
+    function handleTextFocus from (isFocused is Boolean) to ()
+    {
+        println("HANDLE TEXT FOCUS => {isFocused}");
+        if (not isFocused) {
+            textAreaEnabled = false;
+            textInputEnabled = false;
+        }
+    }
 
     const onDown = DefaultObserver of MouseEvent {
         override function onNext from (event is MouseEvent) to ()
         {
+            println("text area enabled: {textAreaEnabled}");
             if (event.clickCount > 1) {
-                textAreaEnabled = true;
-                textArea.selectAll();
                 textAreaEnabled = true;
                 textInputEnabled = true;
                 event.scene.setFocus(textArea);
+                textArea.selectAll();
                 event.stopPropagation();
             }
         }

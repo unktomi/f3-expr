@@ -284,17 +284,20 @@ public class VarDecl {
 
 class ExportingBuilder is ResourceBuilder {
     const resourcesToCopy = new java.util.HashSet of String();
-    override override function convertUrl from (url is String) to String {
-        if (url.startsWith("timenode://") or url.contains("#")) {
+    override function convertUrl from (url is String) to String 
+    {
+        if (url.startsWith("timenode://") or url.contains("#") or url.startsWith("node://") or url == "") {
             return url;
         } 
         resourcesToCopy.add(url);
         return "file:./{new java.net.URL(url).getPath()}";
     }
-    override function makeResource from (n is ResourceNode) to SpatialResource {
+    override function makeResource from (n is ResourceNode) to SpatialResource 
+    {
         super.makeResource(n);
     }
-    override function makeResource from (n is ResourceTimeNode) to TemporalResource {
+    override function makeResource from (n is ResourceTimeNode) to TemporalResource 
+    {
         super.makeResource(n);
     }
 }

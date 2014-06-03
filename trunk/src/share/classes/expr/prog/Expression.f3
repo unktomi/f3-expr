@@ -417,7 +417,8 @@ public const BOOL_MEMBERS is Member[] =
         m: IF_EXPR;
     }];
 
-public const UNIT_MEMBERS = [FunctionMember { m: Reflect.getFunction("f3.util.Observable", "count", []) }];
+public const UNIT_MEMBERS = 
+    [FunctionMember { m: Reflect.getFunction("f3.util.Observable", "count", []) }];
 
 public function introspectMembers from (v is Context.ClosureVarContext) to Member[] 
 {

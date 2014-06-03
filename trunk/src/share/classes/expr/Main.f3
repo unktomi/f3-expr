@@ -1483,6 +1483,14 @@ public function run from (args is String[]) to ()
                                                      MasterUndoable.commit();
                                                  }
                                              }
+                                             if (asset is AssetTree.GroupAsset) {
+                                                 const picked = getUnderMouseInEditor();
+                                                 if (picked == []) {
+                                                     const f = (asset as AssetTree.GroupAsset).getGroup();
+                                                     addResource(f, currentScene.mousePosition);
+                                                     MasterUndoable.commit();
+                                                 }
+                                             }
                                              if (asset is AssetTree.SceneAsset) {
                                                  const picked = getUnderMouseInEditor();
                                                  if (picked == []) {
@@ -1708,6 +1716,7 @@ public function run from (args is String[]) to ()
                                                                      selectNodeLater(clip);
                                                                  }
                                                              }
+                                                             break;
                                                          }
                                                      }
                                                  }
