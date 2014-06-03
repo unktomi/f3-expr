@@ -268,7 +268,7 @@ public class TransformHierarchy
             delete src from srcParent.content;
         }
 	var targetGroup is Group;
-	if (not (target is Group) or target is ResourceNode) {
+	if (not (target is Group) or (target is ResourceNode and not (target is GroupResourceNode))) {
 	    const parent = target.parent as Group;
 	    const i = f3.util.Sequences.indexOf(parent.content, target);
             println("inserting into: {parent} at {i}");

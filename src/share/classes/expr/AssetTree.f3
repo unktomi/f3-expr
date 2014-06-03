@@ -20,6 +20,16 @@ public class AssetGroup is Asset {
     override var containedAssets = bind content;
 }
 
+public class GroupAsset is SpatialAsset {
+    protected var count = 1;
+    override var name is String = "Group";
+    public function getGroup to GroupResourceNode {
+        GroupResourceNode {
+            url: "node://Group {count++}";
+        }
+    }
+}
+
 public class MaAsset is Asset {
     public const model is Ma.Model;
     override var url = bind model.url;
@@ -61,9 +71,7 @@ public class Scene2DAsset is SceneAsset {
     }
 }
 
-public class TextFieldAsset is Asset {
-    override var name = "Text Input";
-    var count = 1;
+public class SpatialAsset is Asset {
     public const webBrowserFactory is AbstractWebBrowserFactory = the AbstractWebBrowserFactory;
     public const pathFactory is Shape2D.Path2DFactory = the Shape2D.Path2DFactory;
     public const layoutEngine is Text.LayoutEngine = the Text.LayoutEngine;
@@ -71,6 +79,11 @@ public class TextFieldAsset is Asset {
     public const soundLoader is SoundLoader = the SoundLoader;
     public const movieLoader is MovieLoader = the MovieLoader;
     public const imageLoader is ImageLoader = the ImageLoader;
+}
+
+public class TextFieldAsset is SpatialAsset {
+    override var name = "Text Input";
+    var count = 1;
     public function getTextField 
         to ResourceTextField 
     {
@@ -170,11 +183,11 @@ public function makeAsset from (r is ResourceNode) to Asset {
 	    model: (r as MaResourceNode).model;
             temporalRoot: r.temporal;
 	}
-    } else {
+    } else if (not (r is GroupResourceNode)) {
         ResourceNodeAsset {
             rn: r;
         }
-    }
+    } else null
 }
 
 public class PackageAsset is Asset {
@@ -497,6 +510,15 @@ public class AssetModel is Treemodel {
         movieLoader: bind movieLoader;
     };
 
+    const groupAsset = GroupAsset {
+        pathFactory: bind pathFactory;
+        layoutEngine: bind layoutEngine;
+        imageLoader: bind imageLoader;
+        effectLoader: bind effectLoader;
+        soundLoader: bind soundLoader; 
+        movieLoader: bind movieLoader;
+    };
+
     const temporal = AssetGroup {
         name: "Temporal";
         content: [TimeLayerAsset {}, TransitionLayerAsset{}, BlendLayerAsset {}];
@@ -504,7 +526,7 @@ public class AssetModel is Treemodel {
 
     const spatial = AssetGroup { 
         name: "Spatial", 
-        content: [Scene2DAsset {}, textFieldAsset];
+        content: [groupAsset, Scene2DAsset {}, textFieldAsset];
     } 
 
     override var root = AssetTreenode {

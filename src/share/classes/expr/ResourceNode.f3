@@ -136,3 +136,5 @@ public class SoundResourceNode is ResourceNode {
         if (soundChannels == null) then soundChannels = [createSoundChannels(), super.getChannels()] else soundChannels;
     }
 }
+
+
