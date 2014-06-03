@@ -3445,6 +3445,7 @@ public class ParameterView is InputView {
             height: bind cellHeight;
             width: bind w;
             transform: bind translate(cellWidth/2-w/2, 0, 0);
+            textInputEnabled: false;
             override function setT from (t is Number) to ()
             {       
                 this.t = if (t > 0.5) then 1.0 else 0.5;
@@ -3457,7 +3458,7 @@ public class ParameterView is InputView {
             {
                 MasterUndoable.commit();
             }
-            override var t on replace {
+            override var t = 0.5 on replace {
                 parameter.constantValue = (t > 0.5);
                 canvas.dumpSrc();
             }
