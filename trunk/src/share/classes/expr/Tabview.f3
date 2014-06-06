@@ -56,7 +56,7 @@ public class Tabview is ResizableNode, Focuser {
     public bound var selectedTab is Tab = tabs[selectedIndex];
 
     var contentWidth is Number = bind width;
-    var contentHeight is Number = bind height - tabHeight -2;
+    var contentHeight is Number = bind height - tabHeight - 2;
 
     bound var font is Text.Font = layoutEngine.createFont(Names.DEFAULT_FONT);
 
@@ -77,6 +77,9 @@ public class Tabview is ResizableNode, Focuser {
     };
 
     var lastSelected is Tab;
+    var contentScissor is Bounds;
+
+    var contentHolder is Content;
 
     override function update to ()
     {
@@ -146,9 +149,9 @@ public class Tabview is ResizableNode, Focuser {
 	},
 	TransformNode {
 	    ty: bind -tabHeight/2-2;
-	    content: Content {
-               override var scissorBounds = bind Bounds.boundsFromRect(-contentWidth/2, -contentHeight/2, contentWidth, contentHeight);
-               content: bind selectedTab.content
+	    content: contentHolder = Content {
+                scissorBounds: bind Bounds.boundsFromRect(contentWidth, contentHeight);
+                content: bind [selectedTab.content]
             }
 	}];
     }

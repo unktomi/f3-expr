@@ -103,12 +103,10 @@ public function getFunctions from (clazz0 is F3ClassType, all is Boolean) to F3F
     if (not all) then funs[f | f.getDeclaringClass() == clazz] else funs;
 }
 
-public function getFunction(clas is String, name is String, params is String[]) to F3FunctionMember 
+public function getFunction from (c is F3ClassType, name is String, params is F3Type[]) to F3FunctionMember 
 {
-    const c = getType(clas) as F3ClassType;
+    const ps = params;
     const fs = getFunctions(c, true);
-
-    const ps = foreach (p in params) getType(p);
     for (f in fs) {
 	if (f.getName() == name and f.getType().minArgs() == params.size()) {
 	    const ft = f.getType();
@@ -116,19 +114,29 @@ public function getFunction(clas is String, name is String, params is String[]) 
 	    for (j in [0..<ft.minArgs()]) {
 		const p0 = ft.getArgumentType(j);
 		const p1 = ps[j];
-		if (p0 <> p1) {
-                   found = false;
-                   break;
+		if (not p0.isAssignableFrom(p1)) {
+                    println("{p0} <> {p1}");
+                    found = false;
+                    break;
                 }
 	    }
             if (found) { 
                 println("found {f}");
                 return f;
+            } else {
+                println("not a match {f}");
             }
 	}
     }
-    println("not found: {clas}.{name}({params})");
+    println("not found: {c.getName()}.{name}({params})");
     return null;
+}
+
+public function getFunction from (clas is String, name is String, params is String[]) to F3FunctionMember 
+{
+    const ps = foreach (p in params) getType(p);
+    const c = getType(clas) as F3ClassType;
+    return getFunction(c, name, ps);
 }
 
 public function getTypeArguments from (c is F3Type) to F3Type[]
@@ -159,6 +167,12 @@ public function isSameTypeVariable (x is F3Type, y is F3Type) to Boolean
 
 public function getType from (t is java.lang.reflect.Type) to F3Type {
     ctx.makeTypeRef(t);
+}
+
+public function getFunctionType from (params is String[], returnType is String) to F3FunctionType
+{
+    const inputTypes = foreach (p in params) getType(p);
+    ctx.makeFunctionType(inputTypes, if (returnType == "") then UNIT_TYPE else getType(returnType));
 }
 
 public function getType from (name is String) to F3Type 
