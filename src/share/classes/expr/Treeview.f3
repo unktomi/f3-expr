@@ -399,7 +399,7 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
 	}
 	if (selectionRow < scrollOffset) {
 	    scrollOffset = selectionRow;
-	} else if (selectionRow > scrollOffset+visibleRows) {
+	} else if (selectionRow >= scrollOffset+visibleRows) {
 	    scrollOffset = selectionRow-visibleRows/2;
 	}
     }

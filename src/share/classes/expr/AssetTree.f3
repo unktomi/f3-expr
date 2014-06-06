@@ -197,10 +197,19 @@ public class PackageAsset is Asset {
 }
 
 public class RootPackageAsset is PackageAsset {
+    const obs = Reflect.getType("f3.util.Observables") as F3ClassType;
+    const ob = Reflect.getType("f3.util.Observable") as F3ClassType;
+    const filter = MemberAsset {
+        name: "Filter"
+        member: FunctionMember { m: Reflect.getFunction(obs, "Filter", 
+                                                        [ob, 
+                                                         Reflect.getFunctionType(["java.lang.Object"], "Boolean")]) }
+    }
     const println = MemberAsset {
           name: "Print Line"
           member: FunctionMember {m: Reflect.getFunction("expr.ExprNode", "printLine", ["Object"]) }
     };
+
     public const primitives is TypeAsset[] = 
         [PrimitiveTypeAsset {
                 name: "Boolean";
@@ -242,7 +251,7 @@ public class RootPackageAsset is PackageAsset {
                     }
                 }
         }*/];
-    override var containedAssets = bind [println, primitives, packages, classes]
+    override var containedAssets = bind [println, filter, primitives, packages, classes]
 }
 
 public class TypeAsset is Asset {

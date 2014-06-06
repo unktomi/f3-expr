@@ -671,6 +671,16 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
           content: bind allRows[low..hi];
 	  var allRows = bind foreach (i in inspecting) Group {
 	    override var transform = bind translate(0, (low-i.index) * (border+cellHeight));
+            var entryLabel = Text.Label {
+                    width: bind width;
+		    indent: 4;	
+		    text: bind Names.formatName(i.label);
+		    font: bind font;
+		    foreground: bind if (i.index <> selectedIndex) FG_PAINT else SELECTED_FG_PAINT;
+                    background: null;//bind if (i.index <> selectedIndex) BG_PAINT else SELECTED_BG_PAINT;
+		    height: bind cellHeight;	    
+                    pickable: false;
+            };
 	    content: 
 	    [Rectangle {
 		 pickable: false;
@@ -722,11 +732,12 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
 		}
 	    } else if (i is InspectedString) then
 	    TransformNode {
-                    //tx: bind width * .33 / 2;
+                var w = width-entryLabel.getLayout().getShape().getBounds().width();
+                tx: bind width/2-w/2-indent;
                 //tx: 80;
                 content: StringField {
                         string: bind i as InspectedString;
-                        width: bind width;
+                        width: bind w;
                         height: bind cellHeight-margin;
                         font: bind font;
                         selected : bind i.index == selectedIndex;
@@ -736,16 +747,7 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
             } else null,
 	    TransformNode {
 		//tx: bind -width / 2;
-		content: Text.Label {
-                    width: bind width;
-		    indent: 4;	
-		    text: bind Names.formatName(i.label);
-		    font: bind font;
-		    foreground: bind if (i.index <> selectedIndex) FG_PAINT else SELECTED_FG_PAINT;
-                    background: null;//bind if (i.index <> selectedIndex) BG_PAINT else SELECTED_BG_PAINT;
-		    height: bind cellHeight;	    
-                    pickable: false;
-		}
+                content: bind entryLabel;
 	    },
             Rectangle {
 		 pickable: false;

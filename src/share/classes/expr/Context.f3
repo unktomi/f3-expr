@@ -390,6 +390,18 @@ public class ContextTreemodel is Treemodel {
     const disp = selectionObserver.subscribe(function from (tn is Treenode) to () {
             this.tn = tn;
         });
+
+    public function toTreeNode from (c is Context) to ContextTreenode 
+    {
+        var result is ContextTreenode;
+        root.foldLeft((), function from (_ is (), tn is Treenode) to () {
+                const x = tn as ContextTreenode;
+                if (x.context == c) {
+                    result = x;
+                }
+            });
+        return result;
+    }
 }
 
 public class ContextTreenode is Treenode {

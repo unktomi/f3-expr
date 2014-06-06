@@ -38,6 +38,8 @@ public const CLIP_SELECTED_PAINT = ColorPaint(CLIP_SELECTED_COLOR);
 public const CLIP_LABEL_PAINT = ColorPaint(CLIP_LABEL_COLOR);
 public const CLIP_SELECTED_LABEL_PAINT = ColorPaint(CLIP_SELECTED_LABEL_COLOR);
 
+const CURVE_PAINT = ColorPaint(Color.GREEN);
+
 function debugPrint of a (label is String, value is a) to a {
     println("{label}: {value}");
     return value;
@@ -396,7 +398,14 @@ class TimeNodeView is AbstractNode
                   visible: bind row > trax.scrollY;
                   pickable: false;
                   transform: bind translate(-w/2, 0);
-                  content: bind makeCurve(target as Channel of Number, h);
+                          content: MeshNode {
+                              var line = PathLine {
+                                  path: bind makeCurve(target as Channel of Number, h).path;
+                              };
+                              pickable: false;
+                              mesh: bind line.mesh;
+                              shader: bind effectLoader.loadPaintShader(CURVE_PAINT);
+                          }
               },
               Group { 
                   transform: bind translate(-w/2, 0);
@@ -1180,8 +1189,9 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
             kox = t.kox;
             koy = t.koy;
         } else { // Linear
-            const frame0 = (k.prev.prev.position / (1s/24))  as Integer;
-            const y0 = k.prev.prev.value;
+            const kpp = if k.prev.prev == null then k.prev else k.prev.prev;
+            const frame0 = (kpp.position / (1s/24))  as Integer;
+            const y0 = kpp.value;
             kox = frame1 - frame0;
             kix = frame2 - frame1;
             koy = k.prev.value - y0;
@@ -1189,11 +1199,15 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
             if (kox == 0) kox = 1.0;
             if (kix == 0) kix = 1.0;
             const len1 = Math.sqrt(kix*kix + kiy*kiy);
-            kix /= len1;
-            kiy /= len1;
+            if (len1 <> 0) {
+                kix /= len1;
+                kiy /= len1;
+            }
             const len2 = Math.sqrt(kox*kox + koy*koy);
-            kox /= len2;
-            koy /= len2;
+            if (len2 <> 0) {
+                kox /= len2;
+                koy /= len2;
+            }
         }
         const value1 = k.prev.value;
         const value2 =  k.value;
@@ -1230,7 +1244,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
             inLength: inLength;
             outAngle: outAngle;
             outLength: outLength;
-            isPointOnly: k.prev == null and k.next == null;
+            isPointOnly: k.prev == null;
         }
         //tool.valueScale = new Vec2(1.0, 1.0 / sy);
         return tool;
@@ -1238,13 +1252,14 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 
     protected function getValueBounds from (keys is (Key of Number)[]) to Vec2 {
         var min is Number = Number.MAX_VALUE;
-        var max is Number = Number.MIN_VALUE;
+        var max is Number = Integer.MIN_VALUE;
         for (k in keys) {
             const n is Number = k.value;
-            if (n > max) { 
+            println("key={k.position},n={n} n<min={n<min}, n>max={n>max} max<0={max<0}");
+            if ((n as Double) > (max as Double)) { 
                 max = n;
             }
-            if (n < min) { 
+            if ((n as Double) < (min as Double)) { 
                 min = n;
             }
             println("key={k.position},{n} min={min}, max={max}");
@@ -1272,9 +1287,9 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
         foreach (k in keys) makeCurveContent(ch, k, k.interpolator, getValueBounds(keys), viewHeight) 
     }
 
-    protected function makeCurve from (ch is Channel of Number, viewHeight is Number) to Node {
+    protected function makeCurve from (ch is Channel of Number, viewHeight is Number) to Path {
         Path {
-            strokePaint: ColorPaint(Color.GREEN);
+            fillPaint: ColorPaint(Color.GREEN);
             content: bind makePathElements(ch, ch.keys, viewHeight);
         }
     }

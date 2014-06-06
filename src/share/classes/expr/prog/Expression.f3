@@ -417,6 +417,7 @@ public const BOOL_MEMBERS is Member[] =
         m: IF_EXPR;
     }];
 
+
 public const UNIT_MEMBERS = 
     [FunctionMember { m: Reflect.getFunction("f3.util.Observable", "count", []) }];
 
@@ -449,7 +450,7 @@ function typeToMember from (t is F3Type) to Member
                 }
                 override function getDeclaringClass to F3ClassType {
                     null
-                        }
+                }
                 override function isStatic to Boolean { false }
                 override function isPublic to Boolean { true }
                 override function isPackage to Boolean { false }
@@ -965,6 +966,14 @@ public interface Expression {
 function nil from (t is F3Type) to String
 {
     if (t == Reflect.STRING_TYPE) then "\"\"" else if (t == Reflect.INTEGER_TYPE) then "0" else if (t == Reflect.NUMBER_TYPE) then "0.0" else if (t == Reflect.BOOLEAN_TYPE) then "false" else "null";
+}
+
+class InputExpressionRef is InputMemberExpression {
+    public var ref is Expression;
+}
+
+class OutputExpressionRef is OutputMemberExpression {
+    public var ref is Expression;
 }
 
 public abstract class ObjectExpression is Expression {
@@ -1981,12 +1990,15 @@ public abstract class ExpressionView is AbstractNode {
     }
     public readonly var label is Text.Label = bind constructLabel();
     protected var labelVisible is Boolean = true;
+    protected var isLinkable is Boolean;
+    protected var isLink is Boolean;
+    protected var linkFont is Text.Font = bind font.derive("text-decoration:underline;");
     bound function constructLabel to Text.Label {
         Text.Label {
             text: bind getLabel();
             height: bind cellHeight;
             width: bind cellWidth;
-            font: bind font;
+            font: bind if (isLink) then linkFont else font;
             foreground: bind if labelVisible then canvas.textFg else canvas.disabledTextFg;
             background: null;
             pickable: false;
@@ -1994,12 +2006,13 @@ public abstract class ExpressionView is AbstractNode {
         };
     }
 
-
     const titleRect = Rectangle {
         height: bind cellHeight;
         width: bind cellWidth;
         fillPaint: bind canvas.cellBg;
+        cursor: bind if isLink then Cursor.Hand else null;
     }
+
     public var defaultTitle is Node = Group {
            content: bind
            [titleRect,
@@ -2056,7 +2069,7 @@ public abstract class ExpressionView is AbstractNode {
                     e.stage.showPopupMenu(e.screenx, e.screeny, menu);
                 }
             } else {
-                dragging = true;
+                dragging = not e.metaKey;
             }
         }
     }
@@ -2071,18 +2084,40 @@ public abstract class ExpressionView is AbstractNode {
         if (dragging) {
             canvas.saveCode();
             MasterUndoable.commit();
+        } else {
+            if (e.metaKey) {
+                onLinkClicked();
+            }
         }
         dragging = false;
     }
     var d1;
     var d2;
     var d3;
+    var d4;
+    var d5;
     postinit {
 	d1 = titleRect.observeMouseDown().subscribe(onDown);
 	d2 = titleRect.observeMouseUp().subscribe(onUp);
 	d3 = titleRect.observeMouseDrag().subscribe(onDrag);
+	d4 = titleRect.observeMouseMove().subscribe(onEnter);
+	d5 = titleRect.observeMouseLeave().subscribe(onLeave);
         undoList.addTarget("pos", &pos);
         undoList.addTarget("selected", &selected);
+    }
+
+    protected function onLinkClicked to () 
+    {
+    }
+
+    function onEnter from (e is MouseEvent) to ()
+    {
+        isLink = titleRect.containsPointer and e.metaKey and isLinkable;
+    }
+
+    function onLeave from (e is MouseEvent) to ()
+    {
+        isLink = false;
     }
 
     public function serialize to ExprNode {
@@ -2497,6 +2532,15 @@ class ClassView is ObjectView {
 public class ObjectView is ExpressionView {
 
     override var title = bind borderedTitle();
+
+    override function onLinkClicked to ()
+    {
+        if (objectExpr is VarContextExpression) {
+            const vx = objectExpr as VarContextExpression;
+            const v = vx.varContext;
+            canvas.go(v);
+        }
+    }
 
     override var transform = bind translate(pos);
     override var selectable = true;
@@ -4405,13 +4449,33 @@ var showSource is Boolean;
 
 function canConvert from (target is F3Type, src is F3Type) to Boolean 
 {
-    src == null or (target == UNIT_TYPE or observeType(target).isConvertibleFrom(src)) or
+    if (target.isTypeVariable()) {
+        return true;
+    }
+    if (src is F3FunctionType and target is F3FunctionType) {
+        const f1 = target as F3FunctionType;
+        const f2 = src as F3FunctionType;
+        for (i in [0..<f1.minArgs()]) {
+            const p1 = f1.getArgumentType(i);
+            const p2 = f2.getArgumentType(i);
+            const c = canConvert(p2, p1);
+            println("convertible {p2} from {p1} => {c}");
+        }
+        const c1 = canConvert(f1.getReturnType(), f2.getReturnType());
+        return c1;
+    }
+    const result = src == null or (target == UNIT_TYPE or observeType(target).isConvertibleFrom(src)) or
         (isMappable(src) and canConvert(target, getLoweredType(src)));
+    println("{src} => {target} ====> { result }");
+    return result;
+    
 }
 
 public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollable, MouseInputHandler {
 
     public const menuFactory is MenuFactory;
+
+    public var go is function from Context to ();
 
     public var assetModel is AssetTree.AssetModel;
 
@@ -4644,6 +4708,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             const typ = v.varType.t;
             var r is ExpressionView;
             insert r = ObjectView {
+                isLinkable: true;
                 pos: toLocal * where.scenePoint;
                 objectExpr: VarContextExpression { 
                     varContext: v, override function getType to F3Type { typ }
@@ -4798,6 +4863,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 const members = [foreach (m in introspectMembers(v) where not m.name.contains("pdate") and names.add(m.name)) m];
                 const typ = v.varType.t;
                 ObjectView {
+                    isLinkable: true;
                     objectExpr: VarContextExpression { 
                         varContext: v, override function getType to F3Type { typ }
                         //inputMembers: foreach (x1 in members where x1.isObserver) x1;
@@ -4851,6 +4917,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 code: todo;
             }
             const newCanvas = Canvas {
+                go: bind go;
                 assetModel: assetModel;
                 menuFactory: menuFactory;
                 interactive: interactive;
@@ -5240,6 +5307,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             code: todo;
         }
         const newCanvas = Canvas {
+            go: bind go;
             menuFactory: menuFactory;
             interactive: interactive;
             stepping: bind stepping;
@@ -5505,15 +5573,33 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             println("p1={p1} =>{p1.getEnglishAccess()}");
             eng = "{eng}{p1.getEnglishAccess()}. ";
         }
-        const objExpr = CollapsedExpression {
-            synthName: eng;
-            inputMembers: [ typeToMember(UNIT_TYPE), foreach (i in allInputs) {
+
+        const memberList = [ typeToMember(UNIT_TYPE), foreach (i in allInputs) {
                 const exp = i.expression;
                 if (exp is MemberExpression) then (exp as MemberExpression).member else typeToMember(exp.getType());
-            } ]
+            }];
+        const objExpr = CollapsedExpression {
+            synthName: eng;
+            inputMembers: memberList;
+            override var inputs = foreach (i in allInputs) {
+                InputExpressionRef {
+                    target: this;
+                    ref: i.expression;
+                    member: memberList[indexof i];
+                }
+                
+            }
             outputMembers: foreach (i in allOutputs) {
                 const exp = i.expression;
                 if (exp is MemberExpression) then (exp as MemberExpression).member else typeToMember(exp.getType());
+            }
+            override var outputs = foreach (i in allOutputs) {
+                OutputExpressionRef {
+                    source: this;
+                    ref: i.expression;
+                    member: memberList[indexof i];
+                }
+                
             }
         }
         const canvas = this;
@@ -5527,8 +5613,24 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             objectExpr: objExpr;
             pos: p;
         }
+        for (j in allInputs) {
+            const link = j.links[0];
+            const source = link.source;
+            link.unlink;
+            link.source = source;
+            link.target = objv.inputViews[indexof j+1];
+            link.link();
+        }
+        for (j in allOutputs) {
+            const link = j.links[0];
+            const target = link.target;
+            link.unlink;
+            link.target = target;
+            link.source = objv.outputViews[indexof j];
+            link.link();
+        }
+        deleteSelection();
         insert objv into views;
-
     }
 
     public function deleteSelection to () 
@@ -5768,8 +5870,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             if (not hit) { hit = n is ExpressionView }
 	    if (n is LinkedInputView) {
 		const pv = n as LinkedInputView;
-		if (pv.getInputType() == UNIT_TYPE or observeType(pv.getInputType()).isConvertibleFrom(t) 
-                    or (isMappable(t) and observeType(pv.getInputType()).isConvertibleFrom(getLoweredType(t)))) {
+		if (canConvert(pv.getInputType(), t)) {
 		    println("IS ASSIGNABLE {pv.getClass()} {pv.getInputType()} <- {t}");
 		    k(pv);
                     return;
@@ -6343,6 +6444,7 @@ public class VarContextObjNode is ObjNode {
             effectLoader: canvas.effectLoader;
             canvas: canvas;
             pos: new Point3(x, y, 0);
+            isLinkable: true;
             objectExpr: VarContextExpression { 
                 varContext: c, override function getType to F3Type { typ }
                 inputMembers: [];
@@ -6449,6 +6551,7 @@ public class SourceNode is ExprNode {
 
 public class Editor is ResizableNode, Focuser {
 
+    public var go is function from Context to ();
     public var menuFactory is MenuFactory;
     public var popupLayer is PopupLayer;
     public var popupScene is Scene;
@@ -6578,6 +6681,7 @@ public class Editor is ResizableNode, Focuser {
 	if (prog.canvas == null) {
             println("creating canvas with {pathFactory}");
 	    prog.canvas = Canvas {
+                go: bind go;
                 assetModel: assetModel;
                 menuFactory: menuFactory;
                 interactive: interactive;

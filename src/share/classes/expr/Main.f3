@@ -1932,21 +1932,27 @@ Tabview.Tab {
 				 Tabview.Tab {
 				    title: bind if (contextModel.selectedVarContext <> null) then "Definition: {contextModel.selectedVarContext.name}" else "Event: {contextModel.selectedContext.name}"
 				    content: expr.prog.Expression.Editor {
-                                         assetModel: bind assetModel;
-                                         menuFactory: THE_MENU_FACTORY;
-					 //event: bind inspector1.inspecting[inspector1.selectedIndex].member;
-                                         stepping: bind stepping;
-                                         varContext: bind contextModel.selectedVarContext;
-                                         eventContext: bind contextModel.selectedMemberContext;
-                                         targetObject: bind contextModel.selectedObjectContext.getTarget();
-					 targetSpace: bind currentScene.root;
-                                         instanceSpace: bind currentScene.instanceSpace;
-					 targetTime: bind mainTimeLayer;
-                                         targetTimeline: bind player;
-                                         popupLayer: bind popupLayer;
-                                         popupScene: bind editorScene;
-                                         interactive: function from () to Boolean { interactive } 
-				    }
+                                                 assetModel: bind assetModel;
+                                                 go: function from (c is Context) to ()
+                                                 {
+                                                     const tn = contextModel.toTreeNode(c);
+                                                     contextTree.select(tn);
+                                                     contextModel.selectionObserver.onNext(tn);
+                                                 }
+                                                 menuFactory: THE_MENU_FACTORY;
+                                                 //event: bind inspector1.inspecting[inspector1.selectedIndex].member;
+                                                 stepping: bind stepping;
+                                                 varContext: bind contextModel.selectedVarContext;
+                                                 eventContext: bind contextModel.selectedMemberContext;
+                                                 targetObject: bind contextModel.selectedObjectContext.getTarget();
+                                                 targetSpace: bind currentScene.root;
+                                                 instanceSpace: bind currentScene.instanceSpace;
+                                                 targetTime: bind mainTimeLayer;
+                                                 targetTimeline: bind player;
+                                                 popupLayer: bind popupLayer;
+                                                 popupScene: bind editorScene;
+                                                 interactive: function from () to Boolean { interactive } 
+                                             }
 				 }]
 			    }
                         }
