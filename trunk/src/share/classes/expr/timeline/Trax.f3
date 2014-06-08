@@ -38,22 +38,149 @@ public const CLIP_SELECTED_PAINT = ColorPaint(CLIP_SELECTED_COLOR);
 public const CLIP_LABEL_PAINT = ColorPaint(CLIP_LABEL_COLOR);
 public const CLIP_SELECTED_LABEL_PAINT = ColorPaint(CLIP_SELECTED_LABEL_COLOR);
 
-const CURVE_PAINT = ColorPaint(Color.GREEN);
+const CURVE_PAINT = ColorPaint(Color.YELLOW);
+const yLegendFg = ColorPaint(Color.color(.1, .1, .1));
 
 function debugPrint of a (label is String, value is a) to a {
     println("{label}: {value}");
     return value;
 }
 
+class KeyEditor is AbstractNode {
+    public var view is TimeNodeView;
+    public var key is Key of Number;
+    public var ch is Channel of Number;
+    public var trax is Trax;
+    bound var valueBounds is Vec2 = getValueBounds(ch.keys);
+    public var viewHeight is Number = bind view.viewHeight;
+
+    bound var tangent = getInterpolator(key, key.interpolator);
+    bound var dy = bind valueBounds.y - valueBounds.x;
+    bound var ty = bind valueBounds.x;
+    bound var sy = bind if (dy == 0) then 1.0 else viewHeight/dy;
+    bound var vectors = bind getVectors(ty, sy, key, tangent);
+
+    bound function getVectors 
+        from (ty is Number, 
+              sy is Number, 
+              k is Key of Number, 
+              i is KeyFrame.Tangent) 
+        to Vec2[]
+    {
+        var frame1 = trax.durationToFrame(k.prev.position);
+        var frame2 = trax.durationToFrame(k.position);
+        var kox = i.kox;
+        var koy = i.koy;
+        var kix = i.kix;
+        var kiy = i.kiy;
+        var value1 = k.prev.value;
+        var value2 =  k.value;
+        var p0 = value1;
+        var p3 = value2;
+        var outTan = if (kox == 0) then 0 else koy / (kox * 24.0);
+        var inTan = if (kix == 0) then 0 else  kiy / (kix * 24.0);
+        var oneThirdDelta = (frame2 - frame1) / 3.0;
+        var p1Delta = outTan * oneThirdDelta;
+        var p2Delta = -inTan * oneThirdDelta;
+        var x1 = oneThirdDelta;
+        var y1 = p1Delta;
+        var x2 = (frame2-frame1)-oneThirdDelta;
+        var y2 = -p2Delta;
+        xformResult(ty, sy, new Vec2(x1, y1), new Vec2(x2, y2));
+    }
+
+    function xformResult from (ty is Number, sy is Number, v1 is Vec2, v2 is Vec2) to Vec2[]
+    {
+        var x1 = v1.x;
+        var y1 = v1.y;
+        var x2 = v2.x;
+        var y2 = v2.y;
+        y1 -= ty;
+        y2 -= ty;
+        y1 *= sy;
+        y2 *= sy;
+        const frameX1 = frameToX(x1);
+        const frameX2 = frameToX(x2);
+        x1 = frameX1;
+        x2 = frameX2;
+        [new Vec2(x1, y1), new Vec2(x2, y2)];
+    }
+
+    bound function getInterpolator from (k is Key of Number, interp is Interpolator of Number) to KeyFrame.Tangent 
+    {
+        if (interp is KeyFrame.Tangent) {
+            interp as KeyFrame.Tangent;
+        } else { // Assume Linear
+            var kpp = if k.prev.prev == null then k.prev else k.prev.prev;
+            var frame0 = (kpp.position / (1s/24))  as Integer;
+            var frame1 = trax.durationToFrame(k.prev.position);
+            var frame2 = trax.durationToFrame(k.position);
+            var y0 = kpp.value;
+            var kox = frame1 - frame0;
+            var kix = frame2 - frame1;
+            var koy = k.prev.value - y0;
+            var kiy = k.value - k.prev.value;
+            //if (kox == 0) kox = 1.0;
+            //if (kix == 0) kix = 1.0;
+            /*
+            var len1 = Math.sqrt(kix*kix + kiy*kiy);
+            if (len1 <> 0) {
+                kix /= len1;
+                kiy /= len1;
+            }
+            var len2 = Math.sqrt(kox*kox + koy*koy);
+            if (len2 <> 0) {
+                kox /= len2;
+                koy /= len2;
+            }
+            */
+            var v1 = new Vec2(kox, koy).normalize();
+            var v2 = new Vec2(kix, koy).normalize();
+            var dummy = bind KeyFrame.Tangent {
+                kox: v1.x;
+                koy: v1.y;
+                kix: v2.x;
+                kiy: v2.y;
+            }
+        }
+    }
+
+    override var internalContent = Group {
+        transform: bind translate(trax.durationToX(key.position), 0); 
+        content:
+        [Circle {
+              transform: bind translate(-vectors[0].x, vectors[0].y);
+              radius: 4;
+              strokePaint: ColorPaint(Color.WHITE);
+              onMouseDrag: function from (e is MouseEvent) to ()
+              {
+              }
+        },
+        Circle {
+              radius: 4;
+              strokePaint: ColorPaint(Color.YELLOW);
+              transform: bind translate(vectors[1].x, vectors[1].y);
+              onMouseDrag: function from (e is MouseEvent) to ()
+              {
+              }
+        }]
+    }
+    
+}
+
 class KeyMark is Image, MouseInputHandler, KeyboardInputHandler {
     var kx = 0.0;
     override var url = "{__DIR__}keybubblemarker.png";
     public var k is Key;
-    public var ch is Channel;
+    public var ch is Channel of Number;
     public var trax is Trax;
+    public var view is TimeNodeView;
     override var transform = bind translate(trax.durationToX(k.position), 0);
     override function onMouseDown from (event is MouseEvent) to ()
     {
+        if (event.clickCount > 1) {
+            trax.editKey(view, ch, k);
+        } 
         kx = trax.durationToX(k.position);
     }
     override function onMouseDrag from (event is MouseEvent) to ()
@@ -96,6 +223,7 @@ class GroupKeyMark is Image, MouseInputHandler, KeyboardInputHandler {
 
 class TimeNodeView is AbstractNode 
 {
+    public var keyEditor is KeyEditor;
     public var cy is Number;
     public var row is Number;
     public var trax is Trax;
@@ -244,6 +372,7 @@ class TimeNodeView is AbstractNode
     bound var w = getWidth(if target.hasIndefiniteDuration() then Interval.<<0>> else target.bounds, trax.visibleInterval);
     var rows is Number = 1;
     bound var h is Number = trax.getViewHeight() * rows;
+    bound var viewHeight is Number = h;
     bound var fg = if w == 0 then bg else if (selected1) then CLIP_SELECTED_LABEL_PAINT else CLIP_LABEL_PAINT;//ColorPaint(Color.color(.7, .7, .7, 1));
     bound var bg = getFill(target);
     const bg1 = ColorPaint(Color.color(.83, .83, .83));
@@ -281,7 +410,7 @@ class TimeNodeView is AbstractNode
 		     fillPaint: bind bg1;
                 },
                 Rectangle is MouseInputHandler {
-                    transform: bind translate(trax.durationToX(target.contentBounds.start), rectY)
+                     transform: bind translate(trax.durationToX(target.contentBounds.start), rectY)
                      height: bind h;
                      width: bind w;
 		     fillPaint: bind bg;
@@ -296,10 +425,14 @@ class TimeNodeView is AbstractNode
                      }
 		     override function onMouseDown from (event is MouseEvent) to ()
 		     {
-                         resizing = trax.graph and target is Channel and event.location.y <= rectY + 2;
-			 dx = trax.durationToX(target.playTime);
-                         dy = rows * trax.getViewHeight();
-			 trax.selectTimeNodeView(self)
+                         if (event.clickCount > 1) {
+                             rows = if (rows == 1) then 8 else 1;
+                         } else {
+                             resizing = trax.graph and target is Channel and event.location.y <= rectY + 2;
+                             dx = trax.durationToX(target.playTime);
+                             dy = rows * trax.getViewHeight();
+                         }
+                         trax.selectTimeNodeView(self);
 		     }
 		     override function onMouseDrag from (event is MouseEvent) to ()
 		     {
@@ -380,32 +513,60 @@ class TimeNodeView is AbstractNode
                           }
                       } else null;
               },
-              if (not trax.graph) then null else Group {
-                visible: bind row > trax.scrollY;
-                  transform: bind translate(-w/2, 0);
-                  content: bind if (target is Channel of ?) then {
-                          var ch = target as Channel of Object;
-                          foreach (k in ch.keys) {
-                              KeyMark {
-                                  ch: bind ch;
-                                  k: k;
-                                  trax: bind trax;
-                              }
-                          }
-                      } else null;
-              },
               if (not trax.graph or not (target is Channel of Number)) then null else Group {
                   visible: bind row > trax.scrollY;
-                  pickable: false;
-                  transform: bind translate(-w/2, 0);
-                          content: MeshNode {
+                          //                  pickable: false;
+                          transform: bind translate(-w/2, 0);
+                          var ch = bind target as Channel of Number;
+                          content: 
+                          [MeshNode {
                               var line = PathLine {
-                                  path: bind makeCurve(target as Channel of Number, h).path;
+                                  path: bind makeCurve(target as Channel of Number, h-4).path;
                               };
                               pickable: false;
                               mesh: bind line.mesh;
                               shader: bind effectLoader.loadPaintShader(CURVE_PAINT);
-                          }
+                          },
+                          Group {
+                              var extent = bind bnds.y - bnds.x;
+                              var sy = bind if (extent == 0) then 1.0 else h / extent;
+                              var hoff = bind -h + 2 + trax.getViewHeight()/2;
+                              var chKeys = bind ch.keys;
+                              var bnds = bind getValueBounds(chKeys);
+                              content: 
+                              [Group { 
+                                      transform: bind translate(-50+trax.frameToX(trax.currentFrame)-trax.durationToX(ch.boundsInScene.start), -h+1.5*getViewHeight()-5);
+                                      content: bind if extent == 0 then null else foreach (i in [0..<rows-1]) {
+                                          Text.Label {
+                                              width: 100;
+                                              transform: bind translate(0, trax.getViewHeight() * i);
+                                              font: bind trax.yLegendFont;
+                                              text: bind "{%.04f bnds.x + i * (extent/rows)}";
+                                              rightJustified: true;
+                                              foreground: bind yLegendFg;
+                                              background: null;
+                                         }
+                                      }
+                                  },
+                               Group {
+                                  content: bind foreach (k in chKeys) {
+                                      KeyMark {
+                                          view: this;
+                                          transform: bind translate(trax.durationToX(k.position), hoff+(sy * (k.value - bnds.x)));                                      
+                                          ch: bind ch;
+                                          k: k;
+                                          trax: bind trax;
+                                      }
+                                      
+                                   }
+                              }]
+                          }]
+              },
+              if (not trax.graph or not (target is Channel of Number)) then null else {
+                  Group {
+                      transform: bind translate(-w / 2, -h), 
+                      content: bind keyEditor;
+                  }
               },
               Group { 
                   transform: bind translate(-w/2, 0);
@@ -431,6 +592,7 @@ public class Playhead is AbstractNode
     const playhead_middle = Image { 
 	url: "{__DIR__}playhead_middle.png";
 	transform: bind translate(0, -5) * scale(1, (height-15)/8)
+        pickable: false;
     };
 
     const playhead_bottom = Image { 
@@ -482,13 +644,28 @@ public class Playhead is AbstractNode
 
 public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable {
 
+    function editKey from (view is TimeNodeView, ch is Channel of Number, k is Key of Number) to () 
+    {
+        keyEditor.trax = this;
+        keyEditor.key = k;
+        keyEditor.ch = ch;
+        keyEditor.view = view;
+        view.keyEditor = keyEditor;
+        println("Edit key {ch} {view} {k} vectors={keyEditor.vectors}");
+        const i = keyEditor.tangent;
+        println("i={i.kox},{i.koy} {i.kix},{i.kiy}");
+    }
+
+    var keyEditor = KeyEditor {
+    }
+
     const onWheel = 
 	internalContent.observeMouseWheel().subscribe(function from (event is MouseWheelEvent) to () {
 		const y = event.scroll.y as Integer;
 		scrollVertically(y);
 	    });
 
-    public var graph is Boolean;
+    public var graph is Boolean = true;
     const arrow is Polygon = Polygon {
 	points: [-3.5, -4.5, -3.5, 4.5, 3.5, 0];
 	fillPaint: ColorPaint(Color.WHITE);
@@ -715,6 +892,11 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	Math.round(x / pixelsPerFrame());
     }
 
+    function xToFrameUnbound from (x is Number) to Number
+    {
+	Math.round(x / pixelsPerFrameUnbound());
+    }
+
     bound function durationToX from (d0 is Duration) to Number
     {
 	durationToX(d0, false);
@@ -736,7 +918,9 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	pixelsPerFrame() * frameRate;
     }
 
-    bound function pixelsPerFrame to Number { PIXELS_PER_FRAME }
+    bound function pixelsPerFrame to Number { pixelsPerFrameUnbound() }
+
+    function pixelsPerFrameUnbound to Number { PIXELS_PER_FRAME }
     
     bound function frameToX from (frame is Number) to Number 
     {
@@ -826,6 +1010,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
     var visibleDuration is Duration = bind visibleInterval.duration();
     var labels is Node[] = bind drawLabels(width, height, scrollOffset, frameRate);
     var font = bind layoutEngine.createFont("font-size:8;font-family:Lucida Grande");
+    var yLegendFont = bind layoutEngine.createFont("font-size:11;font-family:Lucida Grande");
     var timeNodeViewFont = bind layoutEngine.createFont(Names.DEFAULT_FONT);
 
     function makeTimeNodeView from (parent is TimeNodeView, t0 is TimeNode) to TimeNodeView 
@@ -1158,11 +1343,12 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	selectedTimeNodeView = x;
     }
 
-    protected function makeTangent from (ch is Channel, k is KeyFrame.Key of Number, 
+    protected function makeTangent from (ch is Channel, k0 is KeyFrame.Key of Number, 
                                          interp is KeyFrame.Interpolator of Number, 
                                          valueBounds is Vec2,
                                          viewHeight is Number) to TangentTool 
     {
+        var k = k0;
         const ty = valueBounds.x;
         var dy = (valueBounds.y - valueBounds.x);
         var sy = if (dy == 0 or viewHeight == 0) then 1.0 else (viewHeight) / dy;
@@ -1170,14 +1356,14 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
         println("VIEW HEIGHT {viewHeight}");
         println("ty={ty}, sy={sy}");
         if (sy == Number.POSITIVE_INFINITY) { sy = 1.0 }
-        var x1 is Number;
-        var y1 is Number;
-        var x2 is Number;
-        var y2 is Number;
-        var kix is Number;
-        var kiy is Number;
-        var kox is Number;
-        var koy is Number;
+        var x1 is Double;
+        var y1 is Double;
+        var x2 is Double;
+        var y2 is Double;
+        var kix is Double;
+        var kiy is Double;
+        var kox is Double;
+        var koy is Double;
 
         const frame1 = (k.prev.position / (1s/24))  as Integer;
         const frame2 = (k.position / (1s/24))  as Integer;
@@ -1196,8 +1382,9 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
             kix = frame2 - frame1;
             koy = k.prev.value - y0;
             kiy = k.value - k.prev.value;
-            if (kox == 0) kox = 1.0;
-            if (kix == 0) kix = 1.0;
+            //if (kox == 0) kox = 1.0;
+            //if (kix == 0) kix = 1.0;
+            /*
             const len1 = Math.sqrt(kix*kix + kiy*kiy);
             if (len1 <> 0) {
                 kix /= len1;
@@ -1208,6 +1395,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
                 kox /= len2;
                 koy /= len2;
             }
+            */
         }
         const value1 = k.prev.value;
         const value2 =  k.value;
@@ -1220,7 +1408,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
         const p2Delta = -inTan * oneThirdDelta;
         x1 = oneThirdDelta;
         y1 = p1Delta;
-        x2 = frame2-oneThirdDelta;
+        x2 = oneThirdDelta;
         y2 = -p2Delta;
 
         y1 -= ty;
@@ -1229,13 +1417,23 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
         y1 *= sy;
         y2 *= sy;
 
+        const frameX1 = frameToX(x1);
+        const frameX2 = frameToX(x2);
+        x1 = frameX1;
+        x2 = frameX2;
+
         const outAngle = Math.atan2(y1, x1);
         const inAngle = Math.atan2(y2, x2);
         const outLength = Math.sqrt(x1*x1+y1*y1);
         const inLength = Math.sqrt(x2*x2+y2*y2);
 
+        println("kox={kox}, koy={koy}  kix={kix}, kiy={kiy}");
+        println("outAngle={Math.toDegrees(outAngle)}, outLen={outLength}");
+        println("inAngle={Math.toDegrees(outAngle)}, inLen={inLength}");
+
+
         const tool = TangentTool {
-            editable: false;
+            editable: true;
             transform: bind translate(durationToX(k.prev.position), -viewHeight);
             p1: bind new Vec2(0, (k.prev.value - ty)*sy);
             p2: bind new Vec2(durationToX(k.position-k.prev.position) / ch.toSceneTransform.rate,
@@ -1245,6 +1443,69 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
             outAngle: outAngle;
             outLength: outLength;
             isPointOnly: k.prev == null;
+            var p1x = 0.0;
+            clickPt1: function to ()
+            {
+                p1x = durationToX(k.prev.position);
+            }
+            movePt1: function from (dx is Number, dy is Number) to ()
+            {
+                p1x += dx;
+                const t = xToDuration(p1x);
+                const newValue = k.prev.value + dy / sy;
+                ch.setKey(k.prev, t, newValue, k.prev.interpolator); 
+            }
+            releasePt1: function to ()
+            {
+                MasterUndoable.commit();
+            }
+
+            var p2x = 0.0;
+            clickPt2: function to ()
+            {
+                p2x = durationToX(k.position);
+            }
+            movePt2: function from (dx is Number, dy is Number) to ()
+            {
+                p2x += dx;
+                const t = xToDuration(p2x);
+                const newValue = k.value + dy / sy;
+                k = ch.setKey(k, t, newValue, k.interpolator); 
+            }
+            releasePt2: function to ()
+            {
+                MasterUndoable.commit();
+            }
+            setInTangent: function from (angle is Number, length is Number) to ()
+            {
+                const newKix = Math.cos(angle) * xToFrameUnbound(length);
+                const newKiy = Math.sin(angle) * length / sy;
+                kix = newKix;
+                kiy = newKiy;
+                println("set in tangent {kox},{koy}    {kix},{kiy}");
+                k = ch.setKey(k, k.position, k.value, 
+                              KeyFrame.Tangent {
+                                  kox: kox;
+                                  koy: koy;
+                                  kix: kix;
+                                  kiy: kiy;
+                              }); 
+            }
+            setOutTangent: function from (angle is Number, length is Number) to () 
+            {
+                const newKox = Math.cos(angle) * xToFrameUnbound(length);
+                const newKix = Math.sin(angle) * length / sy;
+                kox = newKox;
+                koy = newKix;
+                println("set out tangent {kox},{koy}    {kix},{kiy}");
+                k = ch.setKey(k, k.position, k.value, 
+                              KeyFrame.Tangent {
+                                  kox: kox;
+                                  koy: koy;
+                                  kix: kix;
+                                  kiy: kiy;
+                              }); 
+            }
         }
         //tool.valueScale = new Vec2(1.0, 1.0 / sy);
         return tool;
@@ -1275,6 +1536,14 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
         makeCurveFromTangent(makeTangent(ch, k, interp, valueBounds, viewHeight), durationToX(k.prev.position), viewHeight);
     }
 
+    protected function makeCurveContent2 from (ch is Channel, k is KeyFrame.Key of Number, 
+                                              interp is KeyFrame.Interpolator of Number, 
+                                              valueBounds is Vec2,
+                                              viewHeight is Number) to Node
+    {
+        makeTangent(ch, k, interp, valueBounds, viewHeight);
+    }
+
     protected function makeCurveFromTangent from (t is TangentTool, x is Number, viewHeight is Number) to PathElement[]
     {
         const off = new Vec2(x, -viewHeight+getViewHeight()/2); 
@@ -1292,6 +1561,12 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
             fillPaint: ColorPaint(Color.GREEN);
             content: bind makePathElements(ch, ch.keys, viewHeight);
         }
+    }
+
+    protected bound function makeCurve2 from (ch is Channel of Number, viewHeight is Number) to Node[] {
+        var keys = ch.keys;
+        var vb = getValueBounds(keys);
+        foreach (k in keys) makeCurveContent2(ch, k, k.interpolator, vb, viewHeight) 
     }
 
     public function setKey of a from (ch is Channel of a, i is Interpolator of a) to ()

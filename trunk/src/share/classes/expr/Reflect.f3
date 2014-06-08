@@ -214,7 +214,7 @@ public function getVars from (classType is F3ClassType) to F3VarMember[]
     var varMap = classMap[classType.getName()];
     if (varMap == null) {
         const vars = classType.getVariables(true);
-	println("vars={vars}");
+	println("{classType} vars=>{vars}");
         varMap = new java.util.TreeMap of (String, F3VarMember)(String.CASE_INSENSITIVE_ORDER);
         for (varMember in vars) {
 	    varMap.put(varMember.getName(), varMember);
