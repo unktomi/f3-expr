@@ -58,7 +58,8 @@ class KeyEditor is AbstractNode {
     bound var dy = bind valueBounds.y - valueBounds.x;
     bound var ty = bind valueBounds.x;
     bound var sy = bind if (dy == 0) then 1.0 else viewHeight/dy;
-    bound var vectors = bind getVectors(ty, sy, key, tangent);
+    bound var outVectors = bind getVectors(ty, sy, key.prev, tangent);
+    bound var inVectors = bind getVectors(ty, sy, key, tangent);
 
     bound function getVectors 
         from (ty is Number, 
@@ -84,7 +85,7 @@ class KeyEditor is AbstractNode {
         var p2Delta = -inTan * oneThirdDelta;
         var x1 = oneThirdDelta;
         var y1 = p1Delta;
-        var x2 = (frame2-frame1)-oneThirdDelta;
+        var x2 = oneThirdDelta;
         var y2 = -p2Delta;
         xformResult(ty, sy, new Vec2(x1, y1), new Vec2(x2, y2));
     }
@@ -99,6 +100,7 @@ class KeyEditor is AbstractNode {
         y2 -= ty;
         y1 *= sy;
         y2 *= sy;
+        println("ty={ty}, sy={sy} viewHeight={viewHeight}");
         const frameX1 = frameToX(x1);
         const frameX2 = frameToX(x2);
         x1 = frameX1;
@@ -113,8 +115,8 @@ class KeyEditor is AbstractNode {
         } else { // Assume Linear
             var kpp = if k.prev.prev == null then k.prev else k.prev.prev;
             var frame0 = (kpp.position / (1s/24))  as Integer;
-            var frame1 = trax.durationToFrame(k.prev.position);
-            var frame2 = trax.durationToFrame(k.position);
+            var frame1 = k.prev.position / (1s/24);
+            var frame2 = k.position / (1s/24);
             var y0 = kpp.value;
             var kox = frame1 - frame0;
             var kix = frame2 - frame1;
@@ -134,8 +136,8 @@ class KeyEditor is AbstractNode {
                 koy /= len2;
             }
             */
-            var v1 = new Vec2(kox, koy).normalize();
-            var v2 = new Vec2(kix, koy).normalize();
+            var v1 = new Vec2(kox, koy);//.normalize();
+            var v2 = new Vec2(kix, koy);//.normalize();
             var dummy = bind KeyFrame.Tangent {
                 kox: v1.x;
                 koy: v1.y;
@@ -149,7 +151,7 @@ class KeyEditor is AbstractNode {
         transform: bind translate(trax.durationToX(key.position), 0); 
         content:
         [Circle {
-              transform: bind translate(-vectors[0].x, vectors[0].y);
+              transform: bind translate(-outVectors[0].x, outVectors[0].y);
               radius: 4;
               strokePaint: ColorPaint(Color.WHITE);
               onMouseDrag: function from (e is MouseEvent) to ()
@@ -159,7 +161,7 @@ class KeyEditor is AbstractNode {
         Circle {
               radius: 4;
               strokePaint: ColorPaint(Color.YELLOW);
-              transform: bind translate(vectors[1].x, vectors[1].y);
+              transform: bind translate(inVectors[1].x, inVectors[1].y);
               onMouseDrag: function from (e is MouseEvent) to ()
               {
               }
@@ -368,6 +370,7 @@ class TimeNodeView is AbstractNode
         }
         super.update();
     }
+    var openRows = 8.0;
     const self = this;
     bound var w = getWidth(if target.hasIndefiniteDuration() then Interval.<<0>> else target.bounds, trax.visibleInterval);
     var rows is Number = 1;
@@ -419,19 +422,15 @@ class TimeNodeView is AbstractNode
                      cursor: bind if resizing then Cursor.SouthResize else null;
                      override function onMouseMove from  (event is MouseEvent) to ()
                      {
-                         if (trax.graph and target is Channel and not dragging) {
+                         if (trax.graph and expanded and target is Channel and not dragging) {
                              resizing = event.location.y <= rectY - trax.getViewHeight()/2 + 3;
                          }
                      }
 		     override function onMouseDown from (event is MouseEvent) to ()
 		     {
-                         if (event.clickCount > 1) {
-                             rows = if (rows == 1) then 8 else 1;
-                         } else {
-                             resizing = trax.graph and target is Channel and event.location.y <= rectY + 2;
-                             dx = trax.durationToX(target.playTime);
-                             dy = rows * trax.getViewHeight();
-                         }
+                         resizing = expanded and trax.graph and target is Channel and event.location.y <= rectY + 2;
+                         dx = trax.durationToX(target.playTime);
+                         dy = rows * trax.getViewHeight();
                          trax.selectTimeNodeView(self);
 		     }
 		     override function onMouseDrag from (event is MouseEvent) to ()
@@ -454,7 +453,7 @@ class TimeNodeView is AbstractNode
                              MasterUndoable.commit();
                          } else {
                              resizing = false;
-                             rows = Math.max((dy / trax.getViewHeight()) as Integer, 1);
+                             openRows = rows = Math.max((dy / trax.getViewHeight()) as Integer, 1);
                          }
 		     }
 		 },
@@ -486,7 +485,7 @@ class TimeNodeView is AbstractNode
                      blocksPointer: true;
 		 },
                  TransformNode {
-                     visible: bind target is TimeGroup and { var g = target as TimeGroup; g.content.size() > 0 }
+                     //visible: bind target is TimeGroup and { var g = target as TimeGroup; g.content.size() > 0 }
                      tx: bind labelX+-w/2 + 13;
                      rz: bind if (expanded) then -90 else 0;
                      content: Polygon is MouseInputHandler {
@@ -495,6 +494,9 @@ class TimeNodeView is AbstractNode
                          override function onMouseDown from (event is MouseEvent) to ()
                          {
                              expanded = not expanded;
+                             if (not (target is TimeGroup)) {
+                                 rows = if (rows == 1) then openRows else 1;
+                             }
                          }
                      }
                  }]
@@ -514,7 +516,7 @@ class TimeNodeView is AbstractNode
                       } else null;
               },
               if (not trax.graph or not (target is Channel of Number)) then null else Group {
-                  visible: bind row > trax.scrollY;
+                          //                  visible: bind row > trax.scrollY;
                           //                  pickable: false;
                           transform: bind translate(-w/2, 0);
                           var ch = bind target as Channel of Number;
@@ -564,14 +566,16 @@ class TimeNodeView is AbstractNode
               },
               if (not trax.graph or not (target is Channel of Number)) then null else {
                   Group {
-                      transform: bind translate(-w / 2, -h), 
+                      visible: bind keyEditor <> null;
+                      transform: bind translate(-w / 2, 0), 
                       content: bind keyEditor;
                   }
-              },
+              }
               Group { 
                   transform: bind translate(-w/2, 0);
                   content: bind if (expanded) then content else [] 
-	      }]
+              }
+              ]
 	 }
     }
 }
@@ -651,7 +655,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
         keyEditor.ch = ch;
         keyEditor.view = view;
         view.keyEditor = keyEditor;
-        println("Edit key {ch} {view} {k} vectors={keyEditor.vectors}");
+        println("Edit key {ch} {view} {k} outVectors={keyEditor.outVectors}, inVectors={keyEditor.inVectors}");
         const i = keyEditor.tangent;
         println("i={i.kox},{i.koy} {i.kix},{i.kiy}");
     }
@@ -1384,7 +1388,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
             kiy = k.value - k.prev.value;
             //if (kox == 0) kox = 1.0;
             //if (kix == 0) kix = 1.0;
-            /*
+
             const len1 = Math.sqrt(kix*kix + kiy*kiy);
             if (len1 <> 0) {
                 kix /= len1;
@@ -1395,7 +1399,6 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
                 kox /= len2;
                 koy /= len2;
             }
-            */
         }
         const value1 = k.prev.value;
         const value2 =  k.value;
@@ -1512,6 +1515,9 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
     }
 
     protected function getValueBounds from (keys is (Key of Number)[]) to Vec2 {
+        if (keys.size() == 0) {
+            return Vec2.<<0>>;
+        }
         var min is Number = Number.MAX_VALUE;
         var max is Number = Integer.MIN_VALUE;
         for (k in keys) {
