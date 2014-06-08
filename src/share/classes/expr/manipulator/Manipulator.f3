@@ -166,20 +166,19 @@ public class Manipulator is AbstractNode
             return;
         }
         const camera = scene.camera;
-        const sceneStartPos = worldTransform.getTranslation();
+        var sceneStartPos = worldTransform.getTranslation();
         const startPos is Point3 = 
             camera.toScreen(sceneStartPos);
         const endPos is Point3 = 
             camera.toScreen(worldTransform * (Point3.<<0>> + axis));
         const screenDir = (endPos - startPos).normalize();
-        const dragDir = new Vec3(event.screenDrag.x, 
-                                 -event.screenDrag.y, 
-                                 0);
-        const pt = startPos + 
-            (screenDir * dragDir.dot(screenDir));
+        const dragDir = new Vec3(event.screenDrag.x, -event.screenDrag.y, 0);
+        const pt = startPos + (screenDir * dragDir.dot(screenDir));
         const sceneEndPos = camera.toScene(pt);
         const fromScene = target.parent.toSceneTransform.inverse();
-        const d = (fromScene * sceneEndPos) - (fromScene * sceneStartPos);
+        //        const d = (fromScene * sceneEndPos) - (fromScene * sceneStartPos);
+        const v = sceneEndPos - sceneStartPos;
+        const d = fromScene * v;
         applyTranslate(d);
     }
 
