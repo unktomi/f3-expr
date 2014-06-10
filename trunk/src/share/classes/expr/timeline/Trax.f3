@@ -1347,6 +1347,8 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	selectedTimeNodeView = x;
     }
 
+    const FPS = 1s/24.0;
+
     protected function makeTangent from (ch is Channel, k0 is KeyFrame.Key of Number, 
                                          interp is KeyFrame.Interpolator of Number, 
                                          valueBounds is Vec2,
@@ -1368,9 +1370,12 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
         var kiy is Double;
         var kox is Double;
         var koy is Double;
-
-        const frame1 = (k.prev.position / (1s/24))  as Integer;
-        const frame2 = (k.position / (1s/24))  as Integer;
+        println("k.position={k.position}");
+        println("k.prev.position={k.prev.position}");
+        println("FPS={FPS}, k.prev.position/FPS={k.prev.position/FPS}");
+        println("k.position/FPS={k.position/FPS}");
+        const frame1 = (k.prev.position / FPS);
+        const frame2 = (k.position / FPS);
 
         if (interp is KeyFrame.Tangent) {
             const t = interp as KeyFrame.Tangent;
@@ -1380,12 +1385,16 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
             koy = t.koy;
         } else { // Linear
             const kpp = if k.prev.prev == null then k.prev else k.prev.prev;
-            const frame0 = (kpp.position / (1s/24))  as Integer;
+            const frame0 = (kpp.position / FPS);
+            println("frame0={frame0}");
+            println("frame1={frame1}");
+            println("frame2={frame2}");
             const y0 = kpp.value;
             kox = frame1 - frame0;
             kix = frame2 - frame1;
             koy = k.prev.value - y0;
             kiy = k.value - k.prev.value;
+            println("kox={kox}, koy={koy}  kix={kix}, kiy={kiy}");
             //if (kox == 0) kox = 1.0;
             //if (kix == 0) kix = 1.0;
 
@@ -1406,9 +1415,13 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
         const p3 = value2;
         const outTan = if (kox == 0) then 0 else koy / (kox * 24.0);
         const inTan = if (kix == 0) then 0 else  kiy / (kix * 24.0);
+        println("inTan={inTan}, outTan={outTan}");
         const oneThirdDelta = (frame2 - frame1) / 3.0;
         const p1Delta = outTan * oneThirdDelta;
         const p2Delta = -inTan * oneThirdDelta;
+        println("p1Delta={p1Delta}");        
+        println("p2Delta={p2Delta}");
+        println("oneThirdDelta={oneThirdDelta}");
         x1 = oneThirdDelta;
         y1 = p1Delta;
         x2 = oneThirdDelta;
@@ -1420,13 +1433,15 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
         y1 *= sy;
         y2 *= sy;
 
+        println("x1={x1},y1={y1},x2={x2},y2={y2}");
+        /*
         const frameX1 = frameToX(x1);
         const frameX2 = frameToX(x2);
         x1 = frameX1;
         x2 = frameX2;
-
-        const outAngle = Math.atan2(y1, x1);
-        const inAngle = Math.atan2(y2, x2);
+        */
+        const outAngle is Number = Math.atan2(y1, x1);
+        const inAngle is Number = Math.atan2(y2, x2);
         const outLength = Math.sqrt(x1*x1+y1*y1);
         const inLength = Math.sqrt(x2*x2+y2*y2);
 
