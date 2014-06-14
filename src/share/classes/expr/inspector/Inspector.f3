@@ -26,6 +26,8 @@ function clamp from (n is Number, lo is Number, hi is Number) to Number
 
 public class NumericSliderField is SliderField {
 
+    public var onSetKey is function from () to ();
+
     public var min is Number = 0.0;
     public var max is Number = 1.0;
 
@@ -59,6 +61,17 @@ public class NumericSliderField is SliderField {
 	"{%.02f (min + (max - min)*t)}"
     }
 
+    override function filterKeyInput from (k is KeyboardEvent) to Boolean
+    {
+        if (k.keyChar == "s") {
+            onSetKey();
+            return false;
+        }
+        if (k.keyChar == "-" or java.lang.Character.isDigit(k.keyChar.charAt(0))) {
+           return true;
+        }
+        return false;
+    }
 }
 
 
@@ -87,6 +100,8 @@ public class ColorInspector extends AbstractNode {
     }
     var disp is Disposable;
 
+    public var onSetKey is function from () to ();
+
     function onChange from (c is Color) to ()
     {
         if (c <> selection) {
@@ -104,6 +119,7 @@ public class ColorInspector extends AbstractNode {
         strokePaint: bind ColorPaint(Color.color(.2, .2, .2));
     };
     const red = NumericSliderField {
+        onSetKey: bind onSetKey;
         min: 0.0;
         max: 1.0;
         height: bind height;
@@ -115,6 +131,7 @@ public class ColorInspector extends AbstractNode {
         }
     }
     const green = NumericSliderField {
+        onSetKey: bind onSetKey;
         min: 0.0;
         max: 1.0;
         height: bind height;
@@ -126,6 +143,7 @@ public class ColorInspector extends AbstractNode {
         }
     }
     const blue = NumericSliderField {
+        onSetKey: bind onSetKey;
         min: 0.0;
         max: 1.0;
         height: bind height;
@@ -137,6 +155,7 @@ public class ColorInspector extends AbstractNode {
         }
     }
     const alpha = NumericSliderField {
+        onSetKey: bind onSetKey;
         min: 0.0;
         max: 1.0;
         height: bind height;
@@ -381,9 +400,21 @@ const SEMI_TRANSPARENT_PAINT = ColorPaint(Color.color(1, 1, 1, 0.1));
 const TEXT_BG_PAINT = ColorPaint(Color.color(.82, .82, .82));
 
 public class NumberField is SliderField {
+    public var onSetKey is function from () to ();
     public var i is InspectedNumber;
     public var min is Number = 0.0;
     public var max is Number = 1.0;
+    override function filterKeyInput from (k is KeyboardEvent) to Boolean
+    {
+        if (k.keyChar == "s") {
+            onSetKey();
+            return false;
+        }
+        if (k.keyChar == "-" or java.lang.Character.isDigit(k.keyChar.charAt(0))) {
+           return true;
+        }
+        return false;
+    }
     var disp is Disposable;
     function onChange from (n is Number) to () 
     {
@@ -569,7 +600,7 @@ class StringField is ResizableNode {
 }
 
 public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scrollable {
-
+    public var onSetKey is function from () to ();
     override public bound function getTx to Number { 0.0 }
     override public bound function getSx to Number { 1.0 }
     override public bound function getTy to Number 
@@ -692,6 +723,7 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
 	    TransformNode {
 		tx: bind width / 2 - fieldWidth / 2-indent;
 		content: NumberField {
+                    onSetKey: bind onSetKey;
 		    i: bind i as InspectedNumber;
 	            width: bind fieldWidth;
 		    height: bind cellHeight-margin;
@@ -699,6 +731,7 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
 	    } else if (i is InspectedColor) then
 	    TransformNode {
                 var  widget = ColorInspector {
+                    onSetKey: bind onSetKey;
 		    i: bind i as InspectedColor;
 		    height: bind cellHeight-margin;
 		};

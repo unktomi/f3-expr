@@ -45,9 +45,10 @@ public class EditorState {
     public var cameraZ is Number;
     public var playheadFrame is Integer = 0;
     public var frameRate is Integer = 24;
+    public var recent is String[];
 }
 
-function saveEditorState from (scene is Scene, player is Timeline, trax is Trax) to () 
+function saveEditorState from (scene is Scene, player is Timeline, trax is Trax, recent is String[]) to () 
 {
     var internalWindows is InternalWindowState[];
     const f is function from ((), Node) to () 
@@ -73,13 +74,14 @@ function saveEditorState from (scene is Scene, player is Timeline, trax is Trax)
             internalWindows: internalWindows;
 //            playheadFrame: trax.currentFrame as Integer;
             frameRate: trax.frameRate as Integer;
+            recent: recent;
         });
     w.flush();
     w.close();
     file.renameTo(new java.io.File(".expr.editorstate"));
 }
 
-function loadEditorState from (stage is JoglStage, scene is Scene, player is Timeline, trax is Trax) to () 
+function loadEditorState from (stage is JoglStage, scene is Scene, player is Timeline, trax is Trax) to String[] 
 {
     const file = new java.io.File(".expr.editorstate");
     if (file.exists()) {
@@ -106,7 +108,9 @@ function loadEditorState from (stage is JoglStage, scene is Scene, player is Tim
         }
         trax.setFrameRate(s.frameRate);
         player.setPlayhead((1s / s.frameRate) * s.playheadFrame);
+        return s.recent;
     }
+    return [];
 }
 
 class CachedScene is Scene {
@@ -547,6 +551,7 @@ public function run from (args is String[]) to ()
         inspecting: bind Inspector.inspect(toInspect, Reflect.getType("f3.media.scene.TimeNode") as f3.reflect.F3ClassType);
     };
     const inspector1 is Inspector = Inspector {
+        onSetKey: function to () { graphEditor.setKeys() }
         inspecting: bind Inspector.inspect(if (currentTransform == null) then currentScene else currentTransform);
     };
     const inspector2 is Inspector = Inspector {
@@ -814,6 +819,9 @@ public function run from (args is String[]) to ()
     function open from (url is String) to ()
     {
 	close();
+        delete url from recentList;
+        recentList = [url, recentList];
+        recentList = recentList[0..8];
 	const sceneRes = Resources.open(url);
         var allPrograms is Program[];
         var baseURL = new java.net.URL(url);
@@ -1217,6 +1225,8 @@ public function run from (args is String[]) to ()
 	mainScene.currentResource.url = url;
     }
 
+    var recentList is String[];
+
     const yesNo = Dialog.YesNoCancel {}
 
     const fileSave = FileDialog.FileSave {}
@@ -1262,10 +1272,10 @@ public function run from (args is String[]) to ()
                     override function update {
                         const now = java.lang.System.currentTimeMillis();
                         if (lastTime == 0) {
-                            loadEditorState(joglStage(), this, player, trax);
+                            recentList = loadEditorState(joglStage(), this, player, trax);
                             lastTime = now;
                         } else if (now - lastTime > 2000) {
-                            saveEditorState(this, player, trax);
+                            saveEditorState(this, player, trax, recentList);
                             if (savePoint <> MasterUndoable.now) {
                                 doSave();
                             }
@@ -2004,7 +2014,7 @@ Tabview.Tab {
             if (not saveChangesIfNecessary()) {
                 return false;
             }
-            saveEditorState(editorScene, player, trax);
+            saveEditorState(editorScene, player, trax, recentList);
             return true;
         }
         title: bind "{mainScene.currentResource.url} {if (savePoint <> MasterUndoable.now) then " (Unsaved)" else ""}";
@@ -2026,6 +2036,18 @@ Tabview.Tab {
                                      open("file:{result}");
                                  }
                              }
+                     }
+                 },
+                 Menu {
+		     label: "Open Recent";
+                     enabled: bind player.paused;
+                     items: bind foreach (x in recentList) {
+                         MenuItem {
+                             label: x;
+                             action: function to () {
+                                 open(x);
+                             }
+                         }
                      }
                  },
 		 MenuItem {
