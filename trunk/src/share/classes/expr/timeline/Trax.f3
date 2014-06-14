@@ -39,7 +39,7 @@ public const CLIP_LABEL_PAINT = ColorPaint(CLIP_LABEL_COLOR);
 public const CLIP_SELECTED_LABEL_PAINT = ColorPaint(CLIP_SELECTED_LABEL_COLOR);
 
 const CURVE_PAINT = ColorPaint(Color.YELLOW);
-const yLegendFg = ColorPaint(Color.color(.1, .1, .1));
+const yLegendFg = ColorPaint(Color.color(.1, .1, .1, .8));
 
 function debugPrint of a (label is String, value is a) to a {
     println("{label}: {value}");
@@ -538,7 +538,7 @@ class TimeNodeView is AbstractNode
                               content: 
                               [Group { 
                                       transform: bind translate(-50+trax.frameToX(trax.currentFrame)-trax.durationToX(ch.boundsInScene.start), -h+1.5*getViewHeight()-5);
-                                      content: bind if extent == 0 then null else foreach (i in [0..<rows-1]) {
+                                      content: bind if extent == 0 then null else foreach (i in [0..<rows]) {
                                           Text.Label {
                                               width: 100;
                                               transform: bind translate(0, trax.getViewHeight() * i);
