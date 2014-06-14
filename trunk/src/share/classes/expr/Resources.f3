@@ -13,10 +13,11 @@ public class Resource {
     public var id is String;
     public var url is String;
     public var programs is ProgramResource[];
-    public var animation is ChannelBoxResource;
+    public var animation is ChannelBoxResource[];
 }
 
 public class ChannelBoxResource is Temporal {
+    public var n_id is Integer;
     public var content is ChannelResource[];
 }
 
@@ -146,12 +147,14 @@ class ResourceBuilder {
                 compiled: p.sourceCode;
                 targetPath: p.targetPath;   
         };
-        const anims = ChannelBoxResource {
-                blendWeight: n.channelBox.blendWeight;
-                playTime: n.channelBox.playTime;
-                playRate: n.channelBox.playRate;
-                playCount: n.channelBox.playCount;
-                content: foreach (j in n.channelBox.content) {
+        const anims = foreach (q in n.channelBoxes.content) ChannelBoxResource {
+                var x = q as ResourceTarget.ChannelBoxGroup;
+                n_id: x.n_id;
+                blendWeight: x.blendWeight;
+                playTime: x.playTime;
+                playRate: x.playRate;
+                playCount: x.playCount;
+                content: foreach (j in x.content) {
                     const c = j as Channel;
                     ChannelResource {
                         target: c.id;
