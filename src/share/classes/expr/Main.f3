@@ -181,6 +181,10 @@ public class MainContext is Context.MemberContext, Context.ResourceObjectContext
         override function toApply to String { "expr.ExprNode.Start" }
         m: Reflect.getVar(Reflect.findClass("expr.ExprNode"), "Start");
     }
+    override function createChannels from (parent is ChannelBoxGroup) to (Channel of Number)[]
+    {
+        []
+    }
 }
 
 var canUndo is Boolean;
@@ -260,7 +264,7 @@ public function run from (args is String[]) to ()
             override var id = "Hierarchy";
             override protected function updateParent to () { // hack...
             }
-            content: bind foreach (target in currentResource.resources) target.channelBox;
+            content: bind foreach (target in currentResource.resources) target.channelBoxes;
         }
     };
     const otherHierarchy = VariableHierarchy { root: bind mainContext }
@@ -303,6 +307,22 @@ public function run from (args is String[]) to ()
 	content: currentAnimResource;
 	playRange: bind if (nonInteractiveLoop) then null else Interval { start: 0s, end: Duration.INDEFINITE };
 	playCount:  bind if (nonInteractiveLoop) then -1 else 1;
+        override function lookup from (id is String) to TimeNode
+        {
+            if (id.startsWith("channelBox:")) {
+                const target = id.substring(11);
+                for (scene in currentScenes) {
+                    for (m in scene.currentModels) {
+                        const r = m.timeline.root.lookup(id);
+                        if (r <> null) {
+                            return r;
+                        }
+                    }
+                }
+                println("Time Node not found: {id}");
+            }
+            return super.lookup(id);
+        }
     }
 
     const player = Timeline {
@@ -965,18 +985,21 @@ public function run from (args is String[]) to ()
                 insert p into allPrograms;
                 ps
             }
-            rn.channelBox.playTime = i.animation.playTime;
-            rn.channelBox.playRate = i.animation.playRate;
-            rn.channelBox.playCount = i.animation.playCount;
-            rn.channelBox.blendWeight = 1.0;//i.animation.blendWeight;
-            foreach (x in i.animation.content) {
-                const c = rn.resolveChannel(x.target);
-                c.playTime = x.playTime;
-                c.playCount = x.playCount;
-                c.playRate = x.playRate;
-                c.blendWeight = x.blendWeight;
-                c.keys = foreach (k in x.keys) {
-                    c.createKey(k.keyTime, k.keyValue, f3.media.scene.KeyFrame.Linear);
+            for (box in i.animation) {
+                const channelBox = rn.addChannelBox(box.n_id);
+                channelBox.playTime = box.playTime;
+                channelBox.playRate = box.playRate;
+                channelBox.playCount = box.playCount;
+                channelBox.blendWeight = 1.0;//i.animation.blendWeight;
+                foreach (x in box.content) {
+                    const c = channelBox.resolveChannel(x.target);
+                    c.playTime = x.playTime;
+                    c.playCount = x.playCount;
+                    c.playRate = x.playRate;
+                    c.blendWeight = x.blendWeight;
+                    c.keys = foreach (k in x.keys) {
+                        c.createKey(k.keyTime, k.keyValue, f3.media.scene.KeyFrame.Linear);
+                    }
                 }
             }
 	}
@@ -1908,6 +1931,7 @@ Tabview.Tab {
 				    content: Scrollpane {
                                              canZoomVertical: false;
                                              content: trax = expr.timeline.Trax {
+                                                 menuFactory: the MenuFactory;
                                                  clips: bind currentAnimResource.resources;
                                                  loop: bind nonInteractiveLoop;
                                                  target: player;
@@ -1927,6 +1951,7 @@ Tabview.Tab {
 
                                                     canZoomVertical: false;
                                                     content: graphEditor = expr.timeline.GraphEditor {
+                                                        menuFactory: the MenuFactory;
                                                         mainTrax: bind trax;
                                                         resourceTargets: bind currentResource.resources;
                                                         loop: bind nonInteractiveLoop;
@@ -1935,6 +1960,13 @@ Tabview.Tab {
                                                         temporalHierarchy: temporalHierarchy;
                                                         removeClip: function from (clip is TimeNode) to ()
                                                         {
+                                                            if (clip is ResourceTarget.ChannelBoxGroup) {
+                                                                const cb = 
+                                                                    clip as ResourceTarget.ChannelBoxGroup;
+                                                                const p = (cb.parent as ResourceTarget.ChannelBoxesGroup);
+                                                                delete cb from p.boxes;
+                                                                MasterUndoable.commit();
+                                                            }
                                                         }
                                                     }
                                                 }

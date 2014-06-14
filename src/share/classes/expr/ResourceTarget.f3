@@ -1,4 +1,5 @@
 package expr;
+import expr.undo.*;
 import expr.prog.Program;
 import f3.media.scene.*;
 import f3.media.scene.KeyFrame.*;
@@ -8,10 +9,26 @@ class KeyTarget of a {
     public var k is Key of a;
 }
 
+public class ChannelBoxesGroup is TimeGroup {
+    public const target is ResourceTarget;
+    public var boxes is ChannelBoxGroup[];
+    override var content = bind boxes;
+    const undoList0 = UndoList {};
+    postinit {
+        undoList0.addTarget("boxes", &boxes);
+    }
+}
+
 public class ChannelBoxGroup is TimeGroup, ChannelBox {
+    public var n_id is Integer;
     public var $useLiteralId is Boolean;
     public const keyMap = new java.util.TreeMap of (Duration, java.util.List of (KeyTarget of Object));
     public var keyTimes is Duration[];
+
+    public function resolveChannel from (id is String) to Channel of Number 
+    {
+        lookup(id) as Channel of Number;
+    }
 
     public function moveKeyTo from (src is Duration, target is Duration) to Duration
     {
@@ -58,23 +75,56 @@ public interface ResourceTarget {
     public var programs is Program[];
     public var $useLiteralId is Boolean = false;
 
-    public function getChannels to (Channel of Number)[] { [] }
+
+    //    public function getChannels to (Channel of Number)[] { [] }
 
     public function resolveChannel from (id is String) to Channel of Number
     {
-        channelBox.lookup(id) as Channel of Number;
+        channelBoxes.lookup(id) as Channel of Number;
     }
 
-    public const channelBox is TimeGroup = ChannelBoxGroup
-    {
-        $useLiteralId: bind $useLiteralId;
+    public const channelBoxes is ChannelBoxesGroup = ChannelBoxesGroup {
+        target: this;
         id: bind "channelBox:{url}";
-        content: getChannels();
     }
 
     public function findTarget from (id is String) to Object 
     {
         if (id == "") then this else null;
     }
+
+    var idCount = 1;
+
+    public function createChannelBox from () to ChannelBoxGroup {
+        createChannelBox(idCount);
+    }
+
+    public function createChannelBox from (n_id is Integer) to ChannelBoxGroup {
+        idCount = n_id+1;
+        var g = ChannelBoxGroup {
+            n_id: n_id;
+            override var id = bind "{channelBoxes.id} Clip {n_id}";
+        }
+        g.content = createChannels(g);
+        return g;
+    }
+
+    protected function createChannels from (parent is ChannelBoxGroup) to (Channel of Number)[];
+
+    public function addChannelBox to ChannelBoxGroup
+    {
+        var result = createChannelBox();
+        insert result into channelBoxes.boxes;
+        return result;
+    }
+
+    public function addChannelBox from (n_id is Integer) to ChannelBoxGroup
+    {
+        var result = createChannelBox(n_id);
+        insert result into channelBoxes.boxes;
+        return result;
+    }
+
 }
 
+        

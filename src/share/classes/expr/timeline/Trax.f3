@@ -401,6 +401,7 @@ class TimeNodeView is AbstractNode
             var dy is Number;
             var resizing is Boolean;
             var dragging is Boolean;
+            var dragOk = false;
 	    content: bind
 	    [if (target == null) then null else Group { 
                 visible: bind row + rows - 1 > trax.scrollY;
@@ -428,33 +429,70 @@ class TimeNodeView is AbstractNode
                      }
 		     override function onMouseDown from (event is MouseEvent) to ()
 		     {
-                         resizing = expanded and trax.graph and target is Channel and event.location.y <= rectY + 2;
+                         if (event.isMouseButton3Down()) {
+                             var menu = Menu {
+                                 factory: trax.menuFactory;
+                             };
+                             if (trax.graph and target is ResourceTarget.ChannelBoxesGroup) {
+                                 insert MenuItem {
+                                     factory: trax.menuFactory;
+                                     label: "Add Clip"
+                                         action: function to ()
+                                     {
+                                         println("add clip");
+                                         (target as ResourceTarget.ChannelBoxesGroup).target.addChannelBox();
+                                     }
+                                 } into menu.items;
+                             }
+                             if (not (target is ResourceTarget.ChannelBoxesGroup)) {
+                                 insert MenuItem {
+                                     factory: trax.menuFactory;
+                                     label: "Delete"
+                                         action: function to ()
+                                     {
+                                         trax.removeClip(target);
+                                     }
+                                 } into menu.items;
+                             }
+                             if (menu.items <> []) {
+                                 event.stage.showPopupMenu(event.screenx, event.screeny+trax.getViewHeight(), menu);
+                             }
+                             resizing = false;
+                             dragOk = false;
+                         } else {
+                             dragOk = true;
+                             resizing = expanded and trax.graph and target is Channel and event.location.y <= rectY + 2;
+                         }
                          dx = trax.durationToX(target.playTime);
                          dy = rows * trax.getViewHeight();
                          trax.selectTimeNodeView(self);
 		     }
 		     override function onMouseDrag from (event is MouseEvent) to ()
 		     {
-                         dragging = true;
-                         if (not resizing) {
-                             dx += (event.picked.dragPoint1 - event.picked.dragPoint0).x;
-                             target.playTime = trax.frameTo(trax.xToDuration(dx));
-                             trax.updatePlayhead();
-                         } else {
-                             dy -= (event.picked.dragPoint1 - event.picked.dragPoint0).y;
-                             rows = Math.max(dy / trax.getViewHeight(), 1.0);
+                         if (dragOk) {
+                             dragging = true;
+                             if (not resizing) {
+                                 dx += (event.picked.dragPoint1 - event.picked.dragPoint0).x;
+                                 target.playTime = trax.frameTo(trax.xToDuration(dx));
+                                 trax.updatePlayhead();
+                             } else {
+                                 dy -= (event.picked.dragPoint1 - event.picked.dragPoint0).y;
+                                 rows = Math.max(dy / trax.getViewHeight(), 1.0);
+                             }
                          }
 		     }
 		     override function onMouseUp from (event is MouseEvent) to ()
 		     {
 			 //println("commit playTime={target.playTime}, pickable={target.pickable}");
-                         dragging = false;
                          if (not resizing) {
-                             MasterUndoable.commit();
+                             if (dragging) { 
+                                 MasterUndoable.commit();
+                             }
                          } else {
                              resizing = false;
                              openRows = rows = Math.max((dy / trax.getViewHeight()) as Integer, 1);
                          }
+                         dragging = false;
 		     }
 		 },
                  Group {
@@ -647,6 +685,8 @@ public class Playhead is AbstractNode
 }
 
 public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable {
+
+    public var menuFactory is MenuFactory;
 
     function editKey from (view is TimeNodeView, ch is Channel of Number, k is Key of Number) to () 
     {
