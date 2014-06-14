@@ -1957,7 +1957,7 @@ Tabview.Tab {
                                                         loop: bind nonInteractiveLoop;
                                                         target: player;
                                                         targetNode: mainTimeLayer;
-                                                        temporalHierarchy: temporalHierarchy;
+                                                        temporalHierarchy: temporalHierarchy2;
                                                         removeClip: function from (clip is TimeNode) to ()
                                                         {
                                                             if (clip is ResourceTarget.ChannelBoxGroup) {

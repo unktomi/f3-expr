@@ -39,7 +39,7 @@ public const CLIP_LABEL_PAINT = ColorPaint(CLIP_LABEL_COLOR);
 public const CLIP_SELECTED_LABEL_PAINT = ColorPaint(CLIP_SELECTED_LABEL_COLOR);
 
 const CURVE_PAINT = ColorPaint(Color.YELLOW);
-const yLegendFg = ColorPaint(Color.color(.1, .1, .1, .8));
+const yLegendFg = ColorPaint(Color.color(.9, .9, .9, .8));
 
 function debugPrint of a (label is String, value is a) to a {
     println("{label}: {value}");
@@ -279,11 +279,22 @@ class TimeNodeView is AbstractNode
     public function close to ()
     {
         expanded = false;
+        if (target <> null and not (target is TimeGroup)) {
+            rows = 1;
+        }
+    }
+
+    function toggleOpen to ()
+    {
+        if (expanded) then close() else open();
     }
 
     public function open to ()
     {
         getParentTimeNodeView().open();
+        if (target <> null and not (target is TimeGroup)) {
+            rows = openRows;
+        }
         expanded = true;
     }
 
@@ -531,10 +542,7 @@ class TimeNodeView is AbstractNode
                          fillPaint: bind fg;
                          override function onMouseDown from (event is MouseEvent) to ()
                          {
-                             expanded = not expanded;
-                             if (not (target is TimeGroup)) {
-                                 rows = if (rows == 1) then openRows else 1;
-                             }
+                             toggleOpen();
                          }
                      }
                  }]
@@ -910,14 +918,16 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
     
     function rowToTimeNodeView from (row is Integer) to TimeNodeView
     {
-        var j = 0;
-        for (i in timeNodeViews) {
-            if (j + (i.rowCount as Integer) > row) {
-                return i.getRow(row-j);
-            }
-            j += i.rowCount as Integer;
-        }
-        return null;
+        var result is TimeNodeView = null;
+        root.foldLeft((), function from (_ is (), t is Node) to () {
+                if (t is TimeNodeView) {
+                    const tv = t as TimeNodeView;
+                    if (row >= tv.row and row < tv.row+tv.rows) {
+                        result = tv;
+                    }
+                }
+            });
+        return result;
     }
 
     function yToRow from (y0 is Number) to Integer 
@@ -1021,6 +1031,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
     var rootContent = bind getRootContent();
     var sy0 = bind Math.min(traxHeight / Math.max(rootContent.bounds.height(), 1), 1.0);
     var ty0 = bind if rootContent.bounds.height() == 0 then 0.0 else (scrollY * getViewHeight()) / rootContent.bounds.height();
+    bound var visibleRows is Integer = Math.round(height / getViewHeight()) as Integer;
 
     override bound function getSy to Number { sy0 }
 
@@ -1298,22 +1309,24 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
     }
 
     override function onKeyDown from (e is KeyboardEvent) to () {
-	var i = selectedTimeNodeView.row;
+	const i = selectedTimeNodeView.row;
 	if (e.keyCode == Keys.F) {
             frameSelection();
             e.stopPropagation();
 	} else if (e.keyCode == Keys.Down) {
-	    const n = rowToTimeNodeView(i+1);
+	    const n = rowToTimeNodeView(i+selectedTimeNodeView.rows);
 	    if (n <> null) {
 		selectTimeNodeView(n);
 	    }
 	} else if (e.keyCode == Keys.Up) {
-	    const n = rowToTimeNodeView(i-1);
-	    if (n <> null) {
-		selectTimeNodeView(n);
-	    }
+            if (i > 1) {
+                const n = rowToTimeNodeView(i-1);
+                if (n <> null) {
+                    selectTimeNodeView(n);
+                }
+            }
 	} else if (e.keyCode == Keys.Home) {
-	    const n = rowToTimeNodeView(0);
+	    const n = rowToTimeNodeView(1);
 	    if (n <> null) {
 		selectTimeNodeView(n);
 	    }
@@ -1385,6 +1398,14 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
             temporalHierarchy.selectTimeNode(x.target);
 	}
 	selectedTimeNodeView = x;
+        if (x <> null) {
+            println("row={x.row}, scrollY={scrollY} visibleRows={visibleRows}");
+            if (x.row < scrollY) {
+                scrollY = x.row as Integer;
+            } else if (x.row > scrollY + visibleRows) {
+                scrollY = Math.max(0, x.row - visibleRows / 2) as Integer
+            }
+        }
     }
 
     const FPS = 1s/24.0;
