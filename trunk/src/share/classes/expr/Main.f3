@@ -836,12 +836,16 @@ public function run from (args is String[]) to ()
 	undoList.addTarget("timenodes", &currentAnimResource.resources);
     }
 
-    function open from (url is String) to ()
+    function updateRecent from (url is String) to ()
     {
-	close();
         delete url from recentList;
         recentList = [url, recentList];
         recentList = recentList[0..8];
+    }
+
+    function open from (url is String) to ()
+    {
+	close();
 	const sceneRes = Resources.open(url);
         var allPrograms is Program[];
         var baseURL = new java.net.URL(url);
@@ -2100,6 +2104,7 @@ Tabview.Tab {
                                  result = "{result}.expr";
                              }
 			     mainScene.currentResource.url = "file:{result}";
+                             updateRecent(mainScene.currentResource.url);
 			     save();
 			 }
 		     }

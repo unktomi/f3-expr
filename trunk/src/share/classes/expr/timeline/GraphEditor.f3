@@ -35,43 +35,14 @@ public class GraphEditor is Trax {
     {
         for (resourceTarget in resourceTargets, box in resourceTarget.channelBoxes.content, clip in (box as TimeGroup).content where clip.pickableInScene) {
             const ch = clip as Channel of Number;
-            var k = ch.pickKey(playheadPos);
-            var i is Interpolator of Number = KeyFrame.Linear;
-            if (false and k <> null) {
-                if (k.position == playheadPos and k.interpolator is KeyFrame.Tangent) {
-                    i = k.interpolator;
-                } else {
-                    if (k.position < playheadPos) {
-                        k = k.next;
-                    }
-                    if (k <> null and k.prev <> null and k.next <> null) {
-                        const fps = 1s / frameRateN;
-                        const frame1 = (k.prev.position / fps)  as Integer;
-                        const frame2 = (k.position / fps)  as Integer;
-                        const frame3 = (k.next.position / fps)  as Integer;
-                        const x1 = frame1;
-                        const x2 = frame2;
-                        const x3 = frame3;
-                        const y1 = k.prev.value;
-                        const y2 = k.value;
-                        const y3 = k.next.value;
-                        const ox = x2 - x1;
-                        const oy = y2 - y1;
-                        const ix = x3 - x2;
-                        const iy = y3 - y2;
-                        i = KeyFrame.Tangent 
-                            {
-                                kox: ox;
-                                koy: oy;
-                                kix: ix;
-                                kiy: iy;
-                            };
-                    }
-                }
+            const k = ch.pickKey(ch.localTime);
+            if (k <> null) {
+                ch.setKey(k.interpolator);
+            } else {
+                ch.setKey(KeyFrame.Linear);
             }
-            //println("setting key {playheadPos}");
-            ch.setKey(i);
         }
+        super.setKeys();
     }
 
     override protected function onPlayheadChange from (event is Duration) to ()

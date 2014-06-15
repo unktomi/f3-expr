@@ -411,7 +411,7 @@ class TimeNodeView is AbstractNode
     const self = this;
     bound var w = getWidth(if target.hasIndefiniteDuration() then Interval.<<0>> else target.bounds, trax.visibleInterval);
     var rows is Number = 1;
-    var bnds is Vec2;
+    var bnds is Vec2 = Vec2.<<1>>;
     bound var h is Number = trax.getViewHeight() * rows;
     bound var viewHeight is Number = h;
     bound var fg = if w == 0 then bg else if (selected1) then CLIP_SELECTED_LABEL_PAINT else CLIP_LABEL_PAINT;//ColorPaint(Color.color(.7, .7, .7, 1));
@@ -616,13 +616,13 @@ class TimeNodeView is AbstractNode
                               content: 
                               [Group { 
                                       visible: bind expanded;
-                                      transform: bind translate(-50+trax.frameToX(trax.currentFrame)-trax.durationToX(ch.boundsInScene.start), hoff+4);
+                                      transform: bind translate(-50+trax.frameToX(trax.currentFrame)-trax.durationToX(ch.boundsInScene.start), hoff+3);
                                       content: bind if extent == 0 then null else foreach (i in [0..<rows]) {
                                           Text.Label {
                                               width: 100;
                                               transform: bind translate(0, trax.getViewHeight() * i);
                                               font: bind trax.yLegendFont;
-                                              text: bind "{%.04f bnds.x + i * (extent/(rows))}";
+                                              text: bind "{%.04f bnds.x + i * (extent/(rows-1))}";
                                               rightJustified: true;
                                               foreground: bind yLegendFg;
                                               background: null;
@@ -1742,6 +1742,12 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 
     protected function setKeys to () 
     {
+        root.foldLeft((), function from (_ is (), t is Node) to () {
+                if (t is TimeNodeView) {
+                    const tv = t as TimeNodeView;
+                    tv.updateValueBounds();
+                }
+            });
     }
 
     public function moveKeyTo of a from (ch is Channel of a, k is KeyFrame.Key of a, pos is Duration) to Key of a
