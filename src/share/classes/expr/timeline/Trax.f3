@@ -173,27 +173,45 @@ class KeyEditor is AbstractNode {
 class KeyMark is Image, MouseInputHandler, KeyboardInputHandler {
     var kx = 0.0;
     override var url = "{__DIR__}keybubblemarker.png";
-    public var k is Key;
+    public var k is Key of Number;
     public var ch is Channel of Number;
     public var trax is Trax;
     public var view is TimeNodeView;
+    public var valueBounds is Vec2;
+    public var sy is Number = 1.0;
     override var transform = bind translate(trax.durationToX(k.position), 0);
+    var lockedValueBounds is Vec2;
+    var lockedSy is Number;
+    var lockX is Boolean;
     override function onMouseDown from (event is MouseEvent) to ()
     {
         if (event.clickCount > 1) {
             trax.editKey(view, ch, k);
         } 
         kx = trax.durationToX(k.position);
+        lockedValueBounds = valueBounds;
+        lockedSy = sy;
+        lockX = event.metaKey;
     }
     override function onMouseDrag from (event is MouseEvent) to ()
     {
+        println("view={view}");
         kx += (event.picked.dragPoint1 - event.picked.dragPoint0).x;
-        k = trax.moveKeyTo(ch, k, trax.frameTo(trax.xToDuration(kx)));
+        var dy = (event.picked.dragPoint1 - event.picked.dragPoint0).y;
+        if (lockX or view.rows == 1) {
+            println("moving on x only");
+            k = trax.moveKeyTo(ch, k, trax.frameTo(trax.xToDuration(kx)));
+        } else {
+            println("sy={sy}, dy={dy}");
+            println("value={k.value} => {k.value + sy * dy}");
+            k = ch.setKey(k, trax.frameTo(trax.xToDuration(kx)), k.value + dy / lockedSy, k.interpolator);
+        }
         trax.updatePlayhead();
     }
     override function onMouseUp from (event is MouseEvent) to ()
     {
         //println("commit playTime={target.playTime}, pickable={target.pickable}");
+        view.updateValueBounds();
         MasterUndoable.commit();
     }
 }
@@ -289,11 +307,19 @@ class TimeNodeView is AbstractNode
         if (expanded) then close() else open();
     }
 
+    function updateValueBounds to ()
+    {
+        if (target is Channel of Number) {
+            bnds = getValueBounds((target as Channel of Number).keys);
+        }
+    }
+
     public function open to ()
     {
         getParentTimeNodeView().open();
         if (target <> null and not (target is TimeGroup)) {
             rows = openRows;
+            updateValueBounds();
         }
         expanded = true;
     }
@@ -385,6 +411,7 @@ class TimeNodeView is AbstractNode
     const self = this;
     bound var w = getWidth(if target.hasIndefiniteDuration() then Interval.<<0>> else target.bounds, trax.visibleInterval);
     var rows is Number = 1;
+    var bnds is Vec2;
     bound var h is Number = trax.getViewHeight() * rows;
     bound var viewHeight is Number = h;
     bound var fg = if w == 0 then bg else if (selected1) then CLIP_SELECTED_LABEL_PAINT else CLIP_LABEL_PAINT;//ColorPaint(Color.color(.7, .7, .7, 1));
@@ -564,12 +591,18 @@ class TimeNodeView is AbstractNode
               if (not trax.graph or not (target is Channel of Number)) then null else Group {
                           //                  visible: bind row > trax.scrollY;
                           //                  pickable: false;
-                          transform: bind translate(-w/2, 0);
+                          var graphHeight = bind h - trax.getViewHeight();
+                          transform: bind translate(-w/2, if expanded then -trax.getViewHeight() else 0);
                           var ch = bind target as Channel of Number;
                           content: 
                           [MeshNode {
+                              visible: bind expanded;
+                              transform: bind translate(0, trax.getViewHeight() /2);
                               var line = PathLine {
-                                  path: bind makeCurve(target as Channel of Number, h-4).path;
+                                  path: bind makeCurve3(target as Channel of Number, 
+                                                        (target as Channel of Number).sortedKeys,
+                                                        bnds,
+                                                        if (expanded) then graphHeight else trax.getViewHeight()).path;
                               };
                               pickable: false;
                               mesh: bind line.mesh;
@@ -577,19 +610,19 @@ class TimeNodeView is AbstractNode
                           },
                           Group {
                               var extent = bind bnds.y - bnds.x;
-                              var sy = bind if (extent == 0) then 1.0 else h / extent;
-                              var hoff = bind -h + 2 + trax.getViewHeight()/2;
+                              var sy = bind if (extent == 0) then 1.0 else (if (expanded) then graphHeight else h) / extent;
+                              var hoff = bind -graphHeight + 1.0 * trax.getViewHeight();
                               var chKeys = bind ch.keys;
-                              var bnds = bind getValueBounds(chKeys);
                               content: 
                               [Group { 
-                                      transform: bind translate(-50+trax.frameToX(trax.currentFrame)-trax.durationToX(ch.boundsInScene.start), -h+1.5*getViewHeight()-5);
+                                      visible: bind expanded;
+                                      transform: bind translate(-50+trax.frameToX(trax.currentFrame)-trax.durationToX(ch.boundsInScene.start), hoff+4);
                                       content: bind if extent == 0 then null else foreach (i in [0..<rows]) {
                                           Text.Label {
                                               width: 100;
                                               transform: bind translate(0, trax.getViewHeight() * i);
                                               font: bind trax.yLegendFont;
-                                              text: bind "{%.04f bnds.x + i * (extent/rows)}";
+                                              text: bind "{%.04f bnds.x + i * (extent/(rows))}";
                                               rightJustified: true;
                                               foreground: bind yLegendFg;
                                               background: null;
@@ -597,13 +630,16 @@ class TimeNodeView is AbstractNode
                                       }
                                   },
                                Group {
+                                  transform: bind translate(0, if (expanded) then -trax.getViewHeight()/2 else 0);
                                   content: bind foreach (k in chKeys) {
                                       KeyMark {
                                           view: this;
-                                          transform: bind translate(trax.durationToX(k.position), hoff+(sy * (k.value - bnds.x)));                                      
+                                          transform: bind translate(trax.durationToX(k.position), if (expanded) then hoff+(sy * (k.value - bnds.x)) else 0);                                      
                                           ch: bind ch;
                                           k: k;
                                           trax: bind trax;
+                                          valueBounds: bind bnds;
+                                          sy: bind sy;
                                       }
                                       
                                    }
@@ -1638,11 +1674,29 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
         foreach (k in keys) makeCurveContent(ch, k, k.interpolator, getValueBounds(keys), viewHeight) 
     }
 
-    protected function makeCurve from (ch is Channel of Number, viewHeight is Number) to Path {
+    protected function makeCurve3 from (ch is Channel of Number, keys is (Key of Number)[], valueBounds is Vec2, viewHeight is Number) to Path {
         Path {
             fillPaint: ColorPaint(Color.GREEN);
-            content: bind makePathElements(ch, ch.keys, viewHeight);
+            content: makePathElements2(ch, keys, valueBounds, viewHeight);
         }
+    }
+
+    protected bound function makeCurve from (ch is Channel of Number, viewHeight is Number) to Path {
+        Path {
+            fillPaint: ColorPaint(Color.GREEN);
+            content: bind makePathElements2(ch, ch.keys, getValueBounds(ch.keys), viewHeight);
+        }
+    }
+
+    function makePathElements2(ch is Channel of Number, keys is (Key of Number)[], valueBounds is Vec2, viewHeight is Number) to PathElement[]
+    {
+        var ty = valueBounds.x;
+        var dy = valueBounds.y - valueBounds.x;
+        var sy = if (dy == 0 or viewHeight == 0) then 1.0 else (viewHeight) / dy;
+        [moveTo(new Vec2(durationToX(keys[0].position), -viewHeight+(keys[0].value - ty)*sy)),
+         foreach (k in keys[1..]) {
+                lineTo(new Vec2(durationToX(k.position), -viewHeight+(k.value - ty)*sy))
+        }]
     }
 
     protected bound function makeCurve2 from (ch is Channel of Number, viewHeight is Number) to Node[] {
