@@ -29,6 +29,10 @@ public class InternalWindow is ResizableNode, Focuser {
 
     public var selected is Boolean;
 
+    public var isResizable is Boolean = true;
+    public var isMovable is Boolean = true;
+    public var isTransient is Boolean = false;
+
     override function resize from (w0 is Number, h0 is Number) to ()
     {
 	const w = Math.round(w0);
@@ -46,8 +50,9 @@ public class InternalWindow is ResizableNode, Focuser {
         [Rectangle is Focuser {
                 override function getTargetOfFocus from () to Focusable {  self.getTargetOfFocus() }
                 height: 12;
-                override var width = bind self.width;
+                override var width = bind self.width+1;
                 fillPaint: bind if selected then selectedTitlePaint else titlePaint;
+                visible: bind isMovable;
             },
         Image {
             visible: false;
@@ -86,18 +91,26 @@ public class InternalWindow is ResizableNode, Focuser {
         url: bind "{__DIR__}resize-corner.png";
 	//fillPaint: ColorPaint(Color.color(.65, .65, .65));
         override var cursor = Cursor.SouthEastResize;
+        visible: bind isResizable;
     };
 
     const leftSide is Node = Rectangle {
-	override var transform = bind translate(-self.width/2, 0);
-	override var height = bind self.height;
+	override var transform = bind translate(-self.width/2, -5);
+	override var height = bind self.height-10;
 	width: 1;
 	fillPaint: ColorPaint(Color.color(.18, .18, .18));
     }
 
+    const bottom is Node = Rectangle {
+	transform: bind translate(0, -height / 2-1);
+        height: 1;
+	width: bind width;
+	fillPaint: ColorPaint(Color.color(.18, .18, .18));
+    }
+
     const rightSide is Node = Rectangle {
-	override var transform = bind translate(self.width/2, 0);
-	override var height = bind self.height;
+	override var transform = bind translate(self.width/2, -5);
+	override var height = bind self.height-10;
 	width: 1;
 	fillPaint: ColorPaint(Color.color(.18, .18, .18));
     }
@@ -118,7 +131,7 @@ public class InternalWindow is ResizableNode, Focuser {
     override var internalContent = Group {
 	content: bind [Group { cursor: Cursor.Default; content: [titleBar, buttonBar, line] },
                        TransformNode { ty: -14, content: bind contentHolder }, 
-                       TransformNode { content: resizeCorner}, leftSide, rightSide];
+                       TransformNode { content: resizeCorner}, leftSide, rightSide, bottom];
     };
 
     public var debugGadget is Boolean;

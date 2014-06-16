@@ -20,6 +20,8 @@ public class Scrollpane is ResizableNode, Focuser {
     public var canZoomVertical is Boolean = true;
     public var canZoomHorizontal is Boolean = true;
 
+    public var canScrollHorizontally = true;
+
     function findScrollable {
         var r is Scrollable = null;
         const f is function from ((), Node) to () 
@@ -89,9 +91,10 @@ public class Scrollpane is ResizableNode, Focuser {
             }
         },
         TransformNode {
+                
             ty: bind -height/2 + H / 2
             tx: bind -W/2 +leftInset/2;
-            content: HScrollbar {
+            content: bind if (not canScrollHorizontally) then null else HScrollbar {
                 canZoom: bind canZoomHorizontal;
                 height: H;
                 width: bind width-W-leftInset;

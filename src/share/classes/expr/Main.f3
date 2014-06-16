@@ -56,13 +56,15 @@ function saveEditorState from (scene is Scene, player is Timeline, trax is Trax,
         {
             if (n is InternalWindow) {
                 const w = n as InternalWindow;
-                insert InternalWindowState {
-                    id: w.id;
-                    cx: w.cx;
-                    cy: w.cy;
-                    width: w.width;
-                    height: w.height;
-                } into internalWindows;
+                if (not w.isTransient) {
+                    insert InternalWindowState {
+                        id: w.id;
+                        cx: w.cx;
+                        cy: w.cy;
+                        width: w.width;
+                        height: w.height;
+                    } into internalWindows;
+                }
             }
         };
     scene.root.foldLeft((), f);
@@ -91,7 +93,7 @@ function loadEditorState from (stage is JoglStage, scene is Scene, player is Tim
         {
             if (n is InternalWindow) {
                 const w = n as InternalWindow;
-                for (x in s.internalWindows) {
+                if (not w.isTransient) for (x in s.internalWindows) {
                     if (x.id == w.id) {
                         w.cx = x.cx;
                         w.cy = x.cy;
@@ -1650,30 +1652,30 @@ public function run from (args is String[]) to ()
                                         }
                                     },
                        },
-                           /*
                        InternalWindow {
-                           var chooseType = ChooseType {
-                               treeModel: bind assetModel
-                           };
-                           gadget: bind chooseType.searchField;
+                           isMovable: false;
+                           isResizable: false;
+                           isTransient: true;
+                           gadget: Text.Label {
+                               text: "Create Variable";
+                               override var font = bind layoutEngine.createFont(Names.DEFAULT_FONT); 
+                               background: null;
+                               foreground: Shape2D.ColorPaint(Color.color(.8, .8, .8));
+                               transform: translate(2, 2)
+                           }
                            containerBounds: bind Bounds.boundsFromRect(0, 
-                                                                    0, 
-                                                                    width,
-                                                                    height-MENU_HEIGHT);
-                           content: bind chooseType;
-                           height: 400, width: 300;
+                                                                       0, 
+                                                                       width,
+                                                                       height-MENU_HEIGHT);
+                           content: CreateVar {
+                               assetModel: bind assetModel;
+                               popupLayer: bind popupLayer;
+                               popupScene: bind editorScene;
+                           }
+                           height: 140, width: 300;
                            cx: 160, cy: 800-300;	   
                        },
-                       InternalWindow {
-                           containerBounds: bind Bounds.boundsFromRect(0, 
-                                                                    0, 
-                                                                    width,
-                                                                    height-MENU_HEIGHT);
-                           content: CreateVar {}
-                           height: 400, width: 300;
-                           cx: 160, cy: 800-300;	   
-                       },
-                           */
+
                        InternalWindow {
                         id: "Editor1";            
 			containerBounds: bind Bounds.boundsFromRect(0, 

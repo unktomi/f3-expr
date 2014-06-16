@@ -4,23 +4,29 @@ import f3.media.input.*;
 import f3.media.scene.Text.*;
 import f3.media.scene.Shape2D.*;
 import f3.math.LinearMath.*;
+import f3.math.*;
+import f3.reflect.*;
 import java.lang.Math;
 
 const textFg = ColorPaint(Color.color(.8, .8, .8));
+const labelFg = ColorPaint(Color.color(.25, .25, .25));
 const textBg = ColorPaint(Color.color(.4, .4, .4));
 
 public class CreateVar is ResizableNode {
+    public var assetModel is AssetTree.AssetModel;
     bound var font is Font = layoutEngine.createFont(Names.DEFAULT_FONT);
-    bound var cellHeight = font.height()+2;
-    bound var labelWidth is Number = Math.max(font.width("Name:"), font.width("Type:"));
+    bound var cellHeight = font.height();
+    bound var labelWidth is Number = Math.max(font.width("Name:"), font.width("Type:"))+2;
     bound var fieldOffset is Number = labelWidth + 1;
     bound var fieldWidth is Number = width - 40 - labelWidth;
+    public var popupLayer is PopupLayer;
+    public var popupScene is Scene;
     const nameLabel is Text.Label = Text.Label {
           text: "Name:"
           font: bind font;
           height: bind cellHeight;
           width: bind labelWidth;
-          foreground: bind textFg;
+          foreground: bind labelFg;
           background: null;
           transform: bind translate(-width/2+labelWidth, 0);
           rightJustified: true;
@@ -30,13 +36,13 @@ public class CreateVar is ResizableNode {
           font: bind font;
           height: bind cellHeight;
           width: bind labelWidth;
-          foreground: bind textFg;
+          foreground: bind labelFg;
           background: null;
           transform: bind translate(-width/2+labelWidth, 0);
           rightJustified: true;
     }
     const nameField is Text.Field = Text.Field {
-        transform: bind translate(fieldOffset-10, 0);
+        transform: bind translate(fieldOffset-20, 0);
         width: bind fieldWidth;
         height: bind cellHeight;      
         font: bind font;
@@ -44,32 +50,124 @@ public class CreateVar is ResizableNode {
         background: bind textBg;
     };
     const typeField is Text.Field = Text.Field {
-        transform: bind translate(fieldOffset-10, 0);
+        transform: bind translate(fieldOffset-20, 0);
         width: bind fieldWidth;
         height: bind cellHeight;      
         font: bind font;
         foreground: bind textFg;
         background: bind textBg;
     };
+    var chooseTypeTransform is Mat4 = Mat4.<<1>>;
+    const self = this;
+    const arrow is Polygon = Polygon {
+        transform: rotate(-90, Vec3.Z_AXIS);
+	points: [-3.5, -4.5, -3.5, 4.5, 3.5, 0];
+	fillPaint: textFg;
+        override function onMouseDown from (e is MouseEvent) to ()
+        {
+            const v = e.sceneLocation;
+            const a = self.boundsInScene.center + new Vec3(fieldOffset/2, -cellHeight*.5+2-200/2, 0);
+            const d = a-v;
+            const popupLoc = popupScene.mousePosition;
+            println("d={d}");
+            println("popupLoc={popupLoc}");
+            const target = popupLoc + d;
+            println("showing at {target}");
+            toggleChooser(target);
+        }
+    };
+    const applyButton = TextButton {
+          text: "Create"
+          transform: translate(30, 0);
+          width: 45;
+          enabled: false;
+    }
+    const cancelButton = TextButton {
+          text: "Cancel";
+          transform: translate(-30, 0);
+          width: 45;
+    }
     public var onApply is function from () to ();
     public var onCancel is function from () to ();
+    const chooseType = ChooseType {
+        transform: bind chooseTypeTransform;
+        treeModel: bind assetModel;
+        visible: false;
+        chooseMembers: false;
+        onSelectType: bind selectType;
+    };
+
+    var selectedType is F3Type;
+
+    function selectType from (t is F3Type) to ()
+    {
+        selectedType = t;
+        chooseType.searchField.setText(Names.formatClassName(t.getName()));
+        hideChooser();
+    }
+
+    function hideChooser to ()
+    {
+        chooseType.visible = false;
+        delete chooseType from popupLayer.content;
+    }
+
+    function showChooser from (target is Point3) to ()
+    {
+        chooseType.visible = true;
+        chooseTypeTransform = translate(target); 
+        insert chooseType into popupLayer.content;
+        popupScene.setFocus(chooseType.getTargetOfFocus());
+    }
+
+    function toggleChooser from (target is Point3) to ()
+    {
+        if (chooseType.visible) {
+            hideChooser()
+        } else {
+            showChooser(target)
+        }
+    }
+    
+    var chooseTypeHolder = TransformNode {
+        ty: -cellHeight * 1.5 - 200 / 2;
+        tx: bind fieldOffset/2;
+    }
+    override function resize from (w is Number, h is Number) to ()
+    {
+        super.resize(w, h);
+        chooseType.resize(fieldWidth, 200);
+    }
     override var internalContent = Group {
         content: bind 
-        
         [Rectangle {
-                height: bind height;
-                width: bind width;
-                fillPaint: ColorPaint(Color.GRAY);
+            height: bind height;
+            width: bind width;
+            fillPaint: ColorPaint(Color.color(.6, .6, .6));
         },
         TransformNode {
-            ty: bind cellHeight/2 + 1;
+            ty: bind 1.5*cellHeight + 1;
             content:             
             bind [nameLabel, nameField]
         },
         TransformNode {
-            ty: bind -cellHeight/2 - 1;
+            ty: bind cellHeight/2 - 1;
             content:             
-            bind [typeLabel, typeField]
+            bind [typeLabel, 
+                 TransformNode {
+                    tx: bind fieldOffset/2-1;
+                    content: bind chooseType.searchField
+                 }, 
+                 TransformNode {
+                     tx: bind (fieldWidth + fieldOffset)/2  - 7;
+                     ty: -3.5;
+                     content: arrow;
+                 }]
+        },
+        TransformNode {
+            ty: bind -1.5*cellHeight -9 - 1;
+            content:
+            bind [cancelButton, applyButton]
         }]
     }
 }
