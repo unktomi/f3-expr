@@ -3,7 +3,7 @@ import f3.media.scene.*;
 import f3.media.input.*;
 import f3.media.scene.Shape2D.*;
 import f3.math.LinearMath.*;
-
+import f3.reflect.*;
 const textFg = ColorPaint(Color.color(.8, .8, .8));
 const textBg = ColorPaint(Color.color(.4, .4, .4));
 
@@ -18,15 +18,39 @@ public class ChooseType is ResizableNode, Focuser {
         {
             searchField.onKeyInput(e);
         }
+        override function onKeyDown from (e is KeyboardEvent) to () {
+            if (e.keyCode == Keys.Enter) {
+                checkSelectType();
+            }
+            super.onKeyDown(e)
+        }
+        override function onMouseDown from (e is MouseEvent) to ()
+        {
+            if (e.clickCount > 1) {
+                checkSelectType();
+            }
+            super.onMouseDown(e);
+        }
     };
+
+    function checkSelectType to ()
+    {
+        const x = (tv.selectedTreenode as AssetTree.AssetTreenode).asset;
+        if (x is AssetTree.TypeAsset) {
+            onSelectType((x as AssetTree.TypeAsset).t);
+        }
+    }        
+
+    public var onSelectType is function from F3Type to ();
+
     const searchTv is Treeview = tv;
     readonly var tree is Treeview = bind if filterText <> [] then searchTv else tv;
     readonly var font = bind layoutEngine.createFont(Names.DEFAULT_FONT);
     var cellHeight = 18;
     public const searchField is Text.Field = Text.Field {
         //visible: bind filterText <> [];
-        width: bind width-20;
-        transform: bind translate(-width/2+5, 2);
+        width: bind width;
+        //transform: bind translate(-width/2+5, 2);
         font: bind font;
         foreground: bind textFg;
         background: bind textBg;
@@ -34,6 +58,7 @@ public class ChooseType is ResizableNode, Focuser {
     const sp = Scrollpane {
         canZoomVertical: false;
         content: bind tree;
+        canScrollHorizontally: false;
     };
     public var choosePackages is Boolean = false;
     public var chooseTypes is Boolean = true;
@@ -48,9 +73,11 @@ public class ChooseType is ResizableNode, Focuser {
         if (not chooseMembers and asset is AssetTree.MemberAsset) {
             return false;
         }
-        const s = tn.label.toLowerCase();
-        for (j in filterText) {
-            if (not s.contains(j)) return false;
+        if (filterText <> []) {
+            const s = tn.label.toLowerCase();
+            for (j in filterText) {
+                if (not s.contains(j)) return false;
+            }
         }
         return true;
     }
@@ -72,6 +99,7 @@ public class ChooseType is ResizableNode, Focuser {
         super.resize(w, h);
         sp.resize(w, h);
     }
+
     override var internalContent = Group {
         content: bind 
         [/*

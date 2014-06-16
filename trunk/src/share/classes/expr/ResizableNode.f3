@@ -4,6 +4,10 @@ import f3.media.scene.*;
 public abstract class ResizableNode is AbstractNode, Scissored {
     public var width is Number;
     public var height is Number;
+    public function resize to ()
+    {
+        resize(width, height);
+    }
     public function resize from (w is Number, h is Number) to ()
     {
 	width = w;
