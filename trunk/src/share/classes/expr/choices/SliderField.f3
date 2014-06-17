@@ -64,7 +64,7 @@ public class SliderField is AbstractNode
 
     public function filterKeyInput from (event is KeyboardEvent) to Boolean
     {
-        false;
+        true
     }
 
     var textAreaCommit = textArea.observeCommit().subscribe(function from (text is String) to () {

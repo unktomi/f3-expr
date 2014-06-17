@@ -22,6 +22,9 @@ public class ChooseType is ResizableNode, Focuser {
             if (e.keyCode == Keys.Enter) {
                 checkSelectType();
             }
+            if (e.keyCode == Keys.Esc) {
+                onEscape();
+            }
             super.onKeyDown(e)
         }
         override function onMouseDown from (e is MouseEvent) to ()
@@ -37,12 +40,12 @@ public class ChooseType is ResizableNode, Focuser {
     {
         const x = (tv.selectedTreenode as AssetTree.AssetTreenode).asset;
         if (x is AssetTree.TypeAsset) {
-            onSelectType((x as AssetTree.TypeAsset).t);
+            onSelectType(x as AssetTree.TypeAsset);
         }
     }        
 
-    public var onSelectType is function from F3Type to ();
-
+    public var onSelectType is function from AssetTree.TypeAsset to ();
+    public var onEscape is function from () to ();
     const searchTv is Treeview = tv;
     readonly var tree is Treeview = bind if filterText <> [] then searchTv else tv;
     readonly var font = bind layoutEngine.createFont(Names.DEFAULT_FONT);
@@ -111,6 +114,12 @@ public class ChooseType is ResizableNode, Focuser {
         TransformNode {
             //            ty: bind -cellHeight/2;
             content: bind sp;
+        },
+        Rectangle {
+            pickable: false;
+            width: bind sp.bounds.width();
+            height: bind sp.bounds.height();
+            strokePaint: (ColorPaint(Color.color(.2, .2, .2)));
         }]
     }
 }

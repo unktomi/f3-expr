@@ -1336,7 +1336,41 @@ public function run from (args is String[]) to ()
                                                 content: Scrollpane {
                                                     canZoomVertical: false;
                                                     content: contextTree = Treeview {
-                                                        model: bind contextModel;
+                                             var handleCreate is function from (String, AssetTree.TypeAsset) to ();
+                                             var createVar = CreateVar {
+                                                     assetModel: bind assetModel;
+                                                     popupLayer: bind popupLayer;
+                                                     popupScene: bind editorScene;
+                                                     create: function from (name is String, asset is AssetTree.TypeAsset) to () {
+                                                         handleCreate(name, asset);
+                                                         delete win from popupLayer.content;
+                                                         popupLayer.modal = false;
+                                                     }
+                                                     cancel: function to () {
+                                                         delete win from popupLayer.content;
+                                                         popupLayer.modal = false;
+                                                     }
+                                             };
+                                             var win = InternalWindow {
+                                                 isMovable: false;
+                                                 isResizable: false;
+                                                 isTransient: true;
+                                                 gadget: Text.Label {
+                                                     text: "Create Variable";
+                                                     override var font = bind layoutEngine.createFont(Names.DEFAULT_FONT); 
+                                                     background: null;
+                                                     foreground: Shape2D.ColorPaint(Color.color(.8, .8, .8));
+                                                     transform: translate(2, 2);
+                                                 }
+                                                 containerBounds: bind Bounds.boundsFromRect(0, 
+                                                                                             0, 
+                                                                                             width,
+                                                                                             height-MENU_HEIGHT);
+                                                 content: createVar;
+                                                 height: 140, width: 300;
+                                                 //cx: e.sceneLocation.x, cy: e.sceneLocation.y;
+                                             };
+                                             model: bind contextModel;
                                                         override function onMouseDown from (e is MouseEvent) to ()
                                                         {
                                                             if (e.isMouseButton3Down()) {
@@ -1362,6 +1396,24 @@ public function run from (args is String[]) to ()
                                                                         },
                                                                         MenuItem {
                                                                             label: "Variable"
+                                                                            action: function to () 
+                                                                            {
+                                                                                win.cx = windowContainingAssets.boundsInScene.center.x;
+                                                                                win.cy = windowContainingAssets.boundsInScene.center.y;
+                                                                                handleCreate = function from (name is String, asset is AssetTree.TypeAsset) to () 
+                                                                                {
+                                                                                    var g = ctx as Context.GroupContext;
+                                                                                    insert Context.ClosureVarContext { 
+                                                                                        varName: name;
+                                                                                        varType: asset;
+                                                                                        parent: g;
+                                                                                    }
+                                                                                    into g.content;
+                                                                                    
+                                                                                }
+                                                                                insert win into popupLayer.content;
+                                                                                popupLayer.modal = true;
+                                                                            }
                                                                         },
                                                                         MenuItem {
                                                                             label: "Function"
@@ -1652,30 +1704,6 @@ public function run from (args is String[]) to ()
                                         }
                                     },
                        },
-                       InternalWindow {
-                           isMovable: false;
-                           isResizable: false;
-                           isTransient: true;
-                           gadget: Text.Label {
-                               text: "Create Variable";
-                               override var font = bind layoutEngine.createFont(Names.DEFAULT_FONT); 
-                               background: null;
-                               foreground: Shape2D.ColorPaint(Color.color(.8, .8, .8));
-                               transform: translate(2, 2)
-                           }
-                           containerBounds: bind Bounds.boundsFromRect(0, 
-                                                                       0, 
-                                                                       width,
-                                                                       height-MENU_HEIGHT);
-                           content: CreateVar {
-                               assetModel: bind assetModel;
-                               popupLayer: bind popupLayer;
-                               popupScene: bind editorScene;
-                           }
-                           height: 140, width: 300;
-                           cx: 160, cy: 800-300;	   
-                       },
-
                        InternalWindow {
                         id: "Editor1";            
 			containerBounds: bind Bounds.boundsFromRect(0, 
