@@ -21,6 +21,15 @@ public class CreateVar is ResizableNode {
     bound var fieldWidth is Number = width - 40 - labelWidth;
     public var popupLayer is PopupLayer;
     public var popupScene is Scene;
+
+    public var create is function from (String, AssetTree.TypeAsset) to ();
+    public var cancel is function from () to ();
+
+    function doCreate to ()
+    {
+        create(nameField.text, selectedType);
+    }
+
     const nameLabel is Text.Label = Text.Label {
           text: "Name:"
           font: bind font;
@@ -66,7 +75,7 @@ public class CreateVar is ResizableNode {
         override function onMouseDown from (e is MouseEvent) to ()
         {
             const v = e.sceneLocation;
-            const a = self.boundsInScene.center + new Vec3(fieldOffset/2, -cellHeight*.5+2-200/2, 0);
+            const a = self.boundsInScene.center + new Vec3(fieldOffset/2, -cellHeight*.5+0-200/2, 0);
             const d = a-v;
             const popupLoc = popupScene.mousePosition;
             println("d={d}");
@@ -77,15 +86,24 @@ public class CreateVar is ResizableNode {
         }
     };
     const applyButton = TextButton {
-          text: "Create"
-          transform: translate(30, 0);
-          width: 45;
-          enabled: false;
+        text: "Create"
+        transform: translate(30, 0);
+        width: 45;
+        height: 18;
+        enabled: false;
+        onPress: function to () 
+        {
+            self.doCreate();
+        }
     }
     const cancelButton = TextButton {
-          text: "Cancel";
-          transform: translate(-30, 0);
-          width: 45;
+        text: "Cancel";
+        transform: translate(-30, 0);
+        width: 45;
+        onPress: function to () 
+        {
+            self.cancel();
+        }
     }
     public var onApply is function from () to ();
     public var onCancel is function from () to ();
@@ -95,14 +113,15 @@ public class CreateVar is ResizableNode {
         visible: false;
         chooseMembers: false;
         onSelectType: bind selectType;
+        onEscape: hideChooser;
     };
 
-    var selectedType is F3Type;
+    var selectedType is AssetTree.TypeAsset;
 
-    function selectType from (t is F3Type) to ()
+    function selectType from (t is AssetTree.TypeAsset) to ()
     {
         selectedType = t;
-        chooseType.searchField.setText(Names.formatClassName(t.getName()));
+        chooseType.searchField.setText(t.name);
         hideChooser();
     }
 
@@ -128,22 +147,40 @@ public class CreateVar is ResizableNode {
             showChooser(target)
         }
     }
+
+    const d1 = nameField.observeText().subscribe(function from (s is String) to () {
+        checkButtons();
+        });
+
+    const d2 = chooseType.searchField.observeText().subscribe(function from (s is String) to () { 
+        checkButtons();
+        });
+    
+    function checkButtons to ()
+    {
+        if (selectedType == null) {
+        }
+        const enable = selectedType <> null and nameField.text <> "";
+        applyButton.enabled = enable;
+    }
     
     var chooseTypeHolder = TransformNode {
         ty: -cellHeight * 1.5 - 200 / 2;
         tx: bind fieldOffset/2;
     }
+
     override function resize from (w is Number, h is Number) to ()
     {
         super.resize(w, h);
         chooseType.resize(fieldWidth, 200);
     }
+
     override var internalContent = Group {
-        content: bind 
+        content:
         [Rectangle {
             height: bind height;
             width: bind width;
-            fillPaint: ColorPaint(Color.color(.6, .6, .6));
+            fillPaint: ColorPaint(Color.color(.7, .7, .7));
         },
         TransformNode {
             ty: bind 1.5*cellHeight + 1;

@@ -174,7 +174,9 @@ public class InternalWindow is ResizableNode, Focuser {
 	{
 	    dx = cx;
 	    dy = cy;
-            toFront();
+            if (isMovable) {
+                toFront();
+            }
 	}
     };
 
