@@ -257,14 +257,13 @@ public class FunctionDefinitionContext is MemberContext, ResourceObjectContext {
 
 public class ClosureVarContext is GroupContext, ProgramContext {
     public var varType is TypeAsset;
-    public var varName is String = "variable";
+    public var variableName is String = "variable";
     public var value is Object;
-    public var isEvent is Boolean;
-    override var name = bind varName;
-    override var label = bind "{varName} [{varType.name}]";
+    override var name = bind variableName;
+    override var label = bind "{variableName} [{varType.name}]";
     override function fullName to String 
     {
-        "{parent.fullName()}|{varName}";
+        "{parent.fullName()}|{variableName}";
     }
     function getMembers from (varType is F3Type) to Member[] {
         const result = if (varType is F3ClassType) then Expression.introspect(varType as F3ClassType) else [];

@@ -50,7 +50,7 @@ public class InternalWindow is ResizableNode, Focuser {
         [Rectangle is Focuser {
                 override function getTargetOfFocus from () to Focusable {  self.getTargetOfFocus() }
                 height: 12;
-                override var width = bind self.width+1;
+                override var width = bind self.width + 0.75;
                 fillPaint: bind if selected then selectedTitlePaint else titlePaint;
                 visible: bind isMovable;
             },
@@ -124,7 +124,7 @@ public class InternalWindow is ResizableNode, Focuser {
 
     const contentHolder = ContentHolder {
         override var cursor = Cursor.Default;
-	scissorBounds: bind Bounds.boundsFromRect(content.width+1, content.height+1);
+	//scissorBounds: bind Bounds.boundsFromRect(content.width+1, content.height+1);
 	content: bind content;
     }
 

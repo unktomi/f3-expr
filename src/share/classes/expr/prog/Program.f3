@@ -1,4 +1,5 @@
 package expr.prog;
+import f3.lang.Ref;
 import expr.*;
 import f3.media.scene.*;
 import f3.util.*;
@@ -32,9 +33,18 @@ public class EvalContext {
     }
     public var instanceSpace is Group;
     public var targetTimeline is Timeline;
-    public var lookupVar is function from String to Object;
+    public function lookupVar from (name is String) to Object {
+        (varMap.get(name) as Ref of Object).get()
+    }
     public var lookupSpatial is function from String to Node;
     public var lookupTemporal is function from String to TimeNode;
+
+    public function registerVar from (name is String, value is Ref of ?) to ()
+    {
+        varMap.put(name, value);
+    }
+
+    const varMap is java.util.Map of (String, Ref of ?) = new java.util.HashMap of (String, Ref of ?);
 
     function lookupVarDebug from (name is String) to Object {
         const r = lookupVar(name);
@@ -74,10 +84,10 @@ public class EvalContext {
         const debugger = if externalDebugger <> null then externalDebugger else this.debugger;
         const f = evaluator.compileAndRun(prog.getSourceCode()) 
             as function from (ObservableDebugger, Object, 
-                              function from String to Object, function from String to Node, function from String to TimeNode) to (Observable of ?)[];
+                              function from String to Object, function from String to Node, function from String to TimeNode, function from (String, Ref of ?) to ()) to (Observable of ?)[];
         unsubscribe();
         println("evaluating with debugger: {debugger}");
-        const obs = f(debugger, targetNode, lookupVarDebug, lookupSpatialDebug, lookupTemporalDebug);
+        const obs = f(debugger, targetNode, lookupVarDebug, lookupSpatialDebug, lookupTemporalDebug, registerVar);
         for (o in obs) {
             subscribe(o, prog.sourceCode);
         }

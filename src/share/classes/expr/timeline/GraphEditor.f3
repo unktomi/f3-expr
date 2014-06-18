@@ -6,7 +6,7 @@ import expr.*;
 public class GraphEditor is Trax {
 
     public const mainTrax is Trax;
-    override var frameRateN = bind mainTrax.frameRateN with inverse;
+    override var frameRateN = bind this.mainTrax.frameRateN with inverse;
     override var graph = true;
     public var resourceTargets is ResourceTarget[];
     override var clips = bind getChannelBoxes(resourceTargets);

@@ -136,7 +136,7 @@ class ResourceBuilder {
         const progs = foreach (p in n.programs where (p.code <> null or p.varSources.size() > 0) and p.parent == null) ProgramResource {
                 variables: foreach (x in p.varSources.entrySet()) {
                     VarDecl {
-                        varName: x.getKey().varName;
+                        varName: x.getKey().variableName;
                         varType: x.getKey().varType.t.getName();
                         sourceCode: x.getValue().sourceCode;
                         code: x.getValue().code;
@@ -241,7 +241,7 @@ class ResourceBuilder {
             programs: foreach (p in n.programs where p.code <> null and p.parent == null) ProgramResource {
                 variables: foreach (x in p.varSources.entrySet()) {
                     VarDecl {
-                        varName: x.getKey().varName;
+                        varName: x.getKey().variableName;
                         varType: x.getKey().varType.t.getName();
                         sourceCode: x.getValue().sourceCode;
                         code: x.getValue().code;
@@ -392,7 +392,7 @@ public function save
                 ProgramResource {
                     variables: foreach (x in p.varSources.entrySet()) {
                         VarDecl {
-                            varName: x.getKey().varName;
+                            varName: x.getKey().variableName;
                             varType: x.getKey().varType.t.getName();
                             sourceCode: x.getValue().sourceCode;
                             code: x.getValue().code;
