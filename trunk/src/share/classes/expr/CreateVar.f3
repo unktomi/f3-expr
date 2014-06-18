@@ -30,6 +30,13 @@ public class CreateVar is ResizableNode {
         create(nameField.text, selectedType);
     }
 
+    public function reset to ()
+    {
+        nameField.setText("");
+        nameField.update();
+        println("nameField=>{nameField.text}");
+    }
+
     const nameLabel is Text.Label = Text.Label {
           text: "Name:"
           font: bind font;
@@ -50,7 +57,7 @@ public class CreateVar is ResizableNode {
           transform: bind translate(-width/2+labelWidth, 0);
           rightJustified: true;
     }
-    const nameField is Text.Field = Text.Field {
+    public const nameField is Text.Field = Text.Field {
         transform: bind translate(fieldOffset-20, 0);
         width: bind fieldWidth;
         height: bind cellHeight;      
@@ -58,7 +65,7 @@ public class CreateVar is ResizableNode {
         foreground: bind textFg;
         background: bind textBg;
     };
-    const typeField is Text.Field = Text.Field {
+    public const typeField is Text.Field = Text.Field {
         transform: bind translate(fieldOffset-20, 0);
         width: bind fieldWidth;
         height: bind cellHeight;      
@@ -133,10 +140,12 @@ public class CreateVar is ResizableNode {
 
     function showChooser from (target is Point3) to ()
     {
-        chooseType.visible = true;
-        chooseTypeTransform = translate(target); 
-        insert chooseType into popupLayer.content;
-        popupScene.setFocus(chooseType.getTargetOfFocus());
+        if (not chooseType.visible) {
+            chooseType.visible = true;
+            chooseTypeTransform = translate(target); 
+            insert chooseType into popupLayer.content;
+            popupScene.setFocus(chooseType.getTargetOfFocus());
+        }
     }
 
     function toggleChooser from (target is Point3) to ()
@@ -153,7 +162,7 @@ public class CreateVar is ResizableNode {
         });
 
     const d2 = chooseType.searchField.observeText().subscribe(function from (s is String) to () { 
-        checkButtons();
+            checkButtons();
         });
     
     function checkButtons to ()

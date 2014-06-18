@@ -46,6 +46,9 @@ function debugPrint of a (label is String, value is a) to a {
     return value;
 }
 
+class ContentHolder is TransformNode, Scissored {
+}
+
 class KeyEditor is AbstractNode {
     public var view is TimeNodeView;
     public var key is Key of Number;
@@ -1323,16 +1326,38 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	     override var mesh = bind getSelf().drawLines(getSelf().width, getSelf().height, getViewHeight(), scrollOffset);
 	     shader: bind effectLoader.loadPaintShader(foregroundPaint);
 	 },
-	 TransformNode { 
-	     tx: bind -getSelf().width/2+15-frameToX(scrollOffset);
-	     content:
-	     [TransformNode {
-                 ty: bind height / 2 + 2 - 15 + scrollY * getViewHeight(); 
-                 content: bind getRootContent();
-	     },
-	     TransformNode { ty: -6, content: bind playhead }]
-	 }]
+         ContentHolder {
+             var sb = bind Bounds {
+                 center: new Point3(0, -10, 0);
+                 extent: new Tuple3(width/2, (height-20)/2, 0);
+             }
+             scissorBounds: bind sb;
+             content:
+             [
+             TransformNode { 
+                 tx: bind -getSelf().width/2+15-frameToX(scrollOffset);
+                 content:
+                 [TransformNode {
+                         ty: bind height / 2 + 2 - 15 + scrollY * getViewHeight(); 
+                         content: bind getRootContent();
+                 }]
+             },
+             if (true) then null else Rectangle {
+                 pickable: false;
+                 cx: bind sb.center.x;
+                 cy: bind sb.center.y;
+                 width: bind sb.width();
+                 height: bind sb.height();
+                 strokePaint: ColorPaint(Color.RED);
+             }]
+         },
+         TransformNode { 
+             tx: bind -getSelf().width/2+15-frameToX(scrollOffset);
+             content: 
+             TransformNode { ty: -6, content: bind playhead }
+         }]
     }
+
 
     protected bound function getRootContent to Node { root }
 

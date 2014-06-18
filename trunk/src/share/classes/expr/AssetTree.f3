@@ -256,7 +256,7 @@ public class RootPackageAsset is PackageAsset {
                     }
                 }
         }*/];
-    override var containedAssets = bind [println, filter, primitives, packages, classes]
+    override var containedAssets = bind [println, /*filter,*/ primitives, packages, classes]
 }
 
 public class TypeAsset is Asset {
