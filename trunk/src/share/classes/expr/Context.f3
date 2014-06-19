@@ -1,4 +1,9 @@
 package expr;
+import f3.util.*;
+import f3.lang.Ref;
+import f3.lang.AbstractRef;
+import f3.lang.AbstractObservableRef;
+import f3.lang.ObservableRef;
 import f3.media.scene.*;
 import expr.Treeview.*;
 import expr.prog.Expression;
@@ -258,26 +263,91 @@ public class FunctionDefinitionContext is MemberContext, ResourceObjectContext {
 public class ClosureVarContext is GroupContext, ProgramContext {
     public var varType is TypeAsset;
     public var variableName is String = "variable";
-    public var value is Object;
+
     override var name = bind variableName;
     override var label = bind "{variableName} [{varType.name}]";
+
+    // hack...
+    var value is Number;
+    var valueSubject = Subject of Number {};
+    var disp2 is Disposable;
+
+    public const ref = AbstractObservableRef of Number {
+        override function get to Number
+        {
+            if (animationTarget == null) then value else value = (animationTarget as Ref of Number).get();
+        }
+        override function set from (x is Number) to ()
+        {
+            if (x <> get()) {
+                (animationTarget as Ref of Number).set(value = x);
+                valueSubject.onNext(x);
+            }
+        }
+        override function subscribe from (f is function from java.lang.Float to ()) to (function from () to ())
+        {
+            const disp = valueSubject.subscribe(function from (x is Number) to () {
+                    f(x)
+                });
+            function from () to () {
+                disp.dispose();
+            }
+        }
+    };
+
+    public var animationClip is Channel of Number = bind if (varType.t == Reflect.NUMBER_TYPE) then Channel of Number {
+            id: bind "channelBox://{label}";
+            targets: [ref];
+    } else null;  
+
+    public var timeline = Timeline {
+        enabled: false;
+        paused: true;
+        content: bind [animationClip];
+    }
+
+    var animationTarget is ObservableRef of ?;
+
+    var d is Disposable;
+
+    override var program on replace {
+        d = program.evalContext.observeVars().subscribe(function from (p is (String, ObservableRef of ?)) to () {
+                println("observer var: {p.first} {p.second}");
+                if (p.first == variableName) {
+                    animationTarget = p.second;
+                    if (varType.t == Reflect.NUMBER_TYPE) {
+                        disp2.dispose();
+                        const ob = Observables.observe(animationTarget as ObservableRef of Number);
+                        ob.subscribe(function from (x is Number) to () {
+                            ref.set(x)
+                        });
+                    }
+                }
+            });
+    }
+
     override function fullName to String 
     {
         "{parent.fullName()}|{variableName}";
     }
+
     function getMembers from (varType is F3Type) to Member[] {
         const result = if (varType is F3ClassType) then Expression.introspect(varType as F3ClassType) else [];
         println("members of {varType} => {result}");
         return result;
     }
+
     function getContentFromType(varType is F3Type) to Context[] 
     {
         const results = foreach (m in getMembers(varType) where m.name.startsWith("observe")) MemberContext { member: m, parent: this } 
         println("content from type of {varType} => {results}");
         return results;
     }
+
     public const outputContext = VarOutputContext {parent: this};
+
     var myContent = bind [/*outputContext ,*/ content];
+
     override public bound function getContent to Context[] 
     { 
         myContent

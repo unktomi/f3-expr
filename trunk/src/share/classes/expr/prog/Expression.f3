@@ -6035,7 +6035,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         const mem = e as MemberExpression;
 	var itype = if mem.member.m.isStatic() then OBJECT_TYPE else mem.member.m.getDeclaringClass();
         if (itype == null) return "";
-	var result = "var _ = function from (debugger is f3.util.ObservableDebugger, i$ is Object, getVar is function from String to Object, getNode is function from String to f3.media.scene.Node, getClip is function from String to f3.media.scene.TimeNode, $register is function from (String, f3.lang.Ref of ?) to ()) to (f3.util.Observable of ?)[] \{ var i0 = i$ as {itype.getName()};  var obsvbs$ is f3.util.Observable[]; \{ ";
+	var result = "var _ = function from (debugger is f3.util.ObservableDebugger, i$ is Object, getVar is function from String to Object, getNode is function from String to f3.media.scene.Node, getClip is function from String to f3.media.scene.TimeNode, $register is function from (String, f3.lang.ObservableRef of ?) to ()) to (f3.util.Observable of ?)[] \{ var i0 = i$ as {itype.getName()};  var obsvbs$ is f3.util.Observable[]; \{ ";
         if (terms == []) {
             var rs = foreach (x in eventContext.content) {
                 if (x is Context.ResourceNodeContext) {

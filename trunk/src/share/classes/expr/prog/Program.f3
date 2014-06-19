@@ -1,5 +1,6 @@
 package expr.prog;
 import f3.lang.Ref;
+import f3.lang.ObservableRef;
 import expr.*;
 import f3.media.scene.*;
 import f3.util.*;
@@ -39,12 +40,24 @@ public class EvalContext {
     public var lookupSpatial is function from String to Node;
     public var lookupTemporal is function from String to TimeNode;
 
-    public function registerVar from (name is String, value is Ref of ?) to ()
-    {
-        varMap.put(name, value);
+    const varRefSubject = Subject of ((String, ObservableRef of ?)) {}
+
+    public function observeVars to Observable of ((String, ObservableRef of ?)) {
+        varRefSubject;
     }
 
-    const varMap is java.util.Map of (String, Ref of ?) = new java.util.HashMap of (String, Ref of ?);
+    public function getVarRef from (name is String) to Ref of ?
+    {
+        varMap.get(name)
+    }
+
+    public function registerVar from (name is String, value is ObservableRef of ?) to ()
+    {
+        varMap.put(name, value);
+        varRefSubject.onNext((name, value));
+    }
+
+    const varMap is java.util.Map of (String, ObservableRef of ?) = new java.util.HashMap of (String, ObservableRef of ?);
 
     function lookupVarDebug from (name is String) to Object {
         const r = lookupVar(name);
@@ -78,18 +91,19 @@ public class EvalContext {
             unsubscribe();
             return;
         }
-        if (prog.parent <> null) {
-            return;
-        }
         const debugger = if externalDebugger <> null then externalDebugger else this.debugger;
-        const f = evaluator.compileAndRun(prog.getSourceCode()) 
-            as function from (ObservableDebugger, Object, 
-                              function from String to Object, function from String to Node, function from String to TimeNode, function from (String, Ref of ?) to ()) to (Observable of ?)[];
-        unsubscribe();
-        println("evaluating with debugger: {debugger}");
-        const obs = f(debugger, targetNode, lookupVarDebug, lookupSpatialDebug, lookupTemporalDebug, registerVar);
-        for (o in obs) {
-            subscribe(o, prog.sourceCode);
+        try {
+            const f = evaluator.compileAndRun(prog.getSourceCode()) 
+                as function from (ObservableDebugger, Object, 
+                                  function from String to Object, function from String to Node, function from String to TimeNode, function from (String, ObservableRef of ?) to ()) to (Observable of ?)[];
+            unsubscribe();
+            println("evaluating with debugger: {debugger}");
+            const obs = f(debugger, targetNode, lookupVarDebug, lookupSpatialDebug, lookupTemporalDebug, registerVar);
+            for (o in obs) {
+                subscribe(o, prog.sourceCode);
+            }
+        } catch (e is java.lang.Throwable) {
+            e.printStackTrace();
         }
     }
 
