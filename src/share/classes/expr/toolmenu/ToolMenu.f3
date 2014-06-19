@@ -86,7 +86,13 @@ public class ToolMenu is ResizableNode {
     const record is Button = Button {
         height: 18, width: 28;
 	baseURL: "{__DIR__}record"
-        onPress: bind toggleStepping;
+        onPress: function to () {
+            java.lang.System.gc();
+            const total = java.lang.Runtime.getRuntime().totalMemory();
+            const free = java.lang.Runtime.getRuntime().freeMemory();
+            println("used memory: {total-free}");
+            println("free memory: {free}");
+        }
     };
 
     const loop is Button = Button {

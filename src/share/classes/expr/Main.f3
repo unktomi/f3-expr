@@ -579,6 +579,7 @@ public function run from (args is String[]) to ()
     const inspector2 is Inspector = Inspector {
         inspecting: bind Inspector.inspect(temporalHierarchy.selectedTransform);
     };
+
     var inspector3 is Inspector = Inspector {
         inspecting: bind [Inspector.inspect(otherHierarchy.selectedVariable)];
     }
@@ -1984,11 +1985,12 @@ Tabview.Tab {
                                             Tabview.Tab {
                                                 title: "Graph Editor"
                                                     content: Scrollpane {
-
                                                     canZoomVertical: false;
                                                     content: graphEditor = expr.timeline.GraphEditor {
                                                         menuFactory: the MenuFactory;
                                                         mainTrax: bind trax;
+                                                        eventTarget: bind contextModel.selectedMemberContext;
+                                                        variableTargets: bind [contextModel.selectedVarContext];
                                                         resourceTargets: bind currentResource.resources;
                                                         loop: bind nonInteractiveLoop;
                                                         target: player;

@@ -799,6 +799,34 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
 	    });
 }
 
+public function inspect from (v is Context.ClosureVarContext) to (Inspected of ?)[] {
+    if (v == null) return [];
+    var ptr1 = &v.variableName;
+    var ptr2 = v.ref;
+    [InspectedString {
+            label: "variableName";
+            observable: Observables.observe(ptr1);
+            override function get to String {
+                ptr1.get();
+            }
+            override function set from (x is String) to ()
+            {
+                ptr1.set(x);
+            }
+    },
+    if (v.varType.t == Reflect.NUMBER_TYPE) then InspectedNumber {
+            label: "value";
+            observable: Observables.observe(ptr2);
+            override function get to Number {
+                ptr2.get();
+            }
+            override function set from (x is Number) to ()
+            {
+                ptr2.set(x)
+            }
+    } else null]
+}
+
 public function inspect from (obj is Object) to (Inspected of ?)[] {
     if (obj == null) then [] else foreach (x in inspect0(obj, Reflect.getType(obj.getClass()) as F3ClassType) where x <> null) x;
 }

@@ -9,11 +9,18 @@ public class GraphEditor is Trax {
     override var frameRateN = bind this.mainTrax.frameRateN with inverse;
     override var graph = true;
     public var resourceTargets is ResourceTarget[];
-    override var clips = bind getChannelBoxes(resourceTargets);
+    public var eventTarget is Context.MemberContext;
+    public var variableTargets is Context.ClosureVarContext[];
+    override var clips = bind [getChannelBoxes(resourceTargets), getVarChannelBoxes(variableTargets)];
 
     bound function getChannelBoxes from (targets is ResourceTarget[]) to TimeNode[]
     {
-        foreach(x in targets) x.channelBoxes;
+        foreach (x in targets) x.channelBoxes;
+    }
+
+    bound function getVarChannelBoxes from (targets is Context.ClosureVarContext[]) to TimeNode[]
+    {
+        foreach (x in targets) x.animationClip;
     }
 
     var playheadPos is Duration;
@@ -42,6 +49,19 @@ public class GraphEditor is Trax {
                 ch.setKey(KeyFrame.Linear);
             }
         }
+        for (clip in clips where clip is Channel of Number) {
+            const ch = clip as Channel of Number;
+            if (ch.targets == []) {
+                println("No target: {clip}");
+                continue;
+            }
+            const k = ch.pickKey(ch.localTime);
+            if (k <> null) {
+                ch.setKey(k.interpolator);
+            } else {
+                ch.setKey(KeyFrame.Linear);
+            }
+        }
         super.setKeys();
     }
 
@@ -56,6 +76,11 @@ public class GraphEditor is Trax {
                 rn.timeline.enabled = true;
                 rn.timeline.setPlayhead(event);
                 rn.timeline.enabled = false;
+            }
+            for (varTarget in variableTargets) {
+                varTarget.timeline.enabled = true;
+                varTarget.timeline.setPlayhead(event);
+                varTarget.timeline.enabled = false;
             }
         }
     }
