@@ -564,7 +564,7 @@ class TimeNodeView is AbstractNode
                      blocksPointer: true;
 		 },
                  TransformNode {
-                     //visible: bind target is TimeGroup and { var g = target as TimeGroup; g.content.size() > 0 }
+                     visible: bind (target is Channel or (target is TimeGroup and { var g = target as TimeGroup; g.content.size() > 0 }));
                      tx: bind labelX+-w/2 + 13;
                      rz: bind if (expanded) then -90 else 0;
                      content: Polygon is MouseInputHandler {
@@ -880,7 +880,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
         rowCount = root.rowCount as Integer;
     }
 
-    const root is TimeNodeView = TimeNodeView {
+    const root = TimeNodeView {
         expanded: true;
         trax: this;
         override var content = bind foreach (tv in timeNodeViews) TransformNode { content: bind tv }
@@ -903,10 +903,10 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
     const backgroundPaint is Paint = ColorPaint(backgroundColor);
     const foregroundPaint is Paint = ColorPaint(Color.color(0.2, 0.2, 0.2));
 
-    function autoScrollLeft {
+    function autoScrollLeft to () {
     }
 
-    function autoScrollRight {
+    function autoScrollRight to () {
     }
 
     public var currentFrame is Number on replace { 
@@ -1202,9 +1202,9 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
                         text: bind "{Math.round(xToFrame(i)+offset-slop) as Integer}"
                     }
                     TransformNode {
-                        tx: bind -t.content.textShape.getBounds().width() / 2
-                            content: t
-                            }
+                        tx: bind -t.content.textShape.getBounds().width() / 2;
+                        content: t;
+                    }
                 }
 	}
     }
@@ -1342,7 +1342,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
                          content: bind getRootContent();
                  }]
              },
-             if (true) then null else Rectangle {
+             if (yes) then null else Rectangle {
                  pickable: false;
                  cx: bind sb.center.x;
                  cy: bind sb.center.y;

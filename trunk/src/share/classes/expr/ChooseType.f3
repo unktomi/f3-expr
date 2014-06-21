@@ -36,6 +36,14 @@ public class ChooseType is ResizableNode, Focuser {
         }
     };
 
+    public var onLoseFocus is function from () to ();
+
+    const focusOb = (tv as Node).observeFocused().subscribe(function from (focused is Boolean) to () {
+            if (not focused) {
+                onLoseFocus();
+            }
+        });
+
     function checkSelectType to ()
     {
         const x = (tv.selectedTreenode as AssetTree.AssetTreenode).asset;

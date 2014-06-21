@@ -48,9 +48,10 @@ public class InternalWindow is ResizableNode, Focuser {
         override var transform = bind translate(0, self.height / 2 - 5);
         content:
         [Rectangle is Focuser {
+                gridFit: false;
                 override function getTargetOfFocus from () to Focusable {  self.getTargetOfFocus() }
-                height: 12;
-                override var width = bind self.width + 0.75;
+                height: 10;
+                override var width = bind self.width + 1;
                 fillPaint: bind if selected then selectedTitlePaint else titlePaint;
                 visible: bind isMovable;
             },
@@ -99,13 +100,15 @@ public class InternalWindow is ResizableNode, Focuser {
 	override var height = bind self.height-10;
 	width: 1;
 	fillPaint: ColorPaint(Color.color(.18, .18, .18));
+        gridFit: false;
     }
 
     const bottom is Node = Rectangle {
 	transform: bind translate(0, -height / 2-1);
         height: 1;
-	width: bind width;
+	width: bind width+1;
 	fillPaint: ColorPaint(Color.color(.18, .18, .18));
+        gridFit: false;
     }
 
     const rightSide is Node = Rectangle {
@@ -113,6 +116,7 @@ public class InternalWindow is ResizableNode, Focuser {
 	override var height = bind self.height-10;
 	width: 1;
 	fillPaint: ColorPaint(Color.color(.18, .18, .18));
+        gridFit: false;
     }
 
     override public function getTargetOfFocus to Focusable 

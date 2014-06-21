@@ -63,22 +63,6 @@ public class ResourceNode is TransformNode, ResourceTarget, NodeAPI {
             pz: x.pz;
             content: exprNode;
         }
-        function localLookup from (name is String) to Node {
-            var n = exprNode.spatialRoot.lookup(name);
-            if (n == null) {
-                n = lookupSpatial(name);
-            }
-            return n;
-        }
-        function localTemporalLookup from (name is String) to TimeNode {
-            var n = exprNode.temporalRoot.lookup(name);
-            if (n == null) {
-                n = lookupTemporal(name);
-            }
-            return n;
-        }
-        for (prog in programs) { // @TODO
-        }
         return target;
     }
 
