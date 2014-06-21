@@ -1,0 +1,53 @@
+package expr;
+import f3.math.LinearMath.*;
+import f3.util.*;
+import f3.media.scene.*;
+import f3.media.scene.Shape2D.*;
+import f3.media.input.*;
+
+public class TextButton is ResizableNode {
+    public var text is String;
+    var pressed is Boolean;
+    var hover is Paint = ColorPaint(Color.color(.9, .9, .9));
+    var active is Paint = ColorPaint(Color.color(.8, .8, .8));
+    var inactive is Paint = ColorPaint(Color.color(.9, .9, .9));
+    var textPaint is Paint = ColorPaint(Color.color(.2, .2, .2));
+    var disabledFg is Paint = ColorPaint(Color.color(.65, .65, .65));
+    var blackPaint is Paint = ColorPaint(Color.BLACK);
+    override var height = 18;
+    override var width = 28;
+    public var enabled is Boolean = true;
+    override var internalContent = Group {
+	content: bind 
+	[Rectangle { 
+            height: bind height, 
+            width: bind width, 
+            fillPaint: bind if (not enabled) then inactive else if (containsPointer) then (if (pressed) then active else hover) else inactive;
+            strokePaint: bind if (containsPointer and enabled) then blackPaint else inactive;
+        },
+        Text.Label {
+            width: bind width;
+            text: bind text;
+            override var font = bind layoutEngine.createFont(Names.DEFAULT_FONT); 
+            override var transform = bind translate((width-font.width(text))/2, font.descent);
+            foreground: bind if (enabled) then textPaint else disabledFg;
+            background: null;
+        }]
+    }
+    const down = observeMouseDown().subscribe(function from (event is MouseEvent) to () {
+	    println("pressed");
+	    pressed = true
+	});
+    const up = observeMouseUp().subscribe(function from (event is MouseEvent) to () {
+	    println("released");
+	    pressed = false;
+	    if (containsPointer and enabled) {
+		onPress();
+		subject.onNext(());
+	    }
+	});
+    const subject = Subject of (()) {};
+    public function observePress to Observable of (()) { subject }
+    public var onPress is function from () to ();
+}
+
