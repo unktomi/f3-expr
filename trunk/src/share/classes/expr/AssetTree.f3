@@ -94,6 +94,19 @@ public class TextFieldAsset is SpatialAsset {
     }
 }
 
+public class TextOutputAsset is SpatialAsset {
+    override var name = "Text Output";
+    var count = 1;
+    public function getTextOutput
+        to ResourceLabel
+    {
+	ResourceLabel {
+            override var url = bind "text-output://{id}"
+	    id: "Text Output {count++}";
+	}
+    }
+}
+
 public class CameraAsset is Asset {
     public const camera is Camera;
 }
@@ -534,6 +547,15 @@ public class AssetModel is Treemodel {
         movieLoader: bind movieLoader;
     };
 
+    const textOutputAsset = TextOutputAsset {
+        pathFactory: bind pathFactory;
+        layoutEngine: bind layoutEngine;
+        imageLoader: bind imageLoader;
+        effectLoader: bind effectLoader;
+        soundLoader: bind soundLoader; 
+        movieLoader: bind movieLoader;
+    };
+
     const groupAsset = GroupAsset {
         pathFactory: bind pathFactory;
         layoutEngine: bind layoutEngine;
@@ -550,7 +572,7 @@ public class AssetModel is Treemodel {
 
     const spatial = AssetGroup { 
         name: "Spatial", 
-        content: [groupAsset, Scene2DAsset {}, textFieldAsset];
+        content: [groupAsset, Scene2DAsset {}, textFieldAsset, textOutputAsset];
     } 
 
     override var root = AssetTreenode {

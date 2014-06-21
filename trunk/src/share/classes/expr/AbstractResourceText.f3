@@ -38,7 +38,7 @@ public class FontWeightSelection is Selection of String {
 public class FontStyleSelection is Selection of String {
 }
 
-public abstract class AbstractResourceText is ResourceNode {
+public abstract class AbstractResourceText is ResourceNode, TextAPI {
     public var fontSize is FontSizeSelection = new FontSizeSelection(16);
     public var fontFamily is FontFamilySelection = new FontFamilySelection("Helvetica");
     public var fontWeight is FontWeightSelection = new FontWeightSelection("normal");
@@ -47,7 +47,7 @@ public abstract class AbstractResourceText is ResourceNode {
     public var background is Color = new Color(.9, .9, .9, 1);
     public var width is Number = 100;
     override var id = "";
-    public function setText from (text is String) to ();
+    override public function setText from (text is String) to ();
 
     const undoList = UndoList {};
     postinit {

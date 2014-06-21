@@ -14,5 +14,6 @@ public class ResourceLabel is AbstractResourceText {
         width: bind width;
     };
     override var content = bind [impl];
+
 }
 
