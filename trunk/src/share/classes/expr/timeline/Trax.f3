@@ -410,7 +410,7 @@ class TimeNodeView is AbstractNode
         }
         super.update();
     }
-    var openRows = 8.0;
+    var openRows = 10.0;
     const self = this;
     bound var w = getWidth(if target.hasIndefiniteDuration() then Interval.<<0>> else target.bounds, trax.visibleInterval);
     var rows is Number = 1;

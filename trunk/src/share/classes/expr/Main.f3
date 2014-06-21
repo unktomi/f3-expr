@@ -754,6 +754,7 @@ public function run from (args is String[]) to ()
     {
         if (mainScene.currentResource.url <> "") {
             savePoint = MasterUndoable.now;
+            updateRecent(mainScene.currentResource.url);
             Resources.save(mainScene.currentResource.url,
                            mainContext.programs,
                            mainScene,
@@ -850,8 +851,8 @@ public function run from (args is String[]) to ()
     function updateRecent from (url is String) to ()
     {
         delete url from recentList;
-        recentList = [url, recentList];
-        recentList = recentList[0..8];
+        insert url before recentList[0];
+        delete recentList[10..];
     }
 
     function open from (url is String) to ()
@@ -920,6 +921,7 @@ public function run from (args is String[]) to ()
                 const r = i as TextFieldResource;
                 const tf = ResourceTextField {
                     id: r.id;
+                    url: r.url;
                     fontSize: new FontSizeSelection(r.fontSize);
                     fontFamily: new FontFamilySelection(r.fontFamily);
                     fontStyle: new FontStyleSelection(r.fontStyle);
@@ -934,6 +936,7 @@ public function run from (args is String[]) to ()
                 const r = i as TextOutputResource;
                 const tf = ResourceLabel {
                     id: r.id;
+                    url: r.url;
                     fontSize: new FontSizeSelection(r.fontSize);
                     fontFamily: new FontFamilySelection(r.fontFamily);
                     fontStyle: new FontStyleSelection(r.fontStyle);
@@ -1095,6 +1098,7 @@ public function run from (args is String[]) to ()
                 if (i is TextFieldResource) {
                     const r = i as TextFieldResource;
                     const tf = ResourceTextField {
+                        url: r.url;
                         id: r.id;
                         fontSize: new FontSizeSelection(r.fontSize);
                         fontFamily: new FontFamilySelection(r.fontFamily);
@@ -1109,6 +1113,7 @@ public function run from (args is String[]) to ()
                 } else if (i is TextOutputResource) {
                     const r = i as TextOutputResource;
                     const tf = ResourceLabel {
+                        url: r.url;
                         id: r.id;
                         fontSize: new FontSizeSelection(r.fontSize);
                         fontFamily: new FontFamilySelection(r.fontFamily);
@@ -1291,6 +1296,7 @@ public function run from (args is String[]) to ()
 	MasterUndoable.commit();
 	savePoint = MasterUndoable.now;
 	mainScene.currentResource.url = url;
+        updateRecent(url);
     }
 
     var recentList is String[];
@@ -2189,7 +2195,6 @@ Tabview.Tab {
                                  result = "{result}.expr";
                              }
 			     mainScene.currentResource.url = "file:{result}";
-                             updateRecent(mainScene.currentResource.url);
 			     save();
 			 }
 		     }

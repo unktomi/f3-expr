@@ -1368,8 +1368,14 @@ public class IPath {
             if (observer.observable is OutputMemberExpression) {
                 const n = observer.observable as OutputMemberExpression;
                 const src = n.source;
+                println("n={n}");
+                println("src={src}");
                 if (src is VarContextExpression) {
                     return "<<{src.getName()}>>";
+                } else if (src is NodeExpression) {
+                    return "(getNode(\"{(src as NodeExpression).node.id}\") as expr.NodeAPI)";
+                } else if (src is TimeNodeExpression) {
+                    return "(getTimeNode(\"{(src as TimeNodeExpression).timeNode.id}\") as f3.media.scene.TimeNode)";
                 }
                 return "i0";
             }
@@ -6334,7 +6340,7 @@ public class NodeObjNode is ObjNode {
     public override function createView from (canvas is Canvas) to ObjectView 
     {
         const clip = canvas.lookupSpatial(nodeId);
-	const typ = Reflect.getType(clip.getClass().getName());
+	const typ = if (clip is SceneAPI) then Reflect.getType("expr.SceneAPI") else if (clip is TextAPI) then Reflect.getType("expr.TextAPI") else Reflect.getType("expr.NodeAPI");
         const names = new java.util.HashSet of String;
 	const members = foreach (m in introspect(typ) where not m.name.contains("pdate") and names.add(m.name)) m;
         const objectExpr =  NodeExpression { 

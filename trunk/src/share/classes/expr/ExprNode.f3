@@ -37,6 +37,11 @@ public class ExprNode is AbstractNode {
     }
     public var standalone is Boolean = true;
 
+    bound function findNodeTarget from (id is String) to Node
+    {
+        spatialRoot.lookup(id)
+    }
+
     var firstTime = true;
 
     override function update to () {
@@ -65,14 +70,16 @@ public class ExprNode is AbstractNode {
             }
             currentTransform.programs = 
             foreach (prog in x.programs) {
+                const targetPath = prog.targetPath;
                 const p = Program {
                     event: prog.event.deserialize();
                     code: prog.code;
                     sourceCode: prog.compiled;
+                    targetPath: targetPath;
                     evalContext: Program.EvalContext {
                         interactive: function to Boolean { isInteractive }
                         debugger: bind debugger;
-                        targetNode: bind currentTransform.spatialRoot;
+                        targetNode: bind currentTransform.findNodeTarget(targetPath);
                         instanceSpace: instanceSpace;
                         lookupSpatial: function from (n is String) to Node { 
                             const r = currentTransform.spatialRoot.lookup(n);
