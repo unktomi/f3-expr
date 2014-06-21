@@ -4729,7 +4729,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     public function onDrop from (where is Pick, clip is Node) to ()
     {
 	println("ON DROP {where.scenePoint}, {where.dragPoint1} {clip}");
-	const typ = if (clip is SceneAPI) then Reflect.getType("expr.SceneAPI") else Reflect.getType("expr.NodeAPI");
+	const typ = if (clip is SceneAPI) then Reflect.getType("expr.SceneAPI") else if (clip is TextAPI) then Reflect.getType("expr.TextAPI") else Reflect.getType("expr.NodeAPI");
         var names = new java.util.HashSet of String;
 	const members = foreach (m in introspect(typ) where not m.name.contains("pdate") and names.add(m.name)) m;
         for (m in members) {

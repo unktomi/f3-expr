@@ -58,7 +58,7 @@ public class SpatialResource is Resource {
     public var pz is Number;
 }
 
-public class TextFieldResource is SpatialResource {
+public class TextResource is SpatialResource {
     public var fontFamily is String = "Helvetica";
     public var fontWeight is String = "normal";
     public var fontStyle is String = "normal";
@@ -67,6 +67,12 @@ public class TextFieldResource is SpatialResource {
     public var width is Number = 100;
     public var foreground is Integer = 0xffffffff;
     public var background is Integer = 0xff000000;
+}
+
+public class TextFieldResource is TextResource {
+}
+
+public class TextOutputResource is TextResource {
 }
 
 function formatColor from (c is Color) to Integer
@@ -176,6 +182,38 @@ class ResourceBuilder {
         if (n is ResourceTextField) {
             const f = n as ResourceTextField;
             TextFieldResource {
+                url: f.url;
+                id: f.id;
+                fontFamily: f.fontFamily.selection;
+                fontWeight: f.fontWeight.selection;
+                fontStyle: f.fontStyle.selection;
+                fontSize: f.fontSize.selection;
+                foreground: formatColor(f.foreground);
+                background: formatColor(f.background);
+                width: f.width;
+                text: f.text;
+                tx: n.tx;
+                ty: n.ty;
+                tz: n.tz;
+                
+                sx: n.sx;
+                sy: n.sy;
+                sz: n.sz;
+                
+                rx: n.rx;
+                ry: n.ry;
+                rz: n.rz;
+                
+                px: n.px;
+                py: n.py;
+                pz: n.pz;
+                programs: progs;
+                animation: anims;
+            }
+         } else if (n is ResourceLabel) {
+            const f = n as ResourceLabel;
+            TextOutputResource {
+                url: f.url;
                 id: f.id;
                 fontFamily: f.fontFamily.selection;
                 fontWeight: f.fontWeight.selection;
@@ -289,7 +327,7 @@ class ExportingBuilder is ResourceBuilder {
     const resourcesToCopy = new java.util.HashSet of String();
     override function convertUrl from (url is String) to String 
     {
-        if (url.startsWith("timenode://") or url.contains("#") or url.startsWith("node://") or url == "") {
+        if (url.startsWith("text-input://") or url.startsWith("text-output://") or url.startsWith("timenode://") or url.contains("#") or url.startsWith("node://") or url == "") {
             return url;
         } 
         resourcesToCopy.add(url);

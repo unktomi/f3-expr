@@ -19,6 +19,7 @@ import expr.inspector.Inspector.*;
 import expr.ResourceNode.*;
 import expr.ResourceTextField.*;
 import expr.Resources.TextFieldResource;
+import expr.Resources.TextOutputResource;
 import expr.Resources.parseColor;
 import expr.ResourceTimeNode.*;
 import expr.AssetTree.*;
@@ -370,6 +371,11 @@ public function run from (args is String[]) to ()
                 parent: contextModel.selectedGroupContext; 
                 resource: rn;
             }
+        } else if (rn is ResourceLabel) {
+            ctx = Context.ResourceLabelContext { 
+                parent: contextModel.selectedGroupContext; 
+                resource: rn;
+            }
         } else {
             ctx = Context.ResourceNodeContext { 
                 parent: contextModel.selectedGroupContext; 
@@ -402,6 +408,7 @@ public function run from (args is String[]) to ()
 
     function doDrop from (url is String, pt is Point3) to () 
     {
+        println("DO DROP : {url}");
 	playerUrl = url;
 	if (url.endsWith(".expr")) {
 	    const model = ExprNode {
@@ -908,9 +915,24 @@ public function run from (args is String[]) to ()
         }
         mainContext.programs = topLevels;
 	for (i in sceneRes.spatialResources) {
-            if (i instanceof TextFieldResource) {
+            println("I={i}");
+            if (i is TextFieldResource) {
                 const r = i as TextFieldResource;
                 const tf = ResourceTextField {
+                    id: r.id;
+                    fontSize: new FontSizeSelection(r.fontSize);
+                    fontFamily: new FontFamilySelection(r.fontFamily);
+                    fontStyle: new FontStyleSelection(r.fontStyle);
+                    fontWeight: new FontWeightSelection(r.fontWeight);
+                    foreground: parseColor(r.foreground);
+                    background: parseColor(r.background);
+                    width: r.width;
+                };
+                tf.setText(r.text);
+                addResource(tf, new Point3(i.tx, i.ty, i.tz));
+            } else if (i is TextOutputResource) {
+                const r = i as TextOutputResource;
+                const tf = ResourceLabel {
                     id: r.id;
                     fontSize: new FontSizeSelection(r.fontSize);
                     fontFamily: new FontFamilySelection(r.fontFamily);
@@ -1069,9 +1091,24 @@ public function run from (args is String[]) to ()
             insert scene into currentScenes;
             transformHierarchy.selectScene(scene);
             foreach (i in j.spatialResources) {
-                if (i instanceof TextFieldResource) {
+                println("JI={i}");
+                if (i is TextFieldResource) {
                     const r = i as TextFieldResource;
                     const tf = ResourceTextField {
+                        id: r.id;
+                        fontSize: new FontSizeSelection(r.fontSize);
+                        fontFamily: new FontFamilySelection(r.fontFamily);
+                        fontStyle: new FontStyleSelection(r.fontStyle);
+                        fontWeight: new FontWeightSelection(r.fontWeight);
+                        foreground: parseColor(r.foreground);
+                        background: parseColor(r.background);
+                        width: r.width;
+                    };
+                    tf.setText(r.text);
+                    addResource(tf, new Point3(i.tx, i.ty, i.tz));
+                } else if (i is TextOutputResource) {
+                    const r = i as TextOutputResource;
+                    const tf = ResourceLabel {
                         id: r.id;
                         fontSize: new FontSizeSelection(r.fontSize);
                         fontFamily: new FontFamilySelection(r.fontFamily);
@@ -1579,6 +1616,14 @@ public function run from (args is String[]) to ()
                                                  const picked = getUnderMouseInEditor();
                                                  if (picked == []) {
                                                      const f = (asset as AssetTree.TextFieldAsset).getTextField();
+                                                     addResource(f, currentScene.mousePosition);
+                                                     MasterUndoable.commit();
+                                                 }
+                                             }
+                                             if (asset is AssetTree.TextOutputAsset) {
+                                                 const picked = getUnderMouseInEditor();
+                                                 if (picked == []) {
+                                                     const f = (asset as AssetTree.TextOutputAsset).getTextOutput();
                                                      addResource(f, currentScene.mousePosition);
                                                      MasterUndoable.commit();
                                                  }
