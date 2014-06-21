@@ -115,6 +115,7 @@ public class CreateVar is ResizableNode {
     public var onApply is function from () to ();
     public var onCancel is function from () to ();
     const chooseType = ChooseType {
+        onLoseFocus: hideChooser;
         transform: bind chooseTypeTransform;
         treeModel: bind assetModel;
         visible: false;

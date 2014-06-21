@@ -74,6 +74,7 @@ public interface ResourceTarget {
     public var url is String;
     public var programs is Program[];
     public var $useLiteralId is Boolean = false;
+    public var displayName is String;
 
 
     //    public function getChannels to (Channel of Number)[] { [] }

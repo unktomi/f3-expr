@@ -19,6 +19,7 @@ public class VScrollbar is ResizableNode {
     public function onScroll from (b is Boolean) to () {}
     override var internalContent = bind hsb;
     const hsb = HScrollbar {
+        hack: false;
         canZoom: bind canZoom;
         override var transform = bind rotate(-90, Vec3.Z_AXIS);
         height: bind width;

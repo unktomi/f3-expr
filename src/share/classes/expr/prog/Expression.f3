@@ -368,6 +368,10 @@ public const OBSVB_MEMBERS = {
     };
 }
 
+public const UNIT_MEMBER = FunctionMember {
+    m: Reflect.getFunction("f3.lang.Builtins", "unit", []);
+}
+
 public const NUM_MEMBERS = 
     [foreach (op in ["add", "subtract", "multiply", "divide", "remainder", "lessThan", "lessOrEqual", "greaterThan", "greaterOrEqual", "equal", "notEqual"]) {
         FunctionMember {

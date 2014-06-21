@@ -246,6 +246,11 @@ public class RootPackageAsset is PackageAsset {
         ClassAsset {
                 className: "String";
                 clazz: Reflect.STRING_TYPE;
+        },
+        PrimitiveTypeAsset {
+            name: "()";
+            t: Reflect.UNIT_TYPE;
+            containedAssets: MemberAsset { member: Expression.UNIT_MEMBER }
         }/*,
         PrimitiveTypeAsset {
                 name: "Events";

@@ -783,6 +783,7 @@ public function run from (args is String[]) to ()
         mainScene.currentResource.url = "";
         currentScenes = [mainScene];
 	mainScene.currentResource.resources = [];
+        mainScene.instanceSpace.content = [];
 	currentAnimResource.resources = [];
         mainTimeLayer.content = [];
         mainTimeLayer.content = currentAnimResource;
@@ -1395,31 +1396,36 @@ public function run from (args is String[]) to ()
                                                                                 }
                                                                             }
                                                                         },
-                                                                        MenuItem {
-                                                                            label: "Variable"
-                                                                            action: function to () 
-                                                                            {
-                                                                                createVar.reset();
-                                                                                win.cx = windowContainingAssets.boundsInScene.center.x;
-                                                                                win.cy = windowContainingAssets.boundsInScene.center.y;
-                                                                                handleCreate = function from (name is String, asset is AssetTree.TypeAsset) to () 
-                                                                                {
-                                                                                    var g = ctx as Context.GroupContext;
-                                                                                    insert Context.ClosureVarContext { 
-                                                                                        variableName: name;
-                                                                                        varType: asset;
-                                                                                        parent: g;
-                                                                                    }
-                                                                                    into g.content;
-                                                                                    
-                                                                                }
-                                                                                insert win into popupLayer.content;
-                                                                                editorScene.setFocus(createVar.nameField);
-                                                                                popupLayer.modal = true;
-                                                                            }
-                                                                        },
-                                                                        MenuItem {
-                                                                            label: "Function"
+                                                                        Menu {
+                                                                            label: "New";
+                                                                            items:[
+                                                                                   MenuItem {
+                                                                                       label: "Variable"
+                                                                                           action: function to () 
+                                                                                       {
+                                                                                           createVar.reset();
+                                                                                           win.cx = windowContainingAssets.boundsInScene.center.x;
+                                                                                           win.cy = windowContainingAssets.boundsInScene.center.y;
+                                                                                           handleCreate = function from (name is String, asset is AssetTree.TypeAsset) to () 
+                                                                                               {
+                                                                                                   var g = ctx as Context.GroupContext;
+                                                                                                   insert Context.ClosureVarContext { 
+                                                                                                       variableName: name;
+                                                                                                       varType: asset;
+                                                                                                       parent: g;
+                                                                                                   }
+                                                                                                   into g.content;
+                                                                                                   
+                                                                                               }
+                                                                                           insert win into popupLayer.content;
+                                                                                           editorScene.setFocus(createVar.nameField);
+                                                                                           popupLayer.modal = true;
+                                                                                       }
+                                                                                   },
+                                                                                   MenuItem {
+                                                                                       label: "Function";
+                                                                                   }
+                                                                                ]
                                                                         }]
                                                                     };
                                                                     e.stage.showPopupMenu(e.screenx, e.screeny+contextTree.cellHeight, menu);

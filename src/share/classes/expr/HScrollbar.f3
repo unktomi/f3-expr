@@ -117,8 +117,11 @@ public class HScrollbar is ResizableNode {
     var w = bind sx * thumbWidth;
     var sx1 = bind sx;
 
+    public const hack is Boolean = true;
+
     const thumbMesh = {
         Rectangle {
+            cy: if hack then 0.5 else 0
             height: bind thumbHeight;
             width: bind thumbWidth;
             arcWidth: bind height-2;
@@ -147,7 +150,6 @@ public class HScrollbar is ResizableNode {
                 tx: bind tx * runWidth - runWidth / 2.0 + (sx1 * runWidth) / 2.0;
                 content:
                 [TransformNode {
-                     ty: 0.5;
                      sx: bind sx1;
                      content: bind thumbMesh;
                  },
