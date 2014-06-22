@@ -49,6 +49,8 @@ function debugPrint of a (label is String, value is a) to a {
 class ContentHolder is TransformNode, Scissored {
 }
 
+const SelectionPaint = ColorPaint(Color.color(0xff, 0xa5, 0, 0.5)); 
+
 class KeyEditor is AbstractNode {
     public var view is TimeNodeView;
     public var key is Key of Number;
@@ -191,7 +193,7 @@ class KeyMark is Image, MouseInputHandler, KeyboardInputHandler {
         if (event.clickCount > 1) {
             trax.editKey(view, ch, k);
         } 
-        kx = trax.durationToX(k.position);
+        kx = trax.durationToX(k.position) / ch.toSceneTransform.rate;
         lockedValueBounds = valueBounds;
         lockedSy = sy;
         lockX = event.metaKey;
@@ -199,7 +201,7 @@ class KeyMark is Image, MouseInputHandler, KeyboardInputHandler {
     override function onMouseDrag from (event is MouseEvent) to ()
     {
         println("view={view}");
-        kx += (event.picked.dragPoint1 - event.picked.dragPoint0).x;
+        kx += (event.picked.dragPoint1 - event.picked.dragPoint0).x / ch.toSceneTransform.rate;
         var dy = (event.picked.dragPoint1 - event.picked.dragPoint0).y;
         if (lockX or view.rows == 1) {
             println("moving on x only");
@@ -225,14 +227,14 @@ class GroupKeyMark is Image, MouseInputHandler, KeyboardInputHandler {
     public var k is Duration;
     public var ch is ResourceTarget.ChannelBoxGroup;
     public var trax is Trax;
-    override var transform = bind translate(trax.durationToX(k), 0);
+    override var transform = bind translate(trax.durationToX(k) / ch.toSceneTransform.rate, 0);
     override function onMouseDown from (event is MouseEvent) to ()
     {
-        kx = trax.durationToX(k);
+        kx = trax.durationToX(k); 
     }
     override function onMouseDrag from (event is MouseEvent) to ()
     {
-        kx += (event.picked.dragPoint1 - event.picked.dragPoint0).x;
+        kx += (event.picked.dragPoint1 - event.picked.dragPoint0).x / ch.toSceneTransform.rate;
         k = ch.moveKeyTo(k, trax.frameTo(trax.xToDuration(kx)));
         trax.updatePlayhead();
     }
@@ -412,7 +414,7 @@ class TimeNodeView is AbstractNode
     }
     var openRows = 10.0;
     const self = this;
-    bound var w = getWidth(if target.hasIndefiniteDuration() then Interval.<<0>> else target.bounds, trax.visibleInterval);
+    bound var w = getWidth(if target.hasIndefiniteDuration() then Interval.<<0>> else target.bounds, trax.visibleInterval) *  target.toSceneTransform.rate;              
     var rows is Number = 1;
     var bnds is Vec2 = Vec2.<<1>>;
     bound var h is Number = trax.getViewHeight() * rows;
@@ -448,7 +450,7 @@ class TimeNodeView is AbstractNode
                 visible: bind row + rows - 1 > trax.scrollY;
 		content: 
                 [Rectangle {
-                     var ww = bind w + trax.durationToX(target.contentBounds.start);              
+                     var ww = bind w + trax.durationToX(target.contentBounds.start) / target.toSceneTransform.rate;              
                      transform: bind translate((ww - w) / 2.0, rectY);
                      width: bind ww
                      height: bind h;
@@ -637,7 +639,7 @@ class TimeNodeView is AbstractNode
                                   content: bind foreach (k in chKeys) {
                                       KeyMark {
                                           view: this;
-                                          transform: bind translate(trax.durationToX(k.position), if (expanded) then hoff+(sy * (k.value - bnds.x)) else 0);                                      
+                                          transform: bind translate(trax.durationToX(k.position) / target.toSceneTransform.rate, if (expanded) then hoff+(sy * (k.value - bnds.x)) else 0);                                      
                                           ch: bind ch;
                                           k: k;
                                           trax: bind trax;
@@ -706,6 +708,7 @@ public class Playhead is AbstractNode
 	{
 	    dragging = true;
 	    tx = trax.frameToX(trax.currentFrame-trax.scrollOffset);
+            trax.startSelection();
 	}
     }
 
@@ -715,7 +718,7 @@ public class Playhead is AbstractNode
 	{
 	    tx += (event.picked.dragPoint1 - event.picked.dragPoint0).x;
 	    println("drag {tx}");
-	    trax.movePlayheadTo(tx);
+	    trax.movePlayheadTo(tx, event.shiftKey);
 	}
     };
 
@@ -1042,12 +1045,22 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	target.setPlayhead(target.playhead + frameToDuration(frames));
     }
 
-    function movePlayheadTo from (x is Number) to ()
+    function startSelection to ()
+    {
+        selectionStartTime = selectionEndTime = target.playhead;
+    }
+
+    function movePlayheadTo from (x is Number, shift is Boolean) to ()
     {
 	const scrollX = frameToX(scrollOffset);
 	const d = xToDuration(x+scrollX);
 	target.setPlayhead(frameToDuration(durationToFrame(d)));
 	println("move playhead to {x}, scrollX={scrollX} d={d} frame={durationToFrame(d)}");
+        if (shift) {
+            selectionEndTime = target.playhead;
+        } else {
+            startSelection()
+        }
     }
 
     function getSelf to Trax { this }
@@ -1289,7 +1302,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 		override function onMouseDown from (event is MouseEvent) to ()
 		{
 		    if (event.location.y >= height / 2 - 20) {
-			movePlayheadTo(event.location.x+width/2-15);
+			movePlayheadTo(event.location.x+width/2-15, event.shiftKey);
 		    } else {
                         backgroundDragging = true;
                     }
@@ -1354,8 +1367,54 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
          TransformNode { 
              tx: bind -getSelf().width/2+15-frameToX(scrollOffset);
              content: 
-             TransformNode { ty: -6, content: bind playhead }
+             [TransformNode { ty: -6, content: bind playhead }
+             Group { 
+                 visible: bind selectionEnd > selectionStart;
+                 transform: bind translate(selectionStart + (selectionEnd-selectionStart)/2, -10);
+                 content: bind horizSelectionRect
+             }]
+
          }]
+    };
+
+    public var selectionStartTime is Duration;
+    public var selectionEndTime is Duration;
+
+    public var selectionStartX is Number = bind durationToX(selectionStartTime);
+    public var selectionEndX is Number = bind durationToX(selectionEndTime);
+
+    public var selectionStart = bind Math.min(selectionStartX, selectionEndX);
+    public var selectionEnd = bind Math.max(selectionStartX, selectionEndX);
+            
+    const horizSelectionRect = Rectangle {
+        pickable: true;
+        width: bind selectionEnd - selectionStart;
+        height: bind height-20;
+        strokePaint: SelectionPaint;
+        fillPaint: ColorPaint(Color.color(1, 1, 1, 0.2));
+        stroke: Stroke {
+            width: 1;
+        }
+        override function onMouseDown from (event is MouseEvent) to ()
+        {
+            if (graph) {
+                if (event.isMouseButton3Down()) {
+                    var menu = Menu {
+                        factory: menuFactory;
+                        items: MenuItem {
+                            label: "Delete Keys";
+                            action: function to () {
+                                deleteKeys();
+                                MasterUndoable.commit();
+                            }
+                        }
+                    }
+                    event.stage.showPopupMenu(event.screenx, event.screeny+getViewHeight()/2, menu);
+                    return;
+                }
+            }
+            startSelection();
+        }
     }
 
 
@@ -1435,6 +1494,11 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	} else if (e.keyCode == Keys.Delete or e.keyCode == Keys.Backspace) {
             handleDelete();
 	}
+    }
+
+    protected function deleteKeys to ()
+    {
+        // no action
     }
 
     protected function handleDelete to ()

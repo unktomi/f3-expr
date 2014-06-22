@@ -12,7 +12,7 @@ const textFg = ColorPaint(Color.color(.8, .8, .8));
 const labelFg = ColorPaint(Color.color(.25, .25, .25));
 const textBg = ColorPaint(Color.color(.4, .4, .4));
 
-public class CreateVar is ResizableNode {
+public class CreateVar is ResizableNode, Focuser {
     public var assetModel is AssetTree.AssetModel;
     bound var font is Font = layoutEngine.createFont(Names.DEFAULT_FONT);
     bound var cellHeight = font.height();
@@ -24,6 +24,11 @@ public class CreateVar is ResizableNode {
 
     public var create is function from (String, AssetTree.TypeAsset) to ();
     public var cancel is function from () to ();
+
+    override public function getTargetOfFocus to Focusable 
+    {
+        nameField
+    }
 
     function doCreate to ()
     {

@@ -2,6 +2,7 @@ package expr.timeline;
 import f3.media.scene.*;
 import f3.media.scene.KeyFrame.*;
 import expr.*;
+import expr.undo.*;
 
 public class GraphEditor is Trax {
 
@@ -28,13 +29,15 @@ public class GraphEditor is Trax {
     override protected function handleDelete to ()
     {
         deleteKeys();
+        MasterUndoable.commit();
     }
 
-    function deleteKeys to () 
+    override function deleteKeys to () 
     {
         foreach (resourceTarget in resourceTargets, box in resourceTarget.channelBoxes.content, clip in (box as TimeGroup).content) {
             const ch = clip as Channel of ?;
-            ch.deleteKey();
+            const m = ch.toSceneTransform.inverse();
+            ch.deleteKeys(m * selectionStartTime, m * selectionEndTime);
         }
     }
 
