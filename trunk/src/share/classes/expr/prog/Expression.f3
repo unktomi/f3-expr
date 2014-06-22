@@ -373,7 +373,10 @@ public const UNIT_MEMBER = FunctionMember {
 }
 
 public const NUM_MEMBERS = 
-    [foreach (op in ["add", "subtract", "multiply", "divide", "remainder", "lessThan", "lessOrEqual", "greaterThan", "greaterOrEqual", "equal", "notEqual"]) {
+    [FunctionMember {
+            m: Reflect.getFunction("f3.lang.Builtins$NumberOperators", "Number", ["Number"]);
+    },
+    foreach (op in ["add", "subtract", "multiply", "divide", "remainder", "lessThan", "lessOrEqual", "greaterThan", "greaterOrEqual", "equal", "notEqual"]) {
         FunctionMember {
             isInfix: true;
             m: Reflect.getFunction("f3.lang.Builtins$NumberOperators", op, ["Number", "Number"]);
@@ -384,7 +387,10 @@ public const NUM_MEMBERS =
     }];
 
 public const INT_MEMBERS = 
-    [foreach (op in ["add", "subtract", "multiply", "divide", "remainder","lessThan", "lessOrEqual", "greaterThan", "greaterOrEqual", "equal", "notEqual"]) {
+    [FunctionMember {
+            m: Reflect.getFunction("f3.lang.Builtins$IntegerOperators", "Integer", ["Integer"]);
+    },
+    foreach (op in ["add", "subtract", "multiply", "divide", "remainder","lessThan", "lessOrEqual", "greaterThan", "greaterOrEqual", "equal", "notEqual"]) {
         FunctionMember {
             isInfix: true;
             m: Reflect.getFunction("f3.lang.Builtins$IntegerOperators", op, ["Integer", "Integer"]);
@@ -1371,7 +1377,8 @@ public class IPath {
                 println("n={n}");
                 println("src={src}");
                 if (src is VarContextExpression) {
-                    return "<<{src.getName()}>>";
+                    const v = (src as VarContextExpression).varContext;
+                    return if (v.isShortcut) then "<<{src.getName()}>>" else "(getVar(\"{v.variableName}\") as {v.varType.t.getName()})";
                 } else if (src is NodeExpression) {
                     return "(getNode(\"{(src as NodeExpression).node.id}\") as expr.NodeAPI)";
                 } else if (src is TimeNodeExpression) {
@@ -1893,10 +1900,10 @@ public class Function is MemberExpression {
 public class Parameter is ObserverExpression {
     public var name is String;
     public var t is F3Type on replace {
-        if (Reflect.NUMBER_TYPE.isConvertibleFrom(t)) {
-            constantValue = 0.0;
-        } else if (Reflect.INTEGER_TYPE.isConvertibleFrom(t)) {
+        if (Reflect.INTEGER_TYPE.isConvertibleFrom(t)) {
             constantValue = 0;
+        } else if (Reflect.NUMBER_TYPE.isConvertibleFrom(t)) {
+            constantValue = 0.0;
         } else if (Reflect.BOOLEAN_TYPE.isConvertibleFrom(t)) {
             constantValue = false;
         } else if (Reflect.STRING_TYPE.isConvertibleFrom(t)) {
@@ -2571,7 +2578,7 @@ public class ObjectView is ExpressionView {
             n = TimeNodeObjNode {timeNodeId: (objectExpr as TimeNodeExpression).timeNode.id};
         } else if (objectExpr is VarContextExpression) {
             const v = (objectExpr as VarContextExpression).varContext;
-            n = VarContextObjNode { varId: v.fullName(), varType: v.varType.t.getName() };
+            n = VarContextObjNode { varId: v.fullName(), varType: v.varType.t.getName(), isShortcut: v.isShortcut };
         } else {
             // @Todo
         }
@@ -3549,12 +3556,12 @@ public class ParameterView is InputView {
             textField.setText(removeQuotes(constValue.toString()));
         } else if (sliderField <> null) {
             const f = sliderField;
-            if (Reflect.NUMBER_TYPE.isConvertibleFrom(getInputType())) {
-                const nf = f as NumberField;
-                nf.onChange(parameter.constantValue as Number);
-            } else if (Reflect.INTEGER_TYPE.isConvertibleFrom(getInputType())) {
+            if (Reflect.INTEGER_TYPE.isConvertibleFrom(getInputType())) {
                 const nf = f as IntegerField;
                 nf.onChange(parameter.constantValue as Integer);
+            } else if (Reflect.NUMBER_TYPE.isConvertibleFrom(getInputType())) {
+                const nf = f as NumberField;
+                nf.onChange(parameter.constantValue as Number);
             } else if (Reflect.BOOLEAN_TYPE.isConvertibleFrom(getInputType())) {
                 f.setT(if parameter.constantValue is Boolean and (parameter.constantValue as Boolean) then 1.0 else 0.5);
             }
@@ -3564,12 +3571,12 @@ public class ParameterView is InputView {
     readonly var textField = bind if Reflect.STRING_TYPE.isConvertibleFrom(getInputType()) then stringField() else null;
 
     readonly var sliderField = bind 
-        if (Reflect.NUMBER_TYPE.isConvertibleFrom(getInputType())) 
+        if (Reflect.INTEGER_TYPE.isConvertibleFrom(getInputType()))
+            then intSlider()
+        else if (Reflect.NUMBER_TYPE.isConvertibleFrom(getInputType())) 
             then numSlider() 
-            else if (Reflect.INTEGER_TYPE.isConvertibleFrom(getInputType()))
-                then intSlider()
-                else if (Reflect.BOOLEAN_TYPE.isConvertibleFrom(getInputType())) 
-                    then boolSlider() else null;
+            else if (Reflect.BOOLEAN_TYPE.isConvertibleFrom(getInputType())) 
+                then boolSlider() else null;
     override var internalContent = Group { content: bind [title, if links.size() == 0 then Group { content: bind [sliderField, textField] } else null] };
     /*
     const titleText = XHTML.Text {
@@ -4860,6 +4867,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 varType: asset;
                 variableName: "shortcut";    
                 parent: eventContext;
+                isShortcut: true;
             }
             insert VarContextObjNode {
                 varId: v.variableName;
@@ -6083,7 +6091,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             } else {
                 eng = "Assign {nil(subject.varType.t)} to <i>{subject.variableName}</i>";
             }
-            prog.defineVar(subject, "var <<{subject.variableName}>> is {subject.varType.t.getName()} = {init}; $register(\"{subject.variableName}\", &<<{subject.variableName}>>);");
+            prog.defineVar(subject, "var <<{subject.variableName}>> is {subject.varType.t.getName()} = {init}");
             englishOutput = eng;
         } else {
             context.dump();
@@ -6428,6 +6436,7 @@ public class TimeNodeObjNode is ObjNode {
 public class VarContextObjNode is ObjNode {
     public var varId is String;
     public var varType is String;
+    public var isShortcut is Boolean;
     public override function createView from (canvas is Canvas) to ExpressionView 
     {
         const c is Context.ClosureVarContext = canvas.eventContext.resolve(varId) as Context.ClosureVarContext;

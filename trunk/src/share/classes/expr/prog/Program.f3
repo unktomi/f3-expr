@@ -19,6 +19,10 @@ import expr.Context;
 import expr.Context.*;
 import expr.EventLayer;
 
+class Value {
+    public var value is Object;
+}
+
 public class EvalContext {
     public const eventContext is Context.MemberContext;
     public var varContext is Context.ClosureVarContext;
@@ -49,6 +53,20 @@ public class EvalContext {
     public function getVarRef from (name is String) to Ref of ?
     {
         varMap.get(name)
+    }
+
+    function createVars from (prog is Program) to ()
+    {
+        for (ent in prog.varSources.entrySet() where not ent.getKey().isShortcut) {
+            const v = ent.getKey();
+            const t = v.varType.t;
+            const vp = ent.getValue();
+            var source = vp.sourceCode;
+            const value = evaluator.compileAndRun(source);
+            const target is Value = Value { value: value }
+            println("created variable {v.variableName} = {source} => {value}");
+            registerVar(v.variableName, &target.value);
+        }
     }
 
     public function registerVar from (name is String, value is ObservableRef of ?) to ()
@@ -91,6 +109,7 @@ public class EvalContext {
             unsubscribe();
             return;
         }
+        createVars(prog);
         const debugger = if externalDebugger <> null then externalDebugger else this.debugger;
         try {
             const f = evaluator.compileAndRun(prog.getSourceCode()) 
@@ -220,7 +239,8 @@ public class Program {
     function getSourceCode to String 
     {
         var varSource is String = "";
-        for (v in varSources.values()) {
+        for (ent in varSources.entrySet() where ent.getKey().isShortcut) {
+            const v = ent.getValue();
             varSource = "{varSource}{v.sourceCode}";
         }
         const result = sourceCode.replace("%VARS%", varSource);
