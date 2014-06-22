@@ -74,7 +74,6 @@ public class NumericSliderField is SliderField {
     }
 }
 
-
 public class ColorInspector extends AbstractNode {
     public var i is InspectedColor;
     public var height is Number = 15;
@@ -112,12 +111,14 @@ public class ColorInspector extends AbstractNode {
     postinit {
         disp = i.observable.subscribe(onChange);
     }
+
     const colorSelection = Rectangle {
         height: bind height;
         width: bind height;
         fillPaint: bind ColorPaint(selection);
         strokePaint: bind ColorPaint(Color.color(.2, .2, .2));
-    };
+    }
+
     const red = NumericSliderField {
         onSetKey: bind onSetKey;
         min: 0.0;
@@ -130,6 +131,7 @@ public class ColorInspector extends AbstractNode {
             super.setT(r);
         }
     }
+
     const green = NumericSliderField {
         onSetKey: bind onSetKey;
         min: 0.0;
@@ -142,6 +144,7 @@ public class ColorInspector extends AbstractNode {
             super.setT(g);
         }
     }
+
     const blue = NumericSliderField {
         onSetKey: bind onSetKey;
         min: 0.0;
@@ -154,6 +157,7 @@ public class ColorInspector extends AbstractNode {
             super.setT(b);
         }
     }
+
     const alpha = NumericSliderField {
         onSetKey: bind onSetKey;
         min: 0.0;
@@ -165,7 +169,8 @@ public class ColorInspector extends AbstractNode {
             a = clamp(t, min, max);
             super.setT(a);
         }
-    };
+    }
+
     var t1 is TransformNode;
     var t2 is TransformNode;
     var t3 is TransformNode;
