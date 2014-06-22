@@ -144,6 +144,7 @@ class ResourceBuilder {
                     VarDecl {
                         varName: x.getKey().variableName;
                         varType: x.getKey().varType.t.getName();
+                        isShortcut: x.getKey().isShortcut;
                         sourceCode: x.getValue().sourceCode;
                         code: x.getValue().code;
                     }
@@ -281,6 +282,7 @@ class ResourceBuilder {
                     VarDecl {
                         varName: x.getKey().variableName;
                         varType: x.getKey().varType.t.getName();
+                        isShortcut: x.getKey().isShortcut;
                         sourceCode: x.getValue().sourceCode;
                         code: x.getValue().code;
                     }
@@ -321,6 +323,7 @@ public class VarDecl {
     public var varType is String;
     public var sourceCode is String;
     public var code is ExprScene;
+    public var isShortcut is Boolean = true;
 }
 
 class ExportingBuilder is ResourceBuilder {
@@ -432,6 +435,7 @@ public function save
                         VarDecl {
                             varName: x.getKey().variableName;
                             varType: x.getKey().varType.t.getName();
+                            isShortcut: x.getKey().isShortcut;
                             sourceCode: x.getValue().sourceCode;
                             code: x.getValue().code;
                         }

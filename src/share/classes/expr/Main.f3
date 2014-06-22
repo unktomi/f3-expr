@@ -990,6 +990,7 @@ public function run from (args is String[]) to ()
                         parent: targetContext;
                         variableName: d.varName;
                         varType: findTypeAsset(d.varType);
+                        isShortcut: d.isShortcut;
                     }
                     insert v into targetContext.content;
                     println("CREATED VAR: {v}");
@@ -1167,6 +1168,7 @@ public function run from (args is String[]) to ()
                             parent: targetContext;
                             variableName: d.varName;
                             varType: findTypeAsset(d.varType);
+                            isShortcut: d.isShortcut;
                         }
                         insert v into targetContext.content;
                         println("CREATED VAR: {v}");
@@ -1456,6 +1458,7 @@ public function run from (args is String[]) to ()
                                                                                                        variableName: name;
                                                                                                        varType: asset;
                                                                                                        parent: g;
+                                                                                                       isShortcut: false;
                                                                                                    }
                                                                                                    into g.content;
                                                                                                    
@@ -1631,6 +1634,22 @@ public function run from (args is String[]) to ()
                                                  if (picked == []) {
                                                      const f = (asset as AssetTree.TextOutputAsset).getTextOutput();
                                                      addResource(f, currentScene.mousePosition);
+                                                     MasterUndoable.commit();
+                                                 }
+                                             }
+                                             if (asset is AssetTree.MaAsset) {
+                                                 const picked = getUnderMouseInEditor();
+                                                 if (picked == []) {
+                                                     const f = (asset as AssetTree.MaAsset);
+                                                     doDrop(f.url, currentScene.mousePosition);
+                                                     MasterUndoable.commit();
+                                                 }
+                                             }
+                                             if (asset is AssetTree.ResourceNodeAsset) {
+                                                 const picked = getUnderMouseInEditor();
+                                                 if (picked == []) {
+                                                     const f = (asset as AssetTree.ResourceNodeAsset);
+                                                     doDrop(f.url, currentScene.mousePosition);
                                                      MasterUndoable.commit();
                                                  }
                                              }

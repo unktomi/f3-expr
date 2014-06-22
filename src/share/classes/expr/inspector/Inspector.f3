@@ -837,7 +837,7 @@ public function inspect from (obj is Object, t is F3ClassType) to (Inspected of 
 
 function inspect0 from (obj is Object, classType is F3ClassType) to (Inspected of ?)[]
 {
-    println("INSPECTING => {obj}");
+    println("INSPECTING => {obj} class={classType}");
     if (obj == null) then [] else {
 	    const members = Expression.introspect(classType);
 	    foreach (m in members where not m.name.contains("$")) {
