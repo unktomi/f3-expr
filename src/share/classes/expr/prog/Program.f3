@@ -72,7 +72,7 @@ public class EvalContext {
     public function registerVar from (name is String, value is ObservableRef of ?) to ()
     {
         varMap.put(name, value);
-        varRefSubject.onNext((name, value));
+        varRefSubject.onNext(new org.f3.runtime.Pair of (String, ObservableRef of ?)(name, value));
     }
 
     const varMap is java.util.Map of (String, ObservableRef of ?) = new java.util.HashMap of (String, ObservableRef of ?);
