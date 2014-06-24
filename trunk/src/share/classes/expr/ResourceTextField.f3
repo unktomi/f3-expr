@@ -2,7 +2,7 @@ package expr;
 import f3.util.*;
 import f3.media.scene.*;
 import f3.media.scene.Shape2D.*;
-
+import java.lang.Math;
 
 public class ResourceTextField is AbstractResourceText {
     public function observeText to Observable of String
@@ -18,11 +18,14 @@ public class ResourceTextField is AbstractResourceText {
     {
         impl.setText(text);
     }
+
+    var font = bind layoutEngine.createFont("font-size:{fontSize.selection};font-family:{fontFamily.selection};font-weight:{fontWeight.selection};font-style:{fontStyle.selection}");
+
     const impl is Text.Field = Text.Field {
         foreground: bind ColorPaint(foreground);
         background: bind ColorPaint(background);
-        font: bind layoutEngine.createFont("font-size:{fontSize.selection};font-family:{fontFamily.selection};font-weight:{fontWeight.selection};font-style:{fontStyle.selection}");
-        width: bind width;
+        font: bind font;
+        width: bind if width < 0 then Math.max(font.width(text), minimumWidth) else width;
     };
     override var content = bind [impl];
 }

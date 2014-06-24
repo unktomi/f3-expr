@@ -1,17 +1,26 @@
 package expr;
+import java.lang.Math;
 import f3.util.*;
 import f3.media.scene.*;
+import f3.media.scene.Shape2D.*;
 
 public class ResourceLabel is AbstractResourceText {
+
     public var text is String;
+
     override public function setText from (text is String) to ()
     {
         this.text = text;
     }
+
+    var font = bind layoutEngine.createFont("font-size:{fontSize.selection};font-family:{fontFamily.selection};font-weight:{fontWeight.selection};font-style:{fontStyle.selection}");
+    
     const impl is Text.Label = Text.Label {
+        foreground: bind ColorPaint(foreground);
+        background: bind ColorPaint(background);
         text: bind text;
-        font: bind layoutEngine.createFont("font-size:{fontSize.selection};font-family:{fontFamily.selection};font-weight:{fontWeight.selection};font-style:{fontStyle.selection}");
-        width: bind width;
+        font: bind font;
+        width: bind if width < 0 then Math.max(minimumWidth, font.width(text)) else width;
     };
     override var content = bind [impl];
 
