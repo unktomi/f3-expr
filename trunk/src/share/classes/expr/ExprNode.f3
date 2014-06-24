@@ -53,10 +53,13 @@ public class ExprNode is AbstractNode {
         }
     }
 
+    const channelBox = TimeGroup {
+    };
+
     var timeline is Timeline = bind if (standalone) then Timeline {
         paused: bind not isInteractive;
         content: TimeGroup {
-            content: bind temporalRoot;
+            content: bind [temporalRoot, channelBox];
         } 
     } else null;
 
@@ -118,6 +121,24 @@ public class ExprNode is AbstractNode {
                     py: x.py;
                     pz: x.pz;
                     content: bind n;
+                }
+            }
+        }
+        for (j in r.spatialResources, box in j.animation) {
+            const channelBox = ns[indexof j].addChannelBox(spatialRoot.content[indexof j] as TransformNode);
+            channelBox.playTime = box.playTime;
+            channelBox.playRate = box.playRate;
+            channelBox.playCount = box.playCount;
+            channelBox.blendWeight = 1.0;//i.animation.blendWeight;
+            foreach (y in box.content) {
+                const c = channelBox.lookup(y.target) as Channel of Number;
+                println("LOOKUP {y.target} => {c}");
+                c.playTime = y.playTime;
+                c.playCount = y.playCount;
+                c.playRate = y.playRate;
+                c.blendWeight = y.blendWeight;
+                c.keys = foreach (k in y.keys) {
+                    c.createKey(k.keyTime, k.keyValue, f3.media.scene.KeyFrame.Linear);
                 }
             }
         }
@@ -272,6 +293,35 @@ public class ExprNode is AbstractNode {
     }
     override var internalContent = Group {
         content: bind [instanceSpace, spatialRoot]
+    };
+
+    function addChannelBox from (t is TransformNode) to TimeGroup {
+        println("ADD CHANNEL BOX :  {t}");
+        const names = ["tx", "ty", "tz", "rx", "ry", "rz", "sx", "sy", "sz", "px", "py", "pz"];
+        const ptrs = [&t.tx, &t.ty, &t.tz, &t.rx, &t.ry, &t.rz, &t.sx, &t.sy, &t.sz, &t.px, &t.py, &t.pz];
+        const tg = TimeGroup {
+            content:
+            foreach (i in [0..<names.size()]) {
+                Channel of Number {
+                    id: names[i];
+                    targets: ptrs[i];
+                }
+            }
+            override function lookup from (id is String) to Channel of Number {
+                const p = id.lastIndexOf("#");
+                if (p > 0) {
+                    const id1 = id.substring(p+1);
+                    for (x in content) {
+                        if (x.id == id1) {
+                            return x as Channel of Number;
+                        }
+                    }
+                }
+                return null;
+            }
+        }
+        insert tg into channelBox.content;
+        return tg;
     }
 }
 
