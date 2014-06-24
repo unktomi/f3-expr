@@ -45,7 +45,8 @@ public abstract class AbstractResourceText is ResourceNode, TextAPI {
     public var fontStyle is FontStyleSelection = new FontStyleSelection("normal");
     public var foreground is Color = new Color(.1, .1, .1, 1);
     public var background is Color = new Color(.9, .9, .9, 1);
-    public var width is Number = 100;
+    public var width is Number = -1;
+    public var minimumWidth is Number = 200;
     override var id = "";
     override public function setText from (text is String) to ();
 

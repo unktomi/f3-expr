@@ -1351,7 +1351,8 @@ public class IPath {
                 return "Assign {parents[0].getEnglishAccess()} to the {formatEnglishName(i.member.name)} of {i.target.toEnglish()}"
             } 
             if (i.member.isObserver and is1ArgFunction(i.member)) {
-                return "{formatEnglishName(i.member.name)} of {i.target.toEnglish()} {parents[0].getEnglishAccess()}";
+                const sep = if (i.member.name.startsWith("set")) then " to " else " " ;
+                return "{formatEnglishName(i.member.name)} of {i.target.toEnglish()}{sep}{parents[0].getEnglishAccess()}";
             } else if (i.target is VarContextExpression) {
                 return "Assign {parents[0].getEnglishAccess()} to {i.target.toEnglish()} "
             } else {
