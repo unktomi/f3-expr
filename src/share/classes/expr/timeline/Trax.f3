@@ -622,7 +622,7 @@ class TimeNodeView is AbstractNode
                               [Group { 
                                       visible: bind expanded;
                                       transform: bind translate(-50+trax.frameToX(trax.currentFrame)-trax.durationToX(ch.boundsInScene.start), hoff+3);
-                                      content: bind if extent == 0 then null else foreach (i in [0..<rows]) {
+                                      content: bind if not expanded or extent == 0 then null else foreach (i in [0..<rows]) {
                                           Text.Label {
                                               width: 100;
                                               transform: bind translate(0, trax.getViewHeight() * i);
@@ -1028,7 +1028,8 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	15
     }
 
-    function updatePlayhead {
+    protected function updatePlayhead to () 
+    {
         const value = target.paused;
         target.paused = true;
 	target.setPlayhead(target.playhead);
