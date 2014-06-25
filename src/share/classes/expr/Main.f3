@@ -2086,7 +2086,7 @@ Tabview.Tab {
                                                 }
                                             },
 				 Tabview.Tab {
-				    title: bind if (contextModel.selectedVarContext <> null) then "Definition: {contextModel.selectedVarContext.name}" else "Event: {contextModel.selectedContext.name}"
+				    title: bind if (contextModel.selectedVarContext <> null) then "Variable: {contextModel.selectedVarContext.name}" else "Event: {contextModel.selectedMemberContext.name}"
 				    content: expr.prog.Expression.Editor {
                                                  assetModel: bind assetModel;
                                                  go: function from (c is Context) to ()

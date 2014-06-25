@@ -426,7 +426,8 @@ public class NumberField is SliderField {
 	t = (n-min) / (max-min);
     }
     postinit {
-        onChange(i.get());
+        const n is Number = i.get();
+        onChange(n);
         disp = i.observable.subscribe(onChange);
     }
     override var t on replace {
