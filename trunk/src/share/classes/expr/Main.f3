@@ -362,6 +362,9 @@ public function run from (args is String[]) to ()
         println("ADDING {rn} to {currentResource} th.scenes={transformHierarchy.scenes}, th.selectedScene={transformHierarchy.selectedScene}");
 	insert rn into currentResource.resources;
 	transformHierarchy.selectNode(rn);
+        if (rn.displayName == "") {
+            rn.displayName = if (rn.$useLiteralId) then rn.id else Names.formatName(rn.id);
+        }
         if (currentScene == mainScene) {
             viewer.focusCamera(rn);
         }
@@ -392,6 +395,9 @@ public function run from (args is String[]) to ()
 
     function addTimeResource from (rn is ResourceTimeNode) to ()
     {
+        if (rn.displayName == "") {
+            rn.displayName = if (rn.$useLiteralId) then rn.id else Names.formatName(rn.id);
+        }
         println("ADDING TIME RESOURCE { rn }");
         rn.updateParent();
 	insert rn into currentAnimResource.resources;
