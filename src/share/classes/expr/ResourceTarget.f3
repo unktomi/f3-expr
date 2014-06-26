@@ -76,7 +76,6 @@ public interface ResourceTarget {
     public var $useLiteralId is Boolean = false;
     public var displayName is String;
 
-
     //    public function getChannels to (Channel of Number)[] { [] }
 
     public function resolveChannel from (id is String) to Channel of Number
