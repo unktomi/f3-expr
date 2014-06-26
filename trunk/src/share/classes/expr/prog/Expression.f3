@@ -125,6 +125,14 @@ const exprMap2 = new java.util.HashMap of (F3ClassType, Member[]);
 
 const SelectionPaint = ColorPaint(Color.ORANGE);
 
+const SHORTCUT is Member = Member {
+    override function equals from (obj is Object) to Boolean {
+        return isSameObject(this, obj);
+    }
+    override var name = "Shortcut";
+    override var members = [];
+}
+
 const FORK is Member = Member {
     override function equals from (obj is Object) to Boolean {
         return isSameObject(this, obj);
@@ -3308,6 +3316,9 @@ abstract class LinkedView is ExpressionView {
     }
 }
 
+class ShortcutTarget is LinkedInputView {
+}
+
 abstract class LinkedInputView is LinkedView {
     public bound function getInputType to F3Type { expression.getType() };
     public function getObserver to ObserverExpression
@@ -4204,7 +4215,7 @@ class TreeLinker {
                 tv = null;
                 delete canvas.targetArrow from canvas.arrows;
                 link.unlink();
-                if (found <> null) {
+                if (found <> null and not (found is ShortcutTarget)) {
                     //cell.link();
                     found.unlink();
                     const newlink = LinkView { 
@@ -4296,7 +4307,7 @@ class ViewLinker {
                 tmpLink = null;
                 delete canvas.targetArrow from canvas.arrows;
                 link.unlink();
-                if (found <> null) {
+                if (found <> null and not (found is ShortcutTarget)) {
                     found.unlink();
                     const newlink = LinkView { 
                         canvas: canvas;
@@ -4405,6 +4416,8 @@ class MemberListview is Listview of Member {
     const app = observeApply().subscribe(function from (m is Member) to () {
             if (m == null) {
                 k(null);
+            } else if (m == SHORTCUT) {
+                k(canvas.createShortcutTarget(targetPosition));
             } else if (m == FORK) {
                 const fork = canvas.createFork(targetPosition);
                 k(fork.sourcePort);
@@ -4528,7 +4541,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             k: k;
             font: font;
             transform: translate(popupScene.mousePosition.x + 100, popupScene.mousePosition.y, 0);
-            members: [FORK, members];
+            members: [SHORTCUT, FORK, members];
             height: 200;
             width: 340; 
         }
@@ -4626,6 +4639,12 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         const r = createTypeView(toLocal * where.scenePoint, t, 0);
         setSelectedExpr(r);
         MasterUndoable.commit();
+    }
+
+    function createShortcutTarget from (pt is Point3) to ShortcutTarget {
+        ShortcutTarget {
+            pos: pt;
+        }
     }
 
     function createFork from (pt is Point3) to ForkView {
@@ -6092,7 +6111,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             } else {
                 eng = "Assign {nil(subject.varType.t)} to <i>{subject.variableName}</i>";
             }
-            prog.defineVar(subject, "var <<{subject.variableName}>> is {subject.varType.t.getName()} = {init}");
+            prog.defineVar(subject, "var <<{subject.variableName}>> is {subject.varType.t.getName()} = {init};");
             englishOutput = eng;
         } else {
             context.dump();

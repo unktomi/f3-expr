@@ -594,7 +594,7 @@ class TimeNodeView is AbstractNode
                       } else null;
               },
               if (not trax.graph or not (target is Channel of Number)) then null else Group {
-                          //                  visible: bind row > trax.scrollY;
+                                            visible: bind row > trax.scrollY;
                           //                  pickable: false;
                           var graphHeight = bind h - trax.getViewHeight();
                           transform: bind translate(-w/2, if expanded then -trax.getViewHeight() else 0);
@@ -1431,6 +1431,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 
     override function onKeyDown from (e is KeyboardEvent) to () {
 	const i = selectedTimeNodeView.row;
+        println("i={i}, view={selectedTimeNodeView.target.id}");
 	if (e.keyCode == Keys.F) {
             frameSelection();
             e.stopPropagation();
@@ -1526,9 +1527,9 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	selectedTimeNodeView = x;
         if (x <> null) {
             println("row={x.row}, scrollY={scrollY} visibleRows={visibleRows}");
-            if (x.row < scrollY) {
-                scrollY = x.row as Integer;
-            } else if (x.row > scrollY + visibleRows) {
+            if (x.row-1 < scrollY) {
+                scrollY = x.row-1 as Integer;
+            } else if (x.row+1 > scrollY + visibleRows) {
                 scrollY = Math.max(0, x.row - visibleRows / 2) as Integer
             }
         }
