@@ -78,7 +78,7 @@ public class TemporalHierarchy
 	}
         if (selectedTransform <> p) {
             println("SELECTION => {p}");
-            //selectedTransform = p as ResourceTimeNode;
+            selectedTransform = p as ResourceTimeNode;
         }
         selection.onNext(selectedTimeNode);
     };

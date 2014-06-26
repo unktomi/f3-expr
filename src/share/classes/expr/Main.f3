@@ -1316,52 +1316,52 @@ public function run from (args is String[]) to ()
     }
 
     var manipLayer = Scene {
-                //visible: bind internalWindowsLayer.visible;
-                      background: null;
-                      camera: bind currentScene.camera;
-		      override var content = [manip = expr.manipulator.Manipulator 
-		      {
-			  visible: bind currentTransform <> null;
-                          viewer: viewer;
-			  target: bind currentTransform;
-			  scene: this;
-		      }, 
-                      Group {
-                          var viewScale = bind uniformScale(manip.viewScale*.5);
-                          content: bind foreach  (cam in currentScene.currentCameras) {
-                              var cameraModel = Ma.Model {
-                                  url: "{__DIR__}camera.ma";
-                              }
-                              Group {
-                                  transform: bind cam.toSceneTransform;
-                                  content: Group {
-                                      transform: bind viewScale;
-                                      content: bind cameraModel.getSpatialRoot();
-                                  }
-                              }
-                          }
-                      }]
+        //visible: bind internalWindowsLayer.visible;
+        background: null;
+        camera: bind currentScene.camera;
+        override var content = 
+            [manip = expr.manipulator.Manipulator {
+                visible: bind currentTransform <> null;
+                viewer: viewer;
+                target: bind currentTransform;
+                scene: this;
+            }, 
+            Group {
+                var viewScale = bind uniformScale(manip.viewScale*.5);
+                content: bind foreach  (cam in currentScene.currentCameras) {
+                    var cameraModel = Ma.Model {
+                        url: "{__DIR__}camera.ma";
+                    }
+                    Group {
+                        transform: bind cam.toSceneTransform;
+                        content: Group {
+                            transform: bind viewScale;
+                            content: bind cameraModel.getSpatialRoot();
+                        }
+                    }
+                }
+            }]
         };
         
         var _ = editorScene = Scene {
-                    var lastTime is Long;
-                    override function update {
-                        const now = java.lang.System.currentTimeMillis();
-                        if (lastTime == 0) {
-                            recentList = loadEditorState(joglStage(), this, player, trax);
-                            lastTime = now;
-                        } else if (now - lastTime > 2000) {
-                            saveEditorState(this, player, trax, recentList);
-                            if (savePoint <> MasterUndoable.now) {
-                                doSave();
-                            }
-                            lastTime = now;
-                        }
-                        super.update();
+            var lastTime is Long;
+            override function update {
+                const now = java.lang.System.currentTimeMillis();
+                if (lastTime == 0) {
+                    recentList = loadEditorState(joglStage(), this, player, trax);
+                    lastTime = now;
+                } else if (now - lastTime > 2000) {
+                    saveEditorState(this, player, trax, recentList);
+                    if (savePoint <> MasterUndoable.now) {
+                        doSave();
                     }
-                    background: null;
-                    camera: Camera2D {}; 
-		    override var content =
+                    lastTime = now;
+                }
+                super.update();
+            }
+            background: null;
+            camera: Camera2D {}; 
+            override var content =
 		    [internalWindowsLayer = Group { 
 
                        content: 
