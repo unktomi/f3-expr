@@ -7,7 +7,9 @@ import f3.media.input.*;
 public class VectorButton is ResizableNode {
     override var height = 16;
     override var width = 28;
+    public var enabled is Boolean = true;
     public var shape is Shape2D;
+    public var disabledForeground is Paint = ColorPaint(Color.color(.65, .65, .65));
     public var foreground is Paint = ColorPaint(Color.color(.8, .8, .8));
     public var hoverForeground is Paint = ColorPaint(Color.color(.9, .9, .9));
     public var selectedForeground is Paint = ColorPaint(Color.color(.9, .9, .9));
@@ -23,20 +25,22 @@ public class VectorButton is ResizableNode {
         },
         MeshNode2D {
             path: bind shape.path;
-            paint: bind if pressed and containsPointer then selectedForeground else if containsPointer then hoverForeground else foreground;
+            paint: bind if not enabled then disabledForeground else if pressed and containsPointer then selectedForeground else if containsPointer then hoverForeground else foreground;
         }]
     }
     const down = observeMouseDown().subscribe(function from (event is MouseEvent) to () {
 	    println("pressed");
-	    pressed = true
+	    if (enabled) pressed = true
 	});
     const up = observeMouseUp().subscribe(function from (event is MouseEvent) to () {
 	    println("released");
-	    pressed = false;
-	    if (containsPointer) {
-		onPress();
-		subject.onNext(());
-	    }
+            if (enabled) {
+                pressed = false;
+                if (containsPointer) {
+                    onPress();
+                    subject.onNext(());
+                }
+            }
 	});
     const subject = Subject of (()) {};
     public function observePress to Observable of (()) { subject }

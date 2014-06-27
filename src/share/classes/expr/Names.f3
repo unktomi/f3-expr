@@ -26,6 +26,7 @@ public function formatName from (str is String) to String
 
 public function uncamelCase from (str is String) to String 
 {
+    const inwordPunct = "-";
     const buf = new java.lang.StringBuffer();
     const seps = "_.$";
     const backslash = "\\".charAt(0);
@@ -49,7 +50,7 @@ public function uncamelCase from (str is String) to String
             forceUpper = true;
         } else { 
             if (i > 0 and Character.isUpperCase(c) and (seps.indexOf(c1) < 0 and not Character.isUpperCase(c1))) {
-                if (not Character.isWhitespace(last)) {
+                if (not Character.isWhitespace(last) and not (inwordPunct.indexOf(last) >= 0)) {
                     buf.append(" ");
                 }
             }

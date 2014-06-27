@@ -477,14 +477,40 @@ class TimeNodeView is AbstractNode
                                  factory: trax.menuFactory;
                              };
                              if (trax.graph and target is ResourceTarget.ChannelBoxesGroup) {
-                                 insert MenuItem {
+                                 insert Menu {
+                                     label: "Add";
                                      factory: trax.menuFactory;
-                                     label: "Add Clip"
+                                     items:  
+                                     [MenuItem {
+                                         factory: trax.menuFactory;
+                                         label: "Clip";
                                          action: function to ()
-                                     {
-                                         println("add clip");
-                                         (target as ResourceTarget.ChannelBoxesGroup).target.addChannelBox();
-                                     }
+                                         {
+                                             println("add clip");
+                                             (target as ResourceTarget.ChannelBoxesGroup).target.addChannelBox();
+                                         }
+                                      },
+                                      MenuItem {
+                                          factory: trax.menuFactory;
+                                          label: "Layer";
+                                          action: function to ()
+                                          {
+                                          }
+                                      },
+                                      MenuItem {
+                                         factory: trax.menuFactory;
+                                         label: "Transition Layer";
+                                         action: function to ()
+                                         {
+                                         }
+                                      },
+                                      MenuItem {
+                                         factory: trax.menuFactory;
+                                         label: "Blend Layer";
+                                         action: function to ()
+                                         {
+                                         }
+                                      }]
                                  } into menu.items;
                              }
                              if ((trax.graph and not (target is ResourceTarget.ChannelBoxesGroup)) or (target is ResourceTimeNode)) {

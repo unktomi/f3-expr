@@ -417,6 +417,10 @@ public class MemberContext is GroupContext, ProgramContext {
 }
 
 public class ContextTreemodel is Treemodel {
+    public const history is History of Context = History of Context {};
+    const d = history.observeSelection().subscribe(function from (c is Context) to () {
+            selectionObserver.onNext(toTreeNode(c));
+    });
     public var rootContext is GroupContext;
     public var selectedContext is Context;
     public function reset to () 
@@ -424,6 +428,7 @@ public class ContextTreemodel is Treemodel {
         rootContext.content = [];
         tn = null;
         tn = root;
+        history.reset();
     }
     var tn is Treenode on replace {
         selectedContext = (tn as ContextTreenode).context;
@@ -460,6 +465,7 @@ public class ContextTreemodel is Treemodel {
         }
         selectedObjectContext = o;
         println("selected object context => {o}: {o.getTarget()}");
+        history.go(selectedContext);
     }
     public var selectedVarInputContext is VarInputContext = bind if (selectedContext is VarInputContext) then selectedContext as VarInputContext else null;
     public var selectedObjectContext is ResourceObjectContext;
