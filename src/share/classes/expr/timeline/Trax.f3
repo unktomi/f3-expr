@@ -487,7 +487,7 @@ class TimeNodeView is AbstractNode
                                      }
                                  } into menu.items;
                              }
-                             if (not (target is ResourceTarget.ChannelBoxesGroup)) {
+                             if ((trax.graph and not (target is ResourceTarget.ChannelBoxesGroup)) or (target is ResourceTimeNode)) {
                                  insert MenuItem {
                                      factory: trax.menuFactory;
                                      label: "Delete"

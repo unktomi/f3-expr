@@ -1374,7 +1374,7 @@ public function run from (args is String[]) to ()
                        [windowContainingAssets = InternalWindow {
 
                         id: "Editor3";
-                                    
+                        //debugGadget: true;
 			containerBounds: bind Bounds.boundsFromRect(0, 
                                                                     0, 
                                                                     width,
@@ -1385,10 +1385,21 @@ public function run from (args is String[]) to ()
                                             tabs: 
                                             [
                                  Tabview.Tab {
-                                                title: "Events";
-                                                content: Scrollpane {
-                                                    canZoomVertical: false;
-                                                    content: contextTree = Treeview {
+                                     var browse = BrowseControl {
+                                         transform: bind translate(-windowContainingAssets.width/2+20, 1);
+                                     }
+                                     onSelect: function to ()
+                                     { 
+                                         windowContainingAssets.gadget = browse;
+                                     }
+                                        onLoseSelection: function to () 
+                                     {
+                                         windowContainingAssets.gadget = null;
+                                     }
+                                     title: "Events";
+                                     content: Scrollpane {
+                                         canZoomVertical: false;
+                                         content: contextTree = Treeview {
                                              var handleCreate is function from (String, AssetTree.TypeAsset) to ();
                                              var createVar = CreateVar {
                                                      assetModel: bind assetModel;
@@ -1538,7 +1549,7 @@ public function run from (args is String[]) to ()
                                             windowContainingAssets.gadget = null;
                                         }
 				     title: "Assets";
-                                     var tv is Treeview = assetTreeview = Treeview {
+                                     var tv is Treeview = assetTreeview = Treeview  {
                                              model: assetModel;
                                              override function onKeyInput from (e is KeyboardEvent) to ()
                                              {

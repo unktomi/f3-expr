@@ -1,0 +1,20 @@
+package expr;
+import f3.math.LinearMath.*;
+import f3.util.*;
+import f3.media.scene.*;
+import f3.media.scene.Shape2D.*;
+import f3.media.input.*;
+
+public class BrowseControl is AbstractNode {
+    const rightArrow is Polygon = Polygon {
+        points: [-3.5, -4.5, -3.5, 4.5, 3.5, 0];
+    };
+    const leftArrow is Polygon = Polygon {
+        points: [3.5, -4.5, 3.5, 4.5, -3.5, 0];
+    };
+    override var internalContent = Group {
+        content: bind
+        [VectorButton { shape: leftArrow, transform: translate(-8, 0), height: 14, width: 14 },
+         VectorButton { shape: rightArrow, transform: translate(8, 0), height: 14, width: 14 }];
+    }
+}

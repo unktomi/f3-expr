@@ -69,7 +69,7 @@ public class InternalWindow is ResizableNode, Focuser {
 	fillPaint: ColorPaint(Color.color(.44, .44, .44));
     }
 
-   public var gadget is Node;
+    public var gadget is Node;
 
     var hasGadget is HasGadget;
 
@@ -150,24 +150,38 @@ public class InternalWindow is ResizableNode, Focuser {
         selected = g.content[g.content.size()-1] == this;
         var hasGadget is HasGadget = null;
 	super.update();
-        content.foldLeft((), function from (_ is (), n is Node) to () {
+        /*
+        const f is function from ((), Node) to () = function from (_ is (), n is Node) to () {
                 if (debugGadget) {
                     println("checking {n} => {n is HasGadget}");
                 }
                 if (hasGadget == null and n is HasGadget) {
                     hasGadget = n as HasGadget;
-                    println("found has gadget: {n}");
+                    if (debugGadget) {
+                        println("found has gadget: {n}");
+                    }
                 }
-            });
-        if (hasGadget == null) {
+                if (hasGadget == null and n is StageNode) {
+                   const sn = n as StageNode;
+                   for (x in sn.content) {
+                       x.root.foldLeft((), f)
+                   }
+                }
+            };
+        content.foldLeft((), f);
+        if (this.hasGadget <> hasGadget) {
             if (this.hasGadget <> null) {
                 gadget = null;
                 this.hasGadget = null;
             }
-        }  else {
+        } 
+        if (hasGadget <> null) {
             gadget = (this.hasGadget = hasGadget).getGadget();
+            if (debugGadget) {
+                println("gadget => {gadget}");
+            }
         }
-        
+        */
     }
 
     var dx = 0.0;
