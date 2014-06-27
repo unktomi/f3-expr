@@ -1385,7 +1385,8 @@ public function run from (args is String[]) to ()
                                             tabs: 
                                             [
                                  Tabview.Tab {
-                                     var browse = BrowseControl {
+                                     var browse = BrowseControl of Context {
+                                         history: bind contextModel.history;
                                          transform: bind translate(-windowContainingAssets.width/2+20, 1);
                                      }
                                      onSelect: function to ()
@@ -2095,7 +2096,7 @@ Tabview.Tab {
                                                                 const cb = 
                                                                     clip as ResourceTarget.ChannelBoxGroup;
                                                                 const p = (cb.parent as ResourceTarget.ChannelBoxesGroup);
-                                                                delete cb from p.boxes;
+                                                                delete cb from p.content;
                                                                 MasterUndoable.commit();
                                                             }
                                                         }

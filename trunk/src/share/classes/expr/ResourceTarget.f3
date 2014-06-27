@@ -11,11 +11,9 @@ class KeyTarget of a {
 
 public class ChannelBoxesGroup is TimeGroup {
     public const target is ResourceTarget;
-    public var boxes is ChannelBoxGroup[];
-    override var content = bind boxes;
     const undoList0 = UndoList {};
     postinit {
-        undoList0.addTarget("boxes", &boxes);
+        undoList0.addTarget("content", &content);
     }
 }
 
@@ -114,14 +112,14 @@ public interface ResourceTarget {
     public function addChannelBox to ChannelBoxGroup
     {
         var result = createChannelBox();
-        insert result into channelBoxes.boxes;
+        insert result into channelBoxes.content;
         return result;
     }
 
     public function addChannelBox from (n_id is Integer) to ChannelBoxGroup
     {
         var result = createChannelBox(n_id);
-        insert result into channelBoxes.boxes;
+        insert result into channelBoxes.content;
         return result;
     }
 

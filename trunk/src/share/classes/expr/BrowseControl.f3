@@ -5,16 +5,35 @@ import f3.media.scene.*;
 import f3.media.scene.Shape2D.*;
 import f3.media.input.*;
 
-public class BrowseControl is AbstractNode {
+public class BrowseControl of a is AbstractNode {
+
+    public const history is History of a;
+
     const rightArrow is Polygon = Polygon {
         points: [-3.5, -4.5, -3.5, 4.5, 3.5, 0];
     };
     const leftArrow is Polygon = Polygon {
         points: [3.5, -4.5, 3.5, 4.5, -3.5, 0];
     };
+    const backButton = VectorButton { 
+        shape: leftArrow; 
+        transform: translate(-8, 0);
+        height: 14;
+        width: 14;
+        onPress: bind history.back;
+        enabled: bind history.canGoBack();
+    };
+    const fwdButton = VectorButton { 
+        shape: rightArrow;
+        transform: translate(8, 0);
+        height: 14; 
+        width: 14;
+        onPress: bind history.forward;
+        enabled: bind history.canGoForward();
+    };
     override var internalContent = Group {
-        content: bind
-        [VectorButton { shape: leftArrow, transform: translate(-8, 0), height: 14, width: 14 },
-         VectorButton { shape: rightArrow, transform: translate(8, 0), height: 14, width: 14 }];
-    }
+        content: bind [backButton, fwdButton];
+    };
+    
+        
 }

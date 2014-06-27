@@ -1,0 +1,53 @@
+package expr;
+import f3.util.*;
+
+public class History of a {
+
+    var history is (..a)[];
+    var historyIndex is Integer = -1;
+
+    public function back to ()
+    {
+        if (canGoBack()) {
+            setSelection(history[--historyIndex])
+        }
+    }
+    public function forward to ()
+    {
+        if (canGoForward()) {
+            setSelection(history[++historyIndex])
+        }
+    }
+
+    public bound function canGoBack to Boolean { historyIndex > 0 }
+    public bound function canGoForward to Boolean { history.size() > historyIndex+1 }
+
+    public readonly var current is a = bind history[historyIndex];
+
+    function setSelection from (x is a) to ()
+    {
+        selectionObserver.onNext(x);
+    }
+
+    const selectionObserver is Subject of a = Subject of a {};
+    public function observeSelection to Observable of a 
+    {
+        selectionObserver;
+    }
+
+    public function go from (x is a) to ()
+    {
+        if (current <> x) {
+            delete history[historyIndex+1..];
+            historyIndex++;
+            insert x into history;
+        }
+    }
+
+    public function reset to ()
+    {
+        history = [];
+        historyIndex = -1;
+    }
+
+}
