@@ -8,12 +8,12 @@ import f3.media.input.*;
 public class TextButton is ResizableNode {
     public var text is String;
     var pressed is Boolean;
-    var hover is Paint = ColorPaint(Color.color(.9, .9, .9));
-    var active is Paint = ColorPaint(Color.color(.8, .8, .8));
-    var inactive is Paint = ColorPaint(Color.color(.9, .9, .9));
-    var textPaint is Paint = ColorPaint(Color.color(.2, .2, .2));
+    var hover is Paint = ColorPaint(Color.color(.3, .3, .3));
+    var active is Paint = ColorPaint(Color.color(.5, .5, .5));
+    var inactive is Paint = ColorPaint(Color.color(.3, .3, .3));
+    var textPaint is Paint = ColorPaint(Color.color(.9, .9, .9));
     var disabledFg is Paint = ColorPaint(Color.color(.65, .65, .65));
-    var blackPaint is Paint = ColorPaint(Color.BLACK);
+    var blackPaint is Paint = ColorPaint(Color.color(.5, .5, .5));
     override var height = 18;
     override var width = 28;
     public var enabled is Boolean = true;
