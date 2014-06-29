@@ -13,6 +13,7 @@ const labelFg = ColorPaint(Color.color(.25, .25, .25));
 const textBg = ColorPaint(Color.color(.4, .4, .4));
 
 public class CreateVar is ResizableNode, Focuser {
+    public var isShortcut is Boolean;
     public var assetModel is AssetTree.AssetModel;
     bound var font is Font = layoutEngine.createFont(Names.DEFAULT_FONT);
     bound var cellHeight = font.height();
@@ -77,6 +78,7 @@ public class CreateVar is ResizableNode, Focuser {
         font: bind font;
         foreground: bind textFg;
         background: bind textBg;
+        editable: bind not isShortcut;
     };
     var chooseTypeTransform is Mat4 = Mat4.<<1>>;
     const self = this;
@@ -84,6 +86,7 @@ public class CreateVar is ResizableNode, Focuser {
         transform: rotate(-90, Vec3.Z_AXIS);
 	points: [-3.5, -4.5, -3.5, 4.5, 3.5, 0];
 	fillPaint: textFg;
+        visible: bind not isShortcut;
         override function onMouseDown from (e is MouseEvent) to ()
         {
             const v = e.sceneLocation;
@@ -131,7 +134,7 @@ public class CreateVar is ResizableNode, Focuser {
 
     var selectedType is AssetTree.TypeAsset;
 
-    function selectType from (t is AssetTree.TypeAsset) to ()
+    public function selectType from (t is AssetTree.TypeAsset) to ()
     {
         selectedType = t;
         chooseType.searchField.setText(t.name);

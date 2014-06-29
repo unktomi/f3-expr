@@ -102,6 +102,8 @@ public class Tabview is ResizableNode, Focuser {
             maxLabelWidth = Math.max(maxLabelWidth, w);
         }
 	minTabWidth = maxLabelWidth + 10;
+        var maxRow = -1;
+        var maxCol = -1;
 	for (label in labels) {
             const i = indexof label;
             const tab = tabs[i];
@@ -115,6 +117,8 @@ public class Tabview is ResizableNode, Focuser {
             x += minTabWidth;
             tab.row = row;
             tab.column = col;
+            maxRow = Math.max(maxRow, row);
+            maxCol = Math.max(maxCol, col);
             col++;
 	}
         tabHeight = h;

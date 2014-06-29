@@ -2083,7 +2083,10 @@ public abstract class ExpressionView is AbstractNode {
                         items: 
                         [MenuItem {
                                 label: "Shortcut";
-                                action: canvas.factor.apply(this);
+                                action: function to () 
+                                {
+                                    canvas.shortcutPrompt(this, canvas.factorAs);
+                                }
                                 enabled: this is FunctionView and (this as FunctionView).output.getTree.getLinks().size() == 1
                             },
                             MenuItem {
@@ -4215,16 +4218,20 @@ class TreeLinker {
                 tv = null;
                 delete canvas.targetArrow from canvas.arrows;
                 link.unlink();
-                if (found <> null and not (found is ShortcutTarget)) {
-                    //cell.link();
-                    found.unlink();
-                    const newlink = LinkView { 
-                        canvas: canvas;
-                        source: cell.linkedView; 
-                        target: found;
-                    };
-                    newlink.link();
-                    canvas.dumpSrc();
+                if (found <> null) {
+                    if (found is ShortcutTarget) {
+                        canvas.shortcutPrompt(cell.linkedView, null);
+                    } else {
+                        //cell.link();
+                        found.unlink();
+                        const newlink = LinkView { 
+                            canvas: canvas;
+                            source: cell.linkedView; 
+                            target: found;
+                        };
+                        newlink.link();
+                        canvas.dumpSrc();
+                    }
                 } 
                 MasterUndoable.commit();
             });
@@ -4828,7 +4835,66 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     {
     }
 
-    function factor from (ev is ExpressionView) to ()
+    function shortcutPrompt from (self is ExpressionView, k is function from (ExpressionView, String) to ()) to ()
+    {
+        const canvas = this;
+        const popupLayer = canvas.popupLayer;
+        function handleCreate from (name is String, asset is TypeAsset) {
+            k(self, name);
+        }
+        const createVar = CreateVar {
+            isShortcut: true;
+            assetModel: bind canvas.assetModel;
+            popupLayer: bind popupLayer;
+            popupScene: bind canvas.popupScene;
+            create: function from (name is String, asset is AssetTree.TypeAsset) to () {
+                handleCreate(name, asset);
+                delete win from popupLayer.content;
+                popupLayer.modal = false;
+            }
+            cancel: function to () {
+                delete win from popupLayer.content;
+                popupLayer.modal = false;
+            }
+        };
+        println("SELF={self}");
+        if (self is FunctionView) {
+            const f = self as FunctionView;
+            const t = f.fun.ft.getReturnType();
+            println("t={t.getName()}");
+            createVar.selectType(canvas.assetModel.findTypeAsset(t.getName()));
+        }
+        const win = InternalWindow {
+            isMovable: false;
+            isResizable: false;
+            isTransient: true;
+            gadget: Text.Label {
+                text: "Create Shortcut";
+                override var font = bind layoutEngine.createFont(Names.DEFAULT_FONT); 
+                background: null;
+                foreground: Shape2D.ColorPaint(Color.color(.8, .8, .8));
+                transform: translate(2, 2);
+            }
+            containerBounds: bind Bounds.boundsFromRect(0, 
+                                                        0, 
+                                                        canvas.width,
+                                                        canvas.height);
+            content: createVar;
+            height: 140, width: 300;
+            //cx: e.sceneLocation.x, cy: e.sceneLocation.y;
+        };
+        win.cx = canvas.popupScene.mousePosition.x;
+        win.cy = canvas.popupScene.mousePosition.y;
+        insert win into popupLayer.content;
+        //editorScene.setFocus(createVar.nameField);
+        popupLayer.modal = true;
+    }
+
+    function factor from (ev is ExpressionView) to () {
+        factorAs(ev, "shortcut");
+    }
+
+    function factorAs from (ev is ExpressionView, name is String) to ()
     {
         const linked = new java.util.HashSet of ExpressionView();
         const links = new java.util.HashSet of LinkView();
@@ -4885,7 +4951,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             }
             const v = ClosureVarContext {
                 varType: asset;
-                variableName: "shortcut";    
+                variableName: name;    
                 parent: eventContext;
                 isShortcut: true;
             }
