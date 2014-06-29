@@ -98,24 +98,26 @@ public class Tabview is ResizableNode, Focuser {
             const i = indexof label;
             const tab = tabs[i];
             tab.index = i;
-            if (i == selectedIndex) {
-            }
 	    const w = label.font.width(label.text) + 6;
             maxLabelWidth = Math.max(maxLabelWidth, w);
-            if (x + w + 10 > width) {
+        }
+	minTabWidth = maxLabelWidth + 10;
+	for (label in labels) {
+            const i = indexof label;
+            const tab = tabs[i];
+            tab.index = i;
+            if (x + minTabWidth > width) {
                 row++;
                 x = 0;
                 col = 0;
                 h += TAB_HEIGHT+2;
-            } else {
-                x += w;
             }
+            x += minTabWidth;
             tab.row = row;
             tab.column = col;
             col++;
 	}
         tabHeight = h;
-	minTabWidth = maxLabelWidth + 10;
         for (t in tabs) {
             t.content.resize(contentWidth, contentHeight);
         }
