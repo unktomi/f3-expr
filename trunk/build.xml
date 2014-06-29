@@ -19,6 +19,9 @@
       <fileset dir="../form-follows-function/f3_xhtml/lib/" includes="core-renderer.jar"/>
       <fileset dir="../form-follows-function/f3_cg_jogl_awt/build/" includes="*.jar"/>
       <fileset dir="../form-follows-function/f3_cg_jogl_awt/lib/" includes="*.jar"/>
+      <fileset dir="../form-follows-function/f3_jbullet_jogl/lib/" includes="jbullet.jar"/>
+      <fileset dir="../form-follows-function/f3_jbullet_jogl/lib/" includes="vecmath.jar"/>
+      <fileset dir="../form-follows-function/f3_jbullet_jogl/build/" includes="*.jar"/>
       <fileset  erroronmissingdir="false" dir="../form-follows-function/f3_awesomium_jogl/build/" includes="*.jar"/>
       <fileset  erroronmissingdir="false" dir="../form-follows-function/f3_awesomium_jogl/lib/" includes="js.jar"/>
     </copy>
