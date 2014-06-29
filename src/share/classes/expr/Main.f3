@@ -301,6 +301,15 @@ public function run from (args is String[]) to ()
 	println("NOTE: couldn't load fmod sound factory");
     }
 
+    var theDynamicsWorldFactory is DynamicsWorldFactory;
+    try {
+	const clazz = 
+	    java.lang.Class.forName("org.f3.jbullet.JBulletDynamicsWorldFactory") as java.lang.Class of DynamicsWorldFactory;
+	theDynamicsWorldFactory = clazz.newInstance();
+    } catch (e is java.lang.Exception) {
+	println("NOTE: couldn't load jbullet dynamics world factory");
+    }
+
     println("args={args}");
 
     var playerUrl is String;
@@ -328,11 +337,14 @@ public function run from (args is String[]) to ()
         }
     }
 
+    const dynamicsWorld = theDynamicsWorldFactory.createDynamicsWorld();
+
     const player = Timeline {
 	override var paused = true on replace {
             if (not paused and playhead == 0s) {
                 ExprNode.Start.onNext(())
             }
+            dynamicsWorld.paused = paused;
         }
 	content: mainTimeLayer;
     }
@@ -345,6 +357,14 @@ public function run from (args is String[]) to ()
 	far: 10000;
         content: [PointLight {}, SoundListener {}]
     }
+
+    const freeCamera = camera;
+
+
+    const playhead = player.observePlayhead().subscribe(function from (sceneTime is Duration) to () 
+                                                        {
+                                                            dynamicsWorld.update(sceneTime, camera);
+                                                        });
 
     const viewer = DefaultExaminerViewer {
 	camera: camera;
@@ -502,6 +522,7 @@ public function run from (args is String[]) to ()
             addTimeResource(rtn);
 	} else if (url.endsWith(".ma")) {
 	    const model = Ma.Model {
+                dynamicsWorld: dynamicsWorld;
 		url: url;
 	    }
 	    const rn = MaResourceNode {
@@ -2446,6 +2467,7 @@ Tabview.Tab {
             for (z in currentScenes) {
                 z.instanceSpace.content = z.instanceSpace.content[ x | { var y = x as EventLayer.EventNode; y.timestamp <= player.playhead }];
             }
+            stage.invoke(function to () {  dynamicsWorld.debugDraw(freeCamera) })
         }
     };
     Inspector.allFontFamilies = (the Text.LayoutEngine).allFontFamilies;
