@@ -564,10 +564,14 @@ public class AssetModel is Treemodel {
         soundLoader: bind soundLoader; 
         movieLoader: bind movieLoader;
     };
+    
+    public const blendLayerAsset = BlendLayerAsset {};
+    public const transitionLayerAsset = TransitionLayerAsset{};
+    public const timeLayerAsset = TimeLayerAsset {};
 
     const temporal = AssetGroup {
         name: "Temporal";
-        content: [TimeLayerAsset {}, TransitionLayerAsset{}, BlendLayerAsset {}];
+        content: [timeLayerAsset, transitionLayerAsset, blendLayerAsset];
     };
 
     const spatial = AssetGroup { 

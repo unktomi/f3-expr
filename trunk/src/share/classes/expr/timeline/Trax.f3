@@ -1,5 +1,6 @@
 package expr.timeline;
 import expr.*;
+import expr.AssetTree.*;
 import expr.Names.*;
 import f3.media.scene.*;
 import f3.media.scene.Shape2D.*;
@@ -495,6 +496,10 @@ class TimeNodeView is AbstractNode
                                           label: "Layer";
                                           action: function to ()
                                           {
+                                              const tn = ResourceTimeNodeWrapper {
+                                                  wrapped: trax.assetModel.timeLayerAsset.getClip() as TimeGroup;
+                                              }
+                                              insert tn into (target as ResourceTarget.ChannelBoxesGroup).content;
                                           }
                                       },
                                       MenuItem {
@@ -502,13 +507,22 @@ class TimeNodeView is AbstractNode
                                          label: "Transition Layer";
                                          action: function to ()
                                          {
+                                              const tn = ResourceTimeNodeWrapper {
+                                                  wrapped: trax.assetModel.transitionLayerAsset.getClip() as TimeGroup;
+                                              }
+                                              insert tn into (target as ResourceTarget.ChannelBoxesGroup).content;
                                          }
                                       },
                                       MenuItem {
                                          factory: trax.menuFactory;
                                          label: "Blend Layer";
                                          action: function to ()
-                                         {
+                                          {
+                                              const tn = ResourceTimeNodeWrapper {
+                                                  playCount: -1;
+                                                  wrapped: trax.assetModel.blendLayerAsset.getClip() as TimeGroup;
+                                              }
+                                              insert tn into (target as ResourceTarget.ChannelBoxesGroup).content;
                                          }
                                       }]
                                  } into menu.items;
@@ -763,7 +777,7 @@ public class Playhead is AbstractNode
 public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable {
 
     public var menuFactory is MenuFactory;
-
+    public var assetModel is AssetModel;
     function editKey from (view is TimeNodeView, ch is Channel of Number, k is Key of Number) to () 
     {
         keyEditor.trax = this;

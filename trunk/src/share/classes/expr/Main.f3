@@ -1047,20 +1047,24 @@ public function run from (args is String[]) to ()
                 insert p into allPrograms;
                 ps
             }
-            for (box in i.animation) {
-                const channelBox = rn.addChannelBox(box.n_id);
-                channelBox.playTime = box.playTime;
-                channelBox.playRate = box.playRate;
-                channelBox.playCount = box.playCount;
-                channelBox.blendWeight = 1.0;//i.animation.blendWeight;
-                foreach (x in box.content) {
-                    const c = channelBox.resolveChannel(x.target);
-                    c.playTime = x.playTime;
-                    c.playCount = x.playCount;
-                    c.playRate = x.playRate;
-                    c.blendWeight = x.blendWeight;
-                    c.keys = foreach (k in x.keys) {
-                        c.createKey(k.keyTime, k.keyValue, f3.media.scene.KeyFrame.Linear);
+            for (j in i.animation) {
+                // @TODO handle layers
+                if (j is Resources.ChannelBoxResource) {
+                    const box = j as Resources.ChannelBoxResource;
+                    const channelBox = rn.addChannelBox(box.n_id);
+                    channelBox.playTime = box.playTime;
+                    channelBox.playRate = box.playRate;
+                    channelBox.playCount = box.playCount;
+                    channelBox.blendWeight = 1.0;//i.animation.blendWeight;
+                    foreach (x in box.channels) {
+                        const c = channelBox.resolveChannel(x.target);
+                        c.playTime = x.playTime;
+                        c.playCount = x.playCount;
+                        c.playRate = x.playRate;
+                        c.blendWeight = x.blendWeight;
+                        c.keys = foreach (k in x.keys) {
+                            c.createKey(k.keyTime, k.keyValue, f3.media.scene.KeyFrame.Linear);
+                        }
                     }
                 }
             }
@@ -2084,6 +2088,7 @@ Tabview.Tab {
 				    content: Scrollpane {
                                              canZoomVertical: false;
                                              content: trax = expr.timeline.Trax {
+                                                 assetModel: bind assetModel;
                                                  menuFactory: the MenuFactory;
                                                  clips: bind currentAnimResource.resources;
                                                  loop: bind nonInteractiveLoop;
@@ -2105,6 +2110,7 @@ Tabview.Tab {
                                                     content: graphEditor = expr.timeline.GraphEditor {
                                                         menuFactory: the MenuFactory;
                                                         mainTrax: bind trax;
+                                                        assetModel: bind assetModel;
                                                         eventTarget: bind contextModel.selectedMemberContext;
                                                         variableTargets: bind [contextModel.selectedVarContext];
                                                         resourceTargets: bind currentResource.resources;
