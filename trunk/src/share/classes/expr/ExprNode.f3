@@ -124,21 +124,25 @@ public class ExprNode is AbstractNode {
                 }
             }
         }
-        for (j in r.spatialResources, box in j.animation) {
-            const channelBox = ns[indexof j].addChannelBox(spatialRoot.content[indexof j] as TransformNode);
-            channelBox.playTime = box.playTime;
-            channelBox.playRate = box.playRate;
-            channelBox.playCount = box.playCount;
-            channelBox.blendWeight = 1.0;//i.animation.blendWeight;
-            foreach (y in box.content) {
-                const c = channelBox.lookup(y.target) as Channel of Number;
-                println("LOOKUP {y.target} => {c}");
-                c.playTime = y.playTime;
-                c.playCount = y.playCount;
-                c.playRate = y.playRate;
-                c.blendWeight = y.blendWeight;
-                c.keys = foreach (k in y.keys) {
-                    c.createKey(k.keyTime, k.keyValue, f3.media.scene.KeyFrame.Linear);
+        for (j in r.spatialResources, anim in j.animation) {
+            // @TODO handle layers
+            if (anim is Resources.ChannelBoxResource) {
+                const box = anim as Resources.ChannelBoxResource;
+                const channelBox = ns[indexof j].addChannelBox(spatialRoot.content[indexof j] as TransformNode);
+                channelBox.playTime = box.playTime;
+                channelBox.playRate = box.playRate;
+                channelBox.playCount = box.playCount;
+                channelBox.blendWeight = 1.0;//i.animation.blendWeight;
+                foreach (y in box.channels) {
+                    const c = channelBox.lookup(y.target) as Channel of Number;
+                    println("LOOKUP {y.target} => {c}");
+                    c.playTime = y.playTime;
+                    c.playCount = y.playCount;
+                    c.playRate = y.playRate;
+                    c.blendWeight = y.blendWeight;
+                    c.keys = foreach (k in y.keys) {
+                        c.createKey(k.keyTime, k.keyValue, f3.media.scene.KeyFrame.Linear);
+                    }
                 }
             }
         }

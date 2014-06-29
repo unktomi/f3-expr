@@ -380,6 +380,17 @@ public class Manipulator is AbstractNode
         moveZ.blocksPointer = true;
         moveZ.observeMouseDrag().subscribe(onMoveZ);
         moveAll = internalContent.lookup("MoveAll");
+        (moveAll as Ma.MaTransform).constraint = Constraint {
+            override var transform = bind 
+            if (scene.camera is PerspectiveCamera) 
+                then {
+                    var toLocal = moveAll.parentToSceneTransform.inverse();
+                    var rot = Quat.lookAt((toLocal * scene.camera.toSceneTransform.getTranslation())-Point3.<<0>>, 
+                                          toSceneTransform * Vec3.Y_AXIS);
+                    rot * translate(0, 0, 0.25)
+                }
+                else Mat4.<<1>>;
+        }
         moveAll.observeMouseDrag().subscribe(onMoveAll);
 
         const moveGuideX = internalContent.lookup("GuideMoveX");
