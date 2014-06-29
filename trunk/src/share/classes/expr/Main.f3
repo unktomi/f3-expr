@@ -337,7 +337,7 @@ public function run from (args is String[]) to ()
         }
     }
 
-    const dynamicsWorld = theDynamicsWorldFactory.createDynamicsWorld();
+    const dynamicsWorld = if (true) null else theDynamicsWorldFactory.createDynamicsWorld();
 
     const player = Timeline {
 	override var paused = true on replace {
@@ -718,6 +718,7 @@ public function run from (args is String[]) to ()
             player.setPlayhead(0.5s);
             player.setPlayhead(0s);
             player.paused = paused;
+            dynamicsWorld.reset();
         }
 	onHideFloating: function from (b is Boolean) to ()
 	{
