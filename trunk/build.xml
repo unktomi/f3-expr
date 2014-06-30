@@ -120,6 +120,7 @@
   <copy todir="demo.app/Contents/MacOS/dist">
     <fileset dir="dist"/>
   </copy>
+  <touch file="demo.app/.Trash"/> 
   <copy todir="demo.app/Contents/MacOS">
     <fileset dir="lib" includes="*.jar"/>
   </copy>
