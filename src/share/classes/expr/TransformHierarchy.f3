@@ -40,9 +40,14 @@ public class Treenode is Treeview.Treenode {
 public class WebBrowserTreenode is Treenode {
     override var canOpen = true;
     override var label = bind (n as WebBrowser).url;
+    var doc is TagNode;
+    override function open to () {
+        doc = ((n as WebBrowser).getImplementation() as Browser).getStaticDocument();
+        super.open();
+    }
     override var children = HtmlContentTreenode {
         n: bind n;
-        tagNode: bind ((n as WebBrowser).getImplementation() as Browser).getStaticDocument();
+        tagNode: bind doc;
     };
 }
 
