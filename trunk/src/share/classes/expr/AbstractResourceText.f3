@@ -38,7 +38,7 @@ public class FontWeightSelection is Selection of String {
 public class FontStyleSelection is Selection of String {
 }
 
-public abstract class AbstractResourceText is ResourceNode, TextAPI {
+public abstract class AbstractResourceText is ResourceNode, TextAPI, ResourceLeafNode {
     public var fontSize is FontSizeSelection = new FontSizeSelection(16);
     public var fontFamily is FontFamilySelection = new FontFamilySelection("Helvetica");
     public var fontWeight is FontWeightSelection = new FontWeightSelection("normal");
