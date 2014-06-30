@@ -111,7 +111,13 @@ function loadEditorState from (stage is JoglStage, scene is Scene, player is Tim
         }
         trax.setFrameRate(s.frameRate);
         player.setPlayhead((1s / s.frameRate) * s.playheadFrame);
-        return s.recent;
+        var result is String[];
+        for (u in s.recent) {
+            const x = new java.io.File(new java.net.URL(u).toURI());
+            const b = x.exists();
+            if (b) insert u into result;
+        }
+        return result;
     }
     return [];
 }
