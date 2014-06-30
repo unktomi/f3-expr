@@ -1,4 +1,13 @@
 package expr;
+import expr.undo.*;
 
 public class GroupResourceNode is ResourceNode {
+    public function deleteContent from (rn is ResourceNode) to ()
+    {
+        delete rn from content;
+    }
+    const undoList = UndoList {};
+    init {
+	undoList.addTarget("content", &content);
+    }
 }

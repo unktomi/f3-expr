@@ -380,7 +380,11 @@ public function run from (args is String[]) to ()
     function addResource from (rn is ResourceNode, pt is Point3) to ()
     {
         println("ADDING {rn} to {currentResource} th.scenes={transformHierarchy.scenes}, th.selectedScene={transformHierarchy.selectedScene}");
-	insert rn into currentResource.resources;
+        if (transformHierarchy.selectedNode is GroupResourceNode) {
+            insert rn into (transformHierarchy.selectedNode as GroupResourceNode).content;
+        } else {
+            insert rn into currentResource.resources;
+        }
 	transformHierarchy.selectNode(rn);
         if (rn.displayName == "") {
             rn.displayName = if (rn.$useLiteralId) then rn.id else Names.formatName(rn.id);
@@ -2340,7 +2344,7 @@ Tabview.Tab {
         var x = n;
         n.updateParent();
         while (x <> null) {
-        println("DELETE {x.getClass()} => {x}");
+            println("DELETE {x.getClass()} => {x}");
             if (x is ResourceTimeNode) {
                 const rn = x as ResourceTimeNode;
                 rn.foldLeft((), function from (_ is (), n is TimeNode) to () {
@@ -2360,12 +2364,16 @@ Tabview.Tab {
     function deleteResource from (n is Node) to () {
 	if (n is ResourceNode) {
 	    const rn = n as ResourceNode;
-	    delete n as ResourceNode from currentResource.resources;
-	    if (rn.temporal <> null) {
-		delete rn.temporal from currentAnimResource.resources;
-		//trax.setClips(currentAnimResource.resources);
-	    }
-            MasterUndoable.commit();        
+            if (rn.parent is GroupResourceNode) {
+                (rn.parent as GroupResourceNode).deleteContent(rn);
+            } else {
+                delete n as ResourceNode from currentResource.resources;
+                if (rn.temporal <> null) {
+                    delete rn.temporal from currentAnimResource.resources;
+                    //trax.setClips(currentAnimResource.resources);
+                }
+                MasterUndoable.commit();        
+            }
 	}
     }
 

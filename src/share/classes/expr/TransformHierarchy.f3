@@ -27,8 +27,8 @@ function shouldFormat from (n is Node) to Boolean {
 
 public class Treenode is Treeview.Treenode {
     public var n is Node;
-    override var label = bind if (n.parent is ResourceNode) then "Main Scene" else if shouldFormat(n) then formatName(n.id) else n.id;
-    function asGroup from (n is Node) to Group { if (n is Group) then n as Group else null }
+    override var label = bind if (n.parent is ResourceNode and not (n.parent is GroupResourceNode)) then "Main Scene" else if shouldFormat(n) then formatName(n.id) else n.id;
+    function asGroup from (n is Node) to Group { if (n is Group and not (n is ResourceLeafNode)) then n as Group else null }
     override var canOpen = bind { var g = asGroup(n); g.content.size() > 0 }
     override var children = bind foreach (x in asGroup(n).content) makeTreeNode(this, x);
     override function open to () {
