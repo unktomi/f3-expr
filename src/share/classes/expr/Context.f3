@@ -105,6 +105,22 @@ public class Context is Foldable of Context {
         }
         return null;
     }
+
+    public function resolveNodeContext from (n is ResourceNode) to ResourceNodeContext
+    {
+        var result is ResourceNodeContext;
+        foldLeft((), 
+                 function from (_ is (), c is Context) to ()
+                 {
+                     if (c is ResourceNodeContext) {
+                         const x = (c as ResourceNodeContext);
+                         if (x.resource == n) {
+                             result = x;
+                         }
+                     }
+                 });
+        return result;
+    }
 }
 
 public abstract class GroupContext is Context {
@@ -197,7 +213,7 @@ public class ResourceNodeContext is GroupContext, ResourceObjectContext {
         bind uniquify(Expression.introspect(Reflect.getType(typeName) as F3ClassType));
 
     public readonly var memberCtxs = bind foreach (x in members) if (not x.name.startsWith("observe")) then null else x;
-    protected var containedNodes = bind foreach (x in resource.content) SubResourceNodeContext {
+    protected var containedNodes = bind foreach (x in resource.content) if (x is ResourceNode) then null else SubResourceNodeContext {
         parent: this;
         resource: resource;
         node: x

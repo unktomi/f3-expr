@@ -33,36 +33,35 @@ public class GraphEditor is Trax {
 
     override function deleteKeys to () 
     {
-        foreach (resourceTarget in resourceTargets, box in resourceTarget.channelBoxes.content, clip in (box as TimeGroup).content) {
-            const ch = clip as Channel of ?;
-            const m = ch.toSceneTransform.inverse();
-            ch.deleteKeys(m * selectionStartTime, m * selectionEndTime);
+        foreach (resourceTarget in resourceTargets, box in resourceTarget.channelBoxes.content) {
+            box.foldLeft((), 
+                         function from (_ is (), clip is TimeNode) to () 
+                         {
+                             if (clip is Channel of ?) {
+                                 const ch = clip as Channel of ?;
+                                 const m = ch.toSceneTransform.inverse();
+                                 ch.deleteKeys(m * selectionStartTime, m * selectionEndTime);
+                             }
+                         });
         }
     }
 
     override public function setKeys to () 
     {
-        for (resourceTarget in resourceTargets, box in resourceTarget.channelBoxes.content, clip in (box as TimeGroup).content where clip.pickableInScene) {
-            const ch = clip as Channel of Number;
-            const k = ch.pickKey(ch.localTime);
-            if (k <> null) {
-                ch.setKey(k.interpolator);
-            } else {
-                ch.setKey(KeyFrame.Linear);
-            }
-        }
-        for (clip in clips where clip is Channel of Number) {
-            const ch = clip as Channel of Number;
-            if (ch.targets == []) {
-                println("No target: {clip}");
-                continue;
-            }
-            const k = ch.pickKey(ch.localTime);
-            if (k <> null) {
-                ch.setKey(k.interpolator);
-            } else {
-                ch.setKey(KeyFrame.Linear);
-            }
+        foreach (resourceTarget in resourceTargets, box in resourceTarget.channelBoxes.content) {
+            box.foldLeft((), 
+                         function from (_ is (), clip is TimeNode) to () 
+                         {
+                             if (clip.pickableInScene and clip is Channel of ?) {
+                                 const ch = clip as Channel of Number;
+                                 const k = ch.pickKey(ch.localTime);
+                                 if (k <> null) {
+                                     ch.setKey(k.interpolator);
+                                 } else {
+                                     ch.setKey(KeyFrame.Linear);
+                                 }
+                             }
+                         });
         }
         super.setKeys();
     }

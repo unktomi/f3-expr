@@ -40,6 +40,10 @@ public class ProjectResource is Resource {
     public var allResources is Resource[];
 }
 
+public class SpatialResourceGroup is SpatialResource {
+    public var resources is SpatialResource[];
+}
+
 public class SpatialResource is Resource {
     public var tx is Number;
     public var ty is Number;
@@ -217,6 +221,29 @@ class ResourceBuilder {
                 pz: n.pz;
                 programs: progs;
                 animation: anims;
+            }
+        } else if (n is GroupResourceNode) {
+            const g = n as GroupResourceNode;
+            SpatialResourceGroup {
+                url: convertUrl(n.url);
+                tx: n.tx;
+                ty: n.ty;
+                tz: n.tz;
+                
+                sx: n.sx;
+                sy: n.sy;
+                sz: n.sz;
+                
+                rx: n.rx;
+                ry: n.ry;
+                rz: n.rz;
+                
+                px: n.px;
+                py: n.py;
+                pz: n.pz;
+                programs: progs;
+                animation: anims;
+                resources: foreach (x in g.content) makeResource(x as ResourceNode);
             }
         } else {
             SpatialResource {

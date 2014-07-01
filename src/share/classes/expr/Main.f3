@@ -386,36 +386,38 @@ public function run from (args is String[]) to ()
     function addResource from (rn is ResourceNode, pt is Point3) to ()
     {
         println("ADDING {rn} to {currentResource} th.scenes={transformHierarchy.scenes}, th.selectedScene={transformHierarchy.selectedScene}");
+        var groupContext is Context.GroupContext = contextModel.selectedGroupContext;
         if (transformHierarchy.selectedNode is GroupResourceNode) {
             insert rn into (transformHierarchy.selectedNode as GroupResourceNode).content;
+            groupContext = mainContext.resolveNodeContext(transformHierarchy.selectedNode as ResourceNode);
         } else {
             insert rn into currentResource.resources;
+        } 
+        var ctx is Context.ResourceNodeContext;
+        if (rn is ResourceTextField) {
+            ctx = Context.ResourceTextFieldContext { 
+                parent: groupContext;
+                resource: rn;
+            }
+        } else if (rn is ResourceLabel) {
+            ctx = Context.ResourceLabelContext { 
+                parent: groupContext;
+                resource: rn;
+            }
+        } else {
+            ctx = Context.ResourceNodeContext { 
+                parent: groupContext;
+                resource: rn;
+            }
         }
-	transformHierarchy.selectNode(rn);
+        insert ctx into groupContext.content;
         if (rn.displayName == "") {
             rn.displayName = if (rn.$useLiteralId) then rn.id else Names.formatName(rn.id);
         }
         if (currentScene == mainScene) {
             viewer.focusCamera(rn);
         }
-        var ctx is Context.ResourceNodeContext;
-        if (rn is ResourceTextField) {
-            ctx = Context.ResourceTextFieldContext { 
-                parent: contextModel.selectedGroupContext; 
-                resource: rn;
-            }
-        } else if (rn is ResourceLabel) {
-            ctx = Context.ResourceLabelContext { 
-                parent: contextModel.selectedGroupContext; 
-                resource: rn;
-            }
-        } else {
-            ctx = Context.ResourceNodeContext { 
-                parent: contextModel.selectedGroupContext; 
-                resource: rn;
-            }
-        } 
-        insert ctx into contextModel.selectedGroupContext.content;
+        transformHierarchy.selectNode(rn);
         println("added asset to context { contextModel.selectedGroupContext } => {contextModel.selectedGroupContext.content}");
         if (currentScene.camera is Camera2D) {
             rn.tx = pt.x;
@@ -953,8 +955,146 @@ public function run from (args is String[]) to ()
             ps
         }
         mainContext.programs = topLevels;
+        function makeSpatRes from (i is Resources.SpatialResource) to ()
+        {
+            if (i is TextFieldResource) {
+                const r = i as TextFieldResource;
+                const tf = ResourceTextField {
+                    id: r.id;
+                    url: r.url;
+                    fontSize: new FontSizeSelection(r.fontSize);
+                    fontFamily: new FontFamilySelection(r.fontFamily);
+                    fontStyle: new FontStyleSelection(r.fontStyle);
+                    fontWeight: new FontWeightSelection(r.fontWeight);
+                    foreground: parseColor(r.foreground);
+                    background: parseColor(r.background);
+                    width: r.width;
+                };
+                tf.setText(r.text);
+                addResource(tf, new Point3(i.tx, i.ty, i.tz));
+            } else if (i is TextOutputResource) {
+                const r = i as TextOutputResource;
+                const tf = ResourceLabel {
+                    id: r.id;
+                    url: r.url;
+                    fontSize: new FontSizeSelection(r.fontSize);
+                    fontFamily: new FontFamilySelection(r.fontFamily);
+                    fontStyle: new FontStyleSelection(r.fontStyle);
+                    fontWeight: new FontWeightSelection(r.fontWeight);
+                    foreground: parseColor(r.foreground);
+                    background: parseColor(r.background);
+                    width: r.width;
+                };
+                tf.setText(r.text);
+                addResource(tf, new Point3(i.tx, i.ty, i.tz));
+            } else if (i is Resources.SpatialResourceGroup) {
+                const gn = GroupResourceNode {
+                    url: i.url;
+                }
+                addResource(gn, new Point3(i.tx, i.ty, i.tz));
+            } else {
+                doDrop(rebaseURL(i.url), new Point3(i.tx, i.ty, i.tz));
+            }
+	    currentTransform.tx = i.tx;
+	    currentTransform.ty = i.ty;
+	    currentTransform.tz = i.tz;
+
+	    currentTransform.sx = i.sx;
+	    currentTransform.sy = i.sy;
+	    currentTransform.sz = i.sz;
+
+	    currentTransform.rx = i.rx;
+	    currentTransform.ry = i.ry;
+	    currentTransform.rz = i.rz;
+
+	    currentTransform.px = i.px;
+	    currentTransform.py = i.py;
+	    currentTransform.pz = i.pz;
+            const rn = (currentTransform as ResourceNode);
+            rn.programs = foreach (prog in i.programs) {
+                const mem = prog.event.deserialize();;
+                const p = Program {
+                    event: mem;
+                    code: prog.code;
+                    sourceCode: prog.compiled;
+                    targetPath: prog.targetPath;
+                    evalContext: Program.EvalContext {
+                        interactive: function from () to Boolean { interactive } 
+                        targetNode: (currentTransform as ResourceTarget).findTarget(prog.targetPath);
+                        instanceSpace: currentScene.instanceSpace;
+                        lookupSpatial: currentScene.root.lookup;
+                        targetTimeline: player;
+                        lookupTemporal: mainTimeLayer.lookup;
+                    }
+                }
+                var ps = [p];
+                var targetContext = resolveContext(rn, p);
+                println("RESOLVED CONTEXT {rn} => {targetContext}");
+                for (d in prog.variables) {
+                    const v = Context.ClosureVarContext {
+                        parent: targetContext;
+                        variableName: d.varName;
+                        varType: findTypeAsset(d.varType);
+                        isShortcut: d.isShortcut;
+                    }
+                    insert v into targetContext.content;
+                    println("CREATED VAR: {v}");
+                    const vp = Program {
+                        parent: p;
+                        event: p.event;
+                        code: d.code;
+                        sourceCode: d.sourceCode;
+                        targetPath: prog.targetPath;
+                        evalContext: Program.EvalContext {
+                            eventContext: targetContext as Context.MemberContext;
+                            varContext: v;
+                            interactive: function from () to Boolean { interactive } 
+                            targetNode: (currentTransform as ResourceTarget).findTarget(prog.targetPath);
+                            instanceSpace: currentScene.instanceSpace;
+                            lookupSpatial: currentScene.root.lookup;
+                            targetTimeline: player;
+                            lookupTemporal: mainTimeLayer.lookup;
+                        }
+                    }
+                    v.program = vp;
+                    p.defineVar(v, vp);
+                    insert vp into ps;
+                }
+                println("CREATING PROGRAM**** {prog} => {p.sourceCode}");
+                insert p into allPrograms;
+                ps
+            }
+            for (j in i.animation) {
+                // @TODO handle layers
+                if (j is Resources.ChannelBoxResource) {
+                    const box = j as Resources.ChannelBoxResource;
+                    const channelBox = rn.addChannelBox(box.n_id);
+                    channelBox.playTime = box.playTime;
+                    channelBox.playRate = box.playRate;
+                    channelBox.playCount = box.playCount;
+                    channelBox.blendWeight = 1.0;//i.animation.blendWeight;
+                    foreach (x in box.channels) {
+                        const c = channelBox.resolveChannel(x.target);
+                        c.playTime = x.playTime;
+                        c.playCount = x.playCount;
+                        c.playRate = x.playRate;
+                        c.blendWeight = x.blendWeight;
+                        c.keys = foreach (k in x.keys) {
+                            c.createKey(k.keyTime, k.keyValue, f3.media.scene.KeyFrame.Linear);
+                        }
+                    }
+                }
+            }
+            if (i is Resources.SpatialResourceGroup) {
+                const g = i as Resources.SpatialResourceGroup;
+                for (x in g.resources) {
+                    makeSpatRes(x);
+                }
+            }
+        }
 	for (i in sceneRes.spatialResources) {
             println("I={i}");
+            /*
             if (i is TextFieldResource) {
                 const r = i as TextFieldResource;
                 const tf = ResourceTextField {
@@ -1078,6 +1218,8 @@ public function run from (args is String[]) to ()
                     }
                 }
             }
+            */
+            makeSpatRes(i);
 	}
         var tempResources = currentAnimResource.resources;
         currentAnimResource.resources = [];
@@ -2379,6 +2521,25 @@ Tabview.Tab {
                     //trax.setClips(currentAnimResource.resources);
                 }
                 MasterUndoable.commit();        
+            }
+            var toDelete is Context[];
+            mainContext.foldLeft((), 
+                                 function from (_ is (), c is Context) to () 
+                                 {
+                                     if (c is Context.ResourceNodeContext) {
+                                         const rnc = c as Context.ResourceNodeContext;
+                                         if (rnc.resource == rn) {
+                                             insert c into toDelete;
+                                         }
+                                     } else if (c is Context.ResourceTimeNodeContext) {
+                                         const rtnc = c as Context.ResourceTimeNodeContext;
+                                         if (rtnc.resource == rn.temporal) {
+                                             insert c into toDelete;
+                                         }
+                                     }
+                                 });
+            for (x in toDelete) {
+                (x.parent as Context.GroupContext).deleteContent(x);
             }
 	}
     }
