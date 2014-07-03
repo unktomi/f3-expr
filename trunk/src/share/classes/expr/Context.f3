@@ -433,6 +433,23 @@ public class MemberContext is GroupContext, ProgramContext {
 }
 
 public class ContextTreemodel is Treemodel {
+    var tfReparent is Disposable;
+    public const transformHierarchy is TransformHierarchy on replace {
+        tfReparent.dispose();
+        tfReparent = 
+            transformHierarchy.observeNodeMoved().subscribe(function from (x is TransformHierarchy.Reparent) to ()
+                                                            {
+                                                                println("REPARENT {x.node} from {x.fromParent} to {x.toParent}");
+                                                                const ctx = rootContext.resolveNodeContext(x.node);
+                                                                (ctx.parent as GroupContext).deleteContent(ctx);
+                                                                if (x.toParent is GroupResourceNode) {
+                                                                    const target = rootContext.resolveNodeContext(x.toParent as ResourceNode);
+                                                                    insert ctx into (target as GroupContext).content;
+                                                                } else {
+                                                                    insert ctx into rootContext.content;
+                                                                }
+                                                            });
+    }
     public const history is History of Context = History of Context {};
     const d = history.observeSelection().subscribe(function from (c is Context) to () {
             selectionObserver.onNext(toTreeNode(c));

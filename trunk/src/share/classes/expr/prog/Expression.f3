@@ -4613,25 +4613,31 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     }
     override public bound function getTx to Number { 1.0-(cx + width/2.0) / width }
     override public bound function getSx to Number { 
-        //Math.min(width / localSpace.bounds.width(), 1.0);
-        0.1
+        //Math.min(width / localSpace.contentBounds.width(), 1.0);
+        //zoomx;
+        .1
     }    
 
     override public bound function getTy to Number { (cy + height/2.0) / height }
 
     override public bound function getSy to Number { 
-        //Math.min(height / localSpace.bounds.height(), 1.0);
-        0.2
+        //Math.min(height / localSpace.contentBounds.height(), 1.0);
+        //zoomy;
+        .2
     }
 
     override public function setX from (tx is Number, sx is Number) to ()
     {
-        cx = (0.5-tx) * width;
+        //println("SET X {tx} {sx}");
+        cx = (0.5-tx) * width
+        //zoomx = sx;
     }
 
     override public function setY from (ty is Number, sy is Number) to ()
     {
+        //println("SET Y {ty} {sy}");
         cy = ty * height - height/2.0;
+        //zoomy = sy;
     }
 
     public function onDrop from (where is Pick, m is Member) to ()
@@ -6004,6 +6010,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             var popup is Node = getPopup(e, members, function (j is LinkedInputView) to () {
                     delete popupLayer.content;
                     popupLayer.modal = false;
+                    popupDisp.dispose();
                     k(j)
                 });
             println("POPUP AT {e.sceneLocation}");
@@ -6712,6 +6719,8 @@ public class Editor is ResizableNode, Focuser {
         width: bind width;
         height: bind height;
         content: bind canvas;
+        canZoomVertical: false;
+        canZoomHorizontal: false;
     }
 
     function getCanvas 
