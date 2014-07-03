@@ -264,7 +264,16 @@ public class RootPackageAsset is PackageAsset {
             name: "()";
             t: Reflect.UNIT_TYPE;
             containedAssets: MemberAsset { member: Expression.UNIT_MEMBER }
-        }/*,
+        }
+        ClassAsset {
+                className: "Either";
+                clazz: Reflect.findClass("f3.lang.Either");
+        },
+        ClassAsset {
+                className: "Both";
+                clazz: Reflect.findClass("f3.lang.Both");
+        },
+        /*,
         PrimitiveTypeAsset {
                 name: "Events";
                 t: Reflect.OBSERVABLE_TYPE;

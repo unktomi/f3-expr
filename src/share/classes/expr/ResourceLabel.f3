@@ -7,6 +7,7 @@ import f3.media.scene.Shape2D.*;
 public class ResourceLabel is AbstractResourceText {
 
     public var text is String;
+    override var background is Color = new Color(.9, .9, .9, 0.0);
 
     override public function setText from (text is String) to ()
     {

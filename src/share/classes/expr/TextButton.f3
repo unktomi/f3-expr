@@ -20,12 +20,14 @@ public class TextButton is ResizableNode {
     override var internalContent = Group {
 	content: bind 
 	[Rectangle { 
+            pickable: bind enabled;
             height: bind height, 
             width: bind width, 
             fillPaint: bind if (not enabled) then inactive else if (containsPointer) then (if (pressed) then active else hover) else inactive;
             strokePaint: bind if (containsPointer and enabled) then blackPaint else inactive;
         },
         Text.Label {
+            pickable: false;
             width: bind width;
             text: bind text;
             override var font = bind layoutEngine.createFont(Names.DEFAULT_FONT); 

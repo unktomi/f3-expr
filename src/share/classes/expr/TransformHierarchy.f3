@@ -7,6 +7,12 @@ import expr.Names.*;
 import org.htmlcleaner.*;
 import org.f3.media.web.awesomium.Browser;
 
+public class Reparent {
+    public const node is ResourceNode;
+    public const fromParent is Object;
+    public const toParent is Object;
+}
+
 bound function makeTreeNode from (parent is Treeview.Treenode, n is Node) to Treenode {
     if (n is WebBrowser) {
         WebBrowserTreenode {
@@ -254,9 +260,15 @@ public class TransformHierarchy
         selectNode(t);
     }
 
+    const reparentSubject = Subject of Reparent {}
+
+    public function observeNodeMoved to Observable of Reparent { reparentSubject }
+
     public function move from (src is Node, target is Node) to ()
     {
 	const srcParent = src.parent as Group;
+        var fromParent is Node = srcParent;
+        var toParent is Node;
         if (srcParent is ResourceGroup) {
             delete src as ResourceNode from (srcParent as ResourceGroup).resources;
         } else if (src is SceneAPI) {
@@ -283,6 +295,7 @@ public class TransformHierarchy
             } else {
                 insert src after parent.content[i];
             }
+            toParent = parent;
 	} else {
 	    const parent = target as Group;
             println("inserting into: {parent}");
@@ -292,7 +305,17 @@ public class TransformHierarchy
             } else {
                 insert src before parent.content[0];
             }
+            toParent = parent;
 	}
+        if (src is ResourceNode) {
+            println("notifying reparent: {src}");
+            reparentSubject.onNext(Reparent 
+                                   {
+                                       node: src as ResourceNode;
+                                       fromParent: fromParent;
+                                       toParent: toParent;
+                                   });
+        }
     }
 
     const selection = Subject of TransformNode {};

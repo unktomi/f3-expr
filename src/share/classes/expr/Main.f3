@@ -214,6 +214,7 @@ public function run from (args is String[]) to ()
 
     var contextModel is Context.ContextTreemodel = Context.ContextTreemodel {
         rootContext: bind mainContext;
+        transformHierarchy: bind transformHierarchy;
     } 
 
     contextModel.reset();
@@ -229,8 +230,10 @@ public function run from (args is String[]) to ()
             for (c1 in [c, c.getContent()]) {
                 if (c1 is Context.ResourceNodeContext) {
                     const rc = c1 as Context.ResourceNodeContext;
-                    println("visible = {v} => {rc.resource}");
                     rc.resource.visible = v;
+                    if (rc <> ctx and rc.resource is GroupResourceNode) {
+                        handleContextVisibility(rc, v);
+                    }
                 }
             }
             c = c.parent;
