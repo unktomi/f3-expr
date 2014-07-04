@@ -22,12 +22,15 @@
       <fileset dir="../form-follows-function/f3_jbullet_jogl/lib/" includes="jbullet.jar"/>
       <fileset dir="../form-follows-function/f3_jbullet_jogl/lib/" includes="vecmath.jar"/>
       <fileset dir="../form-follows-function/f3_jbullet_jogl/build/" includes="*.jar"/>
+      <fileset dir="../form-follows-function/f3_assimp/build/" includes="*.jar"/>
+      <fileset dir="../form-follows-function/f3_assimp/lib/" includes="jassimp.jar"/>
       <fileset  erroronmissingdir="false" dir="../form-follows-function/f3_awesomium_jogl/build/" includes="*.jar"/>
       <fileset  erroronmissingdir="false" dir="../form-follows-function/f3_awesomium_jogl/lib/" includes="js.jar"/>
     </copy>
     <copy todir="lib/macosxuniversal">
       <fileset dir="../form-follows-function/f3_cg_jogl_awt/lib/macosxuniversal" includes="*.dylib"/>
       <fileset dir="../form-follows-function/f3_cg_jogl_awt/lib/macosxuniversal" includes="*.jnilib"/>
+      <fileset dir="../form-follows-function/f3_assimp/lib/macosxuniversal" includes="*.dylib"/>
       <fileset erroronmissingdir="false" dir="../form-follows.function/f3_awesomium_jogl/build/native" includes="*.dylib"/>
     </copy>
   <taskdef name="f3c" classname="org.f3.tools.ant.F3AntTask" >
@@ -83,6 +86,7 @@
 		<path path="lib/f3.xhtml.awt.jar"/>
 		<path path="lib/f3.awesomium.jogl.jar"/>
 		<path path="lib/f3.cg.jogl.awt.jar"/>
+		<path path="lib/f3.assimp.jar"/>
 		<path path="lib/json-simple-1.1.1.jar"/>
 		<path path="lib/guava-16.0.1.jar"/>
 		<path path="lib/paranamer-2.6.jar"/>

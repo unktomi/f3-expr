@@ -7,6 +7,7 @@ import expr.prog.Expression.ExprScene;
 import expr.prog.Program;
 import expr.prog.Expression.MemberNode;
 import expr.ResourceNode.MaResourceNode;
+import expr.ResourceNode.F3AssimpResourceNode;
 import f3.util.Bits;
 
 public class Resource {
@@ -140,6 +141,11 @@ class ResourceBuilder {
     function makeResource from (n is ResourceNode) to SpatialResource {
         if (n is MaResourceNode) {
             for (x in (n as MaResourceNode).model.getResources()) {
+                convertUrl(x);
+            }
+        }
+        if (n is F3AssimpResourceNode) {
+            for (x in (n as F3AssimpResourceNode).model.getResources()) {
                 convertUrl(x);
             }
         }

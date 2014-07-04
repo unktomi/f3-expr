@@ -451,7 +451,8 @@ public function run from (args is String[]) to ()
     {
         println("DO DROP : {url}");
 	playerUrl = url;
-	if (url.endsWith(".expr")) {
+        const loweredUrl = url.toLowerCase();
+	if (loweredUrl.endsWith(".expr")) {
 	    const model = ExprNode {
                 webBrowserFactory: TheWebBrowserFactory
 		url: url;
@@ -474,7 +475,7 @@ public function run from (args is String[]) to ()
                     addTimeResource(rtn);
                 }
             }
-	} else if (url.endsWith(".mp4") or url.endsWith(".mov")) {
+	} else if (loweredUrl.endsWith(".mp4") or loweredUrl.endsWith(".mov")) {
             const movie = Movie {
                 url: url;
                 paused: true;
@@ -496,29 +497,29 @@ public function run from (args is String[]) to ()
                 }
 	    }
             addTimeResource(rtn);
-	} else if (url.endsWith(".aif") or 
-                   url.endsWith(".aiff") or 
-                   url.endsWith(".asf") or 
-                   url.endsWith(".asx") or
-                   url.endsWith(".dls") or
-                   url.endsWith(".flac") or
-                   url.endsWith(".fsb") or
-                   url.endsWith(".it") or
-                   url.endsWith(".m3u") or
-                   url.endsWith(".mid") or
-                   url.endsWith(".midi") or
-                   url.endsWith(".mod") or
-                   url.endsWith(".mp2") or
-                   url.endsWith(".mp3") or
-                   url.endsWith(".pls") or
-                   url.endsWith(".pls") or
-                   url.endsWith(".s3m") or
-                   url.endsWith(".vag") or
-                   url.endsWith(".wav") or
-                   url.endsWith(".wax") or
-                   url.endsWith(".wma") or
-                   url.endsWith(".xm") or
-                   url.endsWith(".xma")){
+	} else if (loweredUrl.endsWith(".aif") or 
+                   loweredUrl.endsWith(".aiff") or 
+                   loweredUrl.endsWith(".asf") or 
+                   loweredUrl.endsWith(".asx") or
+                   loweredUrl.endsWith(".dls") or
+                   loweredUrl.endsWith(".flac") or
+                   loweredUrl.endsWith(".fsb") or
+                   loweredUrl.endsWith(".it") or
+                   loweredUrl.endsWith(".m3u") or
+                   loweredUrl.endsWith(".mid") or
+                   loweredUrl.endsWith(".midi") or
+                   loweredUrl.endsWith(".mod") or
+                   loweredUrl.endsWith(".mp2") or
+                   loweredUrl.endsWith(".mp3") or
+                   loweredUrl.endsWith(".pls") or
+                   loweredUrl.endsWith(".pls") or
+                   loweredUrl.endsWith(".s3m") or
+                   loweredUrl.endsWith(".vag") or
+                   loweredUrl.endsWith(".wav") or
+                   loweredUrl.endsWith(".wax") or
+                   loweredUrl.endsWith(".wma") or
+                   loweredUrl.endsWith(".xm") or
+                   loweredUrl.endsWith(".xma")){
             const sound = Sound.Sample {
                 url: url;
                 paused: true
@@ -535,7 +536,7 @@ public function run from (args is String[]) to ()
             rn.temporal = rtn;
 	    addResource(rn, pt);
             addTimeResource(rtn);
-	} else if (url.endsWith(".ma")) {
+	} else if (loweredUrl.endsWith(".ma")) {
 	    const model = Ma.Model {
                 dynamicsWorld: dynamicsWorld;
 		url: url;
@@ -550,7 +551,63 @@ public function run from (args is String[]) to ()
 	    }
             rn.temporal = rtn;
             addTimeResource(rtn);
-	} else if (url.endsWith(".xhtmli")) {
+	} else if (loweredUrl.endsWith(".fbx") or 
+                   loweredUrl.endsWith(".blend") or
+                   loweredUrl.endsWith(".dae") or
+                   loweredUrl.endsWith(".3ds") or
+                   loweredUrl.endsWith(".ase") or
+                   loweredUrl.endsWith(".obj") or
+                   loweredUrl.endsWith(".ifc") or
+                   loweredUrl.endsWith(".xgl") or
+                   loweredUrl.endsWith(".zgl") or
+                   loweredUrl.endsWith(".ply") or
+                   loweredUrl.endsWith(".dxf") or
+                   loweredUrl.endsWith(".lwo") or
+                   loweredUrl.endsWith(".lws") or
+                   loweredUrl.endsWith(".lxo") or
+                   loweredUrl.endsWith(".stl") or
+                   loweredUrl.endsWith(".x") or
+                   loweredUrl.endsWith(".ac") or
+                   loweredUrl.endsWith(".ms3d") or
+                   loweredUrl.endsWith(".cob") or
+                   loweredUrl.endsWith(".scn") or
+                   loweredUrl.endsWith(".bvh") or
+                   loweredUrl.endsWith(".csm") or
+                   loweredUrl.endsWith(".mdl") or
+                   loweredUrl.endsWith(".md2") or
+                   loweredUrl.endsWith(".md3") or
+                   loweredUrl.endsWith(".pk3") or
+                   loweredUrl.endsWith(".md5") or
+                   loweredUrl.endsWith(".smd") or
+                   loweredUrl.endsWith(".vta") or
+                   loweredUrl.endsWith(".m3") or
+                   loweredUrl.endsWith(".3d") or
+                   loweredUrl.endsWith(".b3d") or
+                   loweredUrl.endsWith(".q3d") or
+                   loweredUrl.endsWith(".q3o") or
+                   loweredUrl.endsWith(".q3s") or
+                   loweredUrl.endsWith(".nff") or
+                   loweredUrl.endsWith(".raw") or
+                   loweredUrl.endsWith(".ter") or
+                   loweredUrl.endsWith(".hmp") or
+                   loweredUrl.endsWith(".ndo")
+                   ) {
+            const assimp = F3Assimp {
+                url: url;
+            }
+	    const rn = F3AssimpResourceNode {
+                model: assimp;
+		content: bind assimp.spatialRoot;
+	    }	
+	    addResource(rn, pt);
+	    const rtn = ResourceTimeNode {
+                url: url;
+		spatial: rn;
+                content: bind assimp.temporalRoot;
+	    }
+            rn.temporal = rtn;
+            addTimeResource(rtn);
+	} else if (loweredUrl.endsWith(".xhtmli")) {
 	    const xhtml = XHTML.Text {
 		content: readTextFile(url).first;
 	    }
@@ -559,7 +616,7 @@ public function run from (args is String[]) to ()
 		content: bind xhtml;
 	    }	
 	    addResource(rn, pt);
-	} else if (url.endsWith(".xhtml")) {
+	} else if (loweredUrl.endsWith(".xhtml")) {
 	    const xhtml = XHTML.Document {
 		url: url;
 	    }
@@ -568,7 +625,7 @@ public function run from (args is String[]) to ()
 		content: bind xhtml;
 	    }	
 	    addResource(rn, pt);
-	} else if (url.endsWith(".svg")) {
+	} else if (loweredUrl.endsWith(".svg")) {
 	    const svg = SVG {
 		url: url;
 	    }
@@ -577,7 +634,7 @@ public function run from (args is String[]) to ()
 		content: bind svg.root;
 	    }	
 	    addResource(rn, pt);
-	} else if (url.endsWith(".png") or url.endsWith(".jpg") or url.endsWith(".tif") or url.endsWith(".tiff") or url.endsWith(".tga")) {
+	} else if (loweredUrl.endsWith(".png") or loweredUrl.endsWith(".jpg") or loweredUrl.endsWith(".tif") or loweredUrl.endsWith(".tiff") or loweredUrl.endsWith(".tga")) {
 	    const image= Image { 
 		url: url;
 	    }
