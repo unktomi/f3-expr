@@ -90,6 +90,7 @@
 		<path path="lib/json-simple-1.1.1.jar"/>
 		<path path="lib/guava-16.0.1.jar"/>
 		<path path="lib/paranamer-2.6.jar"/>
+		<path path="lib/macify-1.4.jar"/>
             </classpath>
     </f3c>
   </target>
