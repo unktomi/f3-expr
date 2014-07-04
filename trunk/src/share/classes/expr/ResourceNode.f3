@@ -92,6 +92,13 @@ public class MaResourceNode is ResourceNode {
     override var content = bind model.getSpatialRoot();
 }
 
+public class F3AssimpResourceNode is ResourceNode {
+    public const model is F3Assimp;
+    override var url = bind model.url;
+    override var content = bind model.getSpatialRoot();
+}
+
+
 public class SoundResourceNode is ResourceNode {
 
     public const sound is Sound;
