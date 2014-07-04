@@ -206,6 +206,9 @@ const IMAGE_LOADER = f3.jogl.awt.JoglStage.ImageLoader_INSTANCE;
 
 public function run from (args is String[]) to ()
 {
+    java.lang.System.setProperty("com.apple.mrj.application.apple.menu.about.name","Tool");
+    const app = com.apple.eawt.Application.getApplication();
+    app.setDockIconImage(new javax.swing.ImageIcon(new java.net.URL("{__DIR__}dock.png")).getImage());
     var mainContext is MainContext = MainContext {
         name: "Start";
     }
