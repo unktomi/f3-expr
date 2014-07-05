@@ -13,7 +13,6 @@
     <mkdir dir="build/classes"/>
     <mkdir dir="lib/macosxuniversal"/>
     <copy todir="lib">
-      <fileset dir="../form-follows-function/dist/lib/shared" includes="*.jar"/>
       <fileset dir="../form-follows-function/f3_svg_awt/build/" includes="*.jar"/>
       <fileset dir="../form-follows-function/f3_xhtml/build/" includes="*.jar"/>
       <fileset dir="../form-follows-function/f3_xhtml/lib/" includes="core-renderer.jar"/>
@@ -24,6 +23,7 @@
       <fileset dir="../form-follows-function/f3_jbullet_jogl/build/" includes="*.jar"/>
       <fileset dir="../form-follows-function/f3_assimp/build/" includes="*.jar"/>
       <fileset dir="../form-follows-function/f3_assimp/lib/" includes="jassimp.jar"/>
+      <fileset dir="../form-follows-function/dist/lib/shared" includes="*.jar"/>
       <fileset  erroronmissingdir="false" dir="../form-follows-function/f3_awesomium_jogl/build/" includes="*.jar"/>
       <fileset  erroronmissingdir="false" dir="../form-follows-function/f3_awesomium_jogl/lib/" includes="js.jar"/>
     </copy>
@@ -76,7 +76,6 @@
              includes="**/*.f3" source="${javac.source}" sourcepath=""
              srcdir="${src.classes.dir}" target="${javac.target}"
              compilerclasspath="${javac.classpath}">
-	  <compilerarg value="-XDdumpjava"/>
 	  <compilerarg value="-XDdumpjava"/>
             <classpath>
                 <path path="lib/jogl-all.jar"/>
@@ -134,6 +133,7 @@
     <fileset dir="build" includes="*.jar"/>
   </copy>
   <copy file="run.sh" todir="demo.app/Contents/MacOS"/>
+  <copy file="src/share/classes/expr/dock.png" todir="demo.app/Contents/MacOS"/>
   <copy file=".expr.editorstate" todir="demo.app/Contents/MacOS"/>
   <chmod dir="demo.app/Contents/Frameworks/" perm="+x" includes="**"/>
   <chmod dir="demo.app/Contents/MacOS" perm="+x" includes="*.sh"/>
