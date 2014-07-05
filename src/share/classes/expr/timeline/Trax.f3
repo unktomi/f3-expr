@@ -409,7 +409,7 @@ public class TimeNodeView is AbstractNode
                              var menu = Menu {
                                  factory: trax.menuFactory;
                              };
-                             if (trax.graph and cbox <> null) {
+                             if (trax.graph) {
                                  insert Menu {
                                      label: "Add";
                                      factory: trax.menuFactory;
