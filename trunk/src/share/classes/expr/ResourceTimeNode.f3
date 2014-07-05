@@ -1,11 +1,13 @@
 package expr;
 import f3.media.scene.*;
+import f3.math.*;
+import f3.media.scene.KeyFrame.*;
 
 public class MaResourceTimeNode is ResourceTimeNode {
     override var url = bind model.url;
     public var model is Ma.Model;
     override var content = bind model.getTemporalRoot();
-    var mapped = new java.util.HashMap of (String, TimeNode);
+    const mapped = new java.util.HashMap of (String, TimeNode);
     override function lookup from (n is String) to TimeNode {
         var rtn = mapped.get(n);
         if (rtn <> null) return rtn;
@@ -52,6 +54,47 @@ public class MaResourceTimeNode is ResourceTimeNode {
     }
 }
 
+public class Subclip is TimeGroup
+{
+    public var name is String;
+    public var target is ResourceTimeNode;
+    public var clipInterval is Interval;
+    override var content = bind createSubclip(this, clipInterval, target);
+    override var id = bind "{target.id}#{name}";
+}
+
+function createSubclip from (clip is Subclip, interval is Interval, target is TimeNode) to TimeNode {
+    if (Interval.intersect(target.boundsInScene, interval) == null) return null;
+    if (target is TimeGroup) {
+        const g = target as TimeGroup;
+        TimeGroup {
+            playTime: g.playTime;
+            playCount: g.playCount;
+            playRate: g.playRate;
+            blendWeight: g.blendWeight;
+            id: bind "{clip.id}#{g.id}";
+            content: foreach (x in g.content) createSubclip(clip, interval, x);
+        }
+    } else if (target is Channel of Number) {
+        const ch = target as Channel of Number;
+        Channel of Number {
+            playTime: ch.playTime;
+            playCount: ch.playCount;
+            playRate: ch.playRate;
+            blendWeight: ch.blendWeight;
+            id: bind "{clip.id}#{ch.id}";
+            targets: ch.targets;
+            keys: foreach (k in ch.keys where interval.intersects(k.position)) {
+                Key of Number {
+                    position: k.position;
+                    value: k.value;
+                    interpolator: k.interpolator;
+                }
+            }
+        }
+    } else null
+}
+
 public class ResourceTimeNode is TimeGroup, ResourceTarget {
     override function createChannels from (parent is ChannelBoxGroup) to (Channel of Number)[]
     {
@@ -67,6 +110,9 @@ public class ResourceTimeNode is TimeGroup, ResourceTarget {
     public function unwrapContent to TimeNode[] {
          content
     }
+
+    public var subclips is Subclip[];
+
 }
 
 
