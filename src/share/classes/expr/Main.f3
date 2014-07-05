@@ -2350,8 +2350,10 @@ Tabview.Tab {
                                                                     clip as ResourceTarget.ChannelBoxGroup;
                                                                 const p = (cb.parent as ResourceTarget.ChannelBoxesGroup);
                                                                 delete cb from p.content;
-                                                                MasterUndoable.commit();
+                                                            } else {
+                                                                delete clip from (clip.parent as TimeGroup).content;
                                                             }
+                                                            MasterUndoable.commit();
                                                         }
                                                     }
                                                 }

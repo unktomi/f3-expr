@@ -4,6 +4,7 @@ import f3.media.scene.*;
 public class ResourceTimeNodeWrapper is ResourceTimeNode {
     public var wrapped is TimeGroup;
     override var content = bind [wrapped];
+    override var id = bind wrapped.id;
     override public function unwrapContent to TimeNode[] 
     {
         wrapped.content

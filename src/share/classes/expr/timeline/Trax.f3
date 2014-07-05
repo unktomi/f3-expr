@@ -409,7 +409,7 @@ public class TimeNodeView is AbstractNode
                              var menu = Menu {
                                  factory: trax.menuFactory;
                              };
-                             if (trax.graph and target is ResourceTarget.ChannelBoxesGroup) {
+                             if (trax.graph and cbox <> null) {
                                  insert Menu {
                                      label: "Add";
                                      factory: trax.menuFactory;
@@ -762,6 +762,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
         const tv = rowToTimeNodeView(row);
         var targetNode = tv.target;
         println("targetNode={targetNode}");
+        /*
         if (targetNode is ResourceTimeNodeWrapper) {
             targetNode = (targetNode as ResourceTimeNodeWrapper).wrapped;
         }
@@ -775,6 +776,8 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
         } else {
             add(clip);
         }
+        */
+        add(clip);
     }
 
     var timelineListener is Disposable;
@@ -1055,8 +1058,9 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
     var dur = bind visibleInterval.duration() + targetNode.contentBounds.end;
     var traxHeight = bind height - 20;
     var rootContent = bind getRootContent();
-    var sy0 = bind Math.min(traxHeight / Math.max(rootContent.bounds.height(), 1), 1.0);
-    var ty0 = bind if rootContent.bounds.height() == 0 then 0.0 else (scrollY * getViewHeight()) / rootContent.bounds.height();
+    var contentHeight = bind rowCount * getViewHeight();
+    var sy0 = bind Math.min(traxHeight / Math.max(contentHeight, 1), 1.0);
+    var ty0 = bind if contentHeight == 0 then 0.0 else (scrollY * getViewHeight()) / contentHeight;
     bound var visibleRows is Integer = Math.round(height / getViewHeight()) as Integer;
 
     override bound function getSy to Number { sy0 }
@@ -1069,7 +1073,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
     }
 
     override public function setY from (ty is Number, sy is Number) to () {
-        scrollY = (ty * rootContent.bounds.height() / getViewHeight()) as Integer;
+        scrollY = Math.round(ty * contentHeight / getViewHeight()) as Integer;
     }
 
     override public function setX from (tx is Number, sx is Number) to ()
