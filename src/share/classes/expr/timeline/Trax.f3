@@ -176,78 +176,10 @@ class KeyEditor is AbstractNode {
     
 }
 
-class KeyMark is Image, MouseInputHandler, KeyboardInputHandler {
-    var kx = 0.0;
-    override var url = "{__DIR__}keybubblemarker.png";
-    public var k is Key of Number;
-    public var ch is Channel of Number;
-    public var trax is Trax;
-    public var view is TimeNodeView;
-    public var valueBounds is Vec2;
-    public var sy is Number = 1.0;
-    override var transform = bind translate(trax.durationToX(k.position), 0);
-    var lockedValueBounds is Vec2;
-    var lockedSy is Number;
-    var lockX is Boolean;
-    override function onMouseDown from (event is MouseEvent) to ()
-    {
-        if (event.clickCount > 1) {
-            trax.editKey(view, ch, k);
-        } 
-        kx = trax.durationToX(k.position) / ch.toSceneTransform.rate;
-        lockedValueBounds = valueBounds;
-        lockedSy = sy;
-        lockX = event.metaKey;
-    }
-    override function onMouseDrag from (event is MouseEvent) to ()
-    {
-        println("view={view}");
-        kx += (event.picked.dragPoint1 - event.picked.dragPoint0).x / ch.toSceneTransform.rate;
-        var dy = (event.picked.dragPoint1 - event.picked.dragPoint0).y;
-        if (lockX or view.rows == 1) {
-            println("moving on x only");
-            k = trax.moveKeyTo(ch, k, trax.frameTo(trax.xToDuration(kx)));
-        } else {
-            println("sy={sy}, dy={dy}");
-            println("value={k.value} => {k.value + sy * dy}");
-            k = ch.setKey(k, trax.frameTo(trax.xToDuration(kx)), k.value + dy / lockedSy, k.interpolator);
-        }
-        trax.updatePlayhead();
-    }
-    override function onMouseUp from (event is MouseEvent) to ()
-    {
-        //println("commit playTime={target.playTime}, pickable={target.pickable}");
-        view.updateValueBounds();
-        MasterUndoable.commit();
-    }
-}
-
-class GroupKeyMark is Image, MouseInputHandler, KeyboardInputHandler {
-    var kx = 0.0;
-    override var url = "{__DIR__}keybubblemarker.png";
-    public var k is Duration;
-    public var ch is ResourceTarget.ChannelBoxGroup;
-    public var trax is Trax;
-    override var transform = bind translate(trax.durationToX(k) / ch.toSceneTransform.rate, 0);
-    override function onMouseDown from (event is MouseEvent) to ()
-    {
-        kx = trax.durationToX(k); 
-    }
-    override function onMouseDrag from (event is MouseEvent) to ()
-    {
-        kx += (event.picked.dragPoint1 - event.picked.dragPoint0).x / ch.toSceneTransform.rate;
-        k = ch.moveKeyTo(k, trax.frameTo(trax.xToDuration(kx)));
-        trax.updatePlayhead();
-    }
-    override function onMouseUp from (event is MouseEvent) to ()
-    {
-        //println("commit playTime={target.playTime}, pickable={target.pickable}");
-        MasterUndoable.commit();
-    }
-}
 
 
-class TimeNodeView is AbstractNode 
+
+public class TimeNodeView is AbstractNode 
 {
     public var keyEditor is KeyEditor;
     public var cy is Number;
@@ -313,7 +245,7 @@ class TimeNodeView is AbstractNode
         if (expanded) then close() else open();
     }
 
-    function updateValueBounds to ()
+    public function updateValueBounds to ()
     {
         if (target is Channel of Number) {
             bnds = getValueBounds((target as Channel of Number).keys);
@@ -416,7 +348,7 @@ class TimeNodeView is AbstractNode
     var openRows = 10.0;
     const self = this;
     bound var w = getWidth(if target.hasIndefiniteDuration() then Interval.<<0>> else target.bounds, trax.visibleInterval) *  target.toSceneTransform.rate;              
-    var rows is Number = 1;
+    public var rows is Number = 1;
     var bnds is Vec2 = Vec2.<<1>>;
     bound var h is Number = trax.getViewHeight() * rows;
     bound var viewHeight is Number = h;
@@ -674,10 +606,12 @@ class TimeNodeView is AbstractNode
                                          }
                                       }
                                   },
-                               Group {
+                                  Group {
                                   transform: bind translate(0, if (expanded) then -trax.getViewHeight()/2 else 0);
+                                  var channelVis = bind target.toSceneTransform.inverse() * trax.visibleInterval;
                                   content: bind foreach (k in chKeys) {
                                       KeyMark {
+                                          visible: bind channelVis.intersects(k.position);
                                           view: this;
                                           transform: bind translate(trax.durationToX(k.position) / target.toSceneTransform.rate, if (expanded) then hoff+(sy * (k.value - bnds.x)) else 0);                                      
                                           ch: bind ch;
@@ -686,7 +620,6 @@ class TimeNodeView is AbstractNode
                                           valueBounds: bind bnds;
                                           sy: bind sy;
                                       }
-                                      
                                    }
                               }]
                           }]
@@ -778,7 +711,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 
     public var menuFactory is MenuFactory;
     public var assetModel is AssetModel;
-    function editKey from (view is TimeNodeView, ch is Channel of Number, k is Key of Number) to () 
+    public function editKey from (view is TimeNodeView, ch is Channel of Number, k is Key of Number) to () 
     {
         keyEditor.trax = this;
         keyEditor.key = k;
@@ -799,7 +732,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 		scrollVertically(y);
 	    });
 
-    public var graph is Boolean = true;
+    public var graph is Boolean = false;
     const arrow is Polygon = Polygon {
 	points: [-3.5, -4.5, -3.5, 4.5, 3.5, 0];
 	fillPaint: ColorPaint(Color.WHITE);
@@ -982,17 +915,17 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
     var unzoomedVisibleFrameCount is Number = bind (width-10) / PIXELS_PER_FRAME;
     var unzoomedVisibleDuration = bind 1s / 24 * unzoomedVisibleFrameCount;
 
-    bound function durationToFrame from (d is Duration) to Number
+    public bound function durationToFrame from (d is Duration) to Number
     {
 	Math.round((d / 1s) * frameRate);
     }
 
-    bound function frameToDuration from (frames is Number) to Duration 
+    public bound function frameToDuration from (frames is Number) to Duration 
     {
 	(1s / frameRate) * frames
     }
     
-    bound function frameTo from (d is Duration) to Duration {
+    public bound function frameTo from (d is Duration) to Duration {
 	var seconds = d / 1s;
 	var frames = Math.round((seconds * frameRate));
 	return (1s / frameRate) * frames;
@@ -1018,27 +951,27 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
         -Math.round(y / getViewHeight() + 2) as Integer;
     }
 
-    bound function xToDuration from (x is Number) to Duration
+    public bound function xToDuration from (x is Number) to Duration
     {
 	1s * x / (pixelsPerFrame() * frameRate);
     }
 
-    bound function xToFrame from (x is Number) to Number
+    public bound function xToFrame from (x is Number) to Number
     {
 	Math.round(x / pixelsPerFrame());
     }
 
-    function xToFrameUnbound from (x is Number) to Number
+    public function xToFrameUnbound from (x is Number) to Number
     {
 	Math.round(x / pixelsPerFrameUnbound());
     }
 
-    bound function durationToX from (d0 is Duration) to Number
+    public bound function durationToX from (d0 is Duration) to Number
     {
 	durationToX(d0, false);
     }
 
-    bound function durationToX from (d0 is Duration, loop is Boolean) to Number
+    public bound function durationToX from (d0 is Duration, loop is Boolean) to Number
     {
         var dur = targetNode.contentBounds.duration();
 	var d = if (loop and dur > 0s) d0.rem(dur) else d0;

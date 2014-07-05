@@ -1,0 +1,40 @@
+package expr.timeline;
+import expr.*;
+import expr.AssetTree.*;
+import expr.Names.*;
+import f3.media.scene.*;
+import f3.media.scene.Shape2D.*;
+import f3.media.scene.KeyFrame.*;
+import f3.media.input.*;
+import f3.util.*;
+import f3.util.Observer.*;
+import f3.math.*;
+import f3.math.LinearMath.*;
+import java.lang.Math;
+import expr.undo.*;
+import expr.timeline.Trax.*;
+
+public class GroupKeyMark is AbstractNode, MouseInputHandler, KeyboardInputHandler {
+    var kx = 0.0;
+    override var internalContent = Image {
+        url: "{__DIR__}keybubblemarker.png";
+    }       
+    public var k is Duration;
+    public var ch is ResourceTarget.ChannelBoxGroup;
+    public var trax is Trax;
+    override var transform = bind translate(trax.durationToX(k) / ch.toSceneTransform.rate, 0);
+    override function onMouseDown from (event is MouseEvent) to ()
+    {
+        kx = trax.durationToX(k); 
+    }
+    override function onMouseDrag from (event is MouseEvent) to ()
+    {
+        kx += (event.picked.dragPoint1 - event.picked.dragPoint0).x / ch.toSceneTransform.rate;
+        k = ch.moveKeyTo(k, trax.frameTo(trax.xToDuration(kx)));
+        trax.updatePlayhead();
+    }
+    override function onMouseUp from (event is MouseEvent) to ()
+    {
+        MasterUndoable.commit();
+    }
+}
