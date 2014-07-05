@@ -599,6 +599,7 @@ public function run from (args is String[]) to ()
                 url: url;
             }
 	    const rn = F3AssimpResourceNode {
+                url: url;
                 model: assimp;
 		content: bind assimp.spatialRoot;
 	    }	
