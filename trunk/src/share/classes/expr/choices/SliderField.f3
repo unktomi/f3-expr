@@ -1,6 +1,7 @@
 package expr.choices;
 import f3.media.scene.*;
 import f3.media.scene.Shape2D.*;
+import f3.media.scene.Text.Font;
 import f3.media.input.*;
 import f3.math.*;
 import f3.math.LinearMath.*;
@@ -19,6 +20,7 @@ const BG = ColorPaint(Color.color(.85, .85, .85, 1));
 
 public class SliderField is AbstractNode
 {
+    public var font is Font;
     public var height is Number = bind textArea.font.height();
     public var width is Number = 64;
 
@@ -49,9 +51,9 @@ public class SliderField is AbstractNode
         background: null;
 	width: bind width+4;
         height: bind height;
+        font: bind if (font == null) then layoutEngine.createFont(Names.DEFAULT_FONT) else font;
 	transform: translate(0, 1);
 	rightJustified: true;
-        font: layoutEngine.createFont(Names.DEFAULT_FONT);
         pickable: bind textAreaEnabled and textInputEnabled;
         editable: bind textInputEnabled;
         override function onKeyInput from (event is KeyboardEvent) to ()

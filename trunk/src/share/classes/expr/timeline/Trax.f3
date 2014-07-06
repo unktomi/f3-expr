@@ -982,19 +982,19 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	return pixels;
     }
 
-    bound function framesPerTick to Number {
+    public bound function framesPerTick to Number {
         pixelsPerFrame() * TICK_PIXELS;
     }
     
-    bound function pixelsPerSecond to Number {  
+    public bound function pixelsPerSecond to Number {  
 	pixelsPerFrame() * frameRate;
     }
 
-    bound function pixelsPerFrame to Number { pixelsPerFrameUnbound() }
+    public bound function pixelsPerFrame to Number { pixelsPerFrameUnbound() }
 
     function pixelsPerFrameUnbound to Number { PIXELS_PER_FRAME }
     
-    bound function frameToX from (frame is Number) to Number 
+    public bound function frameToX from (frame is Number) to Number 
     {
 	frame * pixelsPerFrame();
     }
@@ -1091,7 +1091,8 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	override var height = bind getSelf().height;
     }
     var scrollY is Integer;
-    public var scrollOffset is Number;
+    protected var scrollOffset is Number;
+    var scrollX = bind frameToX(scrollOffset);
     var visibleDuration is Duration = bind visibleInterval.duration();
     var labels is Node[] = bind drawLabels(width, height, scrollOffset, frameRate);
     var font = bind layoutEngine.createFont("font-size:8;font-family:Lucida Grande");
@@ -1118,16 +1119,16 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
             target: t;
         }
     }
-
     readonly var gadgetFont = bind layoutEngine.createFont(Names.DEFAULT_FONT);
+    readonly var largeGadgetFont = bind layoutEngine.createFont(Names.DEFAULT_FONT).derive("font-size:13");
     readonly var gadgetFg = ColorPaint(Color.color(.8, .8, .8));
     readonly var gadgetBg = ColorPaint(Color.color(.4, .4, .4));
         
 
     public var frameGadget is Text.Field = Text.Field {
-        width: bind 64;
+        width: 64;
         rightJustified: true;
-        font: bind gadgetFont;
+        font: bind largeGadgetFont;
         foreground: bind gadgetFg;
         background: bind gadgetBg;
         text: "0"
@@ -1152,10 +1153,10 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
         });
 
     public var combinedGadget is Node = Group {
-        transform: bind translate(width / 2-64, 2)
+        transform: bind translate(width / 2-50, 2)
         content: 
         [TransformNode {
-            tx: -64
+            tx: -60
             content: frameGadget;
         },
         TransformNode {
@@ -1343,7 +1344,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
              }]
          },
          TransformNode { 
-             tx: bind -getSelf().width/2+15-frameToX(scrollOffset);
+             tx: bind -width/2+15-scrollX;
              content: 
              [TransformNode { ty: -6, content: bind playhead }
              Group { 

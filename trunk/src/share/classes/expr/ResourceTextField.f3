@@ -19,8 +19,6 @@ public class ResourceTextField is AbstractResourceText {
         impl.setText(text);
     }
 
-    var font = bind layoutEngine.createFont("font-size:{fontSize.selection};font-family:{fontFamily.selection};font-weight:{fontWeight.selection};font-style:{fontStyle.selection}");
-
     const impl is Text.Field = Text.Field {
         foreground: bind ColorPaint(foreground);
         background: bind ColorPaint(background);

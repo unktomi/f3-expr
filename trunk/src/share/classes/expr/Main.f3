@@ -358,7 +358,7 @@ public function run from (args is String[]) to ()
         }
     }
 
-    const dynamicsWorld = if (true) null else theDynamicsWorldFactory.createDynamicsWorld();
+    const dynamicsWorld = theDynamicsWorldFactory.createDynamicsWorld();
 
     const player = Timeline {
 	override var paused = true on replace {
@@ -762,6 +762,12 @@ public function run from (args is String[]) to ()
         camera: camera;
     }
 
+    const renderComplete = 
+        mainScene.observeRenderComplete().subscribe(function from (scene is Scene) to () 
+                                                    {
+                                                        dynamicsWorld.debugDraw(scene.camera) 
+                                                    });
+
     var windowContainingAssets is InternalWindow;
     var assetTreeview is Treeview;
     var assetSearch is AssetSearch = bind AssetSearch {
@@ -800,9 +806,9 @@ public function run from (args is String[]) to ()
 	onRewind: function to () { 
             var paused = player.paused;
             player.paused = true;
-            player.setPlayhead(0.5s);
             player.setPlayhead(0s);
             player.paused = paused;
+            println("rewind");
             dynamicsWorld.reset();
         }
 	onHideFloating: function from (b is Boolean) to ()
@@ -901,6 +907,7 @@ public function run from (args is String[]) to ()
     function close from () to () 
     {
 	savePoint = 0;
+        dynamicsWorld.reset();
         mainScene.currentResource.url = "";
         currentScenes = [mainScene];
 	mainScene.currentResource.resources = [];
@@ -2723,7 +2730,6 @@ Tabview.Tab {
             for (z in currentScenes) {
                 z.instanceSpace.content = z.instanceSpace.content[ x | { var y = x as EventLayer.EventNode; y.timestamp <= player.playhead }];
             }
-            stage.invoke(function to () {  dynamicsWorld.debugDraw(freeCamera) })
         }
     };
     Inspector.allFontFamilies = (the Text.LayoutEngine).allFontFamilies;
