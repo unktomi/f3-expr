@@ -393,7 +393,7 @@ const java_included = [
 "javax/xml/xpath"];
 
 
-const excluded = ["jogamp", "com/sun", "com/jogamp", "org/", "jogl", "f3/jogl", "f3/animation", "f3/date", "f3/reflect", "f3/f3unit", "f3/lang", "javax", "expr", "com"];
+const excluded = ["jassimp", "jogamp", "com/sun", "com/jogamp", "org/", "jogl", "f3/jogl", "f3/animation", "f3/date", "f3/reflect", "f3/f3unit", "javax/vecmath", "javax/media", "expr", "com"];
 
 
 function getPackageAssets to PackageAsset {
