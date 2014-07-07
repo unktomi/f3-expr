@@ -4,6 +4,7 @@ import f3.media.scene.*;
 import f3.media.scene.Text.LayoutEngine;
 import f3.media.scene.Text.Font;
 import f3.media.scene.Shape2D.*;
+import f3.media.svg.SVG;
 import expr.choices.*;
 import f3.lang.*;
 import f3.util.*;
@@ -19,6 +20,75 @@ import f3.math.LinearMath.*;
 import java.lang.Math;
 import expr.undo.*;
 import expr.AbstractResourceText.*;
+
+class ColorChooser is AbstractNode {
+
+    const colorChooserSvg = SVG {
+        url: "{__DIR__}colorchooser.svg";
+    };
+
+    public var popupLayer is PopupLayer;
+
+    function show from (sourceScene is Scene, 
+                        location is Point3, 
+                        onSelect is function from Color to ()) 
+        to ()
+    {
+        if (colorHandlers == []) {
+            colorHandlers = initColors();
+        }
+        popupLayer.visible = true;
+        const pt = popupLayer.scene.mousePosition + location;
+        x = pt.x;
+        y = pt.y;
+        insert this into popupLayer.content;
+        popupLayer.modal = true;
+        this.onSelect = onSelect;
+        cancel = popupLayer.observeBackgroundClicked.subscribe(function from (_ is ()) to () {
+                hidePopup();
+            });
+    }
+    
+    var cancel is Disposable;
+    var onSelect is function from Color to ();
+
+    var x is Number;
+    var y is Number;
+
+    var colorHandlers is Disposable[];
+
+    override var internalContent = TransformNode {
+        tx: bind x -85;
+        ty: bind y -51;
+        content: bind colorChooserSvg.root;
+    };
+
+    function hidePopup to ()
+    {
+        cancel.dispose();
+        popupLayer.visible = false;
+    }
+
+    function selectColor from (c is Color) to ()
+    {
+        hidePopup();
+        onSelect(c);
+    }
+
+    function initColors to Disposable[]
+    {
+        foreach (row in [0..<4], col in [0..<13]) {
+            const cell = lookup("shapePath{row*13+col}");
+            println("cell={cell}");
+            const shape = cell as MeshNode2D;
+            const color = (shape.paint as ColorPaint).color;
+            shape.observeTrigger().subscribe(function from (e is MouseEvent) to () {
+                    println(shape.id);
+                    selectColor(color);
+                });
+        }
+    }
+}
 
 function clamp from (n is Number, lo is Number, hi is Number) to Number
 {
@@ -85,6 +155,8 @@ public class ColorInspector extends AbstractNode {
     public var a is Number;
     var firstTime is Boolean = true;
     public readonly var selection is Color = bind Color.color(r, g, b, a);
+    public var colorChooser is ColorChooser;
+    public var popupLayer is PopupLayer;
     override function update to () {
         if (firstTime) {
             firstTime = false;
@@ -118,6 +190,18 @@ public class ColorInspector extends AbstractNode {
         width: bind height;
         fillPaint: bind ColorPaint(selection);
         strokePaint: bind ColorPaint(Color.color(.2, .2, .2));
+        override function onMouseDown from (e is MouseEvent) to ()
+        {
+            const pt = toSceneTransform * new Point3(0, -height/2, 0);
+            colorChooser.show(e.scene, Point3.<<0>> + (pt - e.sceneLocation), 
+                              function from (color is Color) to ()
+                              {
+                                  red.setT(color.red);
+                                  green.setT(color.green);
+                                  blue.setT(color.blue);
+                                  alpha.setT(color.opacity);
+                              });
+        }
     }
 
     const red = NumericSliderField {
@@ -443,6 +527,7 @@ public class InspectedObservable of a is Inspected of Observable of a
 const FG = Color.color(.2, .2, .2, 1);
 const FG_PAINT = ColorPaint(FG);
 const SELECTED_FG = Color.color(.9, .9, .9, 1);
+
 const SELECTED_FG_PAINT = ColorPaint(SELECTED_FG);
 const BG = Color.color(.6, .6, .6);
 const BG_PAINT = ColorPaint(BG);
@@ -658,6 +743,10 @@ class StringField is ResizableNode {
 
 public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scrollable {
     const inspector = this;
+    public var selectionForeground is Paint = bind if focused then
+	ColorPaint(Color.color(.9, .9, .9, 1)) else ColorPaint(Color.color(.77, .77, .77, 1));
+    public var popupLayer is PopupLayer;
+    const colorChooser = ColorChooser { popupLayer: bind popupLayer };
     public var onSetKey is function from () to ();
     override public bound function getTx to Number { 0.0 }
     override public bound function getSx to Number { 1.0 }
@@ -765,7 +854,7 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
 		    indent: 4;	
 		    text: bind Names.formatName(i.label);
 		    font: bind font;
-		    foreground: bind if (i.index <> selectedIndex) FG_PAINT else SELECTED_FG_PAINT;
+                    foreground: bind if (i.index <> selectedIndex) FG_PAINT else selectionForeground;
                     background: null;//bind if (i.index <> selectedIndex) BG_PAINT else SELECTED_BG_PAINT;
 		    height: bind cellHeight;	    
                     pickable: false;
@@ -789,6 +878,7 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
 	    } else if (i is InspectedColor) then
 	    TransformNode {
                 var  widget = ColorInspector {
+                    colorChooser: bind colorChooser;
                     onSetKey: bind onSetKey;
 		    i: bind i as InspectedColor;
 		    height: bind cellHeight-margin;

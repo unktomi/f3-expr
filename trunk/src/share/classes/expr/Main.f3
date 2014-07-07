@@ -688,18 +688,22 @@ public function run from (args is String[]) to ()
     var trax is expr.timeline.Trax;
     var graphEditor is expr.timeline.GraphEditor;
     const inspector0 is Inspector = Inspector {
+        popupLayer: bind popupLayer;
         var toInspect = bind { var t = temporalHierarchy2.selectedTimeNode; if t <> temporalHierarchy2.root then t else null };
         inspecting: bind Inspector.inspect(toInspect, Reflect.getType("f3.media.scene.TimeNode") as f3.reflect.F3ClassType);
     };
     const inspector1 is Inspector = Inspector {
+        popupLayer: bind popupLayer;
         onSetKey: function to () { graphEditor.setKeys() }
         inspecting: bind Inspector.inspect(if (currentTransform == null) then currentScene else currentTransform);
     };
     const inspector2 is Inspector = Inspector {
+        popupLayer: bind popupLayer;
         inspecting: bind Inspector.inspect(temporalHierarchy.selectedTransform);
     };
 
     var inspector3 is Inspector = Inspector {
+        popupLayer: bind popupLayer;
         inspecting: bind [Inspector.inspect(otherHierarchy.selectedVariable)];
     }
     
@@ -740,6 +744,7 @@ public function run from (args is String[]) to ()
         height: bind editorScene.height;
         width: bind editorScene.width;
         //transform: bind translate(editorScene.width/2, editorScene.height/2);
+        scene: bind editorScene;
     };
 
     function getUnderMouseInEditor to Pick[] 

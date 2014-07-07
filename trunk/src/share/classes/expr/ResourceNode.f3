@@ -24,6 +24,7 @@ public class ResourceNode is TransformNode, ResourceTarget, NodeAPI {
     override var id = bind url;
     public var temporal is ResourceTimeNode;
 
+
     override public function findTarget from (id is String) to Object 
     {
         if (id == "") then this else lookup(id);
