@@ -8,7 +8,12 @@ public class MaResourceTimeNode is ResourceTimeNode {
     public var model is Ma.Model;
     override var content = bind model.getTemporalRoot();
     const mapped = new java.util.HashMap of (String, TimeNode);
+    var lastContent is TimeNode;
     override function lookup from (n is String) to TimeNode {
+        if (lastContent <> content[0]) {
+            mapped.clear();
+            lastContent = content[0];
+        }
         var rtn = mapped.get(n);
         if (rtn <> null) return rtn;
         var r = super.lookup(n);
