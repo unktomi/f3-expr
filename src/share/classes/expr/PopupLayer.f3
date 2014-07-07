@@ -5,6 +5,7 @@ import f3.util.*;
 import f3.math.LinearMath.*;
 
 public class PopupLayer is ResizableNode, Focuser {
+    public var scene is Scene;
     public const observeBackgroundClicked is Subject of (()) = Subject of (()) {}
     public var modal is Boolean;
     const background = Shape2D.Rectangle {
