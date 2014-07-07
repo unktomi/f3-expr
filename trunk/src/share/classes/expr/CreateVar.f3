@@ -9,7 +9,7 @@ import f3.reflect.*;
 import java.lang.Math;
 
 const textFg = ColorPaint(Color.color(.8, .8, .8));
-const labelFg = ColorPaint(Color.color(.25, .25, .25));
+const labelFg = ColorPaint(Color.color(.1, .1, .1));
 const textBg = ColorPaint(Color.color(.4, .4, .4));
 
 public class CreateVar is ResizableNode, Focuser {
@@ -198,7 +198,7 @@ public class CreateVar is ResizableNode, Focuser {
         [Rectangle {
             height: bind height;
             width: bind width;
-            fillPaint: ColorPaint(Color.color(.7, .7, .7));
+            fillPaint: ColorPaint(Color.color(.9, .9, .9));
         },
         TransformNode {
             ty: bind 1.5*cellHeight + 1;
