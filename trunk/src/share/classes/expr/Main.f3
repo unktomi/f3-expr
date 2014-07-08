@@ -533,6 +533,7 @@ public function run from (args is String[]) to ()
                    loweredUrl.endsWith(".xm") or
                    loweredUrl.endsWith(".xma")){
             const sound = Sound.Sample {
+                monitorForChanges: yes;
                 url: url;
                 paused: true
             }
@@ -606,6 +607,7 @@ public function run from (args is String[]) to ()
                    loweredUrl.endsWith(".ndo")
                    ) {
             const assimp = F3Assimp {
+                monitorForChanges: yes;
                 url: url;
             }
 	    const rn = F3AssimpResourceNode {
