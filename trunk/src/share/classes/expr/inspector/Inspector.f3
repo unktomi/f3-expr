@@ -21,6 +21,10 @@ import java.lang.Math;
 import expr.undo.*;
 import expr.AbstractResourceText.*;
 
+
+public const CAMERA_TYPE = Reflect.getType("f3.media.scene.Camera");
+public const CAMERA_SELECTION_TYPE = Reflect.getType("expr.CameraSelection");
+
 class ColorChooser is AbstractNode {
 
     const colorChooserSvg = SVG {
@@ -308,6 +312,7 @@ function inspectedFontFamily from (ptr is ObservableRef of FontFamilySelection,
                                    member is Member,
                                    label is String,
                                    families is String[]) to InspectedFontChoice of FontFamilySelection
+
 {
     InspectedFontChoice of FontFamilySelection {
         attr: "font-family";
@@ -349,6 +354,7 @@ function inspectedFontTextDecoration from (ptr is ObservableRef of FontTextDecor
                                            member is Member,
                                            label is String
                                            ) to InspectedFontChoice of FontTextDecorationSelection
+
 {
     InspectedFontChoice of FontTextDecorationSelection {
         attr: "text-decoration";
@@ -372,6 +378,7 @@ function inspectedFontStyle from (ptr is ObservableRef of FontStyleSelection,
                                    member is Member,
                                    label is String,
                                    styles is String[]) to InspectedChoice of FontStyleSelection
+
 {
     InspectedFontChoice of FontStyleSelection {
         attr: "font-style";
@@ -407,6 +414,31 @@ function inspectedFontSize from (ptr is ObservableRef of FontSizeSelection,
         }
     }
 }
+
+function inspectedCamera 
+    from (ptr is ObservableRef of Camera,
+          member is Member,
+          label is String,
+          cameras is Camera[]) 
+    to InspectedChoice of Camera
+{
+    InspectedChoice of Camera {
+        label: label;
+        member: member;
+        choices: cameras;
+        labels: foreach (c in cameras) Names.formatName(c.id);
+        observable: Observables.observe(ptr);
+        override function get to Camera 
+        { 
+            ptr.get();
+        }
+        override function set from (x is Camera) to () 
+        { 
+            ptr.set(x);
+        }
+    }
+}
+
 
 public abstract class Inspected of a 
 {
@@ -455,7 +487,10 @@ public class InspectedDuration is InspectedRange of Duration
 
 public class InspectedChoice of a is InspectedRange of a 
 {
-    public const fieldWidth is Number = 64;
+    public bound var fieldWidth is Number = 64;
+    public bound function getFieldWidth from (font is Font) to Number {
+        getWidth(font, labels);
+    }
     public const choices is (..a)[];
     public const labels is String[] = foreach (choice in choices) "{choice}";
 
@@ -463,6 +498,13 @@ public class InspectedChoice of a is InspectedRange of a
     {
 	const i = (Math.round(t * choices.size()) as Integer);
         return Math.min(Math.max(i, 0), choices.size()-1);
+    }
+
+    function getWidth from (font is Font, labels is String[]) to Number
+    {
+        var w = 64.0;
+        for (x in labels) w = Math.max(font.width(x)+8, w);
+        return w;
     }
 
     override function getAsString from (t is Number) to String
@@ -907,10 +949,11 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
             } else if (i is InspectedChoice of ?) then {
                     var q = i as InspectedChoice of Object;                                 
                     TransformNode {
-                        tx: bind width / 2 - q.fieldWidth / 2-indent;
+                        var w = bind q.getFieldWidth(font)
+                        tx: bind width / 2 - w / 2-indent;
                         content: ChoiceField of Object {
                             i: bind q;
-                            width: bind q.fieldWidth;
+                            width: bind w;
                             height: bind cellHeight-margin;
                         }
                     }
@@ -1062,6 +1105,10 @@ function inspect0 from (obj is Object, classType is F3ClassType) to (Inspected o
                                     override function get to Duration { ptr.get() }
                                     override function set from (x is Duration) to () { ptr.set(x) }
                                 }
+                            } else if (m.m is F3VarMember and m.t == CAMERA_SELECTION_TYPE) {
+                                const ptr = (m.m as F3Local.VarMember).getPointer(obj as F3Object) as ObservableRef of CameraSelection;
+                                const ptr1 = &ptr.get().camera;
+                                inspectedCamera(ptr1, m, m.m.getName(), ptr.get().cameras);
                             } else if (m.m is F3VarMember and m.t == STRING_TYPE) {
                                 const ptr = (m.m as F3Local.VarMember).getPointer(obj as F3Object) as ObservableRef of String;
                                 InspectedString {

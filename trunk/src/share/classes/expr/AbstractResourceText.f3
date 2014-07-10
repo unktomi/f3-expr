@@ -9,23 +9,6 @@ public const FONT_SIZE_TYPE = Reflect.getType("expr.AbstractResourceText.FontSiz
 public const FONT_FAMILY_TYPE = Reflect.getType("expr.AbstractResourceText.FontFamilySelection");
 public const FONT_TEXT_DECORATION_TYPE = Reflect.getType("expr.AbstractResourceText.FontTextDecorationSelection");
 
-public class Selection of a {
-    public const selection is a;
-    override function toString to String
-    {
-        "{selection}"
-    }
-
-    override function equals from (obj is Object) to Boolean 
-    {
-        if (obj is Selection) {
-            const j = obj as Selection of Object;
-            const result = selection == j.selection;
-            return result;
-        }
-        return false;
-    }
-}
 
 public class FontFamilySelection is Selection of String {
 }

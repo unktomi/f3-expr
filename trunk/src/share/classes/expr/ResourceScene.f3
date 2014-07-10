@@ -17,7 +17,7 @@ public class ResourceScene is Scene {
 
     public var currentCameras is Camera[];
 
-    override function update to () {
+     override function update to () {
         super.update();
         updateCams();
     }
@@ -63,6 +63,11 @@ public class ResourceScene is Scene {
     public function observeSelection to Observable of ResourceNode 
     {
         selection
+    }
+
+    public var cameraSelection is CameraSelection = CameraSelection {
+        camera: bind camera inverse;
+        cameras: bind [camera, currentCameras];
     }
 }
 
