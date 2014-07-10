@@ -11,7 +11,7 @@ public class ResourceGroup is TransformNode, SceneAPI {
     override var content = bind resources;
     public var currentClip is TimeNode;
     const undoList = UndoList {};
-
+    
     init {
 	undoList.addTarget("resources", &resources);
 	undoList.addTarget("camera", &scene.camera);

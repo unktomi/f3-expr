@@ -2528,15 +2528,15 @@ Tabview.Tab {
 		 label: "Edit"
 		 items:
 		 [MenuItem {
-		     shortcut: Menu.Shortcut { keyCode: Keys.X }
+                         shortcut: Menu.Shortcut { keyCode: Keys.X, metaKey: yes }
 		     label: "Cut"
 		 },
 		 MenuItem {
-		     shortcut: Menu.Shortcut { keyCode: Keys.C }
+		     shortcut: Menu.Shortcut { keyCode: Keys.C, metaKey: yes }
 		     label: "Copy"
 		 },
 		 MenuItem {
-		     shortcut: Menu.Shortcut { keyCode: Keys.V }
+		     shortcut: Menu.Shortcut { keyCode: Keys.V, metaKey: yes }
 		     label: "Paste"
 		 }
                  Menu.Separator {},
@@ -2552,7 +2552,19 @@ Tabview.Tab {
 		     shortcut: Menu.Shortcut { keyCode: Keys.Z, shiftKey: yes }
 		     action: MasterUndoable.redo
 		 }]
-	     }]
+             },
+	     Menu 
+             { 
+		 label: "Animate"
+		 items:
+		 [MenuItem 
+                  {
+                      label: "Set Key";
+                      action: function {
+                          graphEditor.setKeys();
+                      }
+                  }];
+             }]
 	     
 	}
 
@@ -2688,6 +2700,8 @@ Tabview.Tab {
 			} else {
 			    MasterUndoable.undo();
 			    }*/
+		    } else if (event.keyCode == Keys._3 and event.ctrlKey) {
+                        dynamicsWorld.debug = not dynamicsWorld.debug;
 		    } else if (event.keyCode == Keys.G) {
                         java.lang.System.gc();
                         println("{java.lang.Runtime.getRuntime().freeMemory()} / {java.lang.Runtime.getRuntime().totalMemory()}");
