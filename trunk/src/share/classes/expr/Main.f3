@@ -214,10 +214,8 @@ var doUpdate is Observer of (());
 
 const IMAGE_LOADER = f3.jogl.awt.JoglStage.ImageLoader_INSTANCE;
 
-
 public function run from (args is String[]) to ()
 {
-
     var mainContext is MainContext = MainContext {
         name: "Start";
     }
@@ -380,11 +378,11 @@ public function run from (args is String[]) to ()
     }
 
     const freeCamera = camera;
-
-
+    
     const playhead = player.observePlayhead().subscribe(function from (sceneTime is Duration) to () 
                                                         {
-                                                            dynamicsWorld.update(sceneTime, camera);
+                                                            const finishDynamics = dynamicsWorld.update(sceneTime, camera);
+                                                            stage.invoke(finishDynamics);
                                                         });
 
     const viewer = DefaultExaminerViewer {
@@ -691,22 +689,25 @@ public function run from (args is String[]) to ()
 
     var trax is expr.timeline.Trax;
     var graphEditor is expr.timeline.GraphEditor;
+
     const inspector0 is Inspector = Inspector {
         popupLayer: bind popupLayer;
         var toInspect = bind { var t = temporalHierarchy2.selectedTimeNode; if t <> temporalHierarchy2.root then t else null };
         inspecting: bind Inspector.inspect(toInspect, Reflect.getType("f3.media.scene.TimeNode") as f3.reflect.F3ClassType);
     };
+
     const inspector1 is Inspector = Inspector {
         popupLayer: bind popupLayer;
         onSetKey: function to () { graphEditor.setKeys() }
         inspecting: bind Inspector.inspect(if (currentTransform == null) then currentScene else currentTransform);
     };
+
     const inspector2 is Inspector = Inspector {
         popupLayer: bind popupLayer;
         inspecting: bind Inspector.inspect(temporalHierarchy.selectedTransform);
     };
 
-    var inspector3 is Inspector = Inspector {
+    const inspector3 is Inspector = Inspector {
         popupLayer: bind popupLayer;
         inspecting: bind [Inspector.inspect(otherHierarchy.selectedVariable)];
     }
@@ -2436,6 +2437,7 @@ Tabview.Tab {
      }
      
      var stage is JoglStage = JoglStage {
+
         defaultCursor: bind toolCursor;
         /*
         content: CachedScene {
@@ -2444,7 +2446,8 @@ Tabview.Tab {
         */
         content: bind [currentScenes, manipLayer, editorScene];
 	
-        onClose: function from () to Boolean {
+        onClose: function from () to Boolean 
+        {
             if (not saveChangesIfNecessary()) {
                 return false;
             }
@@ -2452,106 +2455,116 @@ Tabview.Tab {
             return true;
         }
         title: bind "{mainScene.currentResource.url} {if (savePoint <> MasterUndoable.now) then " (Unsaved)" else ""}";
-        menubar: Menu.Bar {
+        menubar: Menu.Bar 
+        {
 	    menus: 
 	    [Menu 
              { 
 		 label: "File";
 		 shortcut: Menu.Shortcut { keyCode: Keys.F }
 		 items:
-		 [MenuItem {
-		     shortcut: Menu.Shortcut { keyCode: Keys.O }
-		     label: "Open...";
-                     enabled: bind player.paused;
-		     action: function {
-                             if (saveChangesIfNecessary()) {
-                                 const result = fileOpen.open();
-                                 if (result <> null) {
-                                     open("file:{result}");
-                                 }
-                             }
-                     }
-                 },
-                 Menu {
-		     label: "Open Recent";
-                     enabled: bind player.paused;
-                     items: bind foreach (x in recentList) {
-                         MenuItem {
-                             label: x;
-                             action: function to () {
-                                 open(x);
-                             }
-                         }
-                     }
-                 },
-		 MenuItem {
-		     shortcut: Menu.Shortcut { keyCode: Keys.S }
-		     label: "Save As...";
-		     enabled: true;//bind mainScene.currentResource.url == ""
-		     action: function {
-                         if (mainScene.currentResource.url <> "") {
-                             const u = new java.net.URL(mainScene.currentResource.url);
-                             fileSave.fileName = new java.io.File(u.getFile()).getName();
-                         } else {
-                             fileSave.fileName = "";
-                         }
-                         fileSave.title = "Save As";
-			 var result = fileSave.open();
-			 if (result <> null) {
-                             if (not result.endsWith(".expr")) {
-                                 result = "{result}.expr";
-                             }
-			     mainScene.currentResource.url = "file:{result}";
-			     save();
-			 }
-		     }
-		 },
-                 MenuItem {
-		     shortcut: Menu.Shortcut { keyCode: Keys.W }
-		     label: "Close";
-                     enabled: bind player.paused;
-		     action: function {
-                         if (saveChangesIfNecessary()) {
-                             close();
-                         }
-                     }
-                 },
-                 MenuItem {
-		     label: "Export...";
-                     enabled: bind player.paused and mainScene.currentResource.url <> "";
-		     action: doExport;
-                 }]
+		 [MenuItem 
+                  {
+                      shortcut: Menu.Shortcut { keyCode: Keys.O }
+                      label: "Open...";
+                      enabled: bind player.paused;
+                      action: function {
+                          if (saveChangesIfNecessary()) {
+                              const result = fileOpen.open();
+                              if (result <> null) {
+                                  open("file:{result}");
+                              }
+                          }
+                      }
+                  },
+                  Menu 
+                  {
+                      label: "Open Recent";
+                      enabled: bind player.paused;
+                      items: bind foreach (x in recentList) {
+                          MenuItem {
+                              label: x;
+                              action: function to () {
+                                  open(x);
+                              }
+                          }
+                      }
+                  },
+                  MenuItem 
+                  {
+                      shortcut: Menu.Shortcut { keyCode: Keys.S }
+                      label: "Save As...";
+                      enabled: true;//bind mainScene.currentResource.url == ""
+                      action: function {
+                          if (mainScene.currentResource.url <> "") {
+                              const u = new java.net.URL(mainScene.currentResource.url);
+                              fileSave.fileName = new java.io.File(u.getFile()).getName();
+                          } else {
+                              fileSave.fileName = "";
+                          }
+                          fileSave.title = "Save As";
+                          var result = fileSave.open();
+                          if (result <> null) {
+                              if (not result.endsWith(".expr")) {
+                                  result = "{result}.expr";
+                              }
+                              mainScene.currentResource.url = "file:{result}";
+                              save();
+                          }
+                      }
+                  },
+                  MenuItem 
+                  {
+                      shortcut: Menu.Shortcut { keyCode: Keys.W }
+                      label: "Close";
+                      enabled: bind player.paused;
+                      action: function {
+                          if (saveChangesIfNecessary()) {
+                              close();
+                          }
+                      }
+                  },
+                  MenuItem {
+                      label: "Export...";
+                      enabled: bind player.paused and mainScene.currentResource.url <> "";
+                      action: doExport;
+                  }];
              },
 	     Menu 
              { 
 		 shortcut: Menu.Shortcut { keyCode: Keys.E }
 		 label: "Edit"
 		 items:
-		 [MenuItem {
-                         shortcut: Menu.Shortcut { keyCode: Keys.X, metaKey: yes }
-		     label: "Cut"
-		 },
-		 MenuItem {
-		     shortcut: Menu.Shortcut { keyCode: Keys.C, metaKey: yes }
-		     label: "Copy"
-		 },
-		 MenuItem {
-		     shortcut: Menu.Shortcut { keyCode: Keys.V, metaKey: yes }
-		     label: "Paste"
-		 }
-                 Menu.Separator {},
-		 MenuItem {
-		     label: "Undo";
-		     enabled: bind canUndo;
-		     shortcut: Menu.Shortcut { keyCode: Keys.Z }
-		     action: MasterUndoable.undo
-		 },
-		 MenuItem {
-		     label: "Redo";
-		     enabled: bind canRedo;
-		     shortcut: Menu.Shortcut { keyCode: Keys.Z, shiftKey: yes }
-		     action: MasterUndoable.redo
-		 }]
+		 [MenuItem 
+                  {
+                      shortcut: Menu.Shortcut { keyCode: Keys.X, metaKey: yes }
+                      label: "Cut";
+                  },
+                  MenuItem 
+                  {
+                      shortcut: Menu.Shortcut { keyCode: Keys.C, metaKey: yes }
+                      label: "Copy";
+                  },
+                  MenuItem 
+                  {
+                      shortcut: Menu.Shortcut { keyCode: Keys.V, metaKey: yes }
+                      label: "Paste";
+                  }
+                  Menu.Separator {},
+                  MenuItem 
+                  {
+                      label: "Undo";
+                      enabled: bind canUndo;
+                      shortcut: Menu.Shortcut { keyCode: Keys.Z }
+                      action: MasterUndoable.undo;
+                  },
+                  MenuItem 
+                  {
+                      label: "Redo";
+                      enabled: bind canRedo;
+                      shortcut: Menu.Shortcut { keyCode: Keys.Z, shiftKey: yes }
+                      action: MasterUndoable.redo;
+                  }];
              },
 	     Menu 
              { 
@@ -2760,9 +2773,6 @@ Tabview.Tab {
     undoList.addTarget("currentScenes", &currentScenes);
     transformHierarchy.selectedScene = mainScene;
     println("SET MAIN SCENE {transformHierarchy.selectedScene}");
-    stage.invoke(function {
-	    //viewer.focusCamera(currentTransform);
-	});
     stage.observeUpdate().subscribe(doUpdate);
     MasterUndoable.commit();
 }
