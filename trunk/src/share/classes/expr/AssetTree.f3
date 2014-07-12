@@ -35,7 +35,7 @@ public class MaAsset is Asset {
     override var url = bind model.url;
     public var temporalRoot is TimeNode;
     override var containedAssets = bind 
-	[foreach (cam in model.getCameras()) CameraAsset { 
+	[foreach (cam in model.getCameras()) if (cam.id == "perspShape" or cam.id == "topShape" or cam.id == "sideShape" or cam.id == "frontShape") then null else CameraAsset { 
 		url: "{url}#{cam.id}";
 		name: cam.id; 
 		camera: cam;

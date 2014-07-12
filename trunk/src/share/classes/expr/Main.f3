@@ -811,12 +811,9 @@ public function run from (args is String[]) to ()
     }
 */
     bound function getCamerasFromModel from (m is Ma.Model) to Camera[] {
-    /*
         foreach (c in m.getCameras()) {
             if (c.id == "topShape" or c.id == "perspShape" or c.id == "frontShape" or c.id == "sideShape") then null else c;
         }
-        */
-        m.getCameras()
     }
 
     var stepping is Boolean = false;
