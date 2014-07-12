@@ -1009,7 +1009,7 @@ public abstract class ObjectExpression is Expression {
     }
 }
 
-class TypeVariableExpression is Expression {
+class TypeVariableExpression is ObserverExpression {
     const typevar is F3Type;
     override function getType { typevar }
     override bound function getName to String { formatTypeVar(typevar) }
@@ -1480,6 +1480,9 @@ public class IPath {
         if (observer is Parameter) {
             return parents[0].getWorldAccess();
         }
+        if (observer is TypeVariableExpression) {
+            return parents[0].getWorldAccess();
+        }
         if (observer is InputMemberExpression) {
             const i = observer as InputMemberExpression;
             if (i.member.m is F3VarMember and i.member.isObserver) {
@@ -1652,6 +1655,8 @@ public class GetVar is VarExpression, ObservableExpression, ObserverExpression {
     override public function toEnglish to String {
         member.name;
     }
+
+    override bound function getName to String { member.name }
 }
 
 public class SetVar is VarExpression, ObserverExpression {
@@ -2162,18 +2167,17 @@ public abstract class ExpressionView is AbstractNode {
 }
 
 function unifyInputs 
-    from (i is LinkedView, 
+    from (l is LinkView, 
           visited is java.util.Set of ExpressionView, 
           result is java.util.List of FunctionView) 
     to () 
 {
-    for (link in i.getInputLinks()) {
-        const v = link.source;
-        unifyInputs(v, visited, result);
+    println("unify inputs {l}");
+    for (link in l.source.getInputLinks()) {
+        unifyInputs(link, visited, result);
     }
-    if (i is ParameterView) {
-        const f =
-            (i as ParameterView).targetView;
+    if (l.target is ParameterView) {
+        const f = (l.target as ParameterView).targetView;
         if (visited.add(f)) {
             result.add(f);
         }
@@ -2276,6 +2280,15 @@ class FunctionView is ExpressionView {
 
     function unify from (substs is java.util.Map of (F3Type, F3Type)) to () 
     {
+        for (x in typeInputs) {
+            if (x.links.size() > 0){
+                var infer is F3Type = null;
+                for (link in x.links) {
+                    infer = (link.source as LinkedOutputView).getResultType();
+                }
+                substs.put(x.parameter.typevar, infer);
+            }
+        }
         for (x in inputs) {
             var t = x.parameter.t;
             if (x.links.size() > 0) {
@@ -2367,7 +2380,7 @@ class FunctionView is ExpressionView {
 
     function getTypeArgs from (fun is Function, resultType is F3Type) to TypeParameterView[] 
     {
-        if (fun.inputs.size() > 1 or not fun.isStatic and fun.inputs.size() > 0) then [] 
+        if (false and fun.inputs.size() > 1 or not fun.isStatic and fun.inputs.size() > 0) then [] 
             else foreach (t in getTypeVars(resultType)) 
                      {
                          TypeParameterView {
@@ -2443,7 +2456,7 @@ class FunctionView is ExpressionView {
 
     public override function getInputLinks to LinkView[] 
     {
-        foreach (i in inputs) i.links 
+        [foreach (i in typeInputs) i.links, foreach (i in inputs) i.links]
     }
 
     override public function getOpenInputs to InputView[] 
@@ -3298,6 +3311,8 @@ public class LinkView is ExpressionView {
     }
 }
 
+class RootLinkView is LinkView {}
+
 abstract class LinkedView is ExpressionView {
     var links is LinkView[] on replace { canvas.dumpSrc() }
     override function unlink from () to () {
@@ -3424,7 +3439,13 @@ class TypeParameterView is InputView {
     public var parameter is TypeVariableExpression;
     override var expression = bind parameter;    
     override var internalContent = Group { content: bind title }
-    public override bound function getLabel to String { expression.getName() }
+    public override bound function getLabel to String { 
+        var src = links[0].source;
+        getName2(src.expression, expression);
+    }
+    function getName2 from (linked is Expression, mine is Expression) to String {
+        if linked <> null then formatType(linked.getType()) else mine.getName();
+    } 
 }
 
 class TypeRefView is OutputView {
@@ -3892,7 +3913,7 @@ public class MemberTreecell is Treeview.Treecell
 
     function link from () to ()
     {
-        if (parentLink == null) {
+        if (parentLink == null or parentLink is RootLinkView) {
             var n = (tn as MemberTreenode);
             //var p = (n.parent as MemberTreenode);
             //const pv = if p == null then null else tv.getView(p) as MemberTreecell;
@@ -3915,7 +3936,9 @@ public class MemberTreecell is Treeview.Treecell
     function unlink from () to ()
     {
         var p = parentLink;
-	parentLink = null;
+        if (not (parentLink is RootLinkView)) {
+            parentLink = null;
+        }
         p.unlink();
     }
 
@@ -4070,7 +4093,7 @@ class GetTreeview is AbstractNode {
 		tv: tv;
 	    }
             if (tn == treeModel.root) {
-                r.parentLink = LinkView { source: self.exprView }
+                r.parentLink = RootLinkView { source: self.exprView }
             }
 	    cellMap.put(tn, r);
 	}
@@ -6028,7 +6051,9 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         for (v in views where v is FunctionView) {
             const f = v as FunctionView;
             f.ununify();
-            unifyInputs(f.inputs[0], x, y);
+            for (j in f.getInputLinks()) {
+                unifyInputs(j, x, y);
+            }
         }
         println("UNIFICATION ORDER:");
         for (v in y) { println(v) }

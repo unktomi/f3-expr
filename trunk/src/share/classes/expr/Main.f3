@@ -649,7 +649,22 @@ public function run from (args is String[]) to ()
 		content: bind svg.root;
 	    }	
 	    addResource(rn, pt);
-	} else if (loweredUrl.endsWith(".png") or loweredUrl.endsWith(".jpg") or loweredUrl.endsWith(".tif") or loweredUrl.endsWith(".tiff") or loweredUrl.endsWith(".tga")) {
+	} else if (loweredUrl.endsWith(".png") or 
+                   loweredUrl.endsWith(".jpg") or 
+                   loweredUrl.endsWith(".tif") or 
+                   loweredUrl.endsWith(".tiff") or 
+                   loweredUrl.endsWith(".bmp") or 
+                   loweredUrl.endsWith(".dcx") or 
+                   loweredUrl.endsWith(".gif") or 
+                   loweredUrl.endsWith(".icns") or 
+                   loweredUrl.endsWith(".ico") or 
+                   loweredUrl.endsWith(".pcx") or 
+                   loweredUrl.endsWith(".psd") or 
+                   loweredUrl.endsWith(".rgbe") or 
+                   loweredUrl.endsWith(".wbmp") or 
+                   loweredUrl.endsWith(".xbm") or 
+                   loweredUrl.endsWith(".xpm") or 
+                   loweredUrl.endsWith(".tga")) {
 	    const image= Image { 
 		url: url;
 	    }
@@ -796,9 +811,12 @@ public function run from (args is String[]) to ()
     }
 */
     bound function getCamerasFromModel from (m is Ma.Model) to Camera[] {
+    /*
         foreach (c in m.getCameras()) {
             if (c.id == "topShape" or c.id == "perspShape" or c.id == "frontShape" or c.id == "sideShape") then null else c;
         }
+        */
+        m.getCameras()
     }
 
     var stepping is Boolean = false;
@@ -922,6 +940,7 @@ public function run from (args is String[]) to ()
         currentScenes = [mainScene];
 	mainScene.currentResource.resources = [];
         mainScene.instanceSpace.content = [];
+        mainScene.camera = freeCamera;
 	currentAnimResource.resources = [];
         mainTimeLayer.content = [];
         mainTimeLayer.content = currentAnimResource;

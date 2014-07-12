@@ -65,7 +65,7 @@ public class Scene2DAsset is SceneAsset {
     override public function getScene to ResourceScene {
 	ResourceScene {
             background: null;
-            camera: Camera2D {id: "2D Camera" near: -1000, far: 1000, tz: 900 };
+            camera: Camera2D {id: "2D Camera" near: -1000, far: 1000, tz: 999 };
 	    id: "2D Scene {count++}";
 	}
     }
