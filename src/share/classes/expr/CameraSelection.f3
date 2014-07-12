@@ -1,0 +1,7 @@
+package expr;
+import f3.media.scene.*;
+
+public class CameraSelection {
+    public var camera is Camera;
+    public var cameras is Camera[];
+}

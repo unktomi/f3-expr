@@ -732,7 +732,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 		scrollVertically(y);
 	    });
 
-    public var graph is Boolean = false;
+    public var graph is Boolean = true;
     const arrow is Polygon = Polygon {
 	points: [-3.5, -4.5, -3.5, 4.5, 3.5, 0];
 	fillPaint: ColorPaint(Color.WHITE);

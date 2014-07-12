@@ -86,14 +86,20 @@ public class GraphEditor is Trax {
         }
     }
     
-    override function refreshPlayhead to () 
+    override function updatePlayhead to () 
     {
-        super.refreshPlayhead();
-        /*
-        const rn = (resourceTarget as ResourceNode);
-        rn.timeline.enabled = true;
-        rn.timeline.setPlayhead(playheadPos);
-        rn.timeline.enabled = false;
-        */
+        super.updatePlayhead();
+        const event = target.playhead;
+        for (resourceTarget in resourceTargets) {
+            const rn = (resourceTarget as ResourceNode);
+            rn.timeline.enabled = true;
+            rn.timeline.setPlayhead(event);
+            rn.timeline.enabled = false;
+        }
+        for (varTarget in variableTargets) {
+            varTarget.timeline.enabled = true;
+            varTarget.timeline.setPlayhead(event);
+            varTarget.timeline.enabled = false;
+        }
     }
 }

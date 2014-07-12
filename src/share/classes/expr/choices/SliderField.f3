@@ -79,6 +79,7 @@ public class SliderField is AbstractNode
     const border = Color.color(.5, .5, .5);
 
     const lightRect is Rectangle = Rectangle {
+        id: "lightRect";
 	fillPaint: bind ColorPaint(light);
 	height: bind height;
 	width: bind width
@@ -91,6 +92,7 @@ public class SliderField is AbstractNode
     var runWidth = bind width + dragw;
 
     const darkRect is Rectangle = Rectangle {
+        id: "darkRect";
 	fillPaint: bind ColorPaint(dark);
 	transform: bind translate(-runWidth/2 + w/2, 0);
 	height: bind height;
@@ -99,6 +101,7 @@ public class SliderField is AbstractNode
     }
 
     const borderRect is Rectangle = Rectangle {
+        id: "borderRect";
 	fillPaint: bind ColorPaint(border);
 	transform: bind translate(-runWidth/2 + runWidth * t - 0.5, 0, 0)
 	height: bind height;

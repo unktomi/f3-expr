@@ -1,0 +1,19 @@
+package expr;
+
+public class Selection of a {
+    public const selection is a;
+    override function toString to String
+    {
+        "{selection}"
+    }
+
+    override function equals from (obj is Object) to Boolean 
+    {
+        if (obj is Selection) {
+            const j = obj as Selection of Object;
+            const result = selection == j.selection;
+            return result;
+        }
+        return false;
+    }
+}

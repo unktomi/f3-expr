@@ -496,8 +496,7 @@ public class InspectedChoice of a is InspectedRange of a
 
     function getIndex from (t is Number) to Integer 
     {
-	const i = (Math.round(t * choices.size()) as Integer);
-        return Math.min(Math.max(i, 0), choices.size()-1);
+        Math.round(Math.min(Math.max(0, t), 1.0) * (choices.size()-1) as Integer)
     }
 
     function getWidth from (font is Font, labels is String[]) to Number
@@ -519,10 +518,16 @@ public class InspectedChoice of a is InspectedRange of a
 
     public function getT to Number
     {
+        if (choices.size() == 0) {
+            return 0;
+        }
+        if (choices.size() == 1) {
+            return 1;
+        }
         const v = get();
         for (x in choices) {
             if (x == v) {
-                const t = indexof x / (choices.size() as Number);
+                const t = indexof x / ((choices.size()-1) as Number);
                 return t;
             }
         }
@@ -708,12 +713,12 @@ public class BooleanField is SliderField {
     override var textInputEnabled = false;
     override function setT from (t is Number) to ()
     {
-	this.t = if (t > 0.5) then 1.0 else 0.5;
+	this.t = if (t > 0.5) then 1.0 else 0.0;
     }
     function onChange from (n is Boolean) to () 
     {
 	println("on change {n}");
-	t = if (n) then 1.0 else 0.5;
+	t = if (n) then 1.0 else 0.0;
     }
     postinit {
         onChange(i.get());
