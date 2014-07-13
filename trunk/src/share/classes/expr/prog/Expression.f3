@@ -2246,6 +2246,11 @@ class FunctionView is ExpressionView {
 
     public function assignLinkIds to () {
         var j = 0;
+        for (x in typeInputs) {
+            for (y in x.links) {
+                y.targetLinkId = j++;
+            }
+        }
         for (x in inputs.reverse()) {
             for (y in x.links) {
                 y.targetLinkId = j++;
@@ -2303,47 +2308,49 @@ class FunctionView is ExpressionView {
         }
         for (x in inputs) {
             var t = x.parameter.t;
+            var infer is F3Type = null;
             if (x.links.size() > 0) {
-                var infer is F3Type = null;
                 for (link in x.links) {
                     infer = (link.source as LinkedOutputView).getResultType();
                 }
-                const canAssign = observeType(t).isConvertibleFrom(infer);
-                println("INFERRED {infer} for {t} => {canAssign}");
-                if (canAssign) {
-                    x.inputType = infer;
-                    var targs is F3Type[];
-                    var tparms is F3Type[];
-                    if (infer is F3ClassType) {
-                        const ct = infer as F3ClassType;
-                        targs = ct.getTypeArguments();
-                        tparms = ct.getTypeParameters();
-                    }
-                    for (j in inputs) {
-                        if (j <> x and j.links.size() == 0) {
-                            var t1 = typeApply(j.parameter.t, x.parameter.t, x.inputType, substs);
-                            for (q in targs) {
-                                const r = tparms[indexof q];
-                                t1 = typeApply(t1, r, q, substs);
-                            }
-                            println("t1={t1} for {j.parameter.t}");
-                            if (t1 <> j.parameter.t and j.inputType == null) {
-                                println("SETTING type of {j} to {t1}");
-                                j.inputType = t1;
-                                insert x into j.inferred;
-                                println("label={j.getLabel()}");
-                            }
+            }  else {
+                infer = substs.get(t);
+            }
+            const canAssign = observeType(t).isConvertibleFrom(infer);
+            println("INFERRED {infer} for {t} => {canAssign}");
+            if (canAssign) {
+                x.inputType = infer;
+                var targs is F3Type[];
+                var tparms is F3Type[];
+                if (infer is F3ClassType) {
+                    const ct = infer as F3ClassType;
+                    targs = ct.getTypeArguments();
+                    tparms = ct.getTypeParameters();
+                }
+                for (j in inputs) {
+                    if (j <> x and j.links.size() == 0) {
+                        var t1 = typeApply(j.parameter.t, x.parameter.t, x.inputType, substs);
+                        for (q in targs) {
+                            const r = tparms[indexof q];
+                            t1 = typeApply(t1, r, q, substs);
+                        }
+                        println("t1={t1} for {j.parameter.t}");
+                        if (t1 <> j.parameter.t and j.inputType == null) {
+                            println("SETTING type of {j} to {t1}");
+                            j.inputType = t1;
+                            insert x into j.inferred;
+                            println("label={j.getLabel()}");
                         }
                     }
-                    const t0 = typeApply(output.result.getType(), x.parameter.t, x.inputType, substs);
-                    if (t0 <> output.result.getType()) {
-                        println("t0={formatClassName(t0)} for {formatClassName(output.result.getType())}");
-                        output.unifiedType = t0;
-                        insert x into output.inferred;
-                        println("output resultType={output.resultType}");
-                        println("output member={output.getter.member}");
-                    } 
                 }
+                const t0 = typeApply(output.result.getType(), x.parameter.t, x.inputType, substs);
+                if (t0 <> output.result.getType()) {
+                    println("t0={formatClassName(t0)} for {formatClassName(output.result.getType())}");
+                    output.unifiedType = t0;
+                    insert x into output.inferred;
+                    println("output resultType={output.resultType}");
+                    println("output member={output.getter.member}");
+                } 
             }
         }
     }
@@ -3468,7 +3475,20 @@ class TypeRefView is OutputView {
     public var ref is TypeExpression;
     override var expression = bind ref;    
     override var treeWidth = 16;
-    override var internalContent = Group { content: bind [title, TransformNode { tx: bind cellWidth/2-8, content: bind getTree }] }
+    var innerContent = Group { content: bind [title, TransformNode { tx: bind cellWidth/2-8, content: bind getTree }] }
+    override var internalContent = Group {
+	content: bind [innerContent, 
+        Rectangle {
+                visible: bind selected
+                pickable: false;
+                width: bind cellWidth;
+                height: bind cellHeight;
+                stroke: Stroke {
+                    width: 2;
+                }
+                strokePaint: SelectionPaint;
+        }]
+    }
     public override bound function getLabel to String { expression.getName() }
     override var outputName = "";
     override var resultType = bind ref.typeref;
@@ -6079,6 +6099,9 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             f.ununify();
             for (j in f.getInputLinks()) {
                 unifyInputs(j, x, y);
+            }
+            if (x.add(f)) {
+                y.add(f);
             }
         }
         println("UNIFICATION ORDER:");
