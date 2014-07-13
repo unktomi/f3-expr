@@ -49,13 +49,28 @@ public class Treemodel is Foldable of Treenode {
     function getRows from (filter is function from Treenode to Boolean) to Treenode[]
     {
 	var result is Treenode[];
+        /*
+        var added = new java.util.HashSet of Treenode;
 	root.getRows(0, Integer.MAX_VALUE, true,
 		     function from (n is Treenode) to ()
 		     {
                          if (filter(n)) {
+                             added.add(n);
+                             var p = n.parent;
+                             var toAdd is Treenode[];
+                             while (p <> null and not added.contains(p)) {
+                                 insert p into toAdd;
+                                 added.add(p);
+                                 p = p.parent;
+                             }
+                             insert toAdd.reverse() into result;
                              insert n into result;
                          }
 		     });
+        */
+        root.getRows(0, Integer.MAX_VALUE, filter, function from (tn is Treenode) to () {
+                insert tn into result
+            });
         for (n in result) n.row = indexof n;
         return result;
     }
@@ -88,6 +103,7 @@ public abstract class Treenode is Foldable of Treenode {
     public var row is Integer;
     public var column is Integer;
     public var isOpen is Boolean;
+    public var filterOpen is Boolean;
     public var canOpen is Boolean;
     public var parent is Treenode;
     public var label is String;
@@ -103,7 +119,7 @@ public abstract class Treenode is Foldable of Treenode {
 		close();
 	    }
 	}
-	if (isOpen) {
+	if (isOpen or filterOpen) {
 	    var k = c+1;
 	    for (child in children) {
 		child.parent = this;
@@ -120,14 +136,41 @@ public abstract class Treenode is Foldable of Treenode {
 	      add is function from Treenode to ()) 
 	to () 
     {
-	if (low <= row and hi > row) {
+        filterOpen = false;
+	if (all or low <= row and hi > row) {
 	    add(this)
 	}
 	if (isOpen or all) {
-	    var j = 0;
 	    for (c in children /*where c.getMinRow() > low and c.getMaxRow() < hi*/) {
 		c.getRows(low, hi, all, add);
 	    }
+	}
+    }
+
+    function getRows 
+	from (low is Integer, 
+	      hi is Integer, 
+              filter is function from Treenode to Boolean,
+	      add is function from Treenode to ()) 
+	to () 
+    {
+        var selfAdded = false;
+        filterOpen = false;
+	if (low <= row and hi > row) {
+	    if (filter(this)) {
+                selfAdded = true;
+                add(this);
+            }
+	}
+        for (c in children /*where c.getMinRow() > low and c.getMaxRow() < hi*/) {
+            c.getRows(low, hi, filter, function from (tn is Treenode) to () {
+                    if (not selfAdded) {
+                        selfAdded = true;
+                        add(this);
+                    }
+                    filterOpen = true;
+                    add(tn)
+                });
 	}
     }
 
@@ -162,6 +205,9 @@ public abstract class Treenode is Foldable of Treenode {
     public function close to ()
     {
 	isOpen = false;
+        for (c in children) {
+            c.column = 0;
+        }
     }
 
     override function foldLeft of b
@@ -234,7 +280,7 @@ public class Treecell is AbstractNode {
 	     content:
 	     [TransformNode { 
 	         tx: bind -tv.cellWidth / 2;
-		 content: bind if (tn.isOpen) then tv.closeArrow(fg) else if (tn.canOpen) then tv.openArrow(fg) else null;
+                 content: bind if (tn.isOpen or tn.filterOpen) then tv.closeArrow(fg) else if (tn.canOpen) then tv.openArrow(fg) else null;
 	     },
 	     Text.Label {
 		 transform: bind translate(if (tn.canOpen) then 6 else 0, 0);
@@ -456,6 +502,8 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
     }
 
     var modelSelection is Treenode on replace { model.selectionObserver.onNext(modelSelection) }
+
+    var openNodes = new java.util.HashSet of (Treenode);
 
     override function preupdate {
 	model.update();

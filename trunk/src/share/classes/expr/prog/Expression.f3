@@ -377,7 +377,7 @@ public const OBSVB_MEMBERS = {
 }
 
 public const UNIT_MEMBER = FunctionMember {
-    m: Reflect.getFunction("f3.lang.Builtins", "unit", []);
+    m: Reflect.getFunction("f3.lang.Builtins", "nothing", []);
 }
 
 public const NUM_MEMBERS = 
@@ -2280,13 +2280,25 @@ class FunctionView is ExpressionView {
 
     function unify from (substs is java.util.Map of (F3Type, F3Type)) to () 
     {
-        for (x in typeInputs) {
+        for (x in potentialTypeInputs) {
             if (x.links.size() > 0){
                 var infer is F3Type = null;
                 for (link in x.links) {
                     infer = (link.source as LinkedOutputView).getResultType();
                 }
+                x.infer = null;
                 substs.put(x.parameter.typevar, infer);
+            } else {
+                var infer is F3Type = null;
+                for (ent in substs.entrySet()) {
+                    if (x.parameter.typevar == ent.getKey()) {
+                        infer = ent.getValue();
+                        break;
+                    }
+                }
+                x.infer = infer;
+                println("inferred {x.infer} for {x.parameter.typevar} in {x}");
+                println("substs={substs}");
             }
         }
         for (x in inputs) {
@@ -2394,7 +2406,10 @@ class FunctionView is ExpressionView {
 
     override var titleSeparatorRow is Integer = bind typeInputs.size();
 
-    bound var typeInputs is TypeParameterView[] = bind getTypeArgs(fun, output.resultType);
+    var potentialTypeInputs is TypeParameterView[] = bind getTypeArgs(fun, output.resultType);
+
+
+    bound var typeInputs is TypeParameterView[] = foreach (x in potentialTypeInputs) if (x.infer == null) then x else null;
 
     bound var inputs is ParameterView[] = foreach (p in fun.inputs) ParameterView {
         targetView: this;
@@ -3438,10 +3453,11 @@ class BooleanConstant is Constant {
 class TypeParameterView is InputView {
     public var parameter is TypeVariableExpression;
     override var expression = bind parameter;    
-    override var internalContent = Group { content: bind title }
+    override var internalContent = Group { content: bind title };
+    public var infer is F3Type;
     public override bound function getLabel to String { 
         var src = links[0].source;
-        getName2(src.expression, expression);
+        if (infer <> null) then formatType(infer) else getName2(src.expression, expression);
     }
     function getName2 from (linked is Expression, mine is Expression) to String {
         if linked <> null then formatType(linked.getType()) else mine.getName();
@@ -4665,7 +4681,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     public function onDrop from (where is Pick, m is Member) to ()
     {
-        const r = createMemberView(toLocal * where.scenePoint, m, 0);
+        const r = createMemberView(toLocal * where.scenePoint, m, 0, true);
         setSelectedExpr(r);
         MasterUndoable.commit();
     }
@@ -4723,11 +4739,17 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             };
         }
         insert r into views;
-        r.pos = new Point3(pt.x+r.bounds.extent.x, pt.y + cellHeight*(offset+1), pt.z);
+        //r.pos = new Point3(pt.x+r.bounds.extent.x, pt.y + cellHeight*(offset+1), pt.z);
+        r.pos= pt;
         return r;
     }
 
     function createMemberView from (pt is Point3, m is Member, offset is Integer) to ExpressionView
+    {
+        createMemberView(pt, m, offset, false);
+    }
+
+    function createMemberView from (pt is Point3, m is Member, offset is Integer, external is Boolean) to ExpressionView
     {
         var r is ExpressionView;
         if (m is FunctionMember) {
@@ -4752,7 +4774,11 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 }
             } into views;
         }
-        r.pos = new Point3(pt.x+r.bounds.extent.x, pt.y + cellHeight*(offset+1), pt.z);
+        if (external) {
+            r.pos = pt;
+        } else {
+            r.pos = new Point3(pt.x+r.bounds.extent.x, pt.y + cellHeight*(offset+1), pt.z);
+        }
         return r;
     }
 
