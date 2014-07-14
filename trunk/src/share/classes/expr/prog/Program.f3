@@ -19,6 +19,9 @@ import expr.Context;
 import expr.Context.*;
 import expr.EventLayer;
 
+    public var evaluator = bind
+        new org.f3.tools.script.ScriptShell(java.lang.Thread.currentThread().getContextClassLoader());
+
 class Value {
     public var value is Object;
 }
@@ -95,8 +98,6 @@ public class EvalContext {
         return r;
     }
     
-    public var evaluator = bind
-        new org.f3.tools.script.ScriptShell(getClass().getClassLoader());
 
     public function evaluate from (prog is Program) to ()
     {

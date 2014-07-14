@@ -4097,11 +4097,15 @@ class GetTreeview is AbstractNode {
 
     const treeModel = MemberTreemodel {
 	root: MemberTreenode {
-	    //get: bind get;
+	    get: bind get;
 	    m: bind get.member;
             isStatic: bind isStatic;
             override var label = bind rootName;
             value: bind debugValue;
+            override function getType to F3Type
+            {
+                exprView.getResultType();
+            }
 	}
     };
 
