@@ -267,6 +267,15 @@ function formatEnglishName from (name is String, id is String, html is Boolean) 
     }
 }
 
+function isSameType from (x is F3Type, y is F3Type) to Boolean {
+    if (x is F3Local.ClassType and y is F3Local.ClassType) {
+        const x1 = x as F3Local.ClassType;
+        const y1 = y as F3Local.ClassType;
+        return x1.getType().equals(y1.getType());
+    }
+    return x == y;
+}
+
 public function isSameTypeVariable (x is F3Type, y is F3Type) to Boolean 
 {
     if (x.isTypeVariable() and y.isTypeVariable()) {
@@ -2396,25 +2405,11 @@ class FunctionView is ExpressionView {
         }
     }
         
-
-    function getTypeArgs from (fun is Function, resultType is F3Type) to TypeParameterView[] 
-    {
-        if (false and fun.inputs.size() > 1 or not fun.isStatic and fun.inputs.size() > 0) then [] 
-            else foreach (t in getTypeVars(resultType)) 
-                     {
-                         TypeParameterView {
-                             canvas: bind canvas;
-                             parameter: TypeVariableExpression {
-                                 typevar: t;
-                             }
-                         }
-                     }
-    }
-
     override var titleSeparatorRow is Integer = bind typeInputs.size();
 
-    var potentialTypeInputs is TypeParameterView[] = bind getTypeArgs(fun, output.resultType);
-
+    var potentialTypeInputs is TypeParameterView[] = bind foreach (t in getTypeVars(output.result.getType())) TypeParameterView {
+        parameter: TypeVariableExpression { typevar: t}, canvas: canvas
+    };
 
     bound var typeInputs is TypeParameterView[] = foreach (x in potentialTypeInputs) if (x.infer == null) then x else null;
 
@@ -4087,17 +4082,26 @@ class GetTreeview is AbstractNode {
 
     public var rootName is String = bind exprView.outputName; //formatType(get.member.t);
 
+    function subst from (m is Member, t is F3Type) to Member {
+        const m1 = Member {
+            t: t;
+            rt: t;
+            m: m.m;
+            name: m.name;
+            isObservable: m.isObservable;
+            isObserver: m.isObserver;
+        }
+        println("SUBST {m} => {t} => {m1}");
+        return m1;
+    }
+
     const treeModel = MemberTreemodel {
 	root: MemberTreenode {
-	    get: bind get;
+	    //get: bind get;
 	    m: bind get.member;
             isStatic: bind isStatic;
             override var label = bind rootName;
             value: bind debugValue;
-            override function getType to F3Type
-            {
-                exprView.getResultType();
-            }
 	}
     };
 
