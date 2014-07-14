@@ -496,7 +496,7 @@ public class InspectedChoice of a is InspectedRange of a
 
     function getIndex from (t is Number) to Integer 
     {
-        Math.round(Math.min(Math.max(0, t), 1.0) * (choices.size()-1) as Integer)
+        Math.round(Math.min(Math.max(0, t), 1.0) * (choices.size()-1)) as Integer;
     }
 
     function getWidth from (font is Font, labels is String[]) to Number
