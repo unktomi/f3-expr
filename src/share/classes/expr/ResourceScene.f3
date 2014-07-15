@@ -11,11 +11,15 @@ public class ResourceScene is Scene {
         "ResourceScene {id}";
     }   
 
+    public var paused is Boolean;
+
     public const instanceSpace is Group = Group {id: "Instance Space"};
 
     public var currentModels = bind foreach (m in currentResource.resources) if (m is MaResourceNode) then m as MaResourceNode else null;
 
     public var currentCameras is Camera[];
+
+    public var drawCollisions is Boolean = true;
 
      override function update to () {
         super.update();
@@ -61,7 +65,9 @@ public class ResourceScene is Scene {
     const renderComplete = 
         observeRenderComplete().subscribe(function from (scene is Scene) to () 
                                           {
-                                              dynamicsWorld.debugDraw(scene.camera) 
+                                              if (drawCollisions) {
+                                                  dynamicsWorld.debugDraw(scene.camera) 
+                                              }
                                           });
     
     const selection = Subject of ResourceNode {};
