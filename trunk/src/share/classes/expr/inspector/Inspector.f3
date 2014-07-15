@@ -150,6 +150,7 @@ public class NumericSliderField is SliderField {
 }
 
 public class ColorInspector extends AbstractNode {
+    public var editable is Boolean = true;
     public var i is InspectedColor;
     public var height is Number = 15;
     var fieldWidth = 30;
@@ -194,6 +195,7 @@ public class ColorInspector extends AbstractNode {
         width: bind height;
         fillPaint: bind ColorPaint(selection);
         strokePaint: bind ColorPaint(Color.color(.2, .2, .2));
+        pickable: bind editable;
         override function onMouseDown from (e is MouseEvent) to ()
         {
             const pt = toSceneTransform * new Point3(0, -height/2, 0);
@@ -209,6 +211,7 @@ public class ColorInspector extends AbstractNode {
     }
 
     const red = NumericSliderField {
+        editable: bind editable;
         onSetKey: bind onSetKey;
         min: 0.0;
         max: 1.0;
@@ -222,6 +225,7 @@ public class ColorInspector extends AbstractNode {
     }
 
     const green = NumericSliderField {
+        editable: bind editable;
         onSetKey: bind onSetKey;
         min: 0.0;
         max: 1.0;
@@ -235,6 +239,7 @@ public class ColorInspector extends AbstractNode {
     }
 
     const blue = NumericSliderField {
+        editable: bind editable;
         onSetKey: bind onSetKey;
         min: 0.0;
         max: 1.0;
@@ -248,6 +253,7 @@ public class ColorInspector extends AbstractNode {
     }
 
     const alpha = NumericSliderField {
+        editable: bind editable;
         onSetKey: bind onSetKey;
         min: 0.0;
         max: 1.0;
@@ -442,6 +448,7 @@ function inspectedCamera
 
 public abstract class Inspected of a 
 {
+    public var editable is Boolean = bind member.isObservable;
     public var member is Member;
     public var label is String;
     public var observable is Observable of a;
@@ -458,9 +465,11 @@ public class InspectedRange of a is Inspected of a {
     public function getFromT from (t is Number) to a { null }
     public function setFromT from (t is Number) to () 
     { 
+        
 	set(getFromT(t)); 
     }
 }
+
 public class InspectedColor is Inspected of Color {
 }
 
@@ -725,7 +734,8 @@ public class BooleanField is SliderField {
 	t = if (n) then 1.0 else 0.0;
     }
     postinit {
-        onChange(i.get());
+        const b = if i.get() == null then no else i.get();
+        onChange(b);
         disp = i.observable.subscribe(onChange);
     }
     override var t on replace {
@@ -771,10 +781,12 @@ public class DurationField is SliderField {
 }
 
 class StringField is ResizableNode {
+    public var editable is Boolean = true;
     public var selected is Boolean;
     public var string is InspectedString;
     public var font is Text.Font;
     const area is Text.Field = Text.Field {
+        editable: bind editable;
         width: bind width;
         height: bind height;
         rightJustified: true;
@@ -921,6 +933,7 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
 	    TransformNode {
 		tx: bind width / 2 - fieldWidth / 2-indent;
 		content: NumberField {
+                    editable: bind i.editable;
                     onSetKey: bind onSetKey;
 		    i: bind i as InspectedNumber;
 	            width: bind fieldWidth;
@@ -929,6 +942,7 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
 	    } else if (i is InspectedColor) then
 	    TransformNode {
                 var  widget = ColorInspector {
+                    editable: bind i.editable;
                     colorChooser: bind colorChooser;
                     onSetKey: bind onSetKey;
 		    i: bind i as InspectedColor;
@@ -940,6 +954,7 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
 	    TransformNode {
 		tx: bind width / 2 - fieldWidth / 2-indent;
 		content: BooleanField {
+                    editable: bind i.editable;
 		    i: bind i as InspectedBoolean;
 	            width: bind fieldWidth;
 		    height: bind cellHeight-margin;
@@ -949,6 +964,7 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
                     TransformNode {
                         tx: bind width / 2 - q.fieldWidth / 2-indent;
                         content: ChoiceField of Object {
+                            editable: bind i.editable;
                             //override var font = bind q.deriveFont(inspector.font, t);
                             i: bind q;
                             width: bind q.fieldWidth;
@@ -970,6 +986,7 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
 	    TransformNode {
 		tx: bind width / 2 - fieldWidth / 2-indent;
 		content: DurationField {
+                    editable: bind i.editable;
 		    i: bind i as InspectedDuration;
 	            width: bind fieldWidth;
 		    height: bind cellHeight-margin;
@@ -980,6 +997,7 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
                 tx: bind width/2-w/2-indent;
                 //tx: 80;
                 content: StringField {
+                        editable: bind i.editable;
                         string: bind i as InspectedString;
                         width: bind w;
                         height: bind cellHeight-margin;
@@ -1056,7 +1074,7 @@ function inspect0 from (obj is Object, classType is F3ClassType) to (Inspected o
                 var result is Inspected of ?;
                 try {
                     result = 
-                        if (m.isObservable)  {
+                        if (true or m.isObservable)  {
                             if (m.m is F3VarMember and m.t == NUMBER_TYPE) {
                                 const ptr = (m.m as F3Local.VarMember).getPointer(obj as F3Object) as ObservableRef of Number;
                                 InspectedNumber {
@@ -1068,7 +1086,7 @@ function inspect0 from (obj is Object, classType is F3ClassType) to (Inspected o
                                         ptr.get() 
                                     }
                                     override function set from (x is Number) to () { 
-                                        ptr.set(x);
+                                        if (m.isObservable) ptr.set(x);
                                         //println("set {m.m.getName()} => {x} => {ptr.get()}");
                                     }
                                 }
@@ -1079,7 +1097,7 @@ function inspect0 from (obj is Object, classType is F3ClassType) to (Inspected o
                                     label: m.m.getName();
                                     observable: Observables.observe(ptr);
                                     override function get to Color { ptr.get() }
-                                    override function set from (x is Color) to () { ptr.set(x) }
+                                    override function set from (x is Color) to () { if (m.isObservable) ptr.set(x) }
                                 }
                             } else if (m.m is F3VarMember and ENUM_TYPE.isAssignableFrom(m.t)) {
                                 const ptr = (m.m as F3Local.VarMember).getPointer(obj as F3Object) as ObservableRef of Object;
@@ -1089,7 +1107,7 @@ function inspect0 from (obj is Object, classType is F3ClassType) to (Inspected o
                                         observable: Observables.observe(ptr) as Observable of Object;
                                         clazz: java.lang.Class.forName(m.t.getName()) as java.lang.Class of Object;
                                         override function get to Object { ptr.get() }
-                                        override function set from (x is Object) to () { ptr.set(x) }
+                                        override function set from (x is Object) to () { if (m.isObservable) ptr.set(x) }
                                     }
                             } else if (m.m is F3VarMember and m.t == BOOLEAN_TYPE) {
                                 const ptr = (m.m as F3Local.VarMember).getPointer(obj as F3Object) as ObservableRef of Boolean;
@@ -1098,7 +1116,7 @@ function inspect0 from (obj is Object, classType is F3ClassType) to (Inspected o
                                     label: m.m.getName();
                                     observable: Observables.observe(ptr);
                                     override function get to Boolean { ptr.get() }
-                                    override function set from (x is Boolean) to () { ptr.set(x) }
+                                    override function set from (x is Boolean) to () { if (m.isObservable) ptr.set(x) }
                                 }
                             } else if (m.m is F3VarMember and m.t == FONT_STYLE_TYPE) {
                                 const ptr = (m.m as F3Local.VarMember).getPointer(obj as F3Object) as ObservableRef of FontStyleSelection;
@@ -1122,7 +1140,7 @@ function inspect0 from (obj is Object, classType is F3ClassType) to (Inspected o
                                     label: m.m.getName();
                                     observable: Observables.observe(ptr);
                                     override function get to Duration { ptr.get() }
-                                    override function set from (x is Duration) to () { ptr.set(x) }
+                                    override function set from (x is Duration) to () { if (m.isObservable) ptr.set(x) }
                                 }
                             } else if (m.m is F3VarMember and m.t == CAMERA_SELECTION_TYPE) {
                                 const ptr = (m.m as F3Local.VarMember).getPointer(obj as F3Object) as ObservableRef of CameraSelection;
@@ -1134,7 +1152,7 @@ function inspect0 from (obj is Object, classType is F3ClassType) to (Inspected o
                                     label: m.m.getName();
                                     observable: Observables.observe(ptr);
                                     override function get to String { var s = ptr.get(); println("{label} => get={s}"); s }
-                                    override function set from (x is String) to () { ptr.set(x) }
+                                    override function set from (x is String) to () { if (m.isObservable) ptr.set(x) }
                                 }
                             } else {
                                 /*
@@ -1146,6 +1164,7 @@ function inspect0 from (obj is Object, classType is F3ClassType) to (Inspected o
                                 null
                             }
                         } else null;
+
                     result.get();
                 } catch (e is java.lang.Exception) {
                     e.printStackTrace();

@@ -11,7 +11,7 @@ public class ResourceScene is Scene {
         "ResourceScene {id}";
     }   
 
-    public var paused is Boolean;
+    public readonly var paused is Boolean;
 
     public const instanceSpace is Group = Group {id: "Instance Space"};
 

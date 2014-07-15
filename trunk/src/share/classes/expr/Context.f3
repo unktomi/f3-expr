@@ -457,9 +457,8 @@ public class ContextTreemodel is Treemodel {
     });
     public var rootContext is GroupContext;
     public var selectedContext is Context;
-    public function reset to () 
+    public function reset from () to ()
     {
-        rootContext.content = [];
         tn = null;
         tn = root;
         history.reset();
@@ -507,7 +506,7 @@ public class ContextTreemodel is Treemodel {
     public var selectedMember is Member = bind selectedMemberContext.member;
     public var selectedMemberContext is MemberContext;
     public readonly var selectedVarContext is ClosureVarContext;
-    override var root = ContextTreenode { context: bind rootContext };
+    override var root = bind ContextTreenode { context: rootContext };
     const disp = selectionObserver.subscribe(function from (tn is Treenode) to () {
             this.tn = tn;
         });
