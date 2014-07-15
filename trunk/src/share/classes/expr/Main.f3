@@ -205,6 +205,11 @@ public class MainContext is Context.MemberContext, Context.ResourceObjectContext
     {
         []
     }
+
+    function createStart to ()
+    {
+        createProgram(member);
+    }
 }
 
 var canUndo is Boolean;
@@ -799,6 +804,7 @@ public function run from (args is String[]) to ()
 	background: Color.GRAY;
         camera: camera;
         dynamicsWorld: { var w = bulletDynamicsWorldFactory.createDynamicsWorld(); w.paused = true; w }
+        paused: bind player.paused;
     }
 
     const renderComplete = 
@@ -957,8 +963,9 @@ public function run from (args is String[]) to ()
 	currentAnimResource.resources = [];
         mainTimeLayer.content = [];
         mainTimeLayer.content = currentAnimResource;
-        mainContext.programs = [];
-        mainContext.program = null;
+        mainContext = MainContext {
+            name: "Start";
+        }
         ExprNode.Start.disposeAll();
         contextModel.reset();
         contextTree.select(contextModel.root);
@@ -1418,6 +1425,7 @@ public function run from (args is String[]) to ()
 	}
         for (j in sceneRes.layers) {
             var scene = ResourceScene {
+                paused: bind player.paused;
                 background: null;
                 id: j.name;
                 camera: Camera2D { near: -1000, far: 1000, tz: 900 };   

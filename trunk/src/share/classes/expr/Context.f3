@@ -208,7 +208,7 @@ public class ResourceNodeContext is GroupContext, ResourceObjectContext {
     }
     public var resource is ResourceNode;
     override var name = bind "{if (resource.$useLiteralId) then resource.id else formatName(resource.id)} [Scene]";
-    protected var typeName = "f3.media.scene.TransformNode";
+    protected var typeName = "expr.ResourceNode";
     protected var members = 
         bind uniquify(Expression.introspect(Reflect.getType(typeName) as F3ClassType));
 

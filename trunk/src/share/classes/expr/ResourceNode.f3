@@ -3,14 +3,34 @@ import f3.media.scene.*;
 import f3.util.Observer.*;
 import f3.util.Observable.*;
 import f3.util.*;
+import f3.math.*;
 import expr.prog.Program;
 
 class ResourceChannel {
      public var channel is Channel of Number;
 }
 
-class InstanceNode extends TransformNode {
+class InstanceNode is TransformNode {
     public var subs is Disposable[];
+}
+
+public class Button {
+    public var pressed is Boolean;
+    public var released is Boolean;
+    public var held is Boolean;
+    public var value is Number;
+}
+
+public class Joystick is Button {
+    public var x is Number;
+    public var y is Number;
+    public var angle is Number;
+}
+
+class Input {
+    public var x is Number;
+    public var y is Number;
+    public var buttons is Button[];
 }
 
 public class ResourceNode is TransformNode, ResourceTarget, NodeAPI {
@@ -28,14 +48,26 @@ public class ResourceNode is TransformNode, ResourceTarget, NodeAPI {
     public var collidableMass is Number = 1.0;
     public var collidableFriction = 0.5;
     public var collidableRestitution = 0.5;
+    public var collidableGravityScale is Number = 1.0;
     public var collidableType is RigidBodyType = RigidBodyType.Dynamic;
     public var $dynamicsWorld is DynamicsWorld;
     
     
-    var updateSubject = Subject of (()) {};
+    var updateSubject = Subject of (NodeAPI) {};
 
-    public function observeUpdate to Subject of (()) {
+    public function observeUpdate to Subject of (NodeAPI) {
         updateSubject;
+    }
+
+    function getScene to ResourceScene {
+        var p is Node = this;
+        while (p <> null) {
+            if (p is SceneAPI) {
+                return (p as SceneAPI).scene as ResourceScene;
+            }
+            p = p.parent;
+        }
+        return null;
     }
 
     override function update to () {
@@ -51,7 +83,9 @@ public class ResourceNode is TransformNode, ResourceTarget, NodeAPI {
             collider.destroy();
             collider = null;
         }
-        updateSubject.onNext(());
+        if (not getScene().paused) {
+            updateSubject.onNext(this);
+        }
         super.update();
     }
 
@@ -115,6 +149,40 @@ public class ResourceNode is TransformNode, ResourceTarget, NodeAPI {
             }
         }
     }   
+
+    override function applyForce from (x is Number, y is Number, z is Number) to ()
+    {
+        collider.applyForce(x, y, z);
+    }
+
+    override function applyTorque from (x is Number, y is Number, z is Number) to ()
+    {
+        collider.applyTorque(x, y, z);
+    }
+    override function getLinearVelocity from () to Vec3
+    {
+        collider.getLinearVelocity();
+    }
+    override function getAngularVelocity from () to Vec3
+    {
+        collider.getAngularVelocity();
+    }
+    override function setLinearVelocity from (x is Number, y is Number, z is Number) to () 
+    {
+        collider.setLinearVelocity(x, y, z)
+    }
+    override function setAngularVelocity from (x is Number, y is Number, z is Number) to ()
+    {
+        collider.setAngularVelocity(x, y, z)
+    }
+    override function applyImpulse from (x is Number, y is Number, z is Number) to () 
+    {
+        collider.applyImpulse(x, y, z)
+    }
+    override function applyTorqueImpulse from (x is Number, y is Number, z is Number) to ()
+    {
+        collider.applyTorqueImpulse(x, y, z);
+    }
 }
 
 public class MaResourceNode is ResourceNode {
@@ -153,6 +221,7 @@ public class SoundResourceNode is ResourceNode {
     override function createChannels from (parent is ChannelBoxGroup) to (Channel of Number)[] { 
         [createSoundChannels(parent), super.createChannels(parent)];
     }
+
 }
 
 

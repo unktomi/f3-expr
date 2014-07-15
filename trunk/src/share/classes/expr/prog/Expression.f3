@@ -757,6 +757,7 @@ public class Member {
             declaringClass: m.getDeclaringClass().getName();
             name: m.getName();
             outputType: t.getName();
+            isStatic: m.isStatic();
         }
     }
     public const rt is F3Type;
@@ -6325,10 +6326,11 @@ public class MemberNode {
     public var name is String;
     public var declaringClass is String;
     public var outputType is String;
+    public var isStatic is Boolean;
     public function deserialize to Member 
     {
         const clazz = Reflect.getType(declaringClass) as F3ClassType;
-        const members = introspect(clazz);
+        const members = introspect(clazz, isStatic);
         for (m in members) {
             if (m.name == name) {
                 return m;
@@ -6687,6 +6689,8 @@ public class GetNode is ExprNode {
         } else {
             println("Didn't match event: {canvas.event}");
             v = GetVarView {
+                selectable: true;
+                isLabeled: true;
                 visibleRowCount: visibleRowCount;
                 pathFactory: canvas.pathFactory;
                 layoutEngine: canvas.layoutEngine;
@@ -6696,6 +6700,10 @@ public class GetNode is ExprNode {
                 pos: new Point3(x, y, 0);
                 get: GetVar {
                     member: m;
+                    override public function getTerminals to Expression[] 
+                    {
+                        if (observers == []) then this else foreach (ob in observers) ob.getTerminals();
+                    }
                 }
             }
             insert v into canvas.views;
