@@ -320,13 +320,23 @@ public function run from (args is String[]) to ()
 	println("NOTE: couldn't load fmod sound factory");
     }
 
-    var theDynamicsWorldFactory is DynamicsWorldFactory;
+    var bulletDynamicsWorldFactory is DynamicsWorldFactory;
     try {
 	const clazz = 
 	    java.lang.Class.forName("org.f3.jbullet.JBulletDynamicsWorldFactory") as java.lang.Class of DynamicsWorldFactory;
-	theDynamicsWorldFactory = clazz.newInstance();
+	bulletDynamicsWorldFactory = clazz.newInstance();
     } catch (e is java.lang.Exception) {
 	println("NOTE: couldn't load jbullet dynamics world factory");
+    }
+
+    var box2dDynamicsWorldFactory is DynamicsWorldFactory;
+    try {
+	const clazz = 
+	    java.lang.Class.forName("f3.dynamics.jbox2d.JBox2DDynamicsWorldFactory") as java.lang.Class of DynamicsWorldFactory;
+	box2dDynamicsWorldFactory = clazz.newInstance();
+    } catch (e is java.lang.Exception) {
+	println("NOTE: couldn't load jbox2d dynamics world factory");
+        e.printStackTrace();
     }
 
     println("args={args}");
@@ -356,14 +366,14 @@ public function run from (args is String[]) to ()
         }
     }
 
-    const dynamicsWorld = theDynamicsWorldFactory.createDynamicsWorld();
+    
 
     const player = Timeline {
 	override var paused = true on replace {
             if (not paused and playhead == 0s) {
                 ExprNode.Start.onNext(())
             }
-            dynamicsWorld.paused = paused;
+            for (scene in currentScenes) scene.dynamicsWorld.paused = paused;
         }
 	content: mainTimeLayer;
     }
@@ -381,8 +391,10 @@ public function run from (args is String[]) to ()
     
     const playhead = player.observePlayhead().subscribe(function from (sceneTime is Duration) to () 
                                                         {
-                                                            const finishDynamics = dynamicsWorld.update(sceneTime, camera);
-                                                            stage.invoke(finishDynamics);
+                                                           const finishDynamics = foreach (scene in currentScenes) scene.dynamicsWorld.update(sceneTime, camera);
+                                                            for (f in finishDynamics) {
+                                                                stage.invoke(f);
+                                                            }
                                                         });
 
     const viewer = DefaultExaminerViewer {
@@ -436,6 +448,7 @@ public function run from (args is String[]) to ()
             rn.tx = pt.x;
             rn.ty = pt.y;
         }
+        rn.$dynamicsWorld = currentScene.dynamicsWorld;
     }
 
     function addTimeResource from (rn is ResourceTimeNode) to ()
@@ -550,7 +563,7 @@ public function run from (args is String[]) to ()
 	} else if (loweredUrl.endsWith(".ma")) {
 	    const model = Ma.Model {
                 monitorForChanges: yes;
-                dynamicsWorld: dynamicsWorld;
+                dynamicsWorld: currentScene.dynamicsWorld;
 		url: url;
 	    }
 	    const rn = MaResourceNode {
@@ -785,12 +798,13 @@ public function run from (args is String[]) to ()
         id: "Main Scene";
 	background: Color.GRAY;
         camera: camera;
+        dynamicsWorld: { var w = bulletDynamicsWorldFactory.createDynamicsWorld(); w.paused = true; w }
     }
 
     const renderComplete = 
         mainScene.observeRenderComplete().subscribe(function from (scene is Scene) to () 
                                                     {
-                                                        dynamicsWorld.debugDraw(scene.camera) 
+                                                        mainScene.dynamicsWorld.debugDraw(scene.camera) 
                                                     });
 
     var windowContainingAssets is InternalWindow;
@@ -834,7 +848,7 @@ public function run from (args is String[]) to ()
             player.setPlayhead(0s);
             player.paused = paused;
             println("rewind");
-            dynamicsWorld.reset();
+            for (scene in currentScenes) scene.dynamicsWorld.reset();
         }
 	onHideFloating: function from (b is Boolean) to ()
 	{
@@ -932,7 +946,9 @@ public function run from (args is String[]) to ()
     function close from () to () 
     {
 	savePoint = 0;
-        dynamicsWorld.reset();
+        for (scene in currentScenes) {
+            scene.dynamicsWorld.reset();
+        }
         mainScene.currentResource.url = "";
         currentScenes = [mainScene];
 	mainScene.currentResource.resources = [];
@@ -1117,6 +1133,18 @@ public function run from (args is String[]) to ()
 	    currentTransform.py = i.py;
 	    currentTransform.pz = i.pz;
             const rn = (currentTransform as ResourceNode);
+            if (i.colliderResource <> null) {
+                const r = i.colliderResource;
+                rn.collidable = r.collidable;
+                rn.collidableMass = r.mass;
+                rn.collidableFriction = r.friction;
+                rn.collidableRestitution = r.restitution;
+                rn.collidableType = 
+                    if (r.colliderType == "Dynamic") then RigidBodyType.Dynamic
+                        else if (r.colliderType == "Kinematic") then RigidBodyType.Kinematic 
+                            else RigidBodyType.Static;
+                                                                     
+            }
             rn.programs = foreach (prog in i.programs) {
                 const mem = prog.event.deserialize();;
                 const p = Program {
@@ -1250,6 +1278,18 @@ public function run from (args is String[]) to ()
 	    currentTransform.py = i.py;
 	    currentTransform.pz = i.pz;
             const rn = (currentTransform as ResourceNode);
+            if (i.colliderResource <> null) {
+                const r = i.colliderResource;
+                rn.collidable = r.collidable;
+                rn.collidableMass = r.mass;
+                rn.collidableFriction = r.friction;
+                rn.collidableRestitution = r.restitution;
+                rn.collidableType = 
+                    if (r.colliderType == "Dynamic") then RigidBodyType.Dynamic
+                        else if (r.colliderType == "Kinematic") then RigidBodyType.Kinematic 
+                            else RigidBodyType.Static;
+                                                                     
+            }
             rn.programs = foreach (prog in i.programs) {
                 const mem = prog.event.deserialize();;
                 const p = Program {
@@ -1380,7 +1420,12 @@ public function run from (args is String[]) to ()
             var scene = ResourceScene {
                 background: null;
                 id: j.name;
-                camera: Camera2D { near: -1000, far: 1000, tz: 900 };
+                camera: Camera2D { near: -1000, far: 1000, tz: 900 };   
+                dynamicsWorld: {
+                    var w = box2dDynamicsWorldFactory.createDynamicsWorld();
+                    w.paused = player.paused;
+                    w
+                }
             }
             insert scene into currentScenes;
             transformHierarchy.selectScene(scene);
@@ -1435,6 +1480,18 @@ public function run from (args is String[]) to ()
                 currentTransform.py = i.py;
                 currentTransform.pz = i.pz;
                 const rn = (currentTransform as ResourceNode);
+                if (i.colliderResource <> null) {
+                    const r = i.colliderResource;
+                    rn.collidable = r.collidable;
+                    rn.collidableMass = r.mass;
+                    rn.collidableFriction = r.friction;
+                    rn.collidableRestitution = r.restitution;
+                    rn.collidableType = 
+                        if (r.colliderType == "Dynamic") then RigidBodyType.Dynamic
+                            else if (r.colliderType == "Kinematic") then RigidBodyType.Kinematic 
+                                else RigidBodyType.Static;
+                                                                     
+                }
                 rn.programs = foreach (prog in i.programs) {
                     const p = Program {
                         event: prog.event.deserialize();
@@ -1968,6 +2025,13 @@ public function run from (args is String[]) to ()
                                                  if (picked == []) {
                                                      const scene = (asset as AssetTree.SceneAsset).getScene();
                                                      insert scene into currentScenes;
+                                                     if (asset is AssetTree.Scene2DAsset) {
+                                                         scene.dynamicsWorld = box2dDynamicsWorldFactory.createDynamicsWorld();
+
+                                                     } else {
+                                                         scene.dynamicsWorld = bulletDynamicsWorldFactory.createDynamicsWorld();
+                                                     }
+                                                     scene.dynamicsWorld.paused = player.paused;
                                                      transformHierarchy.selectScene(scene);
                                                      MasterUndoable.commit();
                                                  }
@@ -2730,7 +2794,7 @@ Tabview.Tab {
 			    MasterUndoable.undo();
 			    }*/
 		    } else if (event.keyCode == Keys._3 and event.ctrlKey) {
-                        dynamicsWorld.debug = not dynamicsWorld.debug;
+                        currentScene.dynamicsWorld.debug = not currentScene.dynamicsWorld.debug;
 		    } else if (event.keyCode == Keys.G) {
                         java.lang.System.gc();
                         println("{java.lang.Runtime.getRuntime().freeMemory()} / {java.lang.Runtime.getRuntime().totalMemory()}");

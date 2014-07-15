@@ -24,6 +24,36 @@ public class ResourceNode is TransformNode, ResourceTarget, NodeAPI {
     override var id = bind url;
     public var temporal is ResourceTimeNode;
 
+    public var collidable is Boolean;
+    public var collidableMass is Number = 1.0;
+    public var collidableFriction = 0.5;
+    public var collidableRestitution = 0.5;
+    public var collidableType is RigidBodyType = RigidBodyType.Dynamic;
+    public var $dynamicsWorld is DynamicsWorld;
+    
+    
+    var updateSubject = Subject of (()) {};
+
+    public function observeUpdate to Subject of (()) {
+        updateSubject;
+    }
+
+    override function update to () {
+        if (collidable) {
+            if (collider == null) {
+                collider = $dynamicsWorld.createCollider(this);
+            }
+            collider.bodyType = collidableType;
+            collider.friction = collidableFriction;
+            collider.restitution = collidableRestitution;
+            collider.mass = collidableMass;
+        } else {
+            collider.destroy();
+            collider = null;
+        }
+        updateSubject.onNext(());
+        super.update();
+    }
 
     override public function findTarget from (id is String) to Object 
     {
