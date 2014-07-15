@@ -36,6 +36,7 @@ public class ExprNode is AbstractNode {
         }
     }
     public var standalone is Boolean = true;
+    public var dynamicsWorld is DynamicsWorld;
 
     bound function findNodeTarget from (id is String) to Node
     {
@@ -105,8 +106,8 @@ public class ExprNode is AbstractNode {
         const spatialRoot = Group {
             id: "Main Scene";
             content: foreach (x in r.spatialResources) {
-                var n = ns[indexof x];
-                TransformNode {
+                const n = ns[indexof x];
+                const tn = TransformNode {
                     id: "transform"
                     tx: x.tx;
                     ty: x.ty;
@@ -120,8 +121,21 @@ public class ExprNode is AbstractNode {
                     px: x.px;
                     py: x.py;
                     pz: x.pz;
-                    content: bind n;
+                    content: n;
                 }
+                if (x.colliderResource <> null) {
+                    const cr = x.colliderResource;
+                    const c = dynamicsWorld.createCollider(tn);
+                    c.mass = cr.mass;
+                    c.friction = cr.friction;
+                    c.restitution = cr.restitution;
+                    c.bodyType = 
+                        if (cr.colliderType == "Dynamic") then RigidBodyType.Dynamic
+                            else if (cr.colliderType == "Kinematic") then RigidBodyType.Kinematic 
+                                else RigidBodyType.Static;
+                    tn.collider = c;
+                }
+                tn
             }
         }
         for (j in r.spatialResources, anim in j.animation) {

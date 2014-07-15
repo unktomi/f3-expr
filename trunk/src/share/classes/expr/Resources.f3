@@ -45,6 +45,14 @@ public class SpatialResourceGroup is SpatialResource {
     public var resources is SpatialResource[];
 }
 
+public class ColliderResource {
+    public var colliderType is String;
+    public var mass is Number;
+    public var collidable is Boolean;
+    public var friction is Number;
+    public var restitution is Number;
+}
+
 public class SpatialResource is Resource {
     public var tx is Number;
     public var ty is Number;
@@ -61,6 +69,8 @@ public class SpatialResource is Resource {
     public var px is Number;
     public var py is Number;
     public var pz is Number;
+
+    public var colliderResource is ColliderResource;
 }
 
 public class TextResource is SpatialResource {
@@ -165,6 +175,13 @@ class ResourceBuilder {
                 targetPath: p.targetPath;   
         };
         const anims = foreach (q in n.channelBoxes.content) makeResource(q);
+        const colliderResource = ColliderResource {
+            collidable: n.collidable;
+            friction: n.collidableFriction;
+            restitution: n.collidableRestitution;
+            mass: n.collidableMass;
+            colliderType: n.collidableType.toString();
+        };
 
         if (n is ResourceTextField) {
             const f = n as ResourceTextField;
@@ -196,6 +213,7 @@ class ResourceBuilder {
                 pz: n.pz;
                 programs: progs;
                 animation: anims;
+                colliderResource: colliderResource;
             }
          } else if (n is ResourceLabel) {
             const f = n as ResourceLabel;
@@ -227,6 +245,7 @@ class ResourceBuilder {
                 pz: n.pz;
                 programs: progs;
                 animation: anims;
+                colliderResource: colliderResource;
             }
         } else if (n is GroupResourceNode) {
             const g = n as GroupResourceNode;
@@ -249,6 +268,7 @@ class ResourceBuilder {
                 pz: n.pz;
                 programs: progs;
                 animation: anims;
+                colliderResource: colliderResource;
                 resources: foreach (x in g.content) makeResource(x as ResourceNode);
             }
         } else {
@@ -271,6 +291,7 @@ class ResourceBuilder {
                 pz: n.pz;
                 programs: progs;
                 animation: anims;
+                colliderResource: colliderResource;
             }
         }
     }
@@ -356,6 +377,7 @@ public class SceneResource is Resource {
     public var width is Number;
     public var height is Number;
     public var name is String;
+    public var dynamicsWorldFactory is String;
     public var spatialResources is SpatialResource[];
     public var temporalResources is TemporalResource[];
     public var layers is SceneLayer[];

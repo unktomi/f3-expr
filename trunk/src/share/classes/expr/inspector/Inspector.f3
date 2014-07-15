@@ -461,7 +461,6 @@ public class InspectedRange of a is Inspected of a {
 	set(getFromT(t)); 
     }
 }
-
 public class InspectedColor is Inspected of Color {
 }
 
@@ -492,7 +491,7 @@ public class InspectedChoice of a is InspectedRange of a
         getWidth(font, labels);
     }
     public const choices is (..a)[];
-    public const labels is String[] = foreach (choice in choices) "{choice}";
+    public var labels is String[] = bind foreach (choice in choices) "{choice}";
 
     function getIndex from (t is Number) to Integer 
     {
@@ -549,6 +548,11 @@ public class InspectedFontChoice of a is InspectedChoice of a {
     }
 }
 
+public class InspectedEnum of a is InspectedChoice of a {
+    public const clazz is java.lang.Class of a;
+    override var choices is (..a)[] = bind clazz.getEnumConstants();
+}
+
 public class InspectedBoolean is InspectedRange of Boolean
 {
     override public function getAsString from (t is Number) to String
@@ -598,7 +602,7 @@ public class NumberField is SliderField {
             onSetKey();
             return false;
         }
-        if (k.keyCode == Keys.Backspace or k.keyChar == "-" or java.lang.Character.isDigit(k.keyChar.charAt(0))) {
+        if (k.keyCode == Keys.Backspace or k.keyChar == "." or k.keyChar == "-" or java.lang.Character.isDigit(k.keyChar.charAt(0))) {
            return true;
         }
         return false;
@@ -1077,6 +1081,16 @@ function inspect0 from (obj is Object, classType is F3ClassType) to (Inspected o
                                     override function get to Color { ptr.get() }
                                     override function set from (x is Color) to () { ptr.set(x) }
                                 }
+                            } else if (m.m is F3VarMember and ENUM_TYPE.isAssignableFrom(m.t)) {
+                                const ptr = (m.m as F3Local.VarMember).getPointer(obj as F3Object) as ObservableRef of Object;
+                                    InspectedEnum of Object {
+                                        member: m;
+                                        label: m.m.getName();
+                                        observable: Observables.observe(ptr) as Observable of Object;
+                                        clazz: java.lang.Class.forName(m.t.getName()) as java.lang.Class of Object;
+                                        override function get to Object { ptr.get() }
+                                        override function set from (x is Object) to () { ptr.set(x) }
+                                    }
                             } else if (m.m is F3VarMember and m.t == BOOLEAN_TYPE) {
                                 const ptr = (m.m as F3Local.VarMember).getPointer(obj as F3Object) as ObservableRef of Boolean;
                                 InspectedBoolean {

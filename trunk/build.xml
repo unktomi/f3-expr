@@ -19,6 +19,8 @@
       <fileset dir="../form-follows-function/f3_cg_jogl_awt/build/" includes="*.jar"/>
       <fileset dir="../form-follows-function/f3_cg_jogl_awt/lib/" includes="*.jar"/>
       <fileset dir="../form-follows-function/f3_jbullet_jogl/lib/" includes="jbullet.jar"/>
+      <fileset dir="../form-follows-function/f3_jbox2d/lib/" includes="jbox2d.jar"/>
+      <fileset dir="../form-follows-function/f3_jbox2d/build/" includes="org.f3.jbox2d.jar"/>
       <fileset dir="../form-follows-function/f3_jbullet_jogl/lib/" includes="vecmath.jar"/>
       <fileset dir="../form-follows-function/f3_jbullet_jogl/build/" includes="*.jar"/>
       <fileset dir="../form-follows-function/f3_assimp/build/" includes="*.jar"/>

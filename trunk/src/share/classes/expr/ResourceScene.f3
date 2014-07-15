@@ -58,6 +58,12 @@ public class ResourceScene is Scene {
         }
     }
 
+    const renderComplete = 
+        observeRenderComplete().subscribe(function from (scene is Scene) to () 
+                                          {
+                                              dynamicsWorld.debugDraw(scene.camera) 
+                                          });
+    
     const selection = Subject of ResourceNode {};
 
     public function observeSelection to Observable of ResourceNode 
@@ -69,5 +75,7 @@ public class ResourceScene is Scene {
         camera: bind camera inverse;
         cameras: bind [camera, currentCameras];
     }
+
+    public var dynamicsWorld is DynamicsWorld;
 }
 
