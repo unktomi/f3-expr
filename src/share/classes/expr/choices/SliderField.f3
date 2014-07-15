@@ -20,6 +20,7 @@ const BG = ColorPaint(Color.color(.85, .85, .85, 1));
 
 public class SliderField is AbstractNode
 {
+    public var editable is Boolean = yes;
     public var font is Font;
     public var height is Number = bind textArea.font.height();
     public var width is Number = 64;
@@ -54,8 +55,8 @@ public class SliderField is AbstractNode
         font: bind if (font == null) then layoutEngine.createFont(Names.DEFAULT_FONT) else font;
 	transform: translate(0, 1);
 	rightJustified: true;
-        pickable: bind textAreaEnabled and textInputEnabled;
-        editable: bind textInputEnabled;
+        pickable: bind editable and textAreaEnabled and textInputEnabled;
+        editable: bind editable and textInputEnabled;
         override function onKeyInput from (event is KeyboardEvent) to ()
         {
             if (filterKeyInput(event)) {
@@ -127,7 +128,7 @@ public class SliderField is AbstractNode
     function handleTextFocus from (isFocused is Boolean) to ()
     {
         println("HANDLE TEXT FOCUS => {isFocused}");
-        if (not isFocused) {
+        if (editable and not isFocused) {
             textAreaEnabled = false;
         }
     }
@@ -136,7 +137,7 @@ public class SliderField is AbstractNode
         override function onNext from (event is MouseEvent) to ()
         {
             println("text area enabled: {textAreaEnabled}");
-            if (event.clickCount > 1) {
+            if (editable and event.clickCount > 1) {
                 textAreaEnabled = true;
                 event.scene.setFocus(textArea);
                 textArea.selectAll();
@@ -148,15 +149,19 @@ public class SliderField is AbstractNode
     const onDrag = DefaultObserver of MouseEvent {
         override function onNext from (event is MouseEvent) to ()
         {     	       		
-            setT((event.location.x + width / 2) / width);
+            if (editable) {
+                setT((event.location.x + width / 2) / width);
+            }
         }
     };
 
     const onUp = DefaultObserver of MouseEvent {
         override function onNext from (event is MouseEvent) to ()
         {     	       		
-            if (not textAreaEnabled) {
-                onCommit();
+            if (editable) {
+                if (not textAreaEnabled) {
+                    onCommit();
+                }
             }
         }
     };
