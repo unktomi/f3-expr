@@ -5,6 +5,7 @@ import f3.util.Observable.*;
 import f3.util.*;
 import f3.math.*;
 import expr.prog.Program;
+import expr.InspectedElement.*;
 
 class ResourceChannel {
      public var channel is Channel of Number;
@@ -33,7 +34,7 @@ class Input {
     public var buttons is Button[];
 }
 
-public class ResourceNode is TransformNode, ResourceTarget, NodeAPI {
+public class ResourceNode is TransformNode, ResourceTarget, NodeAPI, Inspectable {
     public const webBrowserFactory is AbstractWebBrowserFactory = the AbstractWebBrowserFactory;
     public const pathFactory is Shape2D.Path2DFactory = the Shape2D.Path2DFactory;
     public const layoutEngine is Text.LayoutEngine = the Text.LayoutEngine;
@@ -51,6 +52,109 @@ public class ResourceNode is TransformNode, ResourceTarget, NodeAPI {
     public var collidableGravityScale is Number = 1.0;
     public var collidableType is RigidBodyType = RigidBodyType.Dynamic;
     public var $dynamicsWorld is DynamicsWorld;
+
+    override var $hideMembers = ["tx", "ty", "tz", "rx", "ry", "rz", "sx", "sy", "sz", "px", "py", "pz", "collidable", "collidableMass", "collidableFriction", "collidableRestitution", "collidableType", "collidableGravityScale", "debug", "id"];
+
+    public const transformGroup = InspectionGroup {
+        displayName: "Transform"
+        targets:
+        [InspectedVector of Number {
+                displayName: "Translation"
+                targets:[
+                         InspectedNumberValue {
+                             displayName: "Translate X";
+                             target: &tx
+                         },
+                         InspectedNumberValue {
+                             displayName: "Translate Y";
+                             target: &ty;
+                         },
+                         InspectedNumberValue {
+                             displayName: "Translate Z";
+                             target: &tz;
+                         }]
+        },
+        InspectedVector of Number {
+                displayName: "Rotation"
+                targets:[
+                         InspectedNumberValue {
+                             displayName: "Rotate X";
+                             target: &rx
+                         },
+                         InspectedNumberValue {
+                             displayName: "Rotate Y";
+                             target: &ry;
+                         },
+                         InspectedNumberValue {
+                             displayName: "Rotate Z";
+                             target: &rz;
+                         }]
+        },
+        InspectedVector of Number {
+                displayName: "Scale"
+                targets:[
+                         InspectedNumberValue {
+                             displayName: "Scale X";
+                             target: &sx
+                         },
+                         InspectedNumberValue {
+                             displayName: "Scale Y";
+                             target: &sy;
+                         },
+                         InspectedNumberValue {
+                             displayName: "Scale Z";
+                             target: &sz;
+                         }]
+        },
+        InspectedVector of Number {
+                displayName: "Pivot"
+                targets:[
+                         InspectedNumberValue {
+                             displayName: "Pivot X";
+                             target: &px;
+                         },
+                         InspectedNumberValue {
+                             displayName: "Pivot Y";
+                             target: &py;
+                         },
+                         InspectedNumberValue {
+                             displayName: "Pivot Z";
+                             target: &pz;
+                         }]
+        }]
+    }
+
+    public const collisionGroup is InspectionGroup = InspectionGroup {
+        displayName: "Collisions"
+        targets:
+        [InspectedBooleanValue {
+            displayName: "Collidable";
+            target: &collidable;
+        },
+        InspectedValue of RigidBodyType {
+            displayName: "Collider Type";
+            target: &collidableType;
+        },
+        InspectedNumberValue {
+            displayName: "Mass";
+            target: &collidableMass;
+        },
+        InspectedNumberValue {
+            min: 0.0, max: 1.0;
+            displayName: "Friction";
+            target: &collidableFriction;
+        },
+        InspectedNumberValue {
+            min: 0.0, max: 1.0;
+            displayName: "Restitution";
+            target: &collidableRestitution;
+        },
+        InspectedNumberValue {
+            min: 0.0, max: 1.0;
+            displayName: "Gravity Scale";
+            target: &collidableGravityScale;
+        }]
+    }
     
     
     var updateSubject = Subject of (NodeAPI) {};

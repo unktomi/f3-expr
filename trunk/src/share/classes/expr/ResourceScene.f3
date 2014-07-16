@@ -3,8 +3,9 @@ import f3.media.scene.*;
 import f3.media.input.*;
 import f3.util.*;
 import expr.ResourceNode.*;
+import expr.InspectedElement.*;
 
-public class ResourceScene is Scene {
+public class ResourceScene is Scene, Inspectable {
 
     public override function toString to String 
     {
@@ -83,5 +84,23 @@ public class ResourceScene is Scene {
     }
 
     public var dynamicsWorld is DynamicsWorld;
+
+    public const sizeGroup = InspectionGroup {
+        displayName: "Size";
+        targets: 
+        [ReadonlyInspectedNumberValue {
+            editable: false;
+            displayName: "Width";
+            target: &width;
+        },
+        ReadonlyInspectedNumberValue {
+            editable: false;
+            displayName: "Height";
+            target: &height;
+        }]
+    }
+
+    override var $hideMembers = ["width", "height"];
+
 }
 
