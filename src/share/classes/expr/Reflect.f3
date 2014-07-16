@@ -30,6 +30,11 @@ public const MONAD_TYPE = Reflect.findClass("org.f3.runtime.Monad");
 public const COLOR_TYPE = Reflect.findClass("f3.lang.Color");
 public const ENUM_TYPE = Reflect.findClass("java.lang.Enum");
 
+public const INSPECTED_ELEMENT_TYPE = Reflect.findClass("expr.InspectedElement");
+//public const INSPECTED_GROUP_TYPE = Reflect.findClass("expr.InspectedElement.InspectedGroup");
+//public const INSPECTED_NUMBER_TYPE = Reflect.findClass("expr.InspectedElement.InspectedNumberValue");
+//public const INSPECTED_VALUE_TYPE = Reflect.findClass("expr.InspectedElement.InspectedValue");
+
 public const classMap = new java.util.HashMap of (String, java.util.Map of (String, F3VarMember));
 public const funMap = new java.util.HashMap of (F3ClassType, F3FunctionMember[]);
 public const classes = new java.util.HashMap of (String, F3ClassType);

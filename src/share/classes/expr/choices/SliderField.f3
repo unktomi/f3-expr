@@ -76,12 +76,13 @@ public class SliderField is AbstractNode
         });
 
     const dark = Color.color(0.77, 0.77, 0.77, 0.77);
+    const dark2 = Color.color(0.6, 0.6, 0.6, 0.8);
     const light = Color.color(0.85, 0.85, 0.85);
     const border = Color.color(.5, .5, .5);
 
     const lightRect is Rectangle = Rectangle {
         id: "lightRect";
-	fillPaint: bind ColorPaint(light);
+	fillPaint: bind if (editable) then ColorPaint(light) else ColorPaint(dark2);
 	height: bind height;
 	width: bind width
     }
@@ -99,6 +100,7 @@ public class SliderField is AbstractNode
 	height: bind height;
 	width: bind w;
         pickable: false;
+        visible: bind editable;
     }
 
     const borderRect is Rectangle = Rectangle {

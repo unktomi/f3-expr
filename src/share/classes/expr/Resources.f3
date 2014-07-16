@@ -51,6 +51,7 @@ public class ColliderResource {
     public var collidable is Boolean;
     public var friction is Number;
     public var restitution is Number;
+    public var gravityScale is Number = 1.0;
 }
 
 public class SpatialResource is Resource {
@@ -181,6 +182,7 @@ class ResourceBuilder {
             restitution: n.collidableRestitution;
             mass: n.collidableMass;
             colliderType: n.collidableType.toString();
+            gravityScale: n.collidableGravityScale;
         };
 
         if (n is ResourceTextField) {

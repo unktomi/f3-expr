@@ -20,6 +20,7 @@ import f3.math.LinearMath.*;
 import java.lang.Math;
 import expr.undo.*;
 import expr.AbstractResourceText.*;
+import expr.InspectedElement.*;
 
 
 public const CAMERA_TYPE = Reflect.getType("f3.media.scene.Camera");
@@ -1064,18 +1065,123 @@ public function inspect from (obj is Object, t is F3ClassType) to (Inspected of 
     foreach(x in inspect0(obj, t) where x <> null) x;
 }
 
+function inspect from (elem is InspectedElement) to (Inspected of ?)[] 
+{
+    if (elem is InspectionGroup) {
+        const g = elem as InspectionGroup;
+        foreach (x in g.targets) {
+            inspect(x)
+        }
+    } else {
+        const name = elem.displayName;
+        const x = elem;
+        if (x is InspectedNumberValue) {
+            const v = x as InspectedNumberValue;
+            InspectedNumber {
+                editable: v.editable;
+                low: v.min;
+                hi: v.max;
+                observable: Observables.observe(v.target);
+                label: name;
+                override function get to Number { v.target.get() }
+                override function set from (n is Number) to () { if (v.editable) v.target.set(n) }
+            }
+        } else if (x is InspectedBooleanValue) {
+            const v = x as InspectedBooleanValue;
+            InspectedBoolean {
+                editable: v.editable;
+                observable: Observables.observe(v.target);
+                label: name;
+                override function get to Boolean { v.target.get() }
+                override function set from (n is Boolean) to () { if (v.editable) v.target.set(n) }
+            }
+        } else if (x is ReadonlyInspectedNumberValue) {
+            const v = x as ReadonlyInspectedNumberValue;
+            InspectedNumber {
+                editable: false;
+                low: v.min;
+                hi: v.max;
+                observable: Observables.observe(v.target);
+                label: name;
+                override function get to Number { v.target.get() }
+                override function set from (n is Number) to () {}
+            }
+        } else if (x is ReadonlyInspectedBooleanValue) {
+            const v = x as ReadonlyInspectedBooleanValue;
+            InspectedBoolean {
+                editable: false;
+                observable: Observables.observe(v.target);
+                label: name;
+                override function get to Boolean { v.target.get() }
+                override function set from (n is Boolean) to () {}
+            }
+            /*
+        } else if (x is InspectedIntegerValue) {
+            const v = x as InspectedIntegerValue;
+            InspectedInteger {
+                observable: v.target;
+                label: name;
+                override function get to Integer { v.target.get() }
+                override function set from (n is Integer) to () { v.target.set(n) }
+                } */
+            /*
+        } else if (x is InspectedNumberVector) {
+            const v = x as InspectedNumberVector;
+            foreach (j in v.targets) {
+                const vname = j.displayName;
+                const v1 = j.target;
+                InspectedNumber {
+                    observable: Observables.observe(v1);
+                    label: vname;
+                    override function get to Number { v1.get() }
+                    override function set from (n is Number) to () { v1.set(n) }
+                }
+            }
+            */
+        } else if (x is InspectedVector of ?) {
+            const v = x as InspectedVector of ?;
+            foreach (j in v.targets) {
+                inspect(j)
+            }
+        } else if (x is InspectedValue of ?) {        
+            const j = x as InspectedValue of Object;
+            const value = j.target.get();
+            const ptr = j.target;
+            if (value is java.lang.Enum of ?) {
+                InspectedEnum of Object {
+                    editable: j.editable;
+                    label: j.displayName;
+                    observable: Observables.observe(ptr) as Observable of Object;
+                    clazz: value.getClass() as java.lang.Class of Object;
+                    override function get to Object { ptr.get() }
+                    override function set from (x is Object) to () { if (j.editable) ptr.set(x) }
+                }
+            } else null
+        } else null
+    }
+}
+
 function inspect0 from (obj is Object, classType is F3ClassType) to (Inspected of ?)[]
 {
     println("INSPECTING => {obj} class={classType}");
+    const hidden = new java.util.HashSet of String;
+    if (obj is Inspectable) {
+        const j = obj as Inspectable;
+        for (n in j.$hideMembers) hidden.add(n);
+    }
     if (obj == null) then [] else {
 	    const members = Expression.introspect(classType);
-	    foreach (m in members where not m.name.contains("$")) {
+	    foreach (m in members where not m.name.contains("$") and not hidden.contains(m.name)) {
 		println("m={m} {m.m} t={m.t}");
-                var result is Inspected of ?;
+                var result is (Inspected of ?)[];
                 try {
                     result = 
                         if (true or m.isObservable)  {
-                            if (m.m is F3VarMember and m.t == NUMBER_TYPE) {
+                            if (m.m is F3VarMember and INSPECTED_ELEMENT_TYPE.isAssignableFrom(m.t)) {
+                                const ptr = (m.m as F3Local.VarMember).getPointer(obj as F3Object) as ObservableRef of InspectedElement;
+                                const elem = ptr.get();
+                                inspect(elem)
+                            } else if (m.m is F3VarMember and m.t == NUMBER_TYPE) {
                                 const ptr = (m.m as F3Local.VarMember).getPointer(obj as F3Object) as ObservableRef of Number;
                                 InspectedNumber {
                                     member: m;
@@ -1149,6 +1255,7 @@ function inspect0 from (obj is Object, classType is F3ClassType) to (Inspected o
                             } else if (m.m is F3VarMember and m.t == STRING_TYPE) {
                                 const ptr = (m.m as F3Local.VarMember).getPointer(obj as F3Object) as ObservableRef of String;
                                 InspectedString {
+                                    member: m;
                                     label: m.m.getName();
                                     observable: Observables.observe(ptr);
                                     override function get to String { var s = ptr.get(); println("{label} => get={s}"); s }
@@ -1165,7 +1272,7 @@ function inspect0 from (obj is Object, classType is F3ClassType) to (Inspected o
                             }
                         } else null;
 
-                    result.get();
+                    //result.get();
                 } catch (e is java.lang.Exception) {
                     e.printStackTrace();
                     result = null;

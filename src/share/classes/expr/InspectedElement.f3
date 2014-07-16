@@ -1,0 +1,51 @@
+package expr;
+import f3.lang.*;
+
+public interface InspectedElement {
+    public var editable is Boolean = true;
+    public var displayName is String;
+}
+
+public class InspectedNumberValue is InspectedValue of Number {
+    public var min is Number = Number.MIN_VALUE;
+    public var max is Number = Number.MAX_VALUE;
+}
+
+public class InspectedIntegerValue is InspectedValue of Integer {
+    public var min is Integer = Integer.MIN_VALUE;
+    public var max is Integer = Integer.MAX_VALUE;
+}
+
+public class ReadonlyInspectedValue of a is InspectedElement {
+    override var editable = false;
+    public var target is ObservableConstRef of a;
+}
+
+public class ReadonlyInspectedNumberValue is ReadonlyInspectedValue of Number {
+    public var min is Number = Number.MIN_VALUE;
+    public var max is Number = Number.MAX_VALUE;
+}
+
+public class ReadonlyInspectedBooleanValue is ReadonlyInspectedValue of Boolean {
+}
+
+public class ReadonlyInspectedVector of a is InspectedElement {
+    public var targets is (ReadonlyInspectedValue of a)[];
+}
+
+public class InspectedValue of a is InspectedElement {
+    public var target is ObservableRef of a;
+}
+
+public class InspectedBooleanValue is InspectedValue of Boolean {
+}
+
+public class InspectedVector of a is InspectedElement {
+    public var targets is (InspectedValue of a)[];
+}
+
+public class InspectedNumberVector is InspectedVector of Number {}
+
+public class InspectionGroup is InspectedElement {
+    public var targets is InspectedElement[]
+}

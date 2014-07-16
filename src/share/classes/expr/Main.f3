@@ -1150,6 +1150,7 @@ public function run from (args is String[]) to ()
                     if (r.colliderType == "Dynamic") then RigidBodyType.Dynamic
                         else if (r.colliderType == "Kinematic") then RigidBodyType.Kinematic 
                             else RigidBodyType.Static;
+                rn.collidableGravityScale = r.gravityScale;
                                                                      
             }
             rn.programs = foreach (prog in i.programs) {
@@ -1295,6 +1296,7 @@ public function run from (args is String[]) to ()
                     if (r.colliderType == "Dynamic") then RigidBodyType.Dynamic
                         else if (r.colliderType == "Kinematic") then RigidBodyType.Kinematic 
                             else RigidBodyType.Static;
+                rn.collidableGravityScale = r.gravityScale;
                                                                      
             }
             rn.programs = foreach (prog in i.programs) {
@@ -1498,6 +1500,7 @@ public function run from (args is String[]) to ()
                         if (r.colliderType == "Dynamic") then RigidBodyType.Dynamic
                             else if (r.colliderType == "Kinematic") then RigidBodyType.Kinematic 
                                 else RigidBodyType.Static;
+                    rn.collidableGravityScale = r.gravityScale;
                                                                      
                 }
                 rn.programs = foreach (prog in i.programs) {
