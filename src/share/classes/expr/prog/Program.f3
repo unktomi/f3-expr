@@ -154,7 +154,7 @@ public class EvalContext {
         insert obsvb.subscribe(DefaultObserver of a {
                 override function onNext from (x is a) to ()
                 {
-                    println("ON NEXT...{x} interactive={interactive()}");
+//                    println("ON NEXT...{x} interactive={interactive()}");
                     if (interactive()) {
                         for (r in rs) {
                             var n = r.instance(r.id, lookupVar, lookupSpatial, lookupTemporal);
@@ -165,7 +165,7 @@ public class EvalContext {
                             } into instanceSpace.content;
                         }
                         count++;
-                        println("on next {src} {x}");
+                        //                        println("on next {src} {x}");
                     }
                 }
             }) into subs;
