@@ -2215,8 +2215,15 @@ class FunctionView is ExpressionView {
         serializeFunction();
     }
 
+    function getSpecializedMember to Member {
+        makeFunMember(fun.member.name, 
+                      foreach (i in inputs) i.inputType,
+                      output.unifiedType);
+    }
+
     public function serializeFunction to FunNode 
     {
+        //const specializedMember = getSpecializedMember();
         const n = FunNode {
             id: "{id}";
             x: pos.x;
@@ -2278,9 +2285,11 @@ class FunctionView is ExpressionView {
         output.inferred = [];
     }
 
+    const substs = new java.util.HashMap of (F3Type, F3Type);
+
     function unify2 to () 
     {
-        const substs = new java.util.HashMap of (F3Type, F3Type);
+        substs.clear();
         unify(substs);
         println("unify1: {this} => {substs}");
         unify(substs);
@@ -2289,7 +2298,6 @@ class FunctionView is ExpressionView {
 
     function unify to () 
     {
-        const substs = new java.util.HashMap of (F3Type, F3Type);
         unify(substs);
     }
 
@@ -3914,6 +3922,7 @@ public class MemberTreemodel is Treemodel {
             return result;
         } catch (exc is java.lang.StringIndexOutOfBoundsException) {
             println(exc);
+            exc.printStackTrace();
             println("failed on: {path0}");
         }
         return null;
@@ -6091,7 +6100,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                     popupDisp.dispose();
                     k(j)
                 });
-            println("POPUP AT {e.sceneLocation}");
+            println("POPUP AT {popup} => {e.sceneLocation}");
             insert popup into popupLayer.content;
         } else {
             k(null);
