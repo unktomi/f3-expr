@@ -337,7 +337,7 @@ public function run from (args is String[]) to ()
     var box2dDynamicsWorldFactory is DynamicsWorldFactory;
     try {
 	const clazz = 
-	    java.lang.Class.forName("f3.dynamics.jbox2d.JBox2DDynamicsWorldFactory") as java.lang.Class of DynamicsWorldFactory;
+	    java.lang.Class.forName("org.f3.dynamics.jbox2d.JBox2DDynamicsWorldFactory") as java.lang.Class of DynamicsWorldFactory;
 	box2dDynamicsWorldFactory = clazz.newInstance();
     } catch (e is java.lang.Exception) {
 	println("NOTE: couldn't load jbox2d dynamics world factory");
