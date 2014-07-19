@@ -33,7 +33,7 @@
       <fileset dir="../form-follows-function/f3_cg_jogl_awt/lib/macosxuniversal" includes="*.dylib"/>
       <fileset dir="../form-follows-function/f3_cg_jogl_awt/lib/macosxuniversal" includes="*.jnilib"/>
       <fileset dir="../form-follows-function/f3_assimp/lib/macosxuniversal" includes="*.dylib"/>
-      <fileset erroronmissingdir="false" dir="../form-follows.function/f3_awesomium_jogl/build/native" includes="*.dylib"/>
+      <fileset erroronmissingdir="false" dir="../form-follows-function/f3_awesomium_jogl/build/native" includes="*.dylib"/>
     </copy>
   <taskdef name="f3c" classname="org.f3.tools.ant.F3AntTask" >
     <classpath>
