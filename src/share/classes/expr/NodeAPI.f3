@@ -28,7 +28,7 @@ public interface NodeAPI {
 
     public function applyForce from (v is Vec3) to () { applyForce(v.x, v.y, v.z) }
     public function applyForce from (x is Number, y is Number, z is Number) to ();
-    public function applyTarque from (v is Vec3) to () { applyTorque(v.x, v.y, v.z) }
+    public function applyTorque from (v is Vec3) to () { applyTorque(v.x, v.y, v.z) }
     public function applyTorque from (x is Number, y is Number, z is Number) to (); 
     public function getLinearVelocity from () to Vec3; 
     public function getAngularVelocity from () to Vec3; 
