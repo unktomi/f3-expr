@@ -4,6 +4,7 @@ import f3.util.Observer.*;
 import f3.util.Observable.*;
 import f3.util.*;
 import f3.math.*;
+import expr.undo.*;
 import expr.prog.Program;
 import expr.InspectedElement.*;
 
@@ -154,8 +155,14 @@ public class ResourceNode is TransformNode, ResourceTarget, NodeAPI, Inspectable
             displayName: "Gravity Scale";
             target: &collidableGravityScale;
         }]
-    }
+    };
+
+    const undoList = transformGroup.getUndoList(collisionGroup.getUndoList(UndoList{}));
     
+    postinit {
+        undoList.addTarget("displayName", &displayName);
+        undoList.addTarget("visible", &visible);
+    }
     
     var updateSubject = Subject of (NodeAPI) {};
 
@@ -244,11 +251,23 @@ public class ResourceNode is TransformNode, ResourceTarget, NodeAPI, Inspectable
 
     override function createChannels from (parent is ChannelBoxGroup) to (Channel of Number)[]
     {
+        const displayNames = ["Translate X", 
+                              "Translate Y", 
+                              "Translate Z", 
+                              "Rotate X", 
+                              "Rotate Y", 
+                              "Rotate Z", 
+                              "Scale X", 
+                              "Scale Y", 
+                              "Scale Z", 
+                              "Pivot X", 
+                              "Pivot Y", 
+                              "Pivot Z"];
         const names = ["tx", "ty", "tz", "rx", "ry", "rz", "sx", "sy", "sz", "px", "py", "pz"];
         const ptrs = [&tx, &ty, &tz, &rx, &ry, &rz, &sx, &sy, &sz, &px, &py, &pz];
         foreach (i in [0..<names.size()]) {
             Channel of Number {
-                id: bind "{parent.id}#{names[i]}";
+                id: bind "{parent.id}#{displayNames[i]}";
                 targets: ptrs[i];
             }
         }

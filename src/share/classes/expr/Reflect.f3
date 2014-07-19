@@ -35,7 +35,7 @@ public const INSPECTED_ELEMENT_TYPE = Reflect.findClass("expr.InspectedElement")
 //public const INSPECTED_NUMBER_TYPE = Reflect.findClass("expr.InspectedElement.InspectedNumberValue");
 //public const INSPECTED_VALUE_TYPE = Reflect.findClass("expr.InspectedElement.InspectedValue");
 
-public const classMap = new java.util.HashMap of (String, java.util.Map of (String, F3VarMember));
+public const classMap = new java.util.HashMap of (F3ClassType, java.util.Map of (String, F3VarMember));
 public const funMap = new java.util.HashMap of (F3ClassType, F3FunctionMember[]);
 public const classes = new java.util.HashMap of (String, F3ClassType);
 
@@ -87,7 +87,7 @@ public function findClass from (name is String) to F3ClassType
 
 public function getFunctions from (clazz0 is F3ClassType, all is Boolean) to F3FunctionMember[] 
 {
-    var clazz = findClass(clazz0.getName());
+    var clazz = clazz0;
     if (clazz == null) {
         return [];
     }
@@ -202,7 +202,7 @@ public function getType from (name is String) to F3Type
 
 public function getVar from (classType is F3ClassType, name is String) to F3VarMember 
 {
-    var varMap = classMap[classType.getName()];
+    var varMap = classMap[classType];
     if (varMap == null) {
         const vars = classType.getVariables(true);
 	println("vars={vars}");
@@ -210,14 +210,14 @@ public function getVar from (classType is F3ClassType, name is String) to F3VarM
         for (varMember in vars) {
 	    varMap.put(varMember.getName(), varMember);
         }
-        classMap.put(classType.getName(), varMap);
+        classMap.put(classType, varMap);
     }
     return varMap[name];
 }
 
 public function getVars from (classType is F3ClassType) to F3VarMember[]
 {
-    var varMap = classMap[classType.getName()];
+    var varMap = classMap[classType];
     if (varMap == null) {
         const vars = classType.getVariables(true);
 	println("{classType} vars=>{vars}");
@@ -225,7 +225,7 @@ public function getVars from (classType is F3ClassType) to F3VarMember[]
         for (varMember in vars where not varMember.getName().startsWith("f3debug")) {
 	    varMap.put(varMember.getName(), varMember);
         }
-        classMap.put(classType.getName(), varMap);
+        classMap.put(classType, varMap);
     }
     foreach (k in varMap.values()) k
 }

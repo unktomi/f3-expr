@@ -1,9 +1,11 @@
 package expr;
 import f3.media.scene.*;
 import f3.media.input.*;
+import expr.undo.*;
 import f3.util.*;
 import expr.ResourceNode.*;
 import expr.InspectedElement.*;
+import f3.math.LinearMath.*;
 
 public class ResourceScene is Scene, Inspectable {
 
@@ -20,9 +22,48 @@ public class ResourceScene is Scene, Inspectable {
 
     public var currentCameras is Camera[];
 
-    public var drawCollisions is Boolean = true;
+    public var $drawCollisions is Boolean = true;
+    public var $gravityX is Number;
+    public var $gravityY is Number = -9.8;
+    public var $gravityZ is Number;
 
-     override function update to () {
+    public const dynamicsGroup = InspectionGroup {
+        displayName: "Size";
+        targets: 
+        [InspectedBooleanValue {
+            displayName: "Draw Collisions";
+            target: &$drawCollisions;
+        },
+        InspectedNumberValue {
+            displayName: "Gravity X";
+            target: &$gravityX;
+        },
+        InspectedNumberValue {
+            displayName: "Gravity Y";
+            target: &$gravityY;
+        },
+        InspectedNumberValue {
+            visible: bind not (camera is Camera2D)
+            displayName: "Gravity Z";
+            target: &$gravityZ;
+        }]
+    }
+
+    
+    var g = bind vector($gravityX, $gravityY, $gravityZ);
+
+    const undoList = dynamicsGroup.getUndoList(UndoList {});
+
+    postinit {
+        undoList.addTarget("camera", &camera);
+        undoList.addTarget("visible", &visible);
+        undoList.addTarget("background", &background);
+    }
+
+
+
+    override function update to () {     
+        dynamicsWorld.gravity = g;
         super.update();
         updateCams();
     }
@@ -66,7 +107,7 @@ public class ResourceScene is Scene, Inspectable {
     const renderComplete = 
         observeRenderComplete().subscribe(function from (scene is Scene) to () 
                                           {
-                                              if (drawCollisions) {
+                                              if ($drawCollisions) {
                                                   dynamicsWorld.debugDraw(scene.camera) 
                                               }
                                           });

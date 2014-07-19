@@ -791,13 +791,17 @@ class StringField is ResizableNode {
         width: bind width;
         height: bind height;
         rightJustified: true;
+        indent: 0;
         font: bind font;
         foreground: bind if (not selected) then FG_PAINT else SELECTED_FG_PAINT;
         //background: bind if (not selected) then TEXT_BG_PAINT else SELECTED_BG_PAINT;
         background: TRANSPARENT_PAINT;
     };
     const d = area.observeCommit().subscribe(function from (text is String) to () {
-            try { string.set(text) } catch (e is org.f3.runtime.AssignToBoundException) { } // hack  
+            try { string.set(text); MasterUndoable.commit() } catch (e is org.f3.runtime.AssignToBoundException) { } // hack  
+        });
+    const d1 = string.observable.subscribe(function from (s is String) to () {
+            area.setText(s);
         });
     override var internalContent = bind area;
     postinit {
@@ -880,7 +884,9 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
     }
 
     var visibleRows = bind Math.floor(height / cellHeight) as Integer;
-    var scrollOffset is Integer;
+
+
+    var lastInspected is (Inspected of ?)[];
 
     override function preupdate {
 	for (i in inspecting) {
@@ -889,6 +895,17 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
 	super.preupdate();	
 
     }
+
+    override function update to ()
+    {
+        if (lastInspected <> inspecting) {
+            lastInspected = inspecting;
+            low = 0;
+        }
+        super.update();
+    }
+
+
     const self = this;
 
     override var internalContent = Group {
@@ -995,7 +1012,7 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
 	    } else if (i is InspectedString) then
 	    TransformNode {
                 var w = width-entryLabel.getLayout().getShape().getBounds().width();
-                tx: bind width/2-w/2-indent;
+                tx: bind width/2-w/2;
                 //tx: 80;
                 content: StringField {
                         editable: bind i.editable;
@@ -1067,7 +1084,8 @@ public function inspect from (obj is Object, t is F3ClassType) to (Inspected of 
 
 function inspect from (elem is InspectedElement) to (Inspected of ?)[] 
 {
-    if (elem is InspectionGroup) {
+    if (not elem.visible) then null
+    else if (elem is InspectionGroup) {
         const g = elem as InspectionGroup;
         foreach (x in g.targets) {
             inspect(x)

@@ -352,7 +352,7 @@ public class Manipulator is AbstractNode
     var moveX is Node;
     var moveY is Node;
     var moveZ is Node;
-
+    var moveGuideZ is Node;
     var rotateX is Node;
     var rotateY is Node;
     var rotateZ is Node;
@@ -395,7 +395,7 @@ public class Manipulator is AbstractNode
 
         const moveGuideX = internalContent.lookup("GuideMoveX");
         const moveGuideY = internalContent.lookup("GuideMoveY");
-        const moveGuideZ = internalContent.lookup("GuideMoveZ");
+        moveGuideZ = internalContent.lookup("GuideMoveZ");
         moveGuideX.observeMouseDrag().subscribe(onMoveX);
         moveGuideY.observeMouseDrag().subscribe(onMoveY);
         moveGuideZ.observeMouseDrag().subscribe(onMoveZ);
@@ -495,7 +495,10 @@ public class Manipulator is AbstractNode
             rotateGuideX.visible = false;
             rotateZ.visible = false;
             scaleZ.visible = false;
-            moveZ.visible = false;
+            moveZ.visible = false;      
+            moveGuideZ.visible = false;
+        } else {
+            moveGuideZ.visible = true;
         }
     }
 

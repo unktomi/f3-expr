@@ -4,6 +4,7 @@ import f3.media.scene.*;
 import f3.util.*;
 import f3.util.Observer.*;
 import expr.Names.*;
+import expr.ResourceTarget.*;
 
 function shouldFormat from (n is TimeNode) to Boolean {
     not (n is ResourceTimeNode and (n as ResourceTimeNode).$useLiteralId);
@@ -12,7 +13,7 @@ function shouldFormat from (n is TimeNode) to Boolean {
 public class Treenode is Treeview.Treenode {
     public var n is TimeNode;
     var label0 = bind if shouldFormat(n) 
-                          then if (n.parent is ResourceTimeNode and shouldFormat(n.parent)) then "Main Timeline" else formatName(n.id) 
+                          then if (n.parent is ResourceTimeNode and shouldFormat(n.parent)) then "Main Timeline" else if n is ResourceTimeNode then (n as ResourceTimeNode).displayName else if (n is ChannelBoxesGroup) then (n as ChannelBoxesGroup).target.displayName else formatName(n.id) 
                           else n.id;
     override var label = bind label0;
     function asTimeGroup from (n is TimeNode) to TimeGroup { if (n is TimeGroup) then n as TimeGroup else null }
