@@ -29,6 +29,10 @@ import f3.util.*;
 import f3.util.Observer.*;
 import f3.util.Observable.*;
 
+function formatURL from (u is String) to String {
+    if u.startsWith("file:") then new java.io.File(new java.net.URI(u)).toString() else u;
+}
+
 public function main from (argv is nativearray of String) to ()
 {
     const app = com.apple.eawt.Application.getApplication();
@@ -400,7 +404,10 @@ public function run from (args is String[]) to ()
     
     const playhead = player.observePlayhead().subscribe(function from (sceneTime is Duration) to () 
                                                         {
-                                                           const finishDynamics = foreach (scene in currentScenes) scene.dynamicsWorld.update(sceneTime, camera);
+                                                            foreach (scene in currentScenes) {
+                                                                scene.dynamicsWorld.paused = player.paused;
+                                                            }
+                                                            const finishDynamics = foreach (scene in currentScenes) scene.dynamicsWorld.update(sceneTime, camera);
                                                             for (f in finishDynamics) {
                                                                 stage.invoke(f);
                                                             }
@@ -1163,6 +1170,7 @@ public function run from (args is String[]) to ()
                 rn.collidableGravityScale = r.gravityScale;
                                                                      
             }
+            rn.displayName = i.displayName;
             rn.programs = foreach (prog in i.programs) {
                 const mem = prog.event.deserialize();;
                 const p = Program {
@@ -2420,7 +2428,7 @@ Tabview.Tab {
             saveEditorState(editorScene, player, trax, recentList);
             return true;
         }
-        title: bind "{mainScene.currentResource.url} {if (savePoint <> MasterUndoable.now) then " (Unsaved)" else ""}";
+        title: bind "{formatURL(mainScene.currentResource.url)} {if (savePoint <> MasterUndoable.now) then " (Unsaved)" else ""}";
         menubar: Menu.Bar 
         {
 	    menus: 
@@ -2449,7 +2457,7 @@ Tabview.Tab {
                       enabled: bind player.paused;
                       items: bind foreach (x in recentList) {
                           MenuItem {
-                              label: x;
+                              label: formatURL(x);
                               action: function to () {
                                   open(x);
                               }
