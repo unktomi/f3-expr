@@ -2,6 +2,7 @@ package expr.timeline;
 import expr.*;
 import expr.AssetTree.*;
 import expr.Names.*;
+import expr.ResourceTarget.*;
 import f3.media.scene.*;
 import f3.media.scene.Shape2D.*;
 import f3.media.scene.KeyFrame.*;
@@ -356,12 +357,13 @@ public class TimeNodeView is AbstractNode
     bound var bg = getFill(target);
     const bg1 = ColorPaint(Color.color(.83, .83, .83));
     override var transform = bind translate(playX + w / 2.0, 0);
-    function getTrackName from (target is TimeNode) to String
+    bound function getTrackName from (target is TimeNode) to String
     {
-        const shouldFormat1 = not (target is ResourceTimeNode) or not (target as ResourceTimeNode).$useLiteralId;
-        const shouldFormat2 = not (target is ResourceTarget.ChannelBoxGroup) or not (target as ResourceTarget.ChannelBoxGroup).$useLiteralId;
-        const shouldFormat = shouldFormat1 and shouldFormat2;
-        if ((target.parent is ResourceTimeNode and not (target.parent is ResourceTimeNodeWrapper)) and target.parent.id == target.id) then "Main Timeline" else if shouldFormat then formatName(target.id) else target.id;
+        if (target is ChannelBoxesGroup) {
+            (target as ChannelBoxesGroup).target.displayName;
+        } else {
+            if ((target.parent is ResourceTimeNode and not (target.parent is ResourceTimeNodeWrapper)) and target.parent.id == target.id) then "Main Timeline" else if (target is ResourceTimeNode) then (target as ResourceTimeNode).displayName else Names.formatName(target.id);
+        }
     }   
     bound var labelX = 
         if (target.hasIndefiniteDuration() and trax.visibleInterval.start > target.playTime + target.contentBounds.start)

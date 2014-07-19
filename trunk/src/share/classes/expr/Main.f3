@@ -124,9 +124,13 @@ function loadEditorState from (stage is JoglStage, scene is Scene, player is Tim
         player.setPlayhead((1s / s.frameRate) * s.playheadFrame);
         var result is String[];
         for (u in s.recent) {
-            const x = new java.io.File(new java.net.URL(u).toURI());
-            const b = x.exists();
-            if (b) insert u into result;
+            try {
+                const x = new java.io.File(new java.net.URL(u).toURI());
+                const b = x.exists();
+                if (b) insert u into result;
+            } catch (e is java.lang.Exception) {
+                e.printStackTrace();
+            }
         }
         return result;
     }
@@ -495,6 +499,7 @@ public function run from (args is String[]) to ()
             if (not model.standalone) {
                 const rtn = ResourceTimeNode {
                     url: url;
+                    displayName: bind rn.displayName inverse;
                     content: bind model.temporalRoot;
                     spatial: rn;
                 }
@@ -576,6 +581,7 @@ public function run from (args is String[]) to ()
 	    }
 	    addResource(rn, pt);
 	    const rtn = MaResourceTimeNode {
+                displayName: bind rn.displayName inverse;
                 model: model;
 		spatial: rn;
 	    }
@@ -708,6 +714,7 @@ public function run from (args is String[]) to ()
 	    }
 	    const rtn = ResourceTimeNode {
                 $useLiteralId: true;
+                displayName: bind rn.displayName inverse;
                 id: url;
 		url: url;
 		spatial: rn;
@@ -732,7 +739,8 @@ public function run from (args is String[]) to ()
     const inspector1 is Inspector = Inspector {
         popupLayer: bind popupLayer;
         onSetKey: function to () { graphEditor.setKeys() }
-        inspecting: bind Inspector.inspect(if (currentTransform == null) then currentScene else currentTransform);
+        var toInspect = bind if (currentTransform == null) then currentScene else currentTransform;
+        inspecting: bind Inspector.inspect(toInspect);
     };
 
     const inspector2 is Inspector = Inspector {
@@ -906,7 +914,7 @@ public function run from (args is String[]) to ()
                 if (not result.endsWith(".expr")) {
                     result = "{result}.expr";
                 }
-                mainScene.currentResource.url = "file:{result}";
+                mainScene.currentResource.url = new java.io.File(result).toURI().toString();
             } else {
                 return false;
             }
@@ -1091,6 +1099,7 @@ public function run from (args is String[]) to ()
                 const tf = ResourceTextField {
                     id: r.id;
                     url: r.url;
+                    displayName: i.displayName;
                     fontSize: new FontSizeSelection(r.fontSize);
                     fontFamily: new FontFamilySelection(r.fontFamily);
                     fontStyle: new FontStyleSelection(r.fontStyle);
@@ -1106,6 +1115,7 @@ public function run from (args is String[]) to ()
                 const tf = ResourceLabel {
                     id: r.id;
                     url: r.url;
+                    displayName: i.displayName;
                     fontSize: new FontSizeSelection(r.fontSize);
                     fontFamily: new FontFamilySelection(r.fontFamily);
                     fontStyle: new FontStyleSelection(r.fontStyle);
@@ -1236,144 +1246,6 @@ public function run from (args is String[]) to ()
         }
 	for (i in sceneRes.spatialResources) {
             println("I={i}");
-            /*
-            if (i is TextFieldResource) {
-                const r = i as TextFieldResource;
-                const tf = ResourceTextField {
-                    id: r.id;
-                    url: r.url;
-                    fontSize: new FontSizeSelection(r.fontSize);
-                    fontFamily: new FontFamilySelection(r.fontFamily);
-                    fontStyle: new FontStyleSelection(r.fontStyle);
-                    fontWeight: new FontWeightSelection(r.fontWeight);
-                    foreground: parseColor(r.foreground);
-                    background: parseColor(r.background);
-                    width: r.width;
-                };
-                tf.setText(r.text);
-                addResource(tf, new Point3(i.tx, i.ty, i.tz));
-            } else if (i is TextOutputResource) {
-                const r = i as TextOutputResource;
-                const tf = ResourceLabel {
-                    id: r.id;
-                    url: r.url;
-                    fontSize: new FontSizeSelection(r.fontSize);
-                    fontFamily: new FontFamilySelection(r.fontFamily);
-                    fontStyle: new FontStyleSelection(r.fontStyle);
-                    fontWeight: new FontWeightSelection(r.fontWeight);
-                    foreground: parseColor(r.foreground);
-                    background: parseColor(r.background);
-                    width: r.width;
-                };
-                tf.setText(r.text);
-                addResource(tf, new Point3(i.tx, i.ty, i.tz));
-            } else {
-                doDrop(rebaseURL(i.url), new Point3(i.tx, i.ty, i.tz));
-            }
-	    currentTransform.tx = i.tx;
-	    currentTransform.ty = i.ty;
-	    currentTransform.tz = i.tz;
-
-	    currentTransform.sx = i.sx;
-	    currentTransform.sy = i.sy;
-	    currentTransform.sz = i.sz;
-
-	    currentTransform.rx = i.rx;
-	    currentTransform.ry = i.ry;
-	    currentTransform.rz = i.rz;
-
-	    currentTransform.px = i.px;
-	    currentTransform.py = i.py;
-	    currentTransform.pz = i.pz;
-            const rn = (currentTransform as ResourceNode);
-            if (i.colliderResource <> null) {
-                const r = i.colliderResource;
-                rn.collidable = r.collidable;
-                rn.collidableMass = r.mass;
-                rn.collidableFriction = r.friction;
-                rn.collidableRestitution = r.restitution;
-                rn.collidableType = 
-                    if (r.colliderType == "Dynamic") then RigidBodyType.Dynamic
-                        else if (r.colliderType == "Kinematic") then RigidBodyType.Kinematic 
-                            else RigidBodyType.Static;
-                rn.collidableGravityScale = r.gravityScale;
-                                                                     
-            }
-            rn.programs = foreach (prog in i.programs) {
-                const mem = prog.event.deserialize();;
-                const p = Program {
-                    event: mem;
-                    code: prog.code;
-                    sourceCode: prog.compiled;
-                    targetPath: prog.targetPath;
-                    evalContext: Program.EvalContext {
-                        interactive: function from () to Boolean { interactive } 
-                        targetNode: (currentTransform as ResourceTarget).findTarget(prog.targetPath);
-                        instanceSpace: currentScene.instanceSpace;
-                        lookupSpatial: currentScene.root.lookup;
-                        targetTimeline: player;
-                        lookupTemporal: mainTimeLayer.lookup;
-                    }
-                }
-                var ps = [p];
-                var targetContext = resolveContext(rn, p);
-                println("RESOLVED CONTEXT {rn} => {targetContext}");
-                for (d in prog.variables) {
-                    const v = Context.ClosureVarContext {
-                        parent: targetContext;
-                        variableName: d.varName;
-                        varType: findTypeAsset(d.varType);
-                        isShortcut: d.isShortcut;
-                    }
-                    insert v into targetContext.content;
-                    println("CREATED VAR: {v}");
-                    const vp = Program {
-                        parent: p;
-                        event: p.event;
-                        code: d.code;
-                        sourceCode: d.sourceCode;
-                        targetPath: prog.targetPath;
-                        evalContext: Program.EvalContext {
-                            eventContext: targetContext as Context.MemberContext;
-                            varContext: v;
-                            interactive: function from () to Boolean { interactive } 
-                            targetNode: (currentTransform as ResourceTarget).findTarget(prog.targetPath);
-                            instanceSpace: currentScene.instanceSpace;
-                            lookupSpatial: currentScene.root.lookup;
-                            targetTimeline: player;
-                            lookupTemporal: mainTimeLayer.lookup;
-                        }
-                    }
-                    v.program = vp;
-                    p.defineVar(v, vp);
-                    insert vp into ps;
-                }
-                println("CREATING PROGRAM**** {prog} => {p.sourceCode}");
-                insert p into allPrograms;
-                ps
-            }
-            for (j in i.animation) {
-                // @TODO handle layers
-                if (j is Resources.ChannelBoxResource) {
-                    const box = j as Resources.ChannelBoxResource;
-                    const channelBox = rn.addChannelBox(box.n_id);
-                    channelBox.playTime = box.playTime;
-                    channelBox.playRate = box.playRate;
-                    channelBox.playCount = box.playCount;
-                    channelBox.blendWeight = 1.0;//i.animation.blendWeight;
-                    foreach (x in box.channels) {
-                        const c = channelBox.resolveChannel(x.target);
-                        c.playTime = x.playTime;
-                        c.playCount = x.playCount;
-                        c.playRate = x.playRate;
-                        c.blendWeight = x.blendWeight;
-                        c.keys = foreach (k in x.keys) {
-                            c.createKey(k.keyTime, k.keyValue, f3.media.scene.KeyFrame.Linear);
-                        }
-                    }
-                }
-            }
-            */
             makeSpatRes(i);
 	}
         var tempResources = currentAnimResource.resources;
@@ -1568,6 +1440,7 @@ public function run from (args is String[]) to ()
                 }
                 const rtn = ResourceTimeNodeWrapper {
                     url: i.url;
+                    displayName: i.displayName;
                     wrapped: t as TimeGroup;
                     blendWeight: i.blendWeight;
                     playTime: i.playTime;
@@ -1584,6 +1457,7 @@ public function run from (args is String[]) to ()
                     }
                }
                const rtn = ResourceTimeNodeWrapper {
+                    displayName: i.displayName;
                     blendWeight: i.blendWeight;
                     playTime: i.playTime;
                     playRate: i.playRate;
@@ -1626,6 +1500,7 @@ public function run from (args is String[]) to ()
                                     const rtn = ResourceTimeNodeWrapper {
                                         url: i.url;
                                         wrapped: t as TimeGroup;
+                                        
                                         blendWeight: i.blendWeight;
                                         playTime: i.playTime;
                                         playRate: i.playRate;
@@ -2563,7 +2438,7 @@ Tabview.Tab {
                           if (saveChangesIfNecessary()) {
                               const result = fileOpen.open();
                               if (result <> null) {
-                                  open("file:{result}");
+                                  open(new java.io.File(result).toURI().toString());
                               }
                           }
                       }

@@ -15,6 +15,7 @@ public class Resource {
     public var url is String;
     public var programs is ProgramResource[];
     public var animation is TemporalResource[];
+    public var displayName is String;
 }
 
 public class ChannelBoxResource is TemporalResource {
@@ -190,6 +191,7 @@ class ResourceBuilder {
             TextFieldResource {
                 url: f.url;
                 id: f.id;
+                displayName: f.displayName;
                 fontFamily: f.fontFamily.selection;
                 fontWeight: f.fontWeight.selection;
                 fontStyle: f.fontStyle.selection;
@@ -222,6 +224,7 @@ class ResourceBuilder {
             TextOutputResource {
                 url: f.url;
                 id: f.id;
+                displayName: f.displayName;
                 fontFamily: f.fontFamily.selection;
                 fontWeight: f.fontWeight.selection;
                 fontStyle: f.fontStyle.selection;
@@ -252,6 +255,7 @@ class ResourceBuilder {
         } else if (n is GroupResourceNode) {
             const g = n as GroupResourceNode;
             SpatialResourceGroup {
+                displayName: g.displayName;
                 url: convertUrl(n.url);
                 tx: n.tx;
                 ty: n.ty;
@@ -275,6 +279,7 @@ class ResourceBuilder {
             }
         } else {
             SpatialResource {
+                displayName: n.displayName;
                 url: convertUrl(n.url);
                 tx: n.tx;
                 ty: n.ty;
@@ -345,6 +350,7 @@ class ResourceBuilder {
         println("unwrapped content of {n.url} => {n.unwrapContent()}");
         println("programs={n.programs}");
         TemporalResource {
+            displayName: n.displayName;
             url: convertUrl(n.url);
             blendWeight: n.blendWeight;
             playTime: n.playTime;

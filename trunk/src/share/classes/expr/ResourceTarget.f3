@@ -122,7 +122,6 @@ public interface ResourceTarget {
         insert result into channelBoxes.content;
         return result;
     }
-
 }
 
         

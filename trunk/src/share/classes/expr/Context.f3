@@ -207,7 +207,7 @@ public class ResourceNodeContext is GroupContext, ResourceObjectContext {
         return memberCtxs;
     }
     public var resource is ResourceNode;
-    override var name = bind "{if (resource.$useLiteralId) then resource.id else formatName(resource.id)} [Scene]";
+    override var name = bind "{resource.displayName} [Scene]";
     protected var typeName = "expr.ResourceNode";
     protected var members = 
         bind uniquify(Expression.introspect(Reflect.getType(typeName) as F3ClassType));
@@ -229,7 +229,7 @@ public class ResourceNodeContext is GroupContext, ResourceObjectContext {
 public class ResourceTextFieldContext is ResourceNodeContext {
     override var typeName = "expr.ResourceTextField";
     override var containedNodes = [];
-    override var name = bind "{resource.id} [Text Input]";
+    override var name = bind "{resource.displayName} [Text Input]";
     override var members = 
         bind foreach (m in uniquify(Expression.introspect(Reflect.getType(typeName) as F3ClassType))) 
     {
@@ -240,7 +240,7 @@ public class ResourceTextFieldContext is ResourceNodeContext {
 public class ResourceLabelContext is ResourceNodeContext {
     override var typeName = "expr.ResourceLabel";
     override var containedNodes = [];
-    override var name = bind "{resource.id} [Text Output]";
+    override var name = bind "{resource.displayName} [Text Output]";
     override var members = 
         bind foreach (m in uniquify(Expression.introspect(Reflect.getType(typeName) as F3ClassType))) 
     {
@@ -252,7 +252,7 @@ public class ResourceTimeNodeContext is GroupContext, ResourceObjectContext {
     override bound function getTarget to ResourceTarget { resource }
     public var resource is ResourceTimeNode;
     bound var memberCtxs is Member[] = foreach (x in members) if (not x.name.startsWith("observe")) then null else x;
-    override var name = bind "{if (resource.$useLiteralId) then resource.id else formatName(resource.id)} [Timeline]";
+    override var name = bind "{resource.displayName} [Timeline]";
     var members = bind Expression.introspect(Reflect.getType("f3.media.scene.TimeNode") as F3ClassType);
     var myContent = bind [if (resource is ResourceTimeNodeWrapper) then { var w = resource as ResourceTimeNodeWrapper; foreach (g in w.unwrapContent()) if (g is ResourceTimeNode) then ResourceTimeNodeContext {  resource: g as ResourceTimeNode} else null } else null];
 

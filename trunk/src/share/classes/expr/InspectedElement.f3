@@ -1,9 +1,34 @@
 package expr;
 import f3.lang.*;
+import f3.util.*;
+import org.f3.runtime.Foldable;
+import expr.undo.*;
 
-public interface InspectedElement {
+public interface InspectedElement is Foldable of InspectedElement {
+    public var visible is Boolean = true;
     public var editable is Boolean = true;
     public var displayName is String;
+    override function foldLeft of b from (z is b, f is function from (b, InspectedElement) to b) to b
+    {
+        f(z, this);
+    }
+    override function foldRight of b from (z is b, f is function from (InspectedElement, b) to b) to b
+    {
+        f(this, z);
+    }
+    
+    public function getUndoList from (undoList is UndoList) to UndoList {
+        foldLeft(undoList, 
+                 function from (u is UndoList, e is InspectedElement) to UndoList 
+                 {
+                     if (e is InspectedValue) {
+                         const v = e as InspectedValue of ?;
+                         u.addTarget(v.displayName, v.target);
+                     }
+                     u;
+                 });
+    }
+    
 }
 
 public class InspectedNumberValue is InspectedValue of Number {
@@ -42,10 +67,28 @@ public class InspectedBooleanValue is InspectedValue of Boolean {
 
 public class InspectedVector of a is InspectedElement {
     public var targets is (InspectedValue of a)[];
+    override function foldLeft of b from (z is b, f is function from (b, InspectedElement) to b) to b
+    {
+        targets.foldLeft(f(z, this), f);
+    }
+    override function foldRight of b from (z is b, f is function from (InspectedElement, b) to b) to b
+    {
+        f(this, targets.foldRight(z, f));
+    }
 }
 
 public class InspectedNumberVector is InspectedVector of Number {}
 
 public class InspectionGroup is InspectedElement {
-    public var targets is InspectedElement[]
+
+    public var targets is InspectedElement[];
+
+    override function foldLeft of b from (z is b, f is function from (b, InspectedElement) to b) to b
+    {
+        targets.foldLeft(f(z, this), f);
+    }
+    override function foldRight of b from (z is b, f is function from (InspectedElement, b) to b) to b
+    {
+        f(this, targets.foldRight(z, f));
+    }
 }
