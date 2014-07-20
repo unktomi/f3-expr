@@ -23,6 +23,35 @@ import expr.inspector.*;
 import expr.Context.ClosureVarContext;
 import expr.AssetTree.TypeAsset;
 
+function getTypeVars from (t is F3Type) to F3Type[] 
+{
+    const list = new java.util.ArrayList of F3Type;
+    getTypeVars(t, list);
+    foreach (x in list) x;
+}
+
+function getTypeVars from (t is F3Type, result is java.util.List of F3Type) to ()
+{
+    getTypeVars0(t, result);
+    println("get type vars {t} => {result}");
+}
+
+function getTypeVars0 from (t is F3Type, result is java.util.List of F3Type) to ()
+{
+    if (t.isTypeVariable()) {
+        if (not result.contains(t)) {
+            result.add(t);
+        }
+    } else {
+        if (t is F3ClassType) {
+            const ct = t as F3ClassType;
+            for (x in ct.getTypeArguments()) {
+                getTypeVars(x, result);
+            }
+        }
+    }
+}
+
 public class NumberField is SliderField {
 
     public var min is Number = 0.0;
@@ -294,10 +323,24 @@ function typeApply from (target is F3Type,
                          substs is java.util.Map of (F3Type, F3Type)) 
     to F3Type 
 {
-    const p = substs.get(target);
+    var p is F3Type;
+    for (ent in substs.entrySet()) {
+        println("{ent.getKey()} == {target} => {ent.getKey() == target}, hash={ent.getKey().hashCode()}, {target.hashCode()}");
+        if (srcType == null) { // major hack
+            const x = ent.getKey();
+            const y = target;
+            if (x.isTypeVariable() and y.isTypeVariable() and x.getTypeVariable() == y.getTypeVariable()) {
+                p = ent.getValue();
+            }
+        } else {
+            if (ent.getKey() == target) {
+                p = ent.getValue();
+            }
+        }
+    }
     if (p <> null) return p;
-    if (target.isTypeVariable() and srcType.isTypeVariable()) {
-        if (isSameTypeVariable(target, srcType)) {
+    if (srcType <> null and target.isTypeVariable() and srcType.isTypeVariable()) {
+        if (isSameTypeVariable(target, srcType) and not subst.isTypeVariable()) {
             substs.put(target, subst);
             return subst;
         }
@@ -753,6 +796,7 @@ function getTypeMembers from (classType is F3ClassType) to Member[]
 }
 
 public class Member {
+    protected var substs is java.util.Map of (F3Type, F3Type);
     override function equals from (obj is Object) to Boolean {
         (obj is Member)  and {
             const objm = obj as Member;
@@ -776,9 +820,29 @@ public class Member {
     public var isObservable is Boolean;
     public var isObserver is Boolean;
     protected var members is Member[] = bind Expression.introspect(t);
-    public function getMembers to Member[]
+    public bound function getMembers to Member[]
     {
-        members;
+        applySubsts(members, substs);
+    }
+
+    function applySubsts from (xs is Member[], subst is java.util.Map of (F3Type, F3Type)) to Member[] 
+    {
+        if (subst == null) then xs else {
+                foreach (x in xs) {
+                    const t0 = subst.get(x.t);
+                    const t1 = if (t0 <> null) then t0 else typeApply(x.t, null, x.t, substs); 
+                    println("applying {subst} to {x.t} in {x.name} => {t1}");
+                    if (t1 <> x.t) {
+                        Member {
+                            substs: subst;
+                            t: t1;
+                            rt: t1;
+                            m: x.m;
+                            name: x.name;
+                        }
+                    } else x
+                }
+            }
     }
 
     function toObservable to String 
@@ -2057,6 +2121,10 @@ public abstract class ExpressionView is AbstractNode {
     public var font is Text.Font = bind canvas.font;
     public var selected is Boolean;
     public var selectable is Boolean = false;
+    public function deselect to ()
+    {
+        selected = false;
+    }
     public function select to ()
     {
         if (selectable) {
@@ -2800,13 +2868,14 @@ public class GetVarView is OutputView {
     override var resultType = bind get.getType();
     public var get is GetVar;
     public var visibleRowCount is Number = 10;
-    const tv is GetTreeview = GetTreeview {
+    bound var tv is GetTreeview = GetTreeview {
         canvas: bind canvas;
         width: bind cellWidth;
         visibleRowCount: bind visibleRowCount;
         get: bind get;
         exprView: bind this;
     }
+
     override var transform = bind translate(pos);
     override var expression = bind get;
     public var isLabeled is Boolean = false;
@@ -2870,7 +2939,7 @@ public class GetVarView is OutputView {
         }
     };
     bound var h = innerContent.bounds.height();
-    override var internalContent = Group {
+    override var internalContent = bind Group {
         content: bind 
         [innerContent,
          Rectangle {
@@ -3812,10 +3881,22 @@ class ResultView is OutputView {
             member: bind constructMember(if (unifiedType == null) then resultType else unifiedType, outputName);
        }
     }
+
     function constructMember from (t is F3Type, name is String) to Member 
     {
         println("CREATING GET VAR for {sourceView.fun.funMember.name} => {t}, {name}");
+        const substs = if (sourceView.substs.size() > 0) {
+            var m = new java.util.HashMap of (F3Type, F3Type);
+            for (ent in sourceView.substs.entrySet())  {
+                if (not ent.getValue().isTypeVariable()) {
+                    println("adding {ent.getKey()} => {ent.getValue()}");
+                    m.put(ent.getKey(), ent.getValue());
+                }
+            }
+            m;
+        } else null;
         Member {
+            substs: substs;
             m: null;
             t: t;
             rt: t;
@@ -4025,8 +4106,22 @@ public class MemberTreecell is Treeview.Treecell
             }
     }
 
+    public var showSelection is Boolean;
+
     const linkedView is GetVarView = TreecellGetVarView {
         parentLink: bind parentLink;
+        override function select to () {
+            self.tv.select(self.tn);
+            canvas.setSelectedExpr(this);
+            selected = true;
+            showSelection = true;
+        }
+        override function deselect to ()
+        {
+            println("deselecting {tn.label}");
+            showSelection = false;
+            selected = false;
+        }
         override function getResultType to F3Type {
             return (tn as MemberTreenode).getType();
         }
@@ -4089,6 +4184,25 @@ public class MemberTreecell is Treeview.Treecell
                 } else null
             }
     }
+
+    bound var rect = 
+        Rectangle {
+            visible: bind showSelection;
+            height: bind tv.cellHeight;
+            width: bind tv.cellWidth;
+            pickable: false;
+            stroke: Stroke {
+                width: 2;
+            }
+            strokePaint: bind SelectionPaint;
+    };
+
+
+    override var internalContent = bind
+        Group {
+            content: bind [defaultContent, if showSelection then rect else null];
+        }
+
 
     function formatValue from (v is F3Value) to String
     {
@@ -4203,7 +4317,6 @@ class GetTreeview is AbstractNode {
 
         override function update to ()
         {
-            super.update();
             var cells is java.util.List of MemberTreecell = cellsArray;
             var linkCount = 0;
             cells.clear();
@@ -4239,6 +4352,7 @@ class GetTreeview is AbstractNode {
                 const cell = cellMap.get(row);
                 cell.active = true;
             }
+            super.update();
         }
     };
 
@@ -4701,13 +4815,14 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     function setSelectedExpr from (e is ExpressionView) to ()
     {
         selectionRect.visible = false;
+        selectedExpr.deselect();
         selectedExpr = e;
     }
 
     var selectedExpr is ExpressionView on replace old {
-        old.selected = false;
+        old.deselect();
         if (selectedExpr <> null) {
-            for (v in views where v <> selectedExpr) v.selected = false;
+            for (v in views where v <> selectedExpr) v.deselect();
             selectedExpr.selected = true;
             moveToFront(selectedExpr);
         }
@@ -5707,9 +5822,36 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                                                                                   break;
                                                                               }
                                                                           }
+                                                                          if (target == null) {
+                                                                              foldLeft((), 
+                                                                                       function from (_ is (), n is Node) to ()
+                                                                                       {
+                                                                                           println("n={n}");
+                                                                                           if (n is ExpressionView) {
+                                                                                               const e = n as ExpressionView;
+                                                                                               if (e.expression.id  == id) target = e;
+                                                                                           } else if (n is MemberTreecell) {
+                                                                                               const c = n as MemberTreecell;
+                                                                                               if (c.linkedView.id == id) target = c.linkedView;
+                                                                                           }
+                                                                                       });
+                                                                          }
+                                                                          println("target=>{target}");
+                                                                          if (target == null) {
+                                                                              for (link in links) {
+                                                                                  if (link.source.id == id) {
+                                                                                      target = link.source;
+                                                                                      break;
+                                                                                  } else if (link.target.id == id) {
+                                                                                      target = link.target;
+                                                                                      break;
+                                                                                  }
+                                                                              }
+                                                                          }
+                                                                          println("target=>{target}");
                                                                           if (target <> null) {
                                                                               clearSelection();
-                                                                              target.selected = true;
+                                                                              target.select();
                                                                               MasterUndoable.commit();
                                                                           }
                                                                       } else {

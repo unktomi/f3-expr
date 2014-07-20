@@ -41,7 +41,6 @@ public abstract class AbstractResourceText is ResourceNode, TextAPI, ResourceLea
     public var font = bind layoutEngine.createFont("font-size:{fontSize.selection};font-family:{fontFamily.selection};font-weight:{fontWeight.selection};font-style:{fontStyle.selection};text-decoration:{fontTextDecoration.selection}");
 
 
-    const undoList = UndoList {};
     postinit {
         undoList.addTarget("fontSize", &fontSize);
         undoList.addTarget("fontFamily", &fontFamily);
