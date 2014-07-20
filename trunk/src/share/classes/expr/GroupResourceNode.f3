@@ -6,8 +6,7 @@ public class GroupResourceNode is ResourceNode {
     {
         delete rn from content;
     }
-    const undoList = UndoList {};
-    init {
+    postinit {
 	undoList.addTarget("content", &content);
     }
 }
