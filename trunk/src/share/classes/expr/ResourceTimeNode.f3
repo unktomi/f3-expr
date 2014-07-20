@@ -111,7 +111,6 @@ public class ResourceTimeNode is TimeGroup, ResourceTarget {
     }
     override var id = bind url;
     public var spatial is ResourceNode;
-    override var displayName = bind spatial.displayName inverse;
     public function unwrapContent to TimeNode[] {
          content
     }
