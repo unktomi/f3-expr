@@ -1483,6 +1483,7 @@ public function run from (args is String[]) to ()
                     }
                 }
                 const rtn = ResourceTimeNodeWrapper {
+                    displayName: i.displayName;
                     blendWeight: i.blendWeight;
                     playTime: i.playTime;
                     playRate: i.playRate;
@@ -1508,7 +1509,7 @@ public function run from (args is String[]) to ()
                                     const rtn = ResourceTimeNodeWrapper {
                                         url: i.url;
                                         wrapped: t as TimeGroup;
-                                        
+                                        displayName: i.displayName;
                                         blendWeight: i.blendWeight;
                                         playTime: i.playTime;
                                         playRate: i.playRate;
@@ -1843,6 +1844,7 @@ public function run from (args is String[]) to ()
                                                                  else ResourceTimeNodeWrapper {
                                                                          playCount: if clip is BlendLayer then -1 else 1; // hack...
                                                                          url: asset.url;
+                                                                         displayName: Names.formatName(clip.id);
                                                                          wrapped: clip as TimeGroup;
                                                                      };
 							 (j.node as Trax).onDrop(j, rtn, 
