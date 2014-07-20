@@ -72,9 +72,9 @@ public class ResourceScene is Scene, Inspectable {
         var cams is Camera[];
         currentResource.foldLeft((), function from (_ is (), n is Node) to () {
                 if (n is Camera and n <> camera) {
-                //                    if (not (n.id == "topShape" or n.id == "perspShape" or n.id == "frontShape" or n.id == "sideShape")) {
+                    if (not (n.id == "topShape" or n.id == "perspShape" or n.id == "frontShape" or n.id == "sideShape")) {
                         insert n as Camera into cams;
-                  //  }
+                    }
                 }
             });
         currentCameras = cams;

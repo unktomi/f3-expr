@@ -307,6 +307,15 @@ function typeApply from (target is F3Type,
         const funType = target as F3FunctionType;
         const retType = typeApply(funType.getReturnType(), srcType, subst, substs);
         var matches = retType <> funType.getReturnType();
+        const typeParams = 
+        {
+            foreach (i in [0..<funType.getTypeParameters().length]) 
+            {
+                const pt = typeApply(funType.getTypeParameters()[i], srcType, subst, substs);
+                if (not matches) matches = pt <> funType.getTypeParameters()[i];
+                pt
+            }
+        }
         const parms = 
             foreach (i in [0..<funType.minArgs()]) 
             {
@@ -315,7 +324,7 @@ function typeApply from (target is F3Type,
                 pt
             };
         if (matches) {
-            return ctx.makeFunctionType(parms, retType);
+            return ctx.makeFunctionType(typeParams, parms, retType);
         }
     } else if (target is F3ClassType) {
         const clsType = target as F3ClassType;
@@ -1023,6 +1032,10 @@ class TypeVariableExpression is ObserverExpression {
     const typevar is F3Type;
     override function getType { typevar }
     override bound function getName to String { formatTypeVar(typevar) }
+    public var infer is F3Type;
+    public bound function getInputType to F3Type {
+        if (infer <> null) then infer else if observable <> null then observable.getType() else typevar;
+    }
 }
 
 class ClassTypeExpression is ObjectExpression {
@@ -1393,8 +1406,8 @@ public class IPath {
             if (observer.observable is OutputMemberExpression) {
                 const n = observer.observable as OutputMemberExpression;
                 const src = n.source;
-                println("n={n}");
-                println("src={src}");
+                //println("n={n}");
+                //println("src={src}");
                 if (src is VarContextExpression) {
                     const v = (src as VarContextExpression).varContext;
                     return if (v.isShortcut) then "<<{src.getName()}>>" else "(getVar(\"{v.variableName}\") as {v.varType.t.getName()})";
@@ -1447,7 +1460,19 @@ public class IPath {
                     args = "{args}{sep}{j}";
                     sep = ", ";
                 }
-                const app = formStaticMethodCall(fun);
+                var app = formStaticMethodCall(fun);
+                var targs = foreach (x in func.typeInputs) {
+                    x.getInputType();
+                }
+                if (targs.size() > 0) {
+                    app = "{app} of (";
+                    var sep1 = "";
+                    for (x in targs) {
+                        app = "{app}{sep1}{x.getName()}";
+                        sep1 = ", ";
+                    }
+                    app = "{app})";
+                }
                 if (obDepth >= 0) {
                     return "{prefix} \}; const obs{obDepth} = foreach (i{getDepth()} in {app}({args})) \{";
                 } else if (lowered >= 0) {
@@ -1474,10 +1499,23 @@ public class IPath {
                     args = "{args}{sep}{j}";
                     sep = ", ";
                 }
-                if (obDepth >= 0) {
-                    return "{prefix} \}; const obs{obDepth} = foreach (i{getDepth()} in {j0}.{fun.getName()}({args})) \{";
+                var app = fun.getName();
+                var targs = foreach (x in func.typeInputs) {
+                    x.getInputType();
                 }
-                return "{parents[0].getWorldAccess()}.{fun.getName()}({args})";                
+                if (targs.size() > 0) {
+                    app = "{app} of (";
+                    var sep1 = "";
+                    for (x in targs) {
+                        app = "{app}{sep1}{x.getName()}";
+                        sep1 = ", ";
+                    }
+                    app = "{app})";
+                }
+                if (obDepth >= 0) {
+                    return "{prefix} \}; const obs{obDepth} = foreach (i{getDepth()} in {j0}.{app}({args})) \{";
+                }
+                return "{parents[0].getWorldAccess()}.{app}({args})";                
             }
         }
         if (observer is GetVar) {
@@ -1698,7 +1736,9 @@ public class Function is MemberExpression {
     var clazz = bind fun.getDeclaringClass();
     var isNull = bind clazz == null;
     var argCount1 = bind ft.minArgs();
-    public var inputs is Parameter[] =
+    public var typeParams is F3Type[] = bind ft.getTypeParameters();
+    public var typeInputs is TypeVariableExpression[] = bind foreach (t in typeParams) TypeVariableExpression {typevar: t};
+    public var inputs is Parameter[] = 
 	bind 
         [if (isNull) then null else 
          Parameter {
@@ -2215,15 +2255,9 @@ class FunctionView is ExpressionView {
         serializeFunction();
     }
 
-    function getSpecializedMember to Member {
-        makeFunMember(fun.member.name, 
-                      foreach (i in inputs) i.inputType,
-                      output.unifiedType);
-    }
 
     public function serializeFunction to FunNode 
     {
-        //const specializedMember = getSpecializedMember();
         const n = FunNode {
             id: "{id}";
             x: pos.x;
@@ -2303,13 +2337,14 @@ class FunctionView is ExpressionView {
 
     function unify from (substs is java.util.Map of (F3Type, F3Type)) to () 
     {
-        for (x in potentialTypeInputs) {
+        for (x in typeInputs) {
             if (x.links.size() > 0){
                 var infer is F3Type = null;
                 for (link in x.links) {
                     infer = (link.source as LinkedOutputView).getResultType();
                 }
                 x.infer = null;
+                x.parameter.infer = null;
                 substs.put(x.parameter.typevar, infer);
             } else {
                 var infer is F3Type = null;
@@ -2320,6 +2355,7 @@ class FunctionView is ExpressionView {
                     }
                 }
                 x.infer = infer;
+                x.parameter.infer = infer;
                 println("inferred {x.infer} for {x.parameter.typevar} in {x}");
                 println("substs={substs}");
             }
@@ -2385,42 +2421,13 @@ class FunctionView is ExpressionView {
         }
     };
 
-    function getTypeVars from (t is F3Type) to F3Type[] 
-    {
-        const list = new java.util.ArrayList of F3Type;
-        getTypeVars(t, list);
-        foreach (x in list) x;
-    }
-
-    function getTypeVars from (t is F3Type, result is java.util.List of F3Type) to ()
-    {
-        getTypeVars0(t, result);
-        println("get type vars {t} => {result}");
-    }
-
-    function getTypeVars0 from (t is F3Type, result is java.util.List of F3Type) to ()
-    {
-        if (t.isTypeVariable()) {
-            if (not result.contains(t)) {
-                result.add(t);
-            }
-        } else {
-            if (t is F3ClassType) {
-                const ct = t as F3ClassType;
-                for (x in ct.getTypeArguments()) {
-                    getTypeVars(x, result);
-                }
-            }
-        }
-    }
         
     override var titleSeparatorRow is Integer = bind typeInputs.size();
 
-    var potentialTypeInputs is TypeParameterView[] = bind foreach (t in getTypeVars(output.result.getType())) TypeParameterView {
-        parameter: TypeVariableExpression { typevar: t}, canvas: canvas
+    bound var typeInputs is TypeParameterView[] = foreach (t in fun.typeInputs) TypeParameterView {
+        parameter: t, canvas: canvas
     };
 
-    bound var typeInputs is TypeParameterView[] = foreach (x in potentialTypeInputs) if (x.infer == null) then x else null;
 
     bound var inputs is ParameterView[] = foreach (p in fun.inputs) ParameterView {
         targetView: this;
@@ -3462,10 +3469,19 @@ class BooleanConstant is Constant {
 }
 
 class TypeParameterView is InputView {
+    override var labelVisible = bind checkLabel(canvas.dropType, getInputType());
+    function checkLabel from (dt is F3Type, t is F3Type) to Boolean
+    {
+        const result = infer == null and canvas.canAssignTo(t);
+        return result;
+    }
     public var parameter is TypeVariableExpression;
     override var expression = bind parameter;    
     override var internalContent = Group { content: bind title };
     public var infer is F3Type;
+    override bound function getInputType to F3Type {
+        if (infer <> null) then infer else if links[0].source <> null then links[0].source.expression.getType() else parameter.typevar;
+    }
     public override bound function getLabel to String { 
         var src = links[0].source;
         if (infer <> null) then formatType(infer) else getName2(src.expression, expression);
@@ -3535,10 +3551,28 @@ public class ParameterView is InputView {
         targetView.assignLinkIds();
     }
 
-    function numSlider to SliderField 
+    override function update to ()
+    {
+        checkParameter();
+        super.update();
+    }
+
+    function checkParameter to () {
+        if (Reflect.INTEGER_TYPE.isConvertibleFrom(getInputType())) {
+            if (parameter.constantValue == null) parameter.constantValue = 0;
+        } else if (Reflect.NUMBER_TYPE.isConvertibleFrom(getInputType())) {
+            if (parameter.constantValue == null) parameter.constantValue = 0.0;
+        } else if (Reflect.BOOLEAN_TYPE.isConvertibleFrom(getInputType())) {
+            if (parameter.constantValue == null) parameter.constantValue = false;
+        } else if (Reflect.STRING_TYPE.isConvertibleFrom(getInputType())) {
+            if (parameter.constantValue == null) parameter.constantValue = "";
+        }
+    }
+
+    bound function numSlider to SliderField 
     {
         var w = bind cellWidth-120;
-        const f = NumberField {
+        var f = NumberField {
             height: bind cellHeight;
             width: bind w;
             transform: bind translate(cellWidth/2-w/2, 0, 0);
@@ -3555,10 +3589,10 @@ public class ParameterView is InputView {
         return f;
     }
     
-    function intSlider to SliderField 
+    bound function intSlider to SliderField 
     {
         var w = bind cellWidth-120;
-        const f = IntegerField {
+        var f = IntegerField {
             height: bind cellHeight;
             width: bind w;
             transform: bind translate(cellWidth/2-w/2, 0, 0);
@@ -3575,10 +3609,10 @@ public class ParameterView is InputView {
         return f;
     }
 
-    function boolSlider to SliderField 
+    bound function boolSlider to SliderField 
     {
         var w = bind cellWidth-130;
-        const f = SliderField {     
+        var f = SliderField {     
             height: bind cellHeight;
             width: bind w;
             transform: bind translate(cellWidth/2-w/2, 0, 0);
@@ -3603,9 +3637,9 @@ public class ParameterView is InputView {
         return f;
     } 
 
-    function stringField to Text.Field {
+    bound function stringField to Text.Field {
         var w = bind cellWidth/2;
-        const f = StringField {
+        var f = StringField {
             width: bind w
             transform: bind translate(cellWidth/2-w/2, 0);
             height: bind cellHeight;
@@ -3653,7 +3687,8 @@ public class ParameterView is InputView {
             then numSlider() 
             else if (Reflect.BOOLEAN_TYPE.isConvertibleFrom(getInputType())) 
                 then boolSlider() else null;
-    override var internalContent = Group { content: bind [title, if links.size() == 0 then Group { content: bind [sliderField, textField] } else null] };
+    var controls = Group { content: bind [sliderField, textField] };
+    override var internalContent = Group { content: bind [title, if links.size() == 0 then controls else null] };
     /*
     const titleText = XHTML.Text {
         width: bind cellWidth;
@@ -5356,9 +5391,9 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         for (link in canvas.links) {
             var src is ExpressionView = link.source;
             var target is ExpressionView = link.target;
-            println("src={src}");
-            println("target={target}");
-            println("bounds={bounds}, src={src.boundsInScene}, target={target.boundsInScene}");
+            //println("src={src}");
+            //println("target={target}");
+            //println("bounds={bounds}, src={src.boundsInScene}, target={target.boundsInScene}");
             var containsSrc = bounds.contains(link.source.getLinkPos());
             var containsTarget = bounds.contains(link.target.getLinkPos());
             println("containsSrc={containsSrc}, containsTarget={containsTarget}");

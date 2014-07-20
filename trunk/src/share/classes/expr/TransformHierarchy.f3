@@ -272,7 +272,7 @@ public class TransformHierarchy
         if (srcParent is ResourceGroup) {
             delete src as ResourceNode from (srcParent as ResourceGroup).resources;
         } else if (src is SceneAPI) {
-            println("src={src}, target={target}");
+            //println("src={src}, target={target}");
             if (target is SceneAPI) {
                 const x = src as SceneAPI;
                 const y = target as SceneAPI;
