@@ -636,6 +636,7 @@ public function run from (args is String[]) to ()
                    loweredUrl.endsWith(".ndo")
                    ) {
             const assimp = F3Assimp {
+                sceneRoot: currentScene.root;
                 monitorForChanges: yes;
                 url: url;
             }
