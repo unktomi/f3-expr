@@ -63,15 +63,15 @@ class ColorChooser is AbstractNode {
     var colorHandlers is Disposable[];
 
     override var internalContent = TransformNode {
-        tx: bind x -85;
-        ty: bind y -51;
+        tx: bind x+16;
+        ty: bind y-25;
         content: bind colorChooserSvg.root;
     };
 
     function hidePopup to ()
     {
         cancel.dispose();
-        popupLayer.visible = false;
+        delete this from popupLayer.content;
     }
 
     function selectColor from (c is Color) to ()
