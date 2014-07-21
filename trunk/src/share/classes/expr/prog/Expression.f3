@@ -2308,6 +2308,10 @@ class FunctionView is ExpressionView {
 
     override public function unlink from () to () 
     {
+        funOutput.unlink();
+        for (x in typeInputs) {
+            x.unlink();
+        }
         for (x in inputs) {
             x.unlink();
         }
@@ -2333,6 +2337,11 @@ class FunctionView is ExpressionView {
             member: fun.member.serialize();
         }
         canvas.serializationMap.put(this, n);
+        n.typeInputs = foreach (i in typeInputs) {
+            TargetNode {
+                targetId: "{i.id}", links: foreach (link in i.links) "{link.id}";
+            }
+        }
         n.inputs = foreach (i in inputs) TargetNode {
             targetId: "{i.id}", links: foreach (link in i.links) "{link.id}";
             intValue: if (i.parameter.constantValue is Integer) then i.parameter.constantValue as Integer else 0;
@@ -2473,7 +2482,7 @@ class FunctionView is ExpressionView {
                     println("output resultType={output.resultType}");
                     println("output member={output.getter.member}");
                 } 
-            }
+            } 
         }
     }
 
@@ -2493,7 +2502,9 @@ class FunctionView is ExpressionView {
     override var titleSeparatorRow is Integer = bind typeInputs.size();
 
     bound var typeInputs is TypeParameterView[] = foreach (t in fun.typeInputs) TypeParameterView {
-        parameter: t, canvas: canvas
+        targetView: this;
+        parameter: t;
+        canvas: canvas;
     };
 
 
@@ -3051,7 +3062,7 @@ public class ForkView is ExpressionView {
     public function assignLinkIds to () 
     {
         var n = 0;
-        for (i in targetPorts) {
+        for (i in targetPorts.reverse()) {
             for (j in i.links) {
                 j.sourceLinkId = n++;
             }
@@ -3538,6 +3549,13 @@ class BooleanConstant is Constant {
 }
 
 class TypeParameterView is InputView {
+    public var targetView is FunctionView;
+
+    override public function assignLinkIds to () 
+    {
+        targetView.assignLinkIds();
+    }
+
     override var labelVisible = bind checkLabel(canvas.dropType, getInputType());
     function checkLabel from (dt is F3Type, t is F3Type) to Boolean
     {
@@ -3561,10 +3579,34 @@ class TypeParameterView is InputView {
 }
 
 class TypeRefView is OutputView {
+
     public var ref is TypeExpression;
+
+    override public function serialize to ExprNode {
+        const n = TypeRefNode { 
+            typeName: ref.getType().getName();
+            x: pos.x;
+            y: pos.y;
+            id: id 
+        };
+        n.outputs = 
+            foreach (link in getTree.getLinks() /*where not (link.target is TreecellGetVarView)*/) 
+            {
+                var p = getPath(link);
+                SourceNode {
+                    sourceId: p;
+                    links: ["{link.id}"];
+                }
+            };
+        canvas.serializationMap.put(this, n);
+        return n;
+    }
+
     override var expression = bind ref;    
     override var treeWidth = 16;
+
     var innerContent = Group { content: bind [title, TransformNode { tx: bind cellWidth/2-8, content: bind getTree }] }
+
     override var internalContent = Group {
 	content: bind [innerContent, 
         Rectangle {
@@ -3638,7 +3680,7 @@ public class ParameterView is InputView {
         }
     }
 
-    bound function numSlider to SliderField 
+    function numSlider to SliderField 
     {
         var w = bind cellWidth-120;
         var f = NumberField {
@@ -3658,7 +3700,7 @@ public class ParameterView is InputView {
         return f;
     }
     
-    bound function intSlider to SliderField 
+    function intSlider to SliderField 
     {
         var w = bind cellWidth-120;
         var f = IntegerField {
@@ -3678,7 +3720,7 @@ public class ParameterView is InputView {
         return f;
     }
 
-    bound function boolSlider to SliderField 
+    function boolSlider to SliderField 
     {
         var w = bind cellWidth-130;
         var f = SliderField {     
@@ -3706,7 +3748,7 @@ public class ParameterView is InputView {
         return f;
     } 
 
-    bound function stringField to Text.Field {
+    function stringField to Text.Field {
         var w = bind cellWidth/2;
         var f = StringField {
             width: bind w
@@ -3749,15 +3791,21 @@ public class ParameterView is InputView {
 
     readonly var textField = bind if Reflect.STRING_TYPE.isConvertibleFrom(getInputType()) then stringField() else null;
 
-    readonly var sliderField = bind 
-        if (Reflect.INTEGER_TYPE.isConvertibleFrom(getInputType()))
+    readonly var sliderField = bind getSliderField(getInputType());
+
+    function getSliderField from (_ is F3Type) to SliderField { // hack: workaround for binding bugs
+        var t = if (inputType == null) then parameter.t else inputType;
+        if (Reflect.INTEGER_TYPE.isConvertibleFrom(t))
             then intSlider()
-        else if (Reflect.NUMBER_TYPE.isConvertibleFrom(getInputType())) 
+        else if (Reflect.NUMBER_TYPE.isConvertibleFrom(t)) 
             then numSlider() 
-            else if (Reflect.BOOLEAN_TYPE.isConvertibleFrom(getInputType())) 
+            else if (Reflect.BOOLEAN_TYPE.isConvertibleFrom(t)) 
                 then boolSlider() else null;
-    var controls = Group { content: bind [sliderField, textField] };
-    override var internalContent = Group { content: bind [title, if links.size() == 0 then controls else null] };
+    }
+
+    var controls = bind if (sliderField <> null) then sliderField else textField;
+ 
+   override var internalContent = Group { content: bind [title, if links.size() == 0 then controls else null] };
     /*
     const titleText = XHTML.Text {
         width: bind cellWidth;
@@ -4185,7 +4233,9 @@ public class MemberTreecell is Treeview.Treecell
             }
     }
 
-    bound var rect = 
+    bound var rect is Rectangle = createRect();
+
+    function createRect to Rectangle {
         Rectangle {
             visible: bind showSelection;
             height: bind tv.cellHeight;
@@ -4195,7 +4245,8 @@ public class MemberTreecell is Treeview.Treecell
                 width: 2;
             }
             strokePaint: bind SelectionPaint;
-    };
+        }
+    }
 
 
     override var internalContent = bind
@@ -6371,9 +6422,9 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             }
             const w = new java.io.StringWriter();
             //println("root={initialExprView} => {serializationMap.get(initialExprView)}");
-            foreach (obj in views) {
+            for (obj in views) {
                 var x = serialize(obj);
-                //                println("serialize {obj} => {x}");
+                println("serialize {obj} => {x}");
             }
             var todo = ExprScene {};
             foreach (j in serializationMap.values()) {
@@ -6549,6 +6600,44 @@ public class ExprNode {
     }
 }
 
+public class TypeRefNode is ExprNode {
+    public var typeName is String;
+    public var outputs is SourceNode[];
+    override public function createView from (canvas is Canvas) to ExpressionView 
+    {
+        const t = Reflect.getType(typeName);
+        var r is TypeRefView;
+        r = TypeRefView {
+            pathFactory: canvas.pathFactory;
+            layoutEngine: canvas.layoutEngine;
+            imageLoader: canvas.imageLoader;
+            effectLoader: canvas.effectLoader;
+            selectable: true;
+            canvas: canvas;
+            ref: TypeExpression { typeref: t }
+            pos: new Point3(x, y, 0);
+        }
+        insert r into canvas.views;
+        for (p in outputs) {
+            const path = p.sourceId;
+            const tn = r.getTree.treeModel.resolvePath(path);
+            if (tn.parent <> null) {
+                tn.open();
+            }
+            println("path={path} tn={tn}");
+            for (link in p.links) {
+                const lnk = canvas.getLink(link);
+                const cell = r.getTree.getCell(tn);
+                const t1 = cell.linkedView;
+                println("t1={t1}");
+                lnk.source = t1;
+                cell.link();
+            }
+        }
+        r;
+    }
+}
+
 public class ExprScene {
     public var views is ExprNode[];
     public var links is LinkNode[];
@@ -6628,6 +6717,7 @@ public class BranchNode is ExprNode {
 
 
 public class FunNode is ExprNode {
+    public var typeInputs is TargetNode[];
     public var inputs is TargetNode[];
     public var outputs is SourceNode[];
     public override function createView from (canvas is Canvas) to FunctionView {
@@ -6646,6 +6736,17 @@ public class FunNode is ExprNode {
     }
     protected function linkView from (canvas is Canvas, v is FunctionView) to FunctionView {
         const m = v.fun.funMember;
+        for (n in typeInputs) {
+            var i = indexof n;
+            const p = v.typeInputs[i];
+            if (n.links.size() > 0) {
+                for (link in n.links) {
+                    println("linking type input {indexof n} linkId={link}");
+                    const lnk = canvas.getLink(link);
+                    lnk.target = p;
+                }
+            } 
+        }
         for (n in inputs) {
             var i = indexof n;
             const p = v.inputs[i];
