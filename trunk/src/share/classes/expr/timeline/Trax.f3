@@ -303,14 +303,14 @@ public class TimeNodeView is AbstractNode
 
     public var selected is Boolean;
 
-    function getPlayX from (d is Duration) to Number 
+    bound function getPlayX from (d is Duration) to Number 
     {
         trax.durationToX(d, false);
     }
 
-    function getWidth from (i0 is Interval, visible is Interval) to Number 
+    bound function getWidth from (i0 is Interval, visible is Interval) to Number 
     {
-        const i = if (i0.duration() == 0s or i0.duration() > 10000s) then visible.end - i0.start else i0.duration();
+        var i = if (i0.duration() == 0s or i0.duration() > 10000s) then visible.end - i0.start else i0.duration();
     	trax.durationToX(i);
     }
 
@@ -764,22 +764,22 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
         const tv = rowToTimeNodeView(row);
         var targetNode = tv.target;
         println("targetNode={targetNode}");
-        /*
-        if (targetNode is ResourceTimeNodeWrapper) {
-            targetNode = (targetNode as ResourceTimeNodeWrapper).wrapped;
-        }
-        if (targetNode is TimeGroup) {
-            tv.getParentTimeNodeView().open();
-            insert clip into (targetNode as TimeGroup).content;
-        } else if (targetNode <> null) {
-            tv.open();
-            const g = targetNode as TimeGroup;
-            insert clip after g.content[Sequences.indexOf(g.content, targetNode)];
+        if (tv.expanded) {
+            if (targetNode is ResourceTimeNodeWrapper) {
+                targetNode = (targetNode as ResourceTimeNodeWrapper).wrapped;
+            }
+            if (targetNode is TimeGroup) {
+                tv.getParentTimeNodeView().open();
+                insert clip into (targetNode as TimeGroup).content;
+            } else if (targetNode <> null) {
+                tv.open();
+                const g = targetNode as TimeGroup;
+                insert clip after g.content[Sequences.indexOf(g.content, targetNode)];
+            }
         } else {
             add(clip);
         }
-        */
-        add(clip);
+        //        add(clip);
     }
 
     var timelineListener is Disposable;
@@ -980,7 +980,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
     {
         var dur = targetNode.contentBounds.duration();
 	var d = if (loop and dur > 0s) d0.rem(dur) else d0;
-	var pixels = d / 1s * pixelsPerSecond();
+	var pixels = d / 1s * PIXELS_PER_FRAME * frameRate;
 	return pixels;
     }
 

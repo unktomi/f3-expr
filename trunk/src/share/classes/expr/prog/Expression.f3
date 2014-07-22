@@ -3668,7 +3668,8 @@ public class ParameterView is InputView {
         super.update();
     }
 
-    function checkParameter to () {
+    function checkParameter to () 
+    {
         if (Reflect.INTEGER_TYPE.isConvertibleFrom(getInputType())) {
             if (parameter.constantValue == null) parameter.constantValue = 0;
         } else if (Reflect.NUMBER_TYPE.isConvertibleFrom(getInputType())) {
@@ -3794,7 +3795,7 @@ public class ParameterView is InputView {
     readonly var sliderField = bind getSliderField(getInputType());
 
     function getSliderField from (_ is F3Type) to SliderField { // hack: workaround for binding bugs
-        var t = if (inputType == null) then parameter.t else inputType;
+        const t = if (inputType == null) then parameter.t else inputType;
         if (Reflect.INTEGER_TYPE.isConvertibleFrom(t))
             then intSlider()
         else if (Reflect.NUMBER_TYPE.isConvertibleFrom(t)) 
@@ -3805,7 +3806,7 @@ public class ParameterView is InputView {
 
     var controls = bind if (sliderField <> null) then sliderField else textField;
  
-   override var internalContent = Group { content: bind [title, if links.size() == 0 then controls else null] };
+    override var internalContent = Group { content: bind [title, if links.size() == 0 then controls else null] };
     /*
     const titleText = XHTML.Text {
         width: bind cellWidth;
