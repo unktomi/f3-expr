@@ -268,7 +268,8 @@ public class Treecell is AbstractNode {
         return str;
     }
     protected bound function getValueContent to Node { null }
-    protected var defaultContent = bind Group {
+    override var internalContent = bind defaultContent;
+    protected const defaultContent = Group {
 	content: 
 	[Rectangle {
 	     height: bind tv.cellHeight;
@@ -296,9 +297,6 @@ public class Treecell is AbstractNode {
              }];
 	 }]
     };
-
-    override var internalContent = bind defaultContent;
-
     function dumpCells to () {
         for (cell in tv.cells) {
             println("tn={cell.n}");
@@ -464,7 +462,7 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
 
     public function select from (t is Treenode) to ()
     {
-        println("SELECTING TREE NODE {t.label} {t.row} current={selectedTreenode.label} {selectedTreenode.row}");
+        println("SELECTING TREE NODE {t.label} {t.row}");
         if (selectedTreenode <> t) {
             nextSelection = t;
         }
@@ -508,10 +506,9 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
 
     var openNodes = new java.util.HashSet of (Treenode);
 
-    override function update to () {
+    override function preupdate {
 	model.update();
 	if (nextSelection <> null) {
-            println("HANDLING: {nextSelection.label}");
 	    const row = nextSelection.row;
 	    nextSelection = null;
 	    selectionRow = row;
@@ -530,7 +527,7 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
             newRows = model.getRows(0, model.rowCount);
         }
         rows = newRows;
-        super.update();
+	super.preupdate();
     }
     public var filterLimit is Integer = 100;
     public var filter is function from Treenode to Boolean;

@@ -130,16 +130,35 @@ public class TemporalHierarchy
 
     public function move from (src is TimeNode, target is TimeNode) to ()
     {
+        if (not (src is ResourceTimeNode)) {
+            return;
+        }
 	const srcParent = src.parent as TimeGroup;
-	delete src from srcParent.content;
+        if (srcParent is ResourceTimeGroup) {
+            const r = srcParent as ResourceTimeGroup;
+            delete src as ResourceTimeNode from r.resources;
+        } else {
+            delete src from srcParent.content;
+        }
 	var targetTimeGroup is TimeGroup;
 	if (not (target is TimeGroup)) {
 	    const parent = target.parent as TimeGroup;
-	    const i = f3.util.Sequences.indexOf(parent.content, target);
-	    insert src after parent.content[i];
+            if (parent is ResourceTimeGroup) {
+                const r = parent as ResourceTimeGroup;
+                const i = f3.util.Sequences.indexOf(r.resources, target);
+                insert src as ResourceTimeNode after r.resources[i];
+            } else {
+                const i = f3.util.Sequences.indexOf(parent.content, target);
+                insert src after parent.content[i];
+            }
 	} else {
 	    const parent = target as TimeGroup;
-	    insert src into parent.content;
+            if (parent is ResourceTimeGroup) {
+                const r = parent as ResourceTimeGroup;
+                insert src as ResourceTimeNode into r.resources;
+            } else {
+                insert src into parent.content;
+            }
 	}
     }
 

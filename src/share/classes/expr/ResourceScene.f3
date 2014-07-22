@@ -22,6 +22,7 @@ public class ResourceScene is Scene, Inspectable {
 
     public var currentCameras is Camera[];
 
+    public var $enableDynamics is Boolean = true;
     public var $drawCollisions is Boolean = true;
     public var $gravityX is Number;
     public var $gravityY is Number = -9.8;
@@ -31,6 +32,10 @@ public class ResourceScene is Scene, Inspectable {
         displayName: "Size";
         targets: 
         [InspectedBooleanValue {
+            displayName: "Enable Dynamics";
+            target: &$enableDynamics;
+        },
+        InspectedBooleanValue {
             displayName: "Draw Collisions";
             target: &$drawCollisions;
         },
@@ -64,6 +69,7 @@ public class ResourceScene is Scene, Inspectable {
 
     override function update to () {     
         dynamicsWorld.gravity = g;
+        dynamicsWorld.enabled = $enableDynamics;
         super.update();
         updateCams();
     }

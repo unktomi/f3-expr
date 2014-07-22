@@ -72,6 +72,7 @@ class ColorChooser is AbstractNode {
     {
         cancel.dispose();
         delete this from popupLayer.content;
+        popupLayer.modal = false;
     }
 
     function selectColor from (c is Color) to ()
@@ -731,7 +732,7 @@ public class BooleanField is SliderField {
     }
     function onChange from (n is Boolean) to () 
     {
-	println("on change {n}");
+	//println("on change {n}");
 	t = if (n) then 1.0 else 0.0;
     }
     postinit {
@@ -751,33 +752,105 @@ public class BooleanField is SliderField {
     }
 }
 
-public class DurationField is SliderField {
-    public var i is InspectedDuration;
-    var disp is Disposable;
-    function onChange from (n is Duration) to () 
+public class IntegerField is SliderField {
+
+    public var min is Integer = 0;
+    public var max is Integer = 100;
+
+    protected function onChange from (n is Integer) to () 
     {
-	println("on change {n}");
-	t = n.toMillis() / 1000.0;
+        if (n < min) {
+            min = n;
+        }
+        if (n > max) {
+            max = n;
+        }
+	t = (n-min as Number) / (max-min as Number);
+    }
+
+    override function onCommit from (text is String) to () {
+        try {
+            onChange(Integer.parseInt(text));
+        } catch (e is java.lang.Exception) {
+        }
+    }
+
+    override function onCommit to () 
+    {
+        const n = java.lang.Math.round(min + (max - min)*t);
+        onChange(n as Integer);
+        MasterUndoable.commit();
+    }
+
+    override function getText from (t is Number) to String
+    {
+	"{Math.round(min + (max - min)*t) as Integer}"
+    }
+}
+
+public class DurationField is SliderField {
+    public var fps is Duration on replace {
+        onChangeDur(i.get());
+    }
+    public var onSetKey is function from () to ();
+    public var i is InspectedDuration;
+    public var min is Number = 0.0;
+    public var max is Number = 1.0;
+    override function filterKeyInput from (k is KeyboardEvent) to Boolean
+    {
+        if (k.keyChar == "s") {
+            onSetKey();
+            return false;
+        }
+        if (k.keyCode == Keys.Backspace or k.keyChar == "." or k.keyChar == "-" or java.lang.Character.isDigit(k.keyChar.charAt(0))) {
+           return true;
+        }
+        return false;
+    }
+    var disp is Disposable;
+    function onChangeDur from (d is Duration) to () 
+    {
+        onChange(d / fps);
+    }
+    function onChange from (n is Number) to () 
+    {
+	t = (n-min) / (max-min);
     }
     postinit {
-        onChange(i.get());
-        disp = i.observable.subscribe(onChange);
+        const n is Duration = i.get();
+        onChangeDur(n);
+        disp = i.observable.subscribe(onChangeDur);
     }
+
     override var t on replace {
-	println("t={t}");
-        i.set(Duration.valueOf(t * 1000.0));
+        var n = min + (max - min)*t;
+        i.set(fps * n);
+    }
+
+    override function onCommit from (text is String) to () {
+        var num is Number = i.get() / fps;
+        try {
+            num = java.lang.Float.parseFloat(text);
+        } catch (e is java.lang.Exception) {
+        }
+        onChange(num);
+        MasterUndoable.commit();
+    }
+
+    override function onCommit to () {
+        const n = i.get() / fps;
+        if (n < min) {
+            min = n;
+        }
+        if (n > max) {
+            max = n;
+        }
+        onChange(n);
+        MasterUndoable.commit();
     }
     override function getText from (t is Number) to String
     {
-	"{%.04f t}s"
-    }
-    override function onCommit from () to () 
-    {
-        MasterUndoable.commit();
-    }
-    override function onCommit from (text is String) to () {
-        //onChange(Duration.valueOf(text));
-        MasterUndoable.commit();
+	"{%.04f (min + (max - min)*t)}"
     }
 }
 
@@ -810,6 +883,7 @@ class StringField is ResizableNode {
 }
 
 public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scrollable {
+    public var fps is Duration;
     const inspector = this;
     public var selectionForeground is Paint = bind if focused then
 	ColorPaint(Color.color(.9, .9, .9, 1)) else ColorPaint(Color.color(.77, .77, .77, 1));
@@ -1004,6 +1078,7 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
 	    TransformNode {
 		tx: bind width / 2 - fieldWidth / 2-indent;
 		content: DurationField {
+                    fps: bind fps;
                     editable: bind i.editable;
 		    i: bind i as InspectedDuration;
 	            width: bind fieldWidth;
@@ -1190,7 +1265,6 @@ function inspect0 from (obj is Object, classType is F3ClassType) to (Inspected o
     if (obj == null) then [] else {
 	    const members = Expression.introspect(classType);
 	    foreach (m in members where not m.name.contains("$") and not hidden.contains(m.name)) {
-		println("m={m} {m.m} t={m.t}");
                 var result is (Inspected of ?)[];
                 try {
                     result = 

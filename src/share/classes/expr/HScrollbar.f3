@@ -35,8 +35,8 @@ public class HScrollbar is ResizableNode {
     public function onScroll from (b is Boolean) to () {}
 
     const run is Rectangle = Rectangle is MouseInputHandler {
-        height: bind height;
-        width: bind width;
+        height: bind Math.max(height, 1);
+        width: bind Math.max(width, 1);
         fillPaint: bind bg;
 
         var dx = 0.0;
@@ -111,8 +111,8 @@ public class HScrollbar is ResizableNode {
     }
 
     var runWidth = bind width - 4;
-    var thumbWidth = bind runWidth-5;
-    var thumbHeight = bind height-4;
+    var thumbWidth = bind Math.max(runWidth-5, 1);
+    var thumbHeight = bind Math.max(height-4, 1);
 
     var w = bind sx * thumbWidth;
     var sx1 = bind sx;

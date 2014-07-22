@@ -293,6 +293,17 @@ public function run from (args is String[]) to ()
             });
     }
 
+    function selectTimeNodeLater from (n is TimeNode) to ()
+    {
+        java.awt.EventQueue.invokeLater(java.lang.Runnable {
+                override function run to ()
+                {
+                    println("SELECT NODE LATER {n}");
+                    temporalHierarchy.selectTimeNode(n);
+                }
+            });
+    }
+
 
     const temporalHierarchy = TemporalHierarchy { root: bind currentAnimResource }
     const temporalHierarchy2 = TemporalHierarchy { root: ResourceTimeGroup {
@@ -738,13 +749,16 @@ public function run from (args is String[]) to ()
     var trax is expr.timeline.Trax;
     var graphEditor is expr.timeline.GraphEditor;
 
+    var fps = bind 1s/trax.frameRate;
     const inspector0 is Inspector = Inspector {
+        fps: bind fps;
         popupLayer: bind popupLayer;
         var toInspect = bind { var t = temporalHierarchy2.selectedTimeNode; if t <> temporalHierarchy2.root then t else null };
         inspecting: bind Inspector.inspect(toInspect, Reflect.getType("f3.media.scene.TimeNode") as f3.reflect.F3ClassType);
     };
 
     const inspector1 is Inspector = Inspector {
+        fps: bind fps;
         popupLayer: bind popupLayer;
         onSetKey: function to () { graphEditor.setKeys() }
         var toInspect = bind if (currentTransform == null) then currentScene else currentTransform;
@@ -752,11 +766,13 @@ public function run from (args is String[]) to ()
     };
 
     const inspector2 is Inspector = Inspector {
+        fps: bind fps;
         popupLayer: bind popupLayer;
         inspecting: bind Inspector.inspect(temporalHierarchy.selectedTransform);
     };
 
     const inspector3 is Inspector = Inspector {
+        fps: bind fps;
         popupLayer: bind popupLayer;
         inspecting: bind [Inspector.inspect(otherHierarchy.selectedVariable)];
     }
@@ -773,14 +789,17 @@ public function run from (args is String[]) to ()
     {
         inspectorSelection = 1;
     }
+
     function inspectTemporal to () 
     {
         inspectorSelection = 2;
     }
+
     function inspectKeyable to () 
     {
         inspectorSelection = 0;
     }
+
     function inspectEventual to () 
     {
         inspectorSelection = 3;
@@ -804,7 +823,7 @@ public function run from (args is String[]) to ()
     function getUnderMouseInEditor to Pick[] 
     {
 	var result is Pick[];
-	foreach (x in editorScene.underMouse) {
+	for (x in editorScene.underMouse) {
 	    insert x into result;
 	    if (x.node is StageNode) {
 		for (y in (x.node as StageNode).content) {
@@ -822,13 +841,13 @@ public function run from (args is String[]) to ()
         dynamicsWorld: { var w = bulletDynamicsWorldFactory.createDynamicsWorld(); w.paused = true; w }
         paused: bind player.paused;
     }
-
+    /*
     const renderComplete = 
         mainScene.observeRenderComplete().subscribe(function from (scene is Scene) to () 
                                                     {
                                                         mainScene.dynamicsWorld.debugDraw(scene.camera) 
                                                     });
-
+    */
     var windowContainingAssets is InternalWindow;
     var assetTreeview is Treeview;
     var assetSearch is AssetSearch = bind AssetSearch {
@@ -2176,10 +2195,28 @@ public function run from (args is String[]) to ()
                                              
                                              override function onMouseUp from (e is MouseEvent) to () 
                                              {
-                                                 for (j in getUnderMouseInEditor()) {
-                                                     if (j.node is Expression.Canvas) {
-                                                         (j.node as Expression.Canvas).onDrop(j, clip);
-                                                         break;
+                                                 if (clip <> null) {
+                                                     for (j in getUnderMouseInEditor()) {
+                                                         if (j.node is Expression.Canvas) {
+                                                             (j.node as Expression.Canvas).onDrop(j, clip);
+                                                             break;
+                                                         }
+                                                     }
+                                                     for (j in getUnderMouseInEditor()) {
+                                                         if (j.node == this) {
+                                                             const pt = j.node.toSceneTransform.inverse() * j.scenePoint;
+                                                             const tn = pick(pt.y) as TemporalHierarchy.Treenode;
+                                                             println("PICKED => {tn} for {e.location.y}");
+                                                             if (tn <> null) {
+                                                                 const n = tn.n;
+                                                                 println("PICKED => {n}");
+                                                                 if (clip <> n) {
+                                                                     temporalHierarchy.move(clip, n);
+                                                                     selectTimeNodeLater(clip);
+                                                                 }
+                                                             }
+                                                             break;
+                                                         }
                                                      }
                                                  }
                                                  delete dragger from popupLayer.content;
