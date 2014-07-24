@@ -771,15 +771,15 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
             if (targetNode is TimeGroup) {
                 tv.getParentTimeNodeView().open();
                 insert clip into (targetNode as TimeGroup).content;
+                return;
             } else if (targetNode <> null) {
                 tv.open();
-                const g = targetNode as TimeGroup;
+                const g = targetNode.parent as TimeGroup;
                 insert clip after g.content[Sequences.indexOf(g.content, targetNode)];
+                return;
             }
-        } else {
-            add(clip);
         }
-        //        add(clip);
+        add(clip);
     }
 
     var timelineListener is Disposable;

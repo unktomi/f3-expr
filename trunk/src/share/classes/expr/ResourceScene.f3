@@ -18,7 +18,7 @@ public class ResourceScene is Scene, Inspectable {
 
     public const instanceSpace is Group = Group {id: "Instance Space"};
 
-    public var currentModels = bind foreach (m in currentResource.resources) if (m is MaResourceNode) then m as MaResourceNode else null;
+    public var currentModels is MaResourceNode[] = bind foreach (m in currentResource.resources) if (m is MaResourceNode) then m as MaResourceNode else null;
 
     public var currentCameras is Camera[];
 
@@ -91,6 +91,7 @@ public class ResourceScene is Scene, Inspectable {
     override var content = bind [currentResource, instanceSpace];
 
     public var selectedResource is ResourceNode;
+    public var selectedMesh is MeshNode;
 
     override function injectMouseDown from (event is MouseEvent) to ()
     {
@@ -101,6 +102,7 @@ public class ResourceScene is Scene, Inspectable {
                 while (p <> null) {
                     if (p is ResourceNode) {
                         println("SELECTING: {p}");
+                        meshSelection.onNext(selectedMesh = i.node as MeshNode);
                         selection.onNext(p as ResourceNode);
                         return;
                     }
@@ -120,9 +122,16 @@ public class ResourceScene is Scene, Inspectable {
     
     const selection = Subject of ResourceNode {};
 
+    const meshSelection = Subject of MeshNode {};
+
     public function observeSelection to Observable of ResourceNode 
     {
         selection
+    }
+
+    public function observeMeshSelection to Observable of MeshNode
+    {
+        meshSelection
     }
 
     public var cameraSelection is CameraSelection = CameraSelection {

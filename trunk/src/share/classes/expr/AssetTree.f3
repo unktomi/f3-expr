@@ -35,17 +35,39 @@ public class MaAsset is Asset {
     override var url = bind model.url;
     public var temporalRoot is TimeNode;
     override var containedAssets = bind 
-	[foreach (cam in model.getCameras()) if (cam.id == "perspShape" or cam.id == "topShape" or cam.id == "sideShape" or cam.id == "frontShape") then null else CameraAsset { 
+	[AssetGroup {
+             name: "Cameras"
+             content: bind 
+foreach (cam in model.getCameras()) if (cam.id == "perspShape" or cam.id == "topShape" or cam.id == "sideShape" or cam.id == "frontShape") then null else CameraAsset { 
 		url: "{url}#{cam.id}";
 		name: cam.id; 
 		camera: cam;
-	 },
-	 foreach (clipLib in model.getClipLibraries()) ClipLibraryAsset { 
-	     url: "{url}#{clipLib.id}";
-	     name: clipLib.id;
-	     clipLibrary: clipLib;
-             temporalRoot: bind temporalRoot;
-	 }];
+             }
+         },
+         AssetGroup {
+             name: "Clip Libraries"
+             content: bind 
+             foreach (clipLib in model.getClipLibraries()) ClipLibraryAsset { 
+                 url: "{url}#{clipLib.id}";
+                 name: clipLib.id;
+                 clipLibrary: clipLib;
+                 temporalRoot: bind temporalRoot;
+             }
+         },
+         AssetGroup {
+             name: "Shaders"
+             content: bind 
+                foreach (shader in model.getShaders()) {
+                 ShaderAsset {
+                     shader: shader;
+                 }
+             }
+         }];
+}
+
+public class ShaderAsset is Asset {
+    public var shader is Shader;
+    override var name = bind shader.id;
 }
 
 public class SceneAsset is Asset {
@@ -539,6 +561,18 @@ public class AssetModel is Treemodel {
         Treemodel {
             root: AssetTreenode {
                 override var label = "Types";
+                override function filter from (assets is Asset[]) to Asset[] { 
+                    foreach (x in assets where x is TypeAsset or x is PackageAsset) x;
+                }
+                asset: packageAssets;
+            }
+        }
+    }
+
+    public function getShaderModel to Treemodel {
+        Treemodel {
+            root: AssetTreenode {
+                override var label = "Shaders";
                 override function filter from (assets is Asset[]) to Asset[] { 
                     foreach (x in assets where x is TypeAsset or x is PackageAsset) x;
                 }

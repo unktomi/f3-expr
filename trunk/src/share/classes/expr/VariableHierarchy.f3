@@ -27,7 +27,10 @@ public class Treenode is Treeview.Treenode {
 
 public class Model is Treeview.Treemodel {
     public const h is VariableHierarchy;
-    override var root = Treenode { n:  bind h.root };
+    override var root = bind createRoot(h.root);
+    function createRoot from (rootContext is Context) to Treenode {
+        Treenode { n: rootContext };
+    }
     public var selection is Treenode on replace {
 	if (h.selectedNode <> selection.n) {
 	    selectionObserver.onNext(selection);

@@ -1474,7 +1474,7 @@ public class IPath {
                 //println("src={src}");
                 if (src is VarContextExpression) {
                     const v = (src as VarContextExpression).varContext;
-                    return if (v.isShortcut) then "<<{src.getName()}>>" else "(getVar(\"{v.variableName}\") as {v.varType.t.getName()})";
+                    return if (v.isShortcut) then "<<{src.getName()}>>" else "(getVar(\"{v.variableName}\") as f3.lang.Ref of {v.varType.t.getName()}).get()";
                 } else if (src is NodeExpression) {
                     return "(getNode(\"{(src as NodeExpression).node.id}\") as expr.NodeAPI)";
                 } else if (src is TimeNodeExpression) {
@@ -1600,8 +1600,8 @@ public class IPath {
             if (i.member.m is F3VarMember and i.member.isObserver) {
                 return "\{ {i.target.toSource(null)}.{i.member.toApply()} = {parents[0].getWorldAccess()}; \}";
             } else if (i.target is VarContextExpression) {
-                // return "{i.target.toSource(null)}.set({parents[0].getWorldAccess()})";
-                return parents[0].getWorldAccess();
+                return "{i.target.toSource(null)}.set({parents[0].getWorldAccess()})";
+                //return parents[0].getWorldAccess();
             } else { 
                 if (i.member.isObserver and is1ArgFunction(i.member)) {
                     return "{i.target.toSource(null)}.{i.member.toApply("{parents[0].getWorldAccess()}")}";
@@ -5051,7 +5051,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 pos: toLocal * where.scenePoint;
                 objectExpr: VarContextExpression { 
                     varContext: v, override function getType to F3Type { typ }
-                    inputMembers: [];//foreach (x in members where x.isObserver) x;
+                    inputMembers: foreach (x in members where x.isObserver) x;
                     outputMembers: foreach (x in members where x.isObservable) x;
                 }
                 canvas: this;
@@ -6931,8 +6931,16 @@ public class VarContextObjNode is ObjNode {
             isLinkable: true;
             objectExpr: VarContextExpression { 
                 varContext: c, override function getType to F3Type { typ }
-                inputMembers: [];
+                inputMembers: foreach (x in members where x.isObserver) x;
                 outputMembers: foreach (x in members where x.isObservable) x;
+            }
+        }
+        for (i in inputs) {
+            if (i.links.size() > 0) {
+                for (link in i.links) {
+                    const lnk = canvas.getLink(link);
+                    lnk.target = result.inputViews[indexof i];
+                }
             }
         }
         for (p in outputs) {

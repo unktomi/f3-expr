@@ -121,6 +121,9 @@ public class Context is Foldable of Context {
                  });
         return result;
     }
+    override function toString to String {
+        "{getClass()} {fullName()}";
+    }
 }
 
 public abstract class GroupContext is Context {
@@ -195,6 +198,7 @@ public class ResourceNodeContext is GroupContext, ResourceObjectContext {
         super.deleteContent(c);
         
     }
+
     public override function createProgram from (member is Member) to MemberContext
     {
         var result = MemberContext { member: member, parent: this };
@@ -202,10 +206,12 @@ public class ResourceNodeContext is GroupContext, ResourceObjectContext {
         println("created member => {programs} => {getContent()}");
         return result;
     }
+
     public override function getMembers to Member[] 
     {
         return memberCtxs;
     }
+
     public var resource is ResourceNode;
     override var name = bind "{resource.displayName} [Scene]";
     protected var typeName = "expr.ResourceNode";
@@ -506,7 +512,10 @@ public class ContextTreemodel is Treemodel {
     public var selectedMember is Member = bind selectedMemberContext.member;
     public var selectedMemberContext is MemberContext;
     public readonly var selectedVarContext is ClosureVarContext;
-    override var root = bind ContextTreenode { context: rootContext };
+    override var root = bind createRoot(rootContext);
+    function createRoot from (rootContext is Context) to ContextTreenode {
+        ContextTreenode { context: rootContext };
+    }
     const disp = selectionObserver.subscribe(function from (tn is Treenode) to () {
             this.tn = tn;
         });

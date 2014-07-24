@@ -12,6 +12,9 @@ public class GraphEditor is Trax {
     public var eventTarget is Context.MemberContext;
     public var variableTargets is Context.ClosureVarContext[];
     override var clips = bind [getChannelBoxes(resourceTargets), getVarChannelBoxes(variableTargets)];
+    override function onDrop from (where is Pick, clip is TimeNode, add is function from TimeNode to ()) to ()
+    {
+    }
 
     bound function getChannelBoxes from (targets is ResourceTarget[]) to TimeNode[]
     {
