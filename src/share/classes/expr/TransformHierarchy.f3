@@ -153,6 +153,8 @@ public class Model is Treeview.Treemodel {
                          })
         });
 
+
+
     function onSelectionChange from (tn is Treeview.Treenode) to ()
     {
         println("SELECTION CHANGE scenes={h.scenes} sel={h.selectedScene}");
@@ -175,6 +177,15 @@ public class Model is Treeview.Treemodel {
 
 public class TransformHierarchy 
 {
+
+    public var effectLoader is CGEffectLoader = the CGEffectLoader;
+    public var outlineShader is Shader = bind effectLoader.loadDefaultShader(null,
+                                                                             Color.ORANGE,
+                                                                             Color.BLACK,
+                                                                             Color.BLACK,
+                                                                             Color.YELLOW,
+                                                                             100);
+    
 
     public function selectScene from (scene is ResourceScene) to ()
     {

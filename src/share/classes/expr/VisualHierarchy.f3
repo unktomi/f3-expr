@@ -1,0 +1,82 @@
+package expr;
+import f3.media.scene.*;
+import Treeview.*;
+import f3.util.*;
+
+public class Visualnode is Treenode {}
+
+public class MaNode is Visualnode {
+    public readonly var model is Ma.Model;
+    override var label = bind Names.formatName(model.url);
+    bound var shaders = model.getShaders();
+    override var canOpen = bind shaders.size() > 0;
+    override var children = bind
+        foreach (x in shaders) ShaderNode { parent: this, shader: bind x };
+}
+
+public class ShaderNode is Visualnode {
+    var shader is Shader;
+    override var label = bind shader.id;
+}
+
+public class VisualHierarchy is Treemodel {
+    public var scenes is ResourceScene[];
+    public var transformHierarchy is TransformHierarchy;
+    var models is Ma.Model[];
+    override function update to Integer {
+        var models is Ma.Model[];
+        for (scene in scenes, y in scene.currentModels) {
+            insert y.model into models;
+        }
+        this.models = models;
+        super.update();
+    }
+    public readonly var selectedShader is Shader;
+    override var root = Treenode {
+        override var label = "Visuals";
+        override var canOpen = bind models.size() > 0;
+        override var children = bind foreach (m in models) MaNode {
+            model: bind m;
+        }
+    };
+
+    public function selectShader from (sh is Shader) to ()
+    {
+        foldLeft((), 
+                 function from (_ is (), t is Treeview.Treenode) to () {
+                     const ht = t as Treenode;
+                     if (t is ShaderNode) {
+                         const st = (t as ShaderNode);
+                         if (st.shader == sh) {
+                             selectionObserver.onNext(st);
+                         }
+                     }
+                 });
+    }
+
+    const selectionListener = selectionObserver.subscribe(function from (tn is Treenode) to () {
+            var sh is Shader;
+            if (tn is ShaderNode) {
+                sh = (tn as ShaderNode).shader;
+            }
+            selectedShader = sh;
+        });
+    var currentMesh is MeshNode on replace old {
+        old.outlineShader = null;
+        if (currentMesh <> null) {
+            println("outline shader={transformHierarchy.outlineShader}");
+            currentMesh.outlineShader = transformHierarchy.outlineShader;
+        }
+    }
+    var meshListener is Disposable;
+    var currentScene = bind transformHierarchy.selectedScene on replace {
+        meshListener.dispose();
+        meshListener = currentScene.observeMeshSelection().subscribe(function from (x is MeshNode) to () {
+                currentMesh = x;
+                selectShader(x.shader);
+            });
+    }
+ 
+
+
+}

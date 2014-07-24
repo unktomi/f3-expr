@@ -21,6 +21,7 @@ import java.lang.Math;
 import expr.undo.*;
 import expr.AbstractResourceText.*;
 import expr.InspectedElement.*;
+import f3.jogl.awt.CGFXShader.*;
 
 
 public const CAMERA_TYPE = Reflect.getType("f3.media.scene.Camera");
@@ -624,7 +625,7 @@ public class NumberField is SliderField {
 	t = (n-min) / (max-min);
     }
     postinit {
-        const n is Number = i.get();
+        const n is Number = if i.get() == null then 0 else i.get();
         onChange(n);
         disp = i.observable.subscribe(onChange);
     }
@@ -1121,6 +1122,95 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
 	    });
 }
 
+public function inspect from (v is Shader) to (Inspected of ?)[] {
+    var result is (Inspected of ?)[];
+    for (x in v.getParameters()) {
+        if (x is BoolParameter) {
+            const y = x as BoolParameter;
+            insert InspectedBoolean {
+                editable: false;
+                observable: Observables.observe(y);
+                label: y.name;
+                override function get to Boolean { y.get() }
+                override function set from (n is Boolean) to () { y.set(n) }
+            } into result;
+        } else if (x is FloatParameter) {
+            const y = x as FloatParameter;
+            insert 
+            InspectedNumber {
+                editable: false;
+                observable: Observables.observe(y);
+                label: y.name;
+                override function get to Number { y.get() }
+                override function set from (n is Number) to () { y.set(n) }
+            }
+            into result;
+        } else if (x is Float2Parameter) {
+
+        } else if (x is Float3Parameter) {
+            const y = x as Float3Parameter;
+            const ob is Observable of Tuple3 = Observables.observe(y);
+            insert 
+            [InspectedNumber {
+                editable: false;
+                observable: foreach (t in ob) t.x;
+                label: "{y.name} X";
+                override function get to Number { y.get().x }
+                override function set from (n is Number) to () {  }
+            },
+            InspectedNumber {
+                editable: false;
+                observable: foreach (t in ob) t.y;
+                label: "{y.name} Y";
+                override function get to Number { y.get().y }
+                override function set from (n is Number) to () {  }
+            },
+            InspectedNumber {
+                editable: false;
+                observable: foreach (t in ob) t.z;
+                label: "{y.name} Z";
+                override function get to Number { y.get().z }
+                override function set from (n is Number) to () {  }
+            }] into result;
+        } else if (x is Float4Parameter) {
+            const y = x as Float4Parameter;
+            const ob is Observable of Tuple4 = Observables.observe(y);
+            insert 
+            [InspectedNumber {
+                editable: false;
+                observable: foreach (t in ob) t.x;
+                label: "{y.name} X";
+                override function get to Number { y.get().x }
+                override function set from (n is Number) to () {  }
+            },
+            InspectedNumber {
+                editable: false;
+                observable: foreach (t in ob) t.y;
+                label: "{y.name} Y";
+                override function get to Number { y.get().y }
+                override function set from (n is Number) to () {  }
+            },
+            InspectedNumber {
+                editable: false;
+                observable: foreach (t in ob) t.z;
+                label: "{y.name} Z";
+                override function get to Number { y.get().z }
+                override function set from (n is Number) to () {  }
+            },
+            InspectedNumber {
+                editable: false;
+                observable: foreach (t in ob) t.w;
+                label: "{y.name} W";
+                override function get to Number { y.get().w }
+                override function set from (n is Number) to () {  }
+            }] into result;
+        } else if (x is SamplerParameter) {
+        } else {
+        }
+    }
+    result;
+}
+
 public function inspect from (v is Context.ClosureVarContext) to (Inspected of ?)[] {
     if (v == null) return [];
     var ptr1 = &v.variableName;
@@ -1150,7 +1240,9 @@ public function inspect from (v is Context.ClosureVarContext) to (Inspected of ?
 }
 
 public function inspect from (obj is Object) to (Inspected of ?)[] {
-    if (obj == null) then [] else foreach (x in inspect0(obj, Reflect.getType(obj.getClass()) as F3ClassType) where x <> null) x;
+    const result = if (obj == null) then [] else foreach (x in inspect0(obj, Reflect.getType(obj.getClass()) as F3ClassType) where x <> null) x;
+    if (obj is Shader) return [result, inspect(obj as Shader)];
+    return result;
 }
 
 public function inspect from (obj is Object, t is F3ClassType) to (Inspected of ?)[] {

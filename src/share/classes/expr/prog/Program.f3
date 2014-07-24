@@ -29,10 +29,17 @@ class Value {
 }
 
 public class EvalContext {
-    public const eventContext is Context.MemberContext;
+    public var eventContext is Context.MemberContext;
     public var varContext is Context.ClosureVarContext;
     public var interactive is function from () to Boolean;
     public const targetNode is Object;
+    public function getParentContext to EvalContext {
+        var c is Context = if (varContext <> null) varContext else eventContext;
+        c = c.parent;
+        while (c <> null and not (c is ProgramContext)) { c = c.parent }
+        println("get parent context: {eventContext.member} / {varContext.variableName} => {c}");
+        return (c as ProgramContext).program.evalContext;
+    }
     public var debugger is ObservableDebugger = DebuggerEngine {
         override public function step of a from (location is Object, x is a, k is Observer of a) to ()
         {
@@ -44,7 +51,7 @@ public class EvalContext {
     public var instanceSpace is Group;
     public var targetTimeline is Timeline;
     public function lookupVar from (name is String) to Object {
-        (varMap.get(name) as Ref of Object).get()
+        getVarRef(name);
     }
     public var lookupSpatial is function from String to Node;
     public var lookupTemporal is function from String to TimeNode;
@@ -57,7 +64,11 @@ public class EvalContext {
 
     public function getVarRef from (name is String) to Ref of ?
     {
-        varMap.get(name)
+        var ref is Ref of ? = varMap.get(name);
+        if (ref == null) {
+            ref = getParentContext().getVarRef(name);
+        }
+        return ref;
     }
 
     function createVars from (prog is Program) to ()

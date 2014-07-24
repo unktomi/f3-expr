@@ -278,8 +278,15 @@ public function run from (args is String[]) to ()
 
     const currentAnimResource is ResourceTimeGroup = ResourceTimeGroup {}
 
+
     const transformHierarchy is TransformHierarchy = TransformHierarchy {
+        effectLoader: the CGEffectLoader;
 	scenes: bind currentScenes inverse;
+    }
+
+    const visualHierarchy is VisualHierarchy = VisualHierarchy {
+        transformHierarchy: transformHierarchy;
+        scenes: bind currentScenes;
     }
 
     function selectNodeLater from (n is Node) to ()
@@ -777,7 +784,13 @@ public function run from (args is String[]) to ()
         inspecting: bind [Inspector.inspect(otherHierarchy.selectedVariable)];
     }
     
-    const inspectors = foreach (i in [inspector0, inspector1, inspector2, inspector3]) {
+    const inspector4 is Inspector = Inspector {
+        fps: bind fps;
+        popupLayer: bind popupLayer;
+        inspecting: bind [Inspector.inspect(visualHierarchy.selectedShader)];
+    }
+    
+    const inspectors = foreach (i in [inspector0, inspector1, inspector2, inspector3, inspector4]) {
         Scrollpane { canZoomVertical: false, content: i }
     }
 
@@ -793,6 +806,11 @@ public function run from (args is String[]) to ()
     function inspectTemporal to () 
     {
         inspectorSelection = 2;
+    }
+
+    function inspectVisual to () 
+    {
+        inspectorSelection = 4;
     }
 
     function inspectKeyable to () 
@@ -1038,8 +1056,10 @@ public function run from (args is String[]) to ()
                                                      }
                                                  });
                                          }
+                                         println("rc1={rc1}");
                                          const mc is Context.MemberContext = rc1.createProgram(p.event);
                                          mc.program = p;
+                                         p.evalContext.eventContext = mc;
                                          r = mc;
                                      }
                                  }
@@ -1192,7 +1212,7 @@ public function run from (args is String[]) to ()
             }
             rn.displayName = i.displayName;
             rn.programs = foreach (prog in i.programs) {
-                const mem = prog.event.deserialize();;
+                const mem = prog.event.deserialize();
                 const p = Program {
                     event: mem;
                     code: prog.code;
@@ -1209,15 +1229,17 @@ public function run from (args is String[]) to ()
                 }
                 var ps = [p];
                 var targetContext = resolveContext(rn, p);
+                var targetNodeContext = mainContext.resolveNodeContext(rn);
                 println("RESOLVED CONTEXT {rn} => {targetContext}");
                 for (d in prog.variables) {
                     const v = Context.ClosureVarContext {
-                        parent: targetContext;
+                        parent: targetNodeContext;
                         variableName: d.varName;
                         varType: findTypeAsset(d.varType);
                         isShortcut: d.isShortcut;
                     }
-                    insert v into targetContext.content;
+                    const container = mainContext.resolve(d.contextPath) as Context.GroupContext;
+                    insert v into container.content;
                     println("CREATED VAR: {v}");
                     const vp = Program {
                         parent: p;
@@ -1428,7 +1450,8 @@ public function run from (args is String[]) to ()
                             varType: findTypeAsset(d.varType);
                             isShortcut: d.isShortcut;
                         }
-                        insert v into targetContext.content;
+                        const container = mainContext.resolve(d.contextPath) as Context.GroupContext;
+                        insert v into container.content;
                         println("CREATED VAR: {v}");
                         const vp = Program {
                             parent: p;
@@ -2156,6 +2179,18 @@ public function run from (args is String[]) to ()
 				     }
 				 },
 				 Tabview.Tab {
+				     title: "Visual";
+                                     onSelect: inspectVisual;
+				     content:
+                                     Scrollpane {
+                                         canZoomVertical: false;
+                                         content:
+                                         Treeview {
+                                             model: bind visualHierarchy;
+                                         }
+                                     }
+                                 },
+				 Tabview.Tab {
 				     title: "Temporal";
                                      onSelect: inspectTemporal;
 				     content:
@@ -2451,6 +2486,8 @@ Tabview.Tab {
      }
      
      var stage is JoglStage = JoglStage {
+        depthBits: 24;
+        stencilBits: 8;
 
         defaultCursor: bind toolCursor;
         /*

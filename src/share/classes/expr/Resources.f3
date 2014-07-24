@@ -169,12 +169,14 @@ class ResourceBuilder {
                         isShortcut: x.getKey().isShortcut;
                         sourceCode: x.getValue().sourceCode;
                         code: x.getValue().code;
+                        contextPath: x.getKey().parent.fullName();        
                     }
                 }
                 event: p.event.serialize();
                 code: p.code;
                 compiled: p.sourceCode;
                 targetPath: p.targetPath;   
+                contextPath: p.evalContext.eventContext.fullName(); 
         };
         const anims = foreach (q in n.channelBoxes.content) makeResource(q);
         const colliderResource = ColliderResource {
@@ -365,12 +367,14 @@ class ResourceBuilder {
                         isShortcut: x.getKey().isShortcut;
                         sourceCode: x.getValue().sourceCode;
                         code: x.getValue().code;
+                        contextPath: x.getKey().parent.fullName();
                     }
                 }
                 event: p.event.serialize();
                 code: p.code;
                 compiled: p.sourceCode;
                 targetPath: p.targetPath;
+                contextPath: p.evalContext.eventContext.fullName(); 
             }
         }
     }
@@ -397,6 +401,7 @@ public class ProgramResource is Resource {
     public var code is ExprScene;
     public var compiled is String;
     public var targetPath is String;
+    public var contextPath is String;
 }
 
 public class VarDecl {
@@ -405,6 +410,7 @@ public class VarDecl {
     public var sourceCode is String;
     public var code is ExprScene;
     public var isShortcut is Boolean = true;
+    public var contextPath is String;
 }
 
 class ExportingBuilder is ResourceBuilder {
@@ -519,11 +525,13 @@ public function save
                             isShortcut: x.getKey().isShortcut;
                             sourceCode: x.getValue().sourceCode;
                             code: x.getValue().code;
+                            contextPath: x.getKey().parent.fullName();
                         }
                     }
                     code: p.code;
                     compiled: p.sourceCode;
                     targetPath: p.targetPath;
+                    contextPath: p.evalContext.eventContext.fullName(); 
                 }
             }
 	    spatialResources:
