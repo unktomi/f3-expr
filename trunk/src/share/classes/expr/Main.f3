@@ -209,6 +209,7 @@ public class MainContext is Context.MemberContext, Context.ResourceObjectContext
         override function toApply to String { "expr.ExprNode.Start" }
         m: Reflect.getVar(Reflect.findClass("expr.ExprNode"), "Start");
     }
+    override var label = "Start [Event]";
     override function createChannels from (parent is ChannelBoxGroup) to (Channel of Number)[]
     {
         []
@@ -249,14 +250,12 @@ public function run from (args is String[]) to ()
         //if (true) return;
         var c = ctx;
         while (c <> null) {
-            //println("c={c.name} parent={c.parent.name} v={v}");
+            println("c={c.name} parent={c.parent.name} v={v}");
             for (c1 in [c, c.getContent()]) {
+                println("c1={c1.name} parent={c1.parent.name} v={v}");
+                c1.selected = v;
                 if (c1 is Context.ResourceNodeContext) {
-                    const rc = c1 as Context.ResourceNodeContext;
-                    rc.resource.visible = v;
-                    if (rc <> ctx and rc.resource is GroupResourceNode) {
-                        handleContextVisibility(rc, v);
-                    }
+                    (c1 as Context.ResourceNodeContext).resource.visible = v;
                 }
             }
             c = c.parent;
@@ -445,7 +444,7 @@ public function run from (args is String[]) to ()
     function addResource from (rn is ResourceNode, pt is Point3) to ()
     {
         println("ADDING {rn} to {currentResource} th.scenes={transformHierarchy.scenes}, th.selectedScene={transformHierarchy.selectedScene}");
-        var groupContext is Context.GroupContext = contextModel.selectedGroupContext;
+        var groupContext is Context.GroupContext = contextModel.selectedMemberContext;
         if (transformHierarchy.selectedNode is GroupResourceNode) {
             insert rn into (transformHierarchy.selectedNode as GroupResourceNode).content;
             groupContext = mainContext.resolveNodeContext(transformHierarchy.selectedNode as ResourceNode);
@@ -470,6 +469,7 @@ public function run from (args is String[]) to ()
             }
         }
         insert ctx into groupContext.content;
+        rn.ctx = ctx;
         if (rn.displayName == "") {
             rn.displayName = if (rn.$useLiteralId) then rn.id else Names.formatName(rn.id);
         }
@@ -501,6 +501,7 @@ public function run from (args is String[]) to ()
             parent: contextModel.selectedGroupContext; 
             resource: rn;
         } 
+        rn.ctx = ctx;
         insert ctx into contextModel.selectedGroupContext.content;
     }
 
@@ -2179,7 +2180,7 @@ public function run from (args is String[]) to ()
 				     }
 				 },
 				 Tabview.Tab {
-				     title: "Visual";
+				     title: "Material";
                                      onSelect: inspectVisual;
 				     content:
                                      Scrollpane {

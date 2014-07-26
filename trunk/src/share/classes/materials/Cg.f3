@@ -1,0 +1,250 @@
+package materials;
+
+public function float2 from (x is Number, y is Number) to Float2 { null }
+public function float3 from (x is Number, y is Number, z is Number) to Float3 { null }
+public function float3 from (xy is Float2, z is Number) to Float3 { null }
+public function float3 from (x is Number, yz is Float2) to Float3 { null }
+public function float4 from (x is Number, y is Number, z is Number, w is Number) to Float4 { null }
+public function float4 from (x is Number, yzw is Float3) to Float4 { null }
+public function float4 from (x is Number, y is Number, zw is Float2) to Float4 { null }
+public function float4 from (xy is Float2, zw is Float2) to Float4 { null }
+public function float4 from (xy is Float2, z is Number, w is Number) to Float4 { null }
+
+public interface Float2x2 {
+    public var xx is Number;
+    public var xy is Number;
+    public var yx is Number;
+    public var yy is Number;
+    public function mul from (vector is Float2) to Float2;
+    public function * from (matrix is Float2x2) to Float2x2;
+    public function transpose to Float2x2;
+}
+
+public interface Float2 {
+    public const x is Number;
+    public const y is Number;
+
+    public function abs from () to Float2;
+    public function acos from () to Float2;
+    public function all from () to Float2;
+    public function any from () to Float2;
+    public function asin from () to Float2;
+    public function atan from () to Float2;
+    public function atan2 from () to Float2;
+    public function ceil from () to Float2;
+    public function clamp from (y is Float2, z is Float2) to Float2;
+    public function cos from () to Float2;
+    public function cosh from () to Float2;
+    public function cross from (v is Float2) to Float2;
+    public function degrees from () to Float2;
+    public function dot from (v is Float2) to Number;
+    public function exp from () to Float2;
+    public function exp2 from () to Float2;
+    public function floor from () to Float2;
+    public function fmod from (y is Float2) to Float2;
+    public function frac from () to Float2;
+    public function frexp from () to Float2;
+    public function isfinite from () to Boolean;
+    public function isinf from () to Boolean;
+    public function isnan from () to Boolean;
+    public function ldexp from (n is Float2) to Float2;
+    public function lerp from (b is Float2, f is Number) to Float2;
+    public function lerp from (b is Float2, f is Float2) to Float2;
+    public function log from () to Float2;
+    public function log2 from () to Float2;
+    public function log10 from () to Float2;
+    public function max from (b is Float2) to Float2;
+    public function min from (b is Float2) to Float2;
+    public function modf from () to (Float2, Float2);
+    public function noise from () to Float2;
+    public function pow from (y is Float2) to Float2;
+    public function radians to Float2;
+    public function round to Float2;
+    public function rsqrt to Float2;
+    public function saturate to Float2;
+    public function sign to Float2;
+    public function sin to Float2;
+    public function sincos to (Float2, Float2);
+    public function sinh to Float2;
+    public function smoothstep from (max is Float2 , x is Float2) to Float2;
+    public function sqrt to Float2;
+    public function tan to Float2;
+    public function tanh to Float2;
+    public function distance from (pt2 is Float2) to Float2;
+    public function faceforward from (i is Float2, ng is Float2) to Float2;
+    public function length to Number;
+    public function normalize to Float2;
+    public function reflect from (n is Float2) to Float2;
+    public function refract from (n is Float2, eta is Float2) to Float2;
+    public function ddx to Number;
+    public function ddy to Number;
+}
+
+public interface Float3x3 {
+    public const xx is Number; public const xy is Number; public const xz is Number;
+    public const yx is Number; public const yy is Number; public const yz is Number;
+    public const zx is Number; public const zy is Number; public const zz is Number;
+
+    public function mul from (vector is Float3) to Float3;
+    public function * from (matrix is Float3x3) to Float3x3;
+    public function transpose to Float3x3;
+}
+
+public interface Float3 {
+    public const x is Number;
+    public const y is Number;
+    public const z is Number;
+
+    public function abs from () to Float3;
+    public function acos from () to Float3;
+    public function all from () to Float3;
+    public function any from () to Float3;
+    public function asin from () to Float3;
+    public function atan from () to Float3;
+    public function atan2 from () to Float3;
+    public function ceil from () to Float3;
+    public function clamp from (y is Float3, z is Float3) to Float3;
+    public function cos from () to Float3;
+    public function cosh from () to Float3;
+    public function cross from (v is Float3) to Float3;
+    public function degrees from () to Float3;
+    public function dot from (v is Float3) to Number;
+    public function exp from () to Float3;
+    public function exp2 from () to Float3;
+    public function floor from () to Float3;
+    public function fmod from (y is Float3) to Float3;
+    public function frac from () to Float3;
+    public function frexp from () to Float3;
+    public function isfinite from () to Boolean;
+    public function isinf from () to Boolean;
+    public function isnan from () to Boolean;
+    public function ldexp from (n is Float3) to Float3;
+    public function lerp from (b is Float3, f is Number) to Float3;
+    public function lerp from (b is Float3, f is Float3) to Float3;
+    public function log from () to Float3;
+    public function log2 from () to Float3;
+    public function log10 from () to Float3;
+    public function max from (b is Float3) to Float3;
+    public function min from (b is Float3) to Float3;
+    public function modf from () to (Float3, Float3);
+    public function noise from () to Float3;
+    public function pow from (y is Float3) to Float3;
+    public function radians to Float3;
+    public function round to Float3;
+    public function rsqrt to Float3;
+    public function saturate to Float3;
+    public function sign to Float3;
+    public function sin to Float3;
+    public function sincos to (Float3, Float3);
+    public function sinh to Float3;
+    public function smoothstep from (max is Float3 , x is Float3) to Float3;
+    public function sqrt to Float3;
+    public function tan to Float3;
+    public function tanh to Float3;
+    public function distance from (pt2 is Float3) to Float3;
+    public function faceforward from (i is Float3, ng is Float3) to Float3;
+    public function length to Number;
+    public function normalize to Float3;
+    public function reflect from (n is Float3) to Float3;
+    public function refract from (n is Float3, eta is Float3) to Float3;
+    public function ddx to Number;
+    public function ddy to Number;
+}
+
+
+public interface Float4x4 {
+    public const xx is Number; public const xy is Number; public const xz is Number; public const xw is Number; 
+    public const yx is Number; public const yy is Number; public const yz is Number; public const yw is Number; 
+    public const zx is Number; public const zy is Number; public const zz is Number; public const zw is Number; 
+    public const wx is Number; public const wy is Number; public const wz is Number; public const ww is Number; 
+
+    public function mul from (vector is Float4) to Float4;
+    public function * from (matrix is Float4x4) to Float4x4;
+    public function transpose to Float4x4;
+}
+
+public interface Float4 {
+    public const x is Number;
+    public const y is Number;
+    public const z is Number;
+
+    public function abs from () to Float4;
+    public function acos from () to Float4;
+    public function all from () to Float4;
+    public function any from () to Float4;
+    public function asin from () to Float4;
+    public function atan from () to Float4;
+    public function atan2 from () to Float4;
+    public function ceil from () to Float4;
+    public function clamp from (y is Float4, z is Float4) to Float4;
+    public function cos from () to Float4;
+    public function cosh from () to Float4;
+    public function cross from (v is Float4) to Float4;
+    public function degrees from () to Float4;
+    public function dot from (v is Float4) to Number;
+    public function exp from () to Float4;
+    public function exp2 from () to Float4;
+    public function floor from () to Float4;
+    public function fmod from (y is Float4) to Float4;
+    public function frac from () to Float4;
+    public function frexp from () to Float4;
+    public function isfinite from () to Boolean;
+    public function isinf from () to Boolean;
+    public function isnan from () to Boolean;
+    public function ldexp from (n is Float4) to Float4;
+    public function lerp from (b is Float4, f is Number) to Float4;
+    public function lerp from (b is Float4, f is Float4) to Float4;
+    public function log from () to Float4;
+    public function log2 from () to Float4;
+    public function log10 from () to Float4;
+    public function max from (b is Float4) to Float4;
+    public function min from (b is Float4) to Float4;
+    public function modf from () to (Float4, Float4);
+    public function noise from () to Float4;
+    public function pow from (y is Float4) to Float4;
+    public function radians to Float4;
+    public function round to Float4;
+    public function rsqrt to Float4;
+    public function saturate to Float4;
+    public function sign to Float4;
+    public function sin to Float4;
+    public function sincos to (Float4, Float4);
+    public function sinh to Float4;
+    public function smoothstep from (max is Float4 , x is Float4) to Float4;
+    public function sqrt to Float4;
+    public function tan to Float4;
+    public function tanh to Float4;
+    public function distance from (pt2 is Float4) to Float4;
+    public function faceforward from (i is Float4, ng is Float4) to Float4;
+    public function length to Number;
+    public function normalize to Float4;
+    public function reflect from (n is Float4) to Float4;
+    public function refract from (n is Float4, eta is Float4) to Float4;
+    public function ddx to Number;
+    public function ddy to Number;
+}
+
+
+public interface Sampler1D {
+    public function tex1D from (s is Number) to Float4;
+}
+
+public interface Sampler2D {
+    public function tex2D from (s is Float2) to Float4;
+}
+
+public interface Sampler3D {
+    public function tex3D from (s is Float3, dsdx is Float3) to Float4;
+}
+
+public interface SamplerCUBE {
+    public function texCube from (s is Float3, dsdx is Float3, dsdy is Float3) to Float4;
+}
+
+public function lit from (nDotL is Number, nDotH is Number, m is Number) to Float4 { null }
+
+
+
+
+
+

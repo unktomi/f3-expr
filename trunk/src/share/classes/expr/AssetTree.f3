@@ -55,7 +55,7 @@ foreach (cam in model.getCameras()) if (cam.id == "perspShape" or cam.id == "top
              }
          },
          AssetGroup {
-             name: "Shaders"
+             name: "Materials"
              content: bind 
                 foreach (shader in model.getShaders()) {
                  ShaderAsset {

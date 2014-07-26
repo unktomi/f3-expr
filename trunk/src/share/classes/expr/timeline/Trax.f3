@@ -330,7 +330,7 @@ public class TimeNodeView is AbstractNode
         var target = if target0 is ResourceTimeNodeWrapper then (target0 as ResourceTimeNodeWrapper).wrapped else target0;
         if (target is TimeGroup) {
             var g = target as TimeGroup;
-            foreach (x in g.content) TransformNode { content: bind trax.makeTimeNodeView(null, x) }
+            foreach (x in g.content) if (x is ResourceTimeNode and not (x as ResourceTimeNode).visible) then null else TransformNode { content: bind trax.makeTimeNodeView(null, x) }
         } else []
     }
 
@@ -839,6 +839,8 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	new Interval(frameToDuration(scrollOffset), 
 		     frameToDuration(scrollOffset+visibleFrameCount));
 
+
+    var filteredClips is TimeNode[];
     public var clips is TimeNode[] on replace deleted[i..j] = inserted {
 	for (x in deleted[i..j]) {
 	    undoList.removeTarget(&x.playTime);
@@ -848,9 +850,16 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	    undoList.addTarget("{x.id}.playtime", &x.playTime);
 	    undoList.addTarget("{x.id}.pickable", &x.pickable);
 	}
+        println("clips:");
+        for (c in clips) println(c.id);
     };
 
     override function update {
+        if (this is GraphEditor) {
+            filteredClips = clips;
+        } else {
+            filteredClips = foreach (clip in clips where (clip as ResourceTimeNode).ctx.selected) clip;
+        }
         super.update();
         performUpdate();
     }
@@ -869,11 +878,11 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 
     var rowCount is Integer;
 
-    readonly var timeNodeViews is TimeNodeView[] = bind getTimeNodes(clips);
+    readonly var timeNodeViews is TimeNodeView[] = bind getTimeNodes(filteredClips);
     
     bound function getTimeNodes from (content is TimeNode[]) to TimeNodeView[] 
     {
-	foreach (t in content) makeTimeNodeView(null, t)
+	foreach (t in content) if (t is ResourceTimeNode and not (t as ResourceTimeNode).visible) then null else makeTimeNodeView(null, t)
     }
 
     public readonly var frameRate is Number = bind frameRateN on replace { frameRateGadget.setText("{Math.round(frameRate) as Integer}") };

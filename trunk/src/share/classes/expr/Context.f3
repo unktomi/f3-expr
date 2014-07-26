@@ -23,11 +23,14 @@ public interface ProgramContext {
 }
 
 public class Context is Foldable of Context {
+    public var selected is Boolean = true;
     public var parent is Context;
     public readonly var name is String;
     public readonly var label is String = bind name;
     public var contextType is F3Type;
     public bound function getContent to Context[]  { [] }
+
+    public readonly var event is MemberContext = bind if this is MemberContext then this as MemberContext else parent.event;
 
     override function foldLeft of a from (z is a, f is function from (a, Context) to a) to a
     {
@@ -186,7 +189,8 @@ public class SubResourceNodeContext is ResourceNodeContext {
 }
 
 public class ResourceNodeContext is GroupContext, ResourceObjectContext {
-    override bound function getTarget to ResourceTarget { resource }
+    public var resource is ResourceNode;
+    override bound function getTarget to ResourceNode { resource }
     protected function getTargetPath to String { "" }
     public override function deleteContent from (c is Context) to ()
     {
@@ -204,6 +208,17 @@ public class ResourceNodeContext is GroupContext, ResourceObjectContext {
         var result = MemberContext { member: member, parent: this };
         insert result into programs;
         println("created member => {programs} => {getContent()}");
+        insert EventResourceNode {
+            imageLoader: resource.imageLoader;
+            pathFactory: resource.pathFactory;
+            layoutEngine: resource.layoutEngine;
+            movieLoader: resource.movieLoader;
+            soundLoader: resource.soundLoader;
+            effectLoader: resource.effectLoader;
+            webBrowserFactory: resource.webBrowserFactory;
+            id: bind "{resource.id}#{member.name}";
+            event: result;
+        } into resource.events;
         return result;
     }
 
@@ -212,7 +227,6 @@ public class ResourceNodeContext is GroupContext, ResourceObjectContext {
         return memberCtxs;
     }
 
-    public var resource is ResourceNode;
     override var name = bind "{resource.displayName} [Scene]";
     protected var typeName = "expr.ResourceNode";
     protected var members = 
@@ -255,14 +269,14 @@ public class ResourceLabelContext is ResourceNodeContext {
 }
 
 public class ResourceTimeNodeContext is GroupContext, ResourceObjectContext {
-    override bound function getTarget to ResourceTarget { resource }
-    public var resource is ResourceTimeNode;
+    override bound function getTarget to ResourceTimeNode { resource }
     bound var memberCtxs is Member[] = foreach (x in members) if (not x.name.startsWith("observe")) then null else x;
     override var name = bind "{resource.displayName} [Timeline]";
     var members = bind Expression.introspect(Reflect.getType("f3.media.scene.TimeNode") as F3ClassType);
     var myContent = bind [if (resource is ResourceTimeNodeWrapper) then { var w = resource as ResourceTimeNodeWrapper; foreach (g in w.unwrapContent()) if (g is ResourceTimeNode) then ResourceTimeNodeContext {  resource: g as ResourceTimeNode} else null } else null];
 
     var programs is MemberContext[];
+    public var resource is ResourceTimeNode;
     public override function createProgram from (member is Member) to MemberContext
     {
         var result = MemberContext { member: member, parent: this };
@@ -286,12 +300,13 @@ public class AssetContext is Context {
     var myContent = bind foreach (x in asset.containedAssets) AssetContext { asset: x, parent: this };
     override public bound function getContent to Context[] { myContent }
 }
-
+/*
 public class FunctionDefinitionContext is MemberContext, ResourceObjectContext {
     public var fun is Function;
     override var member = bind fun.funMember;
     override bound function getTarget to ResourceTarget { null }
 }
+*/
 
 public class ClosureVarContext is GroupContext, ProgramContext {
     public var varType is TypeAsset;
@@ -436,7 +451,7 @@ public class LocalVarContext is Context {
 public class MemberContext is GroupContext, ProgramContext {
     public var member is Member;
     override var name = bind Names.formatName(member.name);
-    override var label = bind name;
+    override var label = bind "{name} [Event]";
 }
 
 public class ContextTreemodel is Treemodel {

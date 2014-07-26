@@ -306,18 +306,20 @@ public class ResourceNode is TransformNode, ResourceTarget, NodeAPI, Inspectable
     {
         collider.applyTorqueImpulse(x, y, z);
     }
+
+    public var events is ResourceNode[];
 }
 
 public class MaResourceNode is ResourceNode {
     public const model is Ma.Model;
     override var url = bind model.url;
-    override var content = bind model.getSpatialRoot();
+    override var content = bind [events, model.getSpatialRoot()];
 }
 
 public class F3AssimpResourceNode is ResourceNode {
     public const model is F3Assimp;
     override var url = bind model.url;
-    override var content = bind model.getSpatialRoot();
+    override var content = bind [events, model.getSpatialRoot()];
 }
 
 

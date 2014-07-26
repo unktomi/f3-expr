@@ -1,6 +1,7 @@
 package expr;
 import expr.undo.*;
 
+
 public class GroupResourceNode is ResourceNode {
     public function deleteContent from (rn is ResourceNode) to ()
     {
