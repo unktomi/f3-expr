@@ -1216,6 +1216,7 @@ public function inspect from (v is Context.ClosureVarContext) to (Inspected of ?
     var ptr1 = &v.variableName;
     var ptr2 = v.ref;
     [InspectedString {
+            editable: true;
             label: "variableName";
             observable: Observables.observe(ptr1);
             override function get to String {
@@ -1227,6 +1228,7 @@ public function inspect from (v is Context.ClosureVarContext) to (Inspected of ?
             }
     },
     if (v.varType.t == Reflect.NUMBER_TYPE) then InspectedNumber {
+            editable: true;
             label: "value";
             observable: Observables.observe(ptr2);
             override function get to Number {

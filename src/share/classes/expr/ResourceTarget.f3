@@ -69,6 +69,7 @@ public class ChannelBoxGroup is TimeGroup, ChannelBox {
 
 
 public interface ResourceTarget {
+    public var ctx is Context;
     public readonly var url is String;
     public var programs is Program[];
     public var $useLiteralId is Boolean = false;

@@ -33,7 +33,7 @@ public class VisualHierarchy is Treemodel {
     }
     public readonly var selectedShader is Shader;
     override var root = Treenode {
-        override var label = "Visuals";
+        override var label = "Materials";
         override var canOpen = bind models.size() > 0;
         override var children = bind foreach (m in models) MaNode {
             model: bind m;

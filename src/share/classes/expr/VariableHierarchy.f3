@@ -8,7 +8,7 @@ import expr.Names.*;
 
 public class Treenode is Treeview.Treenode {
     public var n is Context;
-    override var label = bind n.name;
+    override var label = bind n.label;
     var content = bind n.getContent();
     override var canOpen = bind content.size() > 0;
     override var children = bind

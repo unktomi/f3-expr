@@ -633,7 +633,17 @@ public function introspect from (clazz is F3ClassType, all is Boolean) to Member
     }
     const I = Instantiator {clazz: clazz};
     var result is Member[];
-    const funs = Reflect.getFunctions(clazz, not all);
+    const seen = new java.util.HashSet of F3FunctionMember;
+    function checkSeen from (x is F3FunctionMember) to Boolean {
+        for (y in seen) {
+            if (y.getName().equals(x.getName()) and y.getType().isAssignableFrom(x.getType())) {
+                return false;
+            }
+        }
+        seen.add(x);
+        return true;
+    }
+    const funs = (foreach (j in Reflect.getFunctions(clazz, true).reverse() where checkSeen(j)) j).reverse();
     if (all) {
         var r = 
             foreach (f in funs where f.isPublic() and not f.getName().contains("$") and 
