@@ -3783,7 +3783,9 @@ public class ParameterView is InputView {
         if (str.startsWith("\"") and str.endsWith("\"")) then str.substring(1, str.length()-1) else str;
     }
 
-    bound var constValue = parameter.constantValue on replace {
+    bound var constValue = parameter.constantValue on replace { noteConstantValue(constValue) };
+
+    public function noteConstantValue from (constValue is Object) to () {
         if (textField <> null) {
             textField.setText(removeQuotes(constValue.toString()));
         } else if (sliderField <> null) {
@@ -3800,18 +3802,20 @@ public class ParameterView is InputView {
         }
     }
 
-    readonly var textField = bind if Reflect.STRING_TYPE.isConvertibleFrom(getInputType()) then stringField() else null;
+    readonly var textField is Text.Field = bind if Reflect.STRING_TYPE.isConvertibleFrom(getInputType()) then stringField() else null;
 
-    readonly var sliderField = bind getSliderField(getInputType());
+    readonly var sliderField is SliderField = bind getSliderField(parameter.t, inputType);
 
-    function getSliderField from (_ is F3Type) to SliderField { // hack: workaround for binding bugs
-        const t = if (inputType == null) then parameter.t else inputType;
-        if (Reflect.INTEGER_TYPE.isConvertibleFrom(t))
-            then intSlider()
-        else if (Reflect.NUMBER_TYPE.isConvertibleFrom(t)) 
-            then numSlider() 
-            else if (Reflect.BOOLEAN_TYPE.isConvertibleFrom(t)) 
-                then boolSlider() else null;
+    function getSliderField from (x is F3Type, y is F3Type) to SliderField { // hack: workaround for binding bugs
+        const t = if (y == null) x else y;
+        const slider = 
+            if (Reflect.INTEGER_TYPE.isConvertibleFrom(t))
+                then intSlider()
+                else if (Reflect.NUMBER_TYPE.isConvertibleFrom(t)) 
+                    then numSlider()
+                    else if (Reflect.BOOLEAN_TYPE.isConvertibleFrom(t)) 
+                        then boolSlider() else null;
+        return slider;
     }
 
     var controls = bind if (sliderField <> null) then sliderField else textField;
@@ -6477,7 +6481,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         const mem = e as MemberExpression;
 	var itype = if mem.member.m.isStatic() then OBJECT_TYPE else mem.member.m.getDeclaringClass();
         if (itype == null) return "";
-	var result = "var _ = function from (debugger is f3.util.ObservableDebugger, i$ is Object, getVar is function from String to Object, getNode is function from String to f3.media.scene.Node, getClip is function from String to f3.media.scene.TimeNode, $register is function from (String, f3.lang.ObservableRef of ?) to ()) to (f3.util.Observable of ?)[] \{ var i0 = i$ as {itype.getName()};  var obsvbs$ is f3.util.Observable[]; \{ ";
+	var result = "var _ = function from (debugger is f3.util.ObservableDebugger, i$ is Object, getVar is function from String to Object, getNode is function from String to f3.media.scene.Node, getClip is function from String to f3.media.scene.TimeNode, $register is function from (Object) to ()) to (f3.util.Observable of ?)[] \{ var i0 = i$ as {itype.getName()};  var obsvbs$ is f3.util.Observable[]; \{ ";
         if (terms == []) {
             var rs = foreach (x in eventContext.content) {
                 if (x is Context.ResourceNodeContext) {
@@ -6515,7 +6519,13 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             } else {
                 eng = "Assign {nil(subject.varType.t)} to <i>{subject.variableName}</i>";
             }
-            prog.defineVar(subject, "var <<{subject.variableName}>> is {subject.varType.t.getName()} = {init};");
+            if (subject.isShortcut) {
+                prog.defineVar(subject, "var <<{subject.variableName}>> is {subject.varType.t.getName()} = {init};");
+            } else if (subject.isSubject) {
+                prog.defineVar(subject, "var <<{subject.variableName}>> is f3.util.Subject of {subject.varType.t.getName()}; <<{subject.variableName}.onNext({init}); <<{subject.variableName}>>");
+            } else {
+                prog.defineVar(subject, "var _ = function from (i$ is Object, <<{subject.variableName}>> is f3.lang.Ref of {subject.varType.t.getName()}) to () \{ {init}; \}");
+            }
             englishOutput = eng;
         } else {
             context.dump();
@@ -6531,7 +6541,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                     app = "i0.{app}";
                 }
                 //                result = "{result} const obs{p.getRootId()} = foreach (i in {app}) \{ %VARS%; {p.getWorldAccess()} \}";
-                result = "{result} \{ const obs0 = foreach (i in {app}) \{ %VARS%; {p.getWorldAccess()} \}";
+                result = "{result} \{ const obs0 = foreach (i in {app}) \{ $register(i); %VARS%; {p.getWorldAccess()} \}";
                 result = "{result} insert obs{p.getContainingObservableDepth()} into obsvbs$; \} ";
                 sep = ", ";
                 println(p.getWorldAccess());
@@ -6769,19 +6779,20 @@ public class FunNode is ExprNode {
                 }
             } 
             println("parameter {i} type is {p.parameter.getType()}");
-            if (Reflect.INTEGER_TYPE == p.parameter.getType()) {
-                const nf = p.sliderField as IntegerField;
-                nf.onChange(n.intValue);
-            } else if (Reflect.NUMBER_TYPE == p.parameter.getType()) {
-                const nf = p.sliderField as NumberField;
-                nf.onChange(n.numberValue);
-             } else if (Reflect.BOOLEAN_TYPE == p.parameter.getType()) {
-                println("bool value is {n.booleanValue}");
-                p.sliderField.t = if n.booleanValue then 1.0 else 0.5;
-            } else if (Reflect.STRING_TYPE == p.parameter.getType()) {
+        }
+        for (n in inputs) {
+            var i = indexof n;
+            const p = v.inputs[i];
+            if (Reflect.INTEGER_TYPE.isConvertibleFrom(p.getInputType())) {
+                p.parameter.constantValue = n.intValue;
+            } else if (Reflect.NUMBER_TYPE.isConvertibleFrom(p.getInputType())) {
+                p.parameter.constantValue = n.numberValue;
+            } else if (Reflect.BOOLEAN_TYPE.isConvertibleFrom(p.getInputType())) {
+                p.parameter.constantValue = n.booleanValue;
+            } else if (Reflect.STRING_TYPE.isConvertibleFrom(p.getInputType())) {
                 p.parameter.constantValue = n.stringValue;
-                p.textField.setText(n.stringValue.substring(1, n.stringValue.length()-1));
             }
+            p.noteConstantValue(p.constValue);
         }
         for (p in outputs) {
             println("output: {p}");
@@ -7147,8 +7158,10 @@ public class Editor is ResizableNode, Focuser {
         */
         prog = if (varContext <> null) then varContext.program else eventContext.program;
         var parentProg = if (varContext <> null) then eventContext.program else null;
+        const event = eventContext.event.member;
         const found = prog == null;
 	if (prog == null) {
+            println("CREATING PROGRAM IN CANVAS: {event}");
             if (parentProg == null and varContext <> null) {
                 parentProg = Program { 
                     parent: parentProg;
