@@ -38,7 +38,7 @@ bound function formatRN from (n is ResourceNode) to String
 
 public class Treenode is Treeview.Treenode {
     public var n is Node;
-    override var label = bind if (n.parent is ResourceNode and not (n.parent is GroupResourceNode)) then "Main Scene" else if (n is ResourceNode) then "{(n as ResourceNode).displayName} [{formatRN(n as ResourceNode)}]" else if shouldFormat(n) then formatName(n.id) else n.id;
+    override var label = bind if (n.parent is ResourceNode and not (n.parent is GroupResourceNode)) then "Content" else if (n is ResourceNode) then "{(n as ResourceNode).displayName} [{formatRN(n as ResourceNode)}]" else if shouldFormat(n) then formatName(n.id) else n.id;
     function asGroup from (n is Node) to Group { if (n is Group and not (n is ResourceLeafNode)) then n as Group else null }
     override var canOpen = bind { var g = asGroup(n); g.content.size() > 0 }
     override var children = bind foreach (x in asGroup(n).content) makeTreeNode(this, x);
@@ -185,6 +185,7 @@ public class TransformHierarchy
 
     public var effectLoader is CGEffectLoader = the CGEffectLoader;
     public var outlineShader is Shader = bind effectLoader.loadPaintShader(Shape2D.ColorPaint(Color.ORANGE));
+    public var meshOutlineShader is Shader = bind effectLoader.loadPaintShader(Shape2D.ColorPaint(Color.CYAN));
     
 
     public function selectScene from (scene is ResourceScene) to ()
@@ -222,7 +223,23 @@ public class TransformHierarchy
 	undoList.addTarget("selectedNode", &selectedNode);
     }
 
-    public var selectedTransform is TransformNode;
+
+    public var selectedTransform is TransformNode on replace old {
+        old.foldLeft((), 
+                     function from (_ is (), n is Node) to () 
+                     {
+                         if (n is MeshNode) {
+                             (n as MeshNode).outlineShader = null;
+                         }
+                     });
+        selectedTransform.foldLeft((), 
+                                   function from (_ is (), n is Node) to () 
+                                   {
+                                       if (n is MeshNode) {
+                                           (n as MeshNode).outlineShader = outlineShader;
+                                       }
+                                   });
+    }
 
     public var scenes is ResourceScene[] on replace {
         disps;

@@ -48,6 +48,11 @@ function debugPrint of a (label is String, value is a) to a {
     return value;
 }
 
+bound function formatRN from (n is ResourceTimeNode) to String
+{
+    if (n.ctx.event.parent == null) then n.ctx.event.label else "{n.ctx.event.label} of {n.ctx.event.parent.label}";
+}
+
 class ContentHolder is TransformNode, Scissored {
 }
 
@@ -362,7 +367,7 @@ public class TimeNodeView is AbstractNode
         if (target is ChannelBoxesGroup) {
             (target as ChannelBoxesGroup).target.displayName;
         } else {
-            if ((target.parent is ResourceTimeNode and not (target.parent is ResourceTimeNodeWrapper)) and target.parent.id == target.id) then "Main Timeline" else if (target is ResourceTimeNode) then (target as ResourceTimeNode).displayName else Names.formatName(target.id);
+            if ((target.parent is ResourceTimeNode and not (target.parent is ResourceTimeNodeWrapper)) and target.parent.id == target.id) then "Content" else if (target is ResourceTimeNode) then "{(target as ResourceTimeNode).displayName} [{formatRN(target as ResourceTimeNode)}]" else Names.formatName(target.id);
         }
     }   
     bound var labelX = 

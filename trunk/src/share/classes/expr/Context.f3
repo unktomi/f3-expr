@@ -208,6 +208,7 @@ public class ResourceNodeContext is GroupContext, ResourceObjectContext {
         var result = MemberContext { member: member, parent: this };
         insert result into programs;
         println("created member => {programs} => {getContent()}");
+        /*
         insert EventResourceNode {
             imageLoader: resource.imageLoader;
             pathFactory: resource.pathFactory;
@@ -219,6 +220,7 @@ public class ResourceNodeContext is GroupContext, ResourceObjectContext {
             id: bind "{resource.id}#{member.name}";
             event: result;
         } into resource.events;
+        */
         return result;
     }
 
