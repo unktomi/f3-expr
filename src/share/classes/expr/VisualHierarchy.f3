@@ -64,8 +64,7 @@ public class VisualHierarchy is Treemodel {
     var currentMesh is MeshNode on replace old {
         old.outlineShader = null;
         if (currentMesh <> null) {
-            println("outline shader={transformHierarchy.outlineShader}");
-            currentMesh.outlineShader = transformHierarchy.outlineShader;
+            currentMesh.outlineShader = transformHierarchy.meshOutlineShader;
         }
     }
     var meshListener is Disposable;
