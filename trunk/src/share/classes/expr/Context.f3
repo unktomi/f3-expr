@@ -314,10 +314,10 @@ public class ClosureVarContext is GroupContext, ProgramContext {
     public var varType is TypeAsset;
     public var variableName is String = "variable";
     public var isShortcut is Boolean;
-    public var isSubject is Boolean = true;
+    public var isSubject is Boolean = false;
     override var name = bind variableName;
     override var label = bind "{variableName} [{varType.name}]";
-
+    public var scope is GroupContext;
     // hack...
     var value is Number;
     var valueSubject = Subject of Number {};

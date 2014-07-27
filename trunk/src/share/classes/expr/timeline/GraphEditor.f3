@@ -40,7 +40,7 @@ public class GraphEditor is Trax {
             box.foldLeft((), 
                          function from (_ is (), clip is TimeNode) to () 
                          {
-                             if (clip is Channel of ?) {
+                             if (clip.pickableInScene and clip is Channel of ?) {
                                  const ch = clip as Channel of ?;
                                  const m = ch.toSceneTransform.inverse();
                                  ch.deleteKeys(m * selectionStartTime, m * selectionEndTime);

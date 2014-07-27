@@ -1089,7 +1089,7 @@ public function run from (args is String[]) to ()
         function rebaseURL from (u is String) to String {
             if (u.startsWith("timenode://") or u.contains("#")) then u else new java.net.URL(baseURL, u).toString();
         }
-        const topLevels = foreach (prog in sceneRes.programs where prog.code <> null) {
+        const topLevels = foreach (prog in sceneRes.programs where (prog.code <> null or prog.variables <> [])) {
             const p = Program {
                 event: mainContext.member,
                 code: prog.code;
@@ -1214,7 +1214,7 @@ public function run from (args is String[]) to ()
             rn.displayName = i.displayName;
             rn.programs = foreach (prog in i.programs) {
                 const mem = prog.event.deserialize();
-                const p = Program {
+                var p = Program {
                     event: mem;
                     code: prog.code;
                     sourceCode: prog.compiled;
@@ -1241,15 +1241,17 @@ public function run from (args is String[]) to ()
                     }
                     const container = mainContext.resolve(d.contextPath) as Context.GroupContext;
                     insert v into container.content;
+                    var c1 = container as Context.MemberContext;
+                    var p1 = c1.program;
                     println("CREATED VAR: {v}");
                     const vp = Program {
-                        parent: p;
-                        event: p.event;
+                        parent: p1;
+                        event: p1.event;
                         code: d.code;
                         sourceCode: d.sourceCode;
                         targetPath: prog.targetPath;
                         evalContext: Program.EvalContext {
-                            eventContext: targetContext as Context.MemberContext;
+                            eventContext: c1;
                             varContext: v;
                             interactive: function from () to Boolean { interactive } 
                             targetNode: (currentTransform as ResourceTarget).findTarget(prog.targetPath);
@@ -1260,8 +1262,10 @@ public function run from (args is String[]) to ()
                         }
                     }
                     v.program = vp;
-                    p.defineVar(v, vp);
-                    insert vp into ps;
+                    p1.defineVar(v, vp);
+                    if (p1 == p) {
+                        insert vp into ps;
+                    }
                 }
                 println("CREATING PROGRAM**** {prog} => {p.sourceCode}");
                 insert p into allPrograms;
@@ -1445,13 +1449,13 @@ public function run from (args is String[]) to ()
                     var targetContext = resolveContext(rn, p);
                     println("RESOLVED CONTEXT {rn} => {targetContext}");
                     for (d in prog.variables) {
+                        const container = mainContext.resolve(d.contextPath) as Context.GroupContext;
                         const v = Context.ClosureVarContext {
-                            parent: targetContext;
+                            parent: container,
                             variableName: d.varName;
                             varType: findTypeAsset(d.varType);
                             isShortcut: d.isShortcut;
                         }
-                        const container = mainContext.resolve(d.contextPath) as Context.GroupContext;
                         insert v into container.content;
                         println("CREATED VAR: {v}");
                         const vp = Program {
@@ -1737,7 +1741,7 @@ public function run from (args is String[]) to ()
                                                                         [if (members == []) then null else Menu {
                                                                             label: "Events"
                                                                             items: 
-                                                                            foreach (j in members) {
+                                                                            [foreach (j in members) {
                                                                                 MenuItem {
                                                                                     label: Names.formatName(j.name);
                                                                                     action: function to () 
@@ -1746,7 +1750,20 @@ public function run from (args is String[]) to ()
                                                                                         r.createProgram(j);
                                                                                     }
                                                                                 }
-                                                                            }
+                                                                            },
+                                                                            Menu.Separator {},
+                                                                            MenuItem {
+                                                                                label: "Up"
+                                                                            },
+                                                                            MenuItem {
+                                                                                label: "Down"
+                                                                            },
+                                                                            MenuItem {
+                                                                                label: "Left"
+                                                                            },
+                                                                            MenuItem {
+                                                                                label: "Right"
+                                                                            }]
                                                                         },
                                                                         Menu {
                                                                             label: "New";

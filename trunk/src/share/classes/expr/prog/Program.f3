@@ -37,8 +37,12 @@ public class EvalContext {
         var c is Context = if (varContext <> null) varContext else eventContext;
         c = c.parent;
         while (c <> null and not (c is ProgramContext)) { c = c.parent }
-        println("get parent context: {eventContext.member} / {varContext.variableName} => {c}");
-        return (c as ProgramContext).program.evalContext;
+        const c1 = c as ProgramContext;
+        println("get parent context: {eventContext.member} / {varContext.variableName} => {c}, {c1.program}, {c1.program.evalContext}");
+        if (c1.program.evalContext <> null) {
+            println("vars: {c1.program.evalContext.varMap}");
+        }
+        return c1.program.evalContext;
     }
     public var debugger is ObservableDebugger = DebuggerEngine {
         override public function step of a from (location is Object, x is a, k is Observer of a) to ()
@@ -71,22 +75,28 @@ public class EvalContext {
         return ref;
     }
 
-    function createVars from (prog is Program) to ()
+    function createVars from (prog is Program, target is Object) to ()
     {
+        println("CREATING VARS in {prog.event} => {prog.varSources}");
         for (ent in prog.varSources.entrySet() where not ent.getKey().isShortcut) {
             const v = ent.getKey();
             const t = v.varType.t;
             const vp = ent.getValue();
             var source = vp.sourceCode;
-            var target is Value; 
+            var ref is ObservableRef of Object;
             if (not ent.getKey().isSubject) {
-                target = evaluator.compileAndRun("Value \{source: bind {source}\}") as Value;
+                const vo = Value {};
+                const f = evaluator.compileAndRun(source) as function from (Object, Ref of Object) to ();
+                ref = &vo.value;
+                f(target, ref);
+
             } else {
-                const value = evaluator.compileAndRun(source);
-                target = Value { value: value }
+                const value = evaluator.compileAndRun(source) as Subject of Object;
+                ref = value.toRef();
             }
-            println("created variable {v.variableName} = {source} => {target}");
-            registerVar(v.variableName, &target.value);
+            println("created variable {v.variableName} = {source} => {ref}");
+            java.lang.Thread.currentThread().dumpStack();
+            registerVar(v.variableName, ref);
         }
     }
 
@@ -124,21 +134,22 @@ public class EvalContext {
 
     public function evaluate from (prog is Program, externalDebugger is ObservableDebugger) to ()
     {
-        if (prog.sourceCode == "") {
+        if (varContext <> null or prog.sourceCode == "") {
             unsubscribe();
             return;
         }
-        createVars(prog);
         const debugger = if externalDebugger <> null then externalDebugger else this.debugger;
         try {
             const f = evaluator.compileAndRun(prog.getSourceCode()) 
                 as function from (ObservableDebugger, Object, 
-                                  function from String to Object, function from String to Node, function from String to TimeNode, function from (String, ObservableRef of ?) to ()) to (Observable of ?)[];
+                                  function from String to Object, function from String to Node, function from String to TimeNode, function from (Object) to ()) to (Observable of ?)[];
             unsubscribe();
             println("evaluating with debugger: {debugger}");
-            const obs = f(debugger, targetNode, lookupVarDebug, lookupSpatialDebug, lookupTemporalDebug, registerVar);
+            const obs = f(debugger, targetNode, lookupVarDebug, lookupSpatialDebug, lookupTemporalDebug, function from (x is Object) to () {
+                    createVars(prog, x);
+                });
             for (o in obs) {
-                subscribe(o, prog.sourceCode);
+                subscribe(o, prog);
             }
         } catch (e is java.lang.Throwable) {
             e.printStackTrace();
@@ -153,9 +164,9 @@ public class EvalContext {
 
     var subs is Disposable[];
 
-    public function subscribe of a from (obsvb is Observable of a, src is String) to ()
+    public function subscribe of a from (obsvb is Observable of a, prog is Program) to ()
     {
-	println("SUBSCRIBE {targetNode} {obsvb} / {src}");
+	println("SUBSCRIBE {targetNode} {obsvb}");
         var count = 0;
         const rs = foreach (x in eventContext.content) {
             if (x is Context.ResourceNodeContext) {
@@ -165,7 +176,6 @@ public class EvalContext {
         insert obsvb.subscribe(DefaultObserver of a {
                 override function onNext from (x is a) to ()
                 {
-//                    println("ON NEXT...{x} interactive={interactive()}");
                     if (interactive()) {
                         for (r in rs) {
                             var n = r.instance(r.id, lookupVar, lookupSpatial, lookupTemporal);
@@ -176,7 +186,6 @@ public class EvalContext {
                             } into instanceSpace.content;
                         }
                         count++;
-                        //                        println("on next {src} {x}");
                     }
                 }
             }) into subs;
@@ -218,7 +227,11 @@ public class Program {
     public var sourceCode is String;
     public var targetPath is String;
 
-    public var parent is Program;
+    public var parent is Program on replace {
+        println("defining parent of {this} { event }, {sourceCode}");
+        java.lang.Thread.currentThread().dumpStack();
+    }
+
 
     public const debugger is ProgramDebugger = ProgramDebugger {
         program: this;
@@ -235,12 +248,15 @@ public class Program {
 
     public function defineVar from (v is Context.ClosureVarContext, p is Program) to ()
     {
+        println("defining var {v.variableName} in {event} with p={p.event}, {p.sourceCode}");
+        java.lang.Thread.currentThread().dumpStack();
         varSources.put(v, p);
     }
 
     public function defineVar from (v is Context.ClosureVarContext, source is String) to ()
     {
         sourceCode = source;
+        println("defining var {v.variableName} in {event} source={source} evalContext.event={evalContext.eventContext}, {evalContext.varContext} parent={parent}, parent.event={parent.event}");
         parent.defineVar(v, this);
     }
 
