@@ -25,7 +25,9 @@ public class ChannelBoxGroup is TimeGroup, ChannelBox {
 
     public function resolveChannel from (id is String) to Channel of Number 
     {
-        lookup(id) as Channel of Number;
+        const result = lookup(id) as Channel of Number;
+        println("resolveChannel {id} => {result} in {this.id}");
+        return result;
     }
 
     public function moveKeyTo from (src is Duration, target is Duration) to Duration
@@ -120,7 +122,7 @@ public interface ResourceTarget {
     public function addChannelBox from (n_id is Integer) to ChannelBoxGroup
     {
         var result = createChannelBox(n_id);
-        insert result into channelBoxes.content;
+        //        insert result into channelBoxes.content;
         return result;
     }
 }

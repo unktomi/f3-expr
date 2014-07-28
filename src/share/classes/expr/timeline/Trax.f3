@@ -56,7 +56,7 @@ bound function formatRN from (n is ResourceTimeNode) to String
 class ContentHolder is TransformNode, Scissored {
 }
 
-const SelectionPaint = ColorPaint(Color.color(0xff, 0xa5, 0, 0.5)); 
+const SelectionPaint = ColorPaint(Color.ORANGE);
 
 class KeyEditor is AbstractNode {
     public var view is TimeNodeView;
@@ -426,7 +426,6 @@ public class TimeNodeView is AbstractNode
                                          label: "Clip";
                                          action: function to ()
                                          {
-                                             println("add clip");
                                              (target as ResourceTarget.ChannelBoxesGroup).target.addChannelBox();
                                          }
                                       },
