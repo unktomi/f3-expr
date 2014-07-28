@@ -120,7 +120,7 @@ public function getFunction from (c is F3ClassType, name is String, params is F3
 	    for (j in [0..<ft.minArgs()]) {
 		const p0 = ft.getArgumentType(j);
 		const p1 = ps[j];
-		if (p0 == p1) {//not p0.isAssignableFrom(p1)) {
+		if (p0 <> p1) {
                     println("{p0} <> {p1}");
                     found = false;
                     break;

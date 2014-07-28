@@ -1140,359 +1140,6 @@ public function run from (args is String[]) to ()
             ps
         }
         mainContext.programs = topLevels;
-        function makeSpatRes from (i is Resources.SpatialResource) to ()
-        {
-            if (i is TextFieldResource) {
-                const r = i as TextFieldResource;
-                const tf = ResourceTextField {
-                    id: r.id;
-                    url: r.url;
-                    displayName: i.displayName;
-                    fontSize: new FontSizeSelection(r.fontSize);
-                    fontFamily: new FontFamilySelection(r.fontFamily);
-                    fontStyle: new FontStyleSelection(r.fontStyle);
-                    fontWeight: new FontWeightSelection(r.fontWeight);
-                    foreground: parseColor(r.foreground);
-                    background: parseColor(r.background);
-                    width: r.width;
-                };
-                tf.setText(r.text);
-                addResource(tf, new Point3(i.tx, i.ty, i.tz));
-            } else if (i is TextOutputResource) {
-                const r = i as TextOutputResource;
-                const tf = ResourceLabel {
-                    id: r.id;
-                    url: r.url;
-                    displayName: i.displayName;
-                    fontSize: new FontSizeSelection(r.fontSize);
-                    fontFamily: new FontFamilySelection(r.fontFamily);
-                    fontStyle: new FontStyleSelection(r.fontStyle);
-                    fontWeight: new FontWeightSelection(r.fontWeight);
-                    foreground: parseColor(r.foreground);
-                    background: parseColor(r.background);
-                    width: r.width;
-                };
-                tf.setText(r.text);
-                addResource(tf, new Point3(i.tx, i.ty, i.tz));
-            } else if (i is Resources.SpatialResourceGroup) {
-                const gn = GroupResourceNode {
-                    url: i.url;
-                }
-                addResource(gn, new Point3(i.tx, i.ty, i.tz));
-            } else {
-                doDrop(rebaseURL(i.url), new Point3(i.tx, i.ty, i.tz));
-            }
-	    currentTransform.tx = i.tx;
-	    currentTransform.ty = i.ty;
-	    currentTransform.tz = i.tz;
-
-	    currentTransform.sx = i.sx;
-	    currentTransform.sy = i.sy;
-	    currentTransform.sz = i.sz;
-
-	    currentTransform.rx = i.rx;
-	    currentTransform.ry = i.ry;
-	    currentTransform.rz = i.rz;
-
-	    currentTransform.px = i.px;
-	    currentTransform.py = i.py;
-	    currentTransform.pz = i.pz;
-            const rn = (currentTransform as ResourceNode);
-            if (i.colliderResource <> null) {
-                const r = i.colliderResource;
-                rn.collidable = r.collidable;
-                rn.collidableMass = r.mass;
-                rn.collidableFriction = r.friction;
-                rn.collidableRestitution = r.restitution;
-                rn.collidableType = 
-                    if (r.colliderType == "Dynamic") then RigidBodyType.Dynamic
-                        else if (r.colliderType == "Kinematic") then RigidBodyType.Kinematic 
-                            else RigidBodyType.Static;
-                rn.collidableGravityScale = r.gravityScale;
-                                                                     
-            }
-            rn.displayName = i.displayName;
-            rn.programs = foreach (prog in i.programs) {
-                const mem = prog.event.deserialize();
-                var p = Program {
-                    event: mem;
-                    code: prog.code;
-                    sourceCode: prog.compiled;
-                    targetPath: prog.targetPath;
-                    evalContext: Program.EvalContext {
-                        interactive: function from () to Boolean { interactive } 
-                        targetNode: (currentTransform as ResourceTarget).findTarget(prog.targetPath);
-                        instanceSpace: currentScene.instanceSpace;
-                        lookupSpatial: currentScene.root.lookup;
-                        targetTimeline: player;
-                        lookupTemporal: mainTimeLayer.lookup;
-                    }
-                }
-                var ps = [p];
-                var targetContext = resolveContext(rn, p);
-                var targetNodeContext = mainContext.resolveNodeContext(rn);
-                println("RESOLVED CONTEXT {rn} => {targetContext}");
-                for (d in prog.variables) {
-                    const v = Context.ClosureVarContext {
-                        parent: targetNodeContext;
-                        variableName: d.varName;
-                        varType: findTypeAsset(d.varType);
-                        isShortcut: d.isShortcut;
-                    }
-                    const container = mainContext.resolve(d.contextPath) as Context.GroupContext;
-                    insert v into container.content;
-                    var c1 = container as Context.MemberContext;
-                    var p1 = c1.program;
-                    println("CREATED VAR: {v}");
-                    const vp = Program {
-                        parent: p1;
-                        event: p1.event;
-                        code: d.code;
-                        sourceCode: d.sourceCode;
-                        targetPath: prog.targetPath;
-                        evalContext: Program.EvalContext {
-                            eventContext: c1;
-                            varContext: v;
-                            interactive: function from () to Boolean { interactive } 
-                            targetNode: (currentTransform as ResourceTarget).findTarget(prog.targetPath);
-                            instanceSpace: currentScene.instanceSpace;
-                            lookupSpatial: currentScene.root.lookup;
-                            targetTimeline: player;
-                            lookupTemporal: mainTimeLayer.lookup;
-                        }
-                    }
-                    v.program = vp;
-                    p1.defineVar(v, vp);
-                    if (p1 == p) {
-                        insert vp into ps;
-                    }
-                }
-                println("CREATING PROGRAM**** {prog} => {p.sourceCode}");
-                insert p into allPrograms;
-                ps
-            }
-            for (j in i.animation) {
-                // @TODO handle layers
-                if (j is Resources.ChannelBoxResource) {
-                    const box = j as Resources.ChannelBoxResource;
-                    const channelBox = rn.addChannelBox(box.n_id);
-                    channelBox.playTime = box.playTime;
-                    channelBox.playRate = box.playRate;
-                    channelBox.playCount = box.playCount;
-                    channelBox.blendWeight = 1.0;//i.animation.blendWeight;
-                    foreach (x in box.channels) {
-                        const c = channelBox.resolveChannel(x.target);
-                        c.playTime = x.playTime;
-                        c.playCount = x.playCount;
-                        c.playRate = x.playRate;
-                        c.blendWeight = x.blendWeight;
-                        c.keys = foreach (k in x.keys) {
-                            c.createKey(k.keyTime, k.keyValue, f3.media.scene.KeyFrame.Linear);
-                        }
-                    }
-                }
-            }
-            if (i is Resources.SpatialResourceGroup) {
-                const g = i as Resources.SpatialResourceGroup;
-                for (x in g.resources) {
-                    makeSpatRes(x);
-                }
-            }
-        }
-	for (i in sceneRes.spatialResources) {
-            println("I={i}");
-            makeSpatRes(i);
-	}
-        var tempResources = currentAnimResource.resources;
-        currentAnimResource.resources = [];
-	for (i in sceneRes.temporalResources) {
-            var q is TimeNode;
-            if (i.url.contains("#")) { // clip from library
-                for (x in currentResource.resources) {
-                    if (x is MaResourceNode) {
-                        const j = (x as MaResourceNode).temporal;
-                        q = j.lookup(i.url);
-                    }
-                }
-            } else {
-                for (j in tempResources) {
-                    if (i.url == j.url) {
-                        q = j;
-                        break;
-                    } 
-                }
-            }
-            if (q <> null) {
-                q.playTime = i.playTime;
-                q.playRate = i.playRate;
-                q.playCount = i.playCount;
-                const qt = q as ResourceTimeNode;
-                insert qt into currentAnimResource.resources;
-                qt.programs = foreach (prog in i.programs) {
-                    const p = Program {
-                        event: prog.event.deserialize();
-                        code: prog.code;
-                        sourceCode: prog.compiled;
-                        targetPath: prog.targetPath;
-                        evalContext: Program.EvalContext {
-                            interactive: function from () to Boolean { interactive } 
-                            targetNode: qt;
-                            instanceSpace: currentScene.instanceSpace;
-                            lookupSpatial: currentScene.root.lookup;
-                            targetTimeline: player;
-                            lookupTemporal: mainTimeLayer.lookup;
-                        }
-                    }
-                    println("CREATING PROGRAM**** {prog} => {p.sourceCode}");
-                    insert p into allPrograms;
-                    p;
-                }
-            } else {
-                println("Couldn't resolve temporal resource: {i.url}");
-                null;
-            }
-	}
-        for (j in sceneRes.layers) {
-            var scene = ResourceScene {
-                paused: bind player.paused;
-                background: null;
-                id: j.name;
-                camera: Camera2D { near: -1000, far: 1000, tz: 900 };   
-                dynamicsWorld: {
-                    var w = box2dDynamicsWorldFactory.createDynamicsWorld();
-                    w.paused = player.paused;
-                    w
-                }
-            }
-            insert scene into currentScenes;
-            transformHierarchy.selectScene(scene);
-            foreach (i in j.spatialResources) {
-                println("JI={i}");
-                if (i is TextFieldResource) {
-                    const r = i as TextFieldResource;
-                    const tf = ResourceTextField {
-                        url: r.url;
-                        id: r.id;
-                        fontSize: new FontSizeSelection(r.fontSize);
-                        fontFamily: new FontFamilySelection(r.fontFamily);
-                        fontStyle: new FontStyleSelection(r.fontStyle);
-                        fontWeight: new FontWeightSelection(r.fontWeight);
-                        foreground: parseColor(r.foreground);
-                        background: parseColor(r.background);
-                        width: r.width;
-                    };
-                    tf.setText(r.text);
-                    addResource(tf, new Point3(i.tx, i.ty, i.tz));
-                } else if (i is TextOutputResource) {
-                    const r = i as TextOutputResource;
-                    const tf = ResourceLabel {
-                        url: r.url;
-                        id: r.id;
-                        fontSize: new FontSizeSelection(r.fontSize);
-                        fontFamily: new FontFamilySelection(r.fontFamily);
-                        fontStyle: new FontStyleSelection(r.fontStyle);
-                        fontWeight: new FontWeightSelection(r.fontWeight);
-                        foreground: parseColor(r.foreground);
-                        background: parseColor(r.background);
-                        width: r.width;
-                    };
-                    tf.setText(r.text);
-                    addResource(tf, new Point3(i.tx, i.ty, i.tz));
-                } else {
-                    doDrop(rebaseURL(i.url), new Point3(i.tx, i.ty, i.tz));
-                }
-                currentTransform.tx = i.tx;
-                currentTransform.ty = i.ty;
-                currentTransform.tz = i.tz;
-                
-                currentTransform.sx = i.sx;
-                currentTransform.sy = i.sy;
-                currentTransform.sz = i.sz;
-                
-                currentTransform.rx = i.rx;
-                currentTransform.ry = i.ry;
-                currentTransform.rz = i.rz;
-                
-                currentTransform.px = i.px;
-                currentTransform.py = i.py;
-                currentTransform.pz = i.pz;
-                const rn = (currentTransform as ResourceNode);
-                if (i.colliderResource <> null) {
-                    const r = i.colliderResource;
-                    rn.collidable = r.collidable;
-                    rn.collidableMass = r.mass;
-                    rn.collidableFriction = r.friction;
-                    rn.collidableRestitution = r.restitution;
-                    rn.collidableType = 
-                        if (r.colliderType == "Dynamic") then RigidBodyType.Dynamic
-                            else if (r.colliderType == "Kinematic") then RigidBodyType.Kinematic 
-                                else RigidBodyType.Static;
-                    rn.collidableGravityScale = r.gravityScale;
-                                                                     
-                }
-                rn.programs = foreach (prog in i.programs) {
-                    const p = Program {
-                        event: prog.event.deserialize();
-                        code: prog.code;
-                        sourceCode: prog.compiled;
-                        targetPath: prog.targetPath;
-                        evalContext: Program.EvalContext {
-                            interactive: function from () to Boolean { interactive } 
-                            targetNode: currentTransform;
-                            instanceSpace: currentScene.instanceSpace;
-                            lookupSpatial: currentScene.root.lookup;
-                            targetTimeline: player;
-                            lookupTemporal: mainTimeLayer.lookup;
-                        }
-                    }
-                    var ps = [p];
-                    var targetContext = resolveContext(rn, p);
-                    println("RESOLVED CONTEXT {rn} => {targetContext}");
-                    for (d in prog.variables) {
-                        const container = mainContext.resolve(d.contextPath) as Context.GroupContext;
-                        const v = Context.ClosureVarContext {
-                            parent: container,
-                            variableName: d.varName;
-                            varType: findTypeAsset(d.varType);
-                            isShortcut: d.isShortcut;
-                        }
-                        insert v into container.content;
-                        println("CREATED VAR: {v}");
-                        const vp = Program {
-                            parent: p;
-                            event: p.event;
-                            code: d.code;
-                            sourceCode: d.sourceCode;
-                            targetPath: prog.targetPath;
-                            evalContext: Program.EvalContext {
-                                eventContext: targetContext as Context.MemberContext;
-                                varContext: v;
-                                interactive: function from () to Boolean { interactive } 
-                                targetNode: (currentTransform as ResourceTarget).findTarget(prog.targetPath);
-                                instanceSpace: currentScene.instanceSpace;
-                                lookupSpatial: currentScene.root.lookup;
-                                targetTimeline: player;
-                                lookupTemporal: mainTimeLayer.lookup;
-                            }
-                        }
-                        v.program = vp;
-                        p.defineVar(v, vp);
-                        insert vp into ps;
-                    }
-                    println("CREATING PROGRAM**** {prog} => {p.sourceCode}");
-                    insert p into allPrograms;
-                    ps;
-                }
-            }
-        }
-        function addTimeResource from (rn is ResourceTimeNode) to () {
-            const ctx = Context.ResourceTimeNodeContext { 
-                parent: contextModel.selectedGroupContext; 
-                resource: rn;
-            } 
-            rn.ctx = ctx;
-            insert ctx into contextModel.selectedGroupContext.content;
-        }
         function convertTimeResource from (i is Resources.TemporalResource) to TimeNode {
             var t is TimeNode;
             if (i.url.startsWith("timenode://TransitionLayer")) {
@@ -1582,6 +1229,253 @@ public function run from (args is String[]) to ()
             }
             println("CONVERT TIME RESOURCE : {i.url} => {t}");
             t;
+        }
+        function makeSpatRes from (i is Resources.SpatialResource) to ()
+        {
+
+            if (i is TextFieldResource) {
+                const r = i as TextFieldResource;
+                const tf = ResourceTextField {
+                    id: r.id;
+                    url: r.url;
+                    displayName: i.displayName;
+                    fontSize: new FontSizeSelection(r.fontSize);
+                    fontFamily: new FontFamilySelection(r.fontFamily);
+                    fontStyle: new FontStyleSelection(r.fontStyle);
+                    fontWeight: new FontWeightSelection(r.fontWeight);
+                    foreground: parseColor(r.foreground);
+                    background: parseColor(r.background);
+                    width: r.width;
+                };
+                tf.setText(r.text);
+                addResource(tf, new Point3(i.tx, i.ty, i.tz));
+            } else if (i is TextOutputResource) {
+                const r = i as TextOutputResource;
+                const tf = ResourceLabel {
+                    id: r.id;
+                    url: r.url;
+                    displayName: i.displayName;
+                    fontSize: new FontSizeSelection(r.fontSize);
+                    fontFamily: new FontFamilySelection(r.fontFamily);
+                    fontStyle: new FontStyleSelection(r.fontStyle);
+                    fontWeight: new FontWeightSelection(r.fontWeight);
+                    foreground: parseColor(r.foreground);
+                    background: parseColor(r.background);
+                    width: r.width;
+                };
+                tf.setText(r.text);
+                addResource(tf, new Point3(i.tx, i.ty, i.tz));
+            } else if (i is Resources.SpatialResourceGroup) {
+                const gn = GroupResourceNode {
+                    url: i.url;
+                }
+                addResource(gn, new Point3(i.tx, i.ty, i.tz));
+            } else {
+                doDrop(rebaseURL(i.url), new Point3(i.tx, i.ty, i.tz));
+            }
+	    currentTransform.tx = i.tx;
+	    currentTransform.ty = i.ty;
+	    currentTransform.tz = i.tz;
+
+	    currentTransform.sx = i.sx;
+	    currentTransform.sy = i.sy;
+	    currentTransform.sz = i.sz;
+
+	    currentTransform.rx = i.rx;
+	    currentTransform.ry = i.ry;
+	    currentTransform.rz = i.rz;
+
+	    currentTransform.px = i.px;
+	    currentTransform.py = i.py;
+	    currentTransform.pz = i.pz;
+            const rn = (currentTransform as ResourceNode);
+            println("makeSpatRes: {i} =>{rn}, anim={i.animation}");
+            if (i.colliderResource <> null) {
+                const r = i.colliderResource;
+                rn.collidable = r.collidable;
+                rn.collidableMass = r.mass;
+                rn.collidableFriction = r.friction;
+                rn.collidableRestitution = r.restitution;
+                rn.collidableType = 
+                    if (r.colliderType == "Dynamic") then RigidBodyType.Dynamic
+                        else if (r.colliderType == "Kinematic") then RigidBodyType.Kinematic 
+                            else RigidBodyType.Static;
+                rn.collidableGravityScale = r.gravityScale;
+                                                                     
+            }
+            rn.displayName = i.displayName;
+            rn.programs = foreach (prog in i.programs) {
+                const mem = prog.event.deserialize();
+                var p = Program {
+                    event: mem;
+                    code: prog.code;
+                    sourceCode: prog.compiled;
+                    targetPath: prog.targetPath;
+                    evalContext: Program.EvalContext {
+                        interactive: function from () to Boolean { interactive } 
+                        targetNode: (currentTransform as ResourceTarget).findTarget(prog.targetPath);
+                        instanceSpace: currentScene.instanceSpace;
+                        lookupSpatial: currentScene.root.lookup;
+                        targetTimeline: player;
+                        lookupTemporal: mainTimeLayer.lookup;
+                    }
+                }
+                var ps = [p];
+                var targetContext = resolveContext(rn, p);
+                var targetNodeContext = mainContext.resolveNodeContext(rn);
+                println("RESOLVED CONTEXT {rn} => {targetContext}");
+                for (d in prog.variables) {
+                    const v = Context.ClosureVarContext {
+                        parent: targetNodeContext;
+                        variableName: d.varName;
+                        varType: findTypeAsset(d.varType);
+                        isShortcut: d.isShortcut;
+                    }
+                    const container = mainContext.resolve(d.contextPath) as Context.GroupContext;
+                    insert v into container.content;
+                    var c1 = container as Context.MemberContext;
+                    var p1 = c1.program;
+                    println("CREATED VAR: {v}");
+                    const vp = Program {
+                        parent: p1;
+                        event: p1.event;
+                        code: d.code;
+                        sourceCode: d.sourceCode;
+                        targetPath: prog.targetPath;
+                        evalContext: Program.EvalContext {
+                            eventContext: c1;
+                            varContext: v;
+                            interactive: function from () to Boolean { interactive } 
+                            targetNode: (currentTransform as ResourceTarget).findTarget(prog.targetPath);
+                            instanceSpace: currentScene.instanceSpace;
+                            lookupSpatial: currentScene.root.lookup;
+                            targetTimeline: player;
+                            lookupTemporal: mainTimeLayer.lookup;
+                        }
+                    }
+                    v.program = vp;
+                    p1.defineVar(v, vp);
+                    if (p1 == p) {
+                        insert vp into ps;
+                    }
+                }
+                println("CREATING PROGRAM**** {prog} => {p.sourceCode}");
+                insert p into allPrograms;
+                ps
+            }
+            function convertAnim from (j is Resources.TemporalResource) to TimeNode 
+            {
+                if (j is Resources.ChannelBoxResource) {
+                    const box = j as Resources.ChannelBoxResource;
+                    const channelBox = rn.addChannelBox(box.n_id);
+                    channelBox.playTime = box.playTime;
+                    channelBox.playRate = box.playRate;
+                    channelBox.playCount = box.playCount;
+                    channelBox.blendWeight = 1.0;//i.animation.blendWeight;
+                    foreach (x in box.channels) {
+                        const c = channelBox.resolveChannel(x.target);
+                        c.playTime = x.playTime;
+                        c.playCount = x.playCount;
+                        c.playRate = x.playRate;
+                        c.blendWeight = x.blendWeight;
+                        c.keys = foreach (k in x.keys) {
+                            c.createKey(k.keyTime, k.keyValue, f3.media.scene.KeyFrame.Linear);
+                        }
+                    }
+                    return channelBox;
+                } 
+                convertTimeResource(j)
+            }
+            const anims = 
+                foreach (j in i.animation) {
+                convertAnim(j);
+            }
+            insert anims into rn.channelBoxes.content;
+            if (i is Resources.SpatialResourceGroup) {
+                const g = i as Resources.SpatialResourceGroup;
+                for (x in g.resources) {
+                    makeSpatRes(x);
+                }
+            }
+        }
+	for (i in sceneRes.spatialResources) {
+            println("I={i}");
+            makeSpatRes(i);
+	}
+        var tempResources = currentAnimResource.resources;
+        currentAnimResource.resources = [];
+	for (i in sceneRes.temporalResources) {
+            var q is TimeNode;
+            if (i.url.contains("#")) { // clip from library
+                for (x in currentResource.resources) {
+                    if (x is MaResourceNode) {
+                        const j = (x as MaResourceNode).temporal;
+                        q = j.lookup(i.url);
+                    }
+                }
+            } else {
+                for (j in tempResources) {
+                    if (i.url == j.url) {
+                        q = j;
+                        break;
+                    } 
+                }
+            }
+            if (q <> null) {
+                q.playTime = i.playTime;
+                q.playRate = i.playRate;
+                q.playCount = i.playCount;
+                const qt = q as ResourceTimeNode;
+                insert qt into currentAnimResource.resources;
+                qt.programs = foreach (prog in i.programs) {
+                    const p = Program {
+                        event: prog.event.deserialize();
+                        code: prog.code;
+                        sourceCode: prog.compiled;
+                        targetPath: prog.targetPath;
+                        evalContext: Program.EvalContext {
+                            interactive: function from () to Boolean { interactive } 
+                            targetNode: qt;
+                            instanceSpace: currentScene.instanceSpace;
+                            lookupSpatial: currentScene.root.lookup;
+                            targetTimeline: player;
+                            lookupTemporal: mainTimeLayer.lookup;
+                        }
+                    }
+                    println("CREATING PROGRAM**** {prog} => {p.sourceCode}");
+                    insert p into allPrograms;
+                    p;
+                }
+            } else {
+                println("Couldn't resolve temporal resource: {i.url}");
+                null;
+            }
+	}
+        for (j in sceneRes.layers) {
+            var scene = ResourceScene {
+                paused: bind player.paused;
+                background: null;
+                id: j.name;
+                camera: Camera2D { near: -1000, far: 1000, tz: 900 };   
+                dynamicsWorld: {
+                    var w = box2dDynamicsWorldFactory.createDynamicsWorld();
+                    w.paused = player.paused;
+                    w
+                }
+            }
+            insert scene into currentScenes;
+            transformHierarchy.selectScene(scene);
+            foreach (i in j.spatialResources) {
+                makeSpatRes(i);
+            }
+        }
+        function addTimeResource from (rn is ResourceTimeNode) to () {
+            const ctx = Context.ResourceTimeNodeContext { 
+                parent: contextModel.selectedGroupContext; 
+                resource: rn;
+            } 
+            rn.ctx = ctx;
+            insert ctx into contextModel.selectedGroupContext.content;
         }
         var resulting = 
             foreach (i in sceneRes.temporalResources) {
@@ -2430,7 +2324,6 @@ Tabview.Tab {
                                                         mainTrax: bind trax;
                                                         assetModel: bind assetModel;
                                                         eventTarget: bind contextModel.selectedMemberContext;
-                                                        variableTargets: bind [contextModel.selectedVarContext];
                                                         resourceTargets: bind currentResource.resources;
                                                         loop: bind nonInteractiveLoop;
                                                         target: player;
