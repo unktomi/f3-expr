@@ -18,6 +18,7 @@ import expr.inspector.*;
 import expr.inspector.Inspector.*;
 import expr.ResourceNode.*;
 import expr.ResourceTextField.*;
+import expr.Resources.SpriteResource;
 import expr.Resources.TextFieldResource;
 import expr.Resources.TextOutputResource;
 import expr.Resources.parseColor;
@@ -716,13 +717,25 @@ public function run from (args is String[]) to ()
                    loweredUrl.endsWith(".xbm") or 
                    loweredUrl.endsWith(".xpm") or 
                    loweredUrl.endsWith(".tga")) {
-	    const image= Image { 
+	    const image = Image { 
 		url: url;
 	    }
-	    const rn = ResourceNode {
+            const sprite = SpriteSheet {
+                image: image;
+            }
+	    const rn = SpriteResourceNode {
 		url: url;
-		content: image;
+                sprite: bind sprite;
 	    }	
+            const rtn = ResourceTimeNode {
+                playCount: -1;
+                displayName: bind rn.displayName inverse;
+                id: url;
+		url: url;
+		spatial: rn;
+                content: bind sprite.animation;
+            }
+            addTimeResource(rtn);
 	    addResource(rn, pt);
 	} else {
 	    const browser = WebBrowser {
@@ -758,6 +771,7 @@ public function run from (args is String[]) to ()
     var graphEditor is expr.timeline.GraphEditor;
 
     var fps = bind 1s/trax.frameRate;
+
     const inspector0 is Inspector = Inspector {
         fps: bind fps;
         popupLayer: bind popupLayer;
@@ -1203,6 +1217,7 @@ public function run from (args is String[]) to ()
                     for (x in currentResource.resources) {
                         if (u == x.url) {
                             t = x.temporal;
+                            addTimeResource(x.temporal);
                             break;
                         } else {
                             if (x is MaResourceNode) {
@@ -1222,7 +1237,7 @@ public function run from (args is String[]) to ()
                                     addTimeResource(rtn);
                                     break;
                                 }
-                            }
+                            } 
                         }
                     }
                 } 
@@ -1264,6 +1279,30 @@ public function run from (args is String[]) to ()
                     width: r.width;
                 };
                 tf.setText(r.text);
+                addResource(tf, new Point3(i.tx, i.ty, i.tz));
+            } else if (i is SpriteResource) {
+                const r = i as SpriteResource;
+                const tf = SpriteResourceNode {
+                    sprite: SpriteSheet {
+                        image: Image { url: r.url }
+                        rows: r.rowCount;
+                        columns: r.columnCount;
+                        frameCount: r.frameCount;
+                        duration: r.duration;
+                    }
+                    id: r.id;
+                    url: r.url;
+                    displayName: i.displayName;
+                };
+                const rtn = ResourceTimeNode {
+                    playCount: -1;
+                    displayName: bind tf.displayName inverse;
+                    id: url;
+                    url: url;
+                    spatial: tf;
+                    content: bind tf.sprite.animation;
+                }
+                tf.temporal = rtn;
                 addResource(tf, new Point3(i.tx, i.ty, i.tz));
             } else if (i is Resources.SpatialResourceGroup) {
                 const gn = GroupResourceNode {
@@ -1644,22 +1683,9 @@ public function run from (args is String[]) to ()
                                                                                         r.createProgram(j);
                                                                                     }
                                                                                 }
-                                                                            },
-                                                                            Menu.Separator {},
-                                                                            MenuItem {
-                                                                                label: "Up"
-                                                                            },
-                                                                            MenuItem {
-                                                                                label: "Down"
-                                                                            },
-                                                                            MenuItem {
-                                                                                label: "Left"
-                                                                            },
-                                                                            MenuItem {
-                                                                                label: "Right"
                                                                             }]
                                                                         },
-                                                                        Menu {
+                                                                        if not (ctx is Context.MemberContext) then null else Menu {
                                                                             label: "New";
                                                                             items:[
                                                                                    MenuItem {
@@ -1688,6 +1714,7 @@ public function run from (args is String[]) to ()
                                                                                    },
                                                                                    MenuItem {
                                                                                        label: "Function";
+                                                                                       enabled: no;
                                                                                    }
                                                                                 ]
                                                                         }]

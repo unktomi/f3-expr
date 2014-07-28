@@ -54,6 +54,12 @@ public class ReadonlyInspectedNumberValue is ReadonlyInspectedValue of Number {
 public class ReadonlyInspectedBooleanValue is ReadonlyInspectedValue of Boolean {
 }
 
+public class ReadonlyInspectedIntegerValue is ReadonlyInspectedValue of Integer {
+}
+
+public class ReadonlyInspectedDurationValue is ReadonlyInspectedValue of Duration {
+}
+
 public class ReadonlyInspectedVector of a is InspectedElement {
     public var targets is (ReadonlyInspectedValue of a)[];
 }
@@ -63,6 +69,9 @@ public class InspectedValue of a is InspectedElement {
 }
 
 public class InspectedBooleanValue is InspectedValue of Boolean {
+}
+
+public class InspectedDurationValue is InspectedValue of Duration {
 }
 
 public class InspectedVector of a is InspectedElement {

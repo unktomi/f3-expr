@@ -516,20 +516,24 @@ public class TimeNodeView is AbstractNode
                          dragging = false;
 		     }
 		 },
-                 Group {
+                 if (true) null else Group {
                      transform: bind translate(trax.durationToX(target.contentBounds.start), 0)
                      content: bind getRepeatMesh(-w/2, trax.durationToX(target.contentBounds.duration()), h, target.playCount);
                  },
 		 Text.Label {
 		     blocksPointer: false;
-                     transform: bind translate(20+labelX, 
+                     var f = bind timeNodeViewFont;
+                     var t = bind getTrackName(target);
+                     var tw = bind f.width(t)+6;
+                     transform: bind translate(20+labelX-w/2+tw/2,
                                                font.descent);
 		     //height: bind h;
-		     width: bind Math.max(w, 100);
+		     //width: bind Math.max(w, 100);
+                     width: bind tw;
 		     background: null;
 		     foreground: bind fg;
-		     text: bind getTrackName(target);
-		     font: bind timeNodeViewFont;
+		     text: bind t
+                         font: bind f;
 		 },
 		 Rectangle is MouseInputHandler {
 		     transform: bind translate(labelX+-w/2+5.0/2+2, 0);

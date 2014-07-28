@@ -38,10 +38,7 @@ public class EvalContext {
         c = c.parent;
         while (c <> null and not (c is ProgramContext)) { c = c.parent }
         const c1 = c as ProgramContext;
-        println("get parent context: {eventContext.member} / {varContext.variableName} => {c}, {c1.program}, {c1.program.evalContext}");
-        if (c1.program.evalContext <> null) {
-            println("vars: {c1.program.evalContext.varMap}");
-        }
+        //println("get parent context: {eventContext.member} / {varContext.variableName} => {c}, {c1.program}, {c1.program.evalContext}");
         return c1.program.evalContext;
     }
     public var debugger is ObservableDebugger = DebuggerEngine {
@@ -72,12 +69,15 @@ public class EvalContext {
         if (ref == null) {
             ref = getParentContext().getVarRef(name);
         }
+        if (ref == null) {
+            println("error: variable not found: {name}");
+        }
         return ref;
     }
 
     function createVars from (prog is Program, target is Object) to ()
     {
-        println("CREATING VARS in {prog.event} => {prog.varSources}");
+        //println("CREATING VARS in {prog.event} => {prog.varSources}");
         for (ent in prog.varSources.entrySet() where not ent.getKey().isShortcut) {
             const v = ent.getKey();
             const t = v.varType.t;
@@ -110,7 +110,6 @@ public class EvalContext {
 
     function lookupVarDebug from (name is String) to Object {
         const r = lookupVar(name);
-        println("lookup var {name} => {r}");
         return r;
     }
 
