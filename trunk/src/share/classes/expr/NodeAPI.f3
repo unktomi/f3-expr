@@ -25,6 +25,9 @@ public interface NodeAPI {
     public var pz is Number;
     public readonly var visibleInScene is Boolean;
     public var visible is Boolean;
+    public function getScene to Scene;
+
+    public var toSceneTransform is Mat4;
 
     public function applyForce from (v is Vec3) to () { applyForce(v.x, v.y, v.z) }
     public function applyForce from (x is Number, y is Number, z is Number) to ();

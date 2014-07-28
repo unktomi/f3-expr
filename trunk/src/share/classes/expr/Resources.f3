@@ -92,6 +92,13 @@ public class TextFieldResource is TextResource {
 public class TextOutputResource is TextResource {
 }
 
+public class SpriteResource is SpatialResource {
+    public var rowCount is Integer;
+    public var columnCount is Integer;
+    public var frameCount is Integer;
+    public var duration is Duration;
+}
+
 function formatColor from (c is Color) to Integer
 {
     const r = (c.red * 255 + 0.5) as Integer;
@@ -278,6 +285,34 @@ class ResourceBuilder {
                 animation: anims;
                 colliderResource: colliderResource;
                 resources: foreach (x in g.content) makeResource(x as ResourceNode);
+            }
+        } else if (n is SpriteResourceNode) {
+            const s = n as SpriteResourceNode;
+            SpriteResource {
+                rowCount: s.sprite.rows;
+                columnCount: s.sprite.columns;
+                frameCount: s.sprite.frameCount;
+                duration: s.sprite.duration;
+                displayName: n.displayName;
+                url: convertUrl(n.url);
+                tx: n.tx;
+                ty: n.ty;
+                tz: n.tz;
+                
+                sx: n.sx;
+                sy: n.sy;
+                sz: n.sz;
+                
+                rx: n.rx;
+                ry: n.ry;
+                rz: n.rz;
+                
+                px: n.px;
+                py: n.py;
+                pz: n.pz;
+                programs: progs;
+                animation: anims;
+                colliderResource: colliderResource;
             }
         } else {
             SpatialResource {

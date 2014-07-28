@@ -486,6 +486,17 @@ public class InspectedNumber is InspectedRange of Number
     }
 }
 
+public class InspectedInteger is InspectedRange of Integer 
+{
+    public const low is Integer;
+    public const hi is Integer;
+    override function getFromT from (t is Number) to Integer 
+    { 
+	const n = if (hi > low) then low + (hi - low)*t else t;
+        return Math.round(n) as Integer;
+    }
+}
+
 public class InspectedDuration is InspectedRange of Duration 
 {
     public const low is Duration;
@@ -754,9 +765,22 @@ public class BooleanField is SliderField {
 }
 
 public class IntegerField is SliderField {
-
+    public var onSetKey is function from () to ();
     public var min is Integer = 0;
     public var max is Integer = 100;
+    override function filterKeyInput from (k is KeyboardEvent) to Boolean
+    {
+        if (k.keyChar == "s") {
+            onSetKey();
+            return false;
+        }
+        if (k.keyCode == Keys.Backspace or k.keyChar == "-" or java.lang.Character.isDigit(k.keyChar.charAt(0))) {
+           return true;
+        }
+        return false;
+    }
+
+    public var i is InspectedInteger;
 
     protected function onChange from (n is Integer) to () 
     {
@@ -769,11 +793,25 @@ public class IntegerField is SliderField {
 	t = (n-min as Number) / (max-min as Number);
     }
 
+    var disp is Disposable;
+
+    postinit {
+        const n is Integer = if i.get() == null then 0 else i.get();
+        onChange(n);
+        disp = i.observable.subscribe(onChange);
+    }
+
+    override var t on replace {
+        const n = java.lang.Math.round(min + (max - min)*t) as Integer;
+        i.set(n);
+    }
+
     override function onCommit from (text is String) to () {
         try {
             onChange(Integer.parseInt(text));
         } catch (e is java.lang.Exception) {
         }
+        MasterUndoable.commit();
     }
 
     override function onCommit to () 
@@ -790,11 +828,11 @@ public class IntegerField is SliderField {
 }
 
 public class DurationField is SliderField {
+    public var i is InspectedDuration;
     public var fps is Duration on replace {
-        onChangeDur(i.get());
+        if (0s+fps <> 0s) onChangeDur(i.get());
     }
     public var onSetKey is function from () to ();
-    public var i is InspectedDuration;
     public var min is Number = 0.0;
     public var max is Number = 1.0;
     override function filterKeyInput from (k is KeyboardEvent) to Boolean
@@ -809,33 +847,46 @@ public class DurationField is SliderField {
         return false;
     }
     var disp is Disposable;
-    function onChangeDur from (d is Duration) to () 
+    function onChangeDur from (d0 is Duration) to () 
     {
-        onChange(d / fps);
+        const d = 0s+d0;
+        if (0s+fps <> 0s) {
+            onChange(d / fps);
+        }
     }
     function onChange from (n is Number) to () 
     {
-	t = (n-min) / (max-min);
+	var v = (n-min) / (max-min);
+        if (Number.isNaN(v)) {
+            java.lang.Thread.currentThread().dumpStack();
+        } else if (v == Number.POSITIVE_INFINITY) {
+            java.lang.Thread.currentThread().dumpStack();
+        } else {
+            t = v;
+        }
     }
     postinit {
-        const n is Duration = i.get();
+        const n is Duration = if i.get() == null then 0s else i.get();
         onChangeDur(n);
         disp = i.observable.subscribe(onChangeDur);
     }
 
     override var t on replace {
+        println("t={t}, fps={fps}, i.get()={i.get()}");
         var n = min + (max - min)*t;
         i.set(fps * n);
     }
 
     override function onCommit from (text is String) to () {
-        var num is Number = i.get() / fps;
-        try {
-            num = java.lang.Float.parseFloat(text);
-        } catch (e is java.lang.Exception) {
+        if (0s+fps <> 0s) {
+            var num is Number = i.get() / fps;
+            try {
+                num = java.lang.Float.parseFloat(text);
+            } catch (e is java.lang.Exception) {
+            }
+            onChange(num);
+            MasterUndoable.commit();
         }
-        onChange(num);
-        MasterUndoable.commit();
     }
 
     override function onCommit to () {
@@ -1029,6 +1080,16 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
                     editable: bind i.editable;
                     onSetKey: bind onSetKey;
 		    i: bind i as InspectedNumber;
+	            width: bind fieldWidth;
+		    height: bind cellHeight-margin;
+		}
+            } else if (i is InspectedInteger) then
+	    TransformNode {
+		tx: bind width / 2 - fieldWidth / 2-indent;
+		content: IntegerField {
+                    editable: bind i.editable;
+                    onSetKey: bind onSetKey;
+		    i: bind i as InspectedInteger;
 	            width: bind fieldWidth;
 		    height: bind cellHeight-margin;
 		}
@@ -1282,6 +1343,32 @@ function inspect from (elem is InspectedElement) to (Inspected of ?)[]
                 override function get to Boolean { v.target.get() }
                 override function set from (n is Boolean) to () { if (v.editable) v.target.set(n) }
             }
+        } else if (x is InspectedIntegerValue) {
+            const v = x as InspectedIntegerValue;
+            InspectedInteger {
+                editable: v.editable;
+                observable: Observables.observe(v.target);
+                label: name;
+                override function get to Integer { v.target.get() }
+                override function set from (n is Integer) to () { 
+                    if (v.editable) {
+                        println("SET INTEGER {v}, {v.target}, {n}");
+                        v.target.set(n);
+                    }
+                }
+            }
+        } else if (x is InspectedDurationValue) {
+            const v = x as InspectedDurationValue;
+            InspectedDuration {
+                editable: v.editable;
+                observable: Observables.observe(v.target);
+                label: name;
+                override function get to Duration { v.target.get() }
+                override function set from (n is Duration) to () { 
+                    println("SET DURATION {v}, {v.target}, {n}");
+                    if (v.editable) v.target.set(n);
+                }
+            }
         } else if (x is ReadonlyInspectedNumberValue) {
             const v = x as ReadonlyInspectedNumberValue;
             InspectedNumber {
@@ -1301,6 +1388,24 @@ function inspect from (elem is InspectedElement) to (Inspected of ?)[]
                 label: name;
                 override function get to Boolean { v.target.get() }
                 override function set from (n is Boolean) to () {}
+            }
+        } else if (x is ReadonlyInspectedDurationValue) {
+            const v = x as ReadonlyInspectedDurationValue;
+            InspectedDuration {
+                editable: false;
+                observable: Observables.observe(v.target);
+                label: name;
+                override function get to Duration { v.target.get() }
+                override function set from (n is Duration) to () {}
+            }
+        } else if (x is ReadonlyInspectedIntegerValue) {
+            const v = x as ReadonlyInspectedIntegerValue;
+            InspectedInteger {
+                editable: false;
+                observable: Observables.observe(v.target);
+                label: name;
+                override function get to Integer { v.target.get() }
+                override function set from (n is Integer) to () {}
             }
             /*
         } else if (x is InspectedIntegerValue) {
