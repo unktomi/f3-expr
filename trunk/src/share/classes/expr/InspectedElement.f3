@@ -41,6 +41,9 @@ public class InspectedIntegerValue is InspectedValue of Integer {
     public var max is Integer = Integer.MAX_VALUE;
 }
 
+public class InspectedColorValue is InspectedValue of Color {
+}
+
 public class ReadonlyInspectedValue of a is InspectedElement {
     override var editable = false;
     public var target is ObservableConstRef of a;

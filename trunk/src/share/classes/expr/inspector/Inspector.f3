@@ -1369,6 +1369,17 @@ function inspect from (elem is InspectedElement) to (Inspected of ?)[]
                     if (v.editable) v.target.set(n);
                 }
             }
+        } else if (x is InspectedColorValue) {
+            const v = x as InspectedColorValue;
+            InspectedColor {
+                editable: v.editable;
+                observable: Observables.observe(v.target);
+                label: name;
+                override function get to Color { v.target.get() }
+                override function set from (n is Color) to () { 
+                    if (v.editable) v.target.set(n);
+                }
+            }
         } else if (x is ReadonlyInspectedNumberValue) {
             const v = x as ReadonlyInspectedNumberValue;
             InspectedNumber {

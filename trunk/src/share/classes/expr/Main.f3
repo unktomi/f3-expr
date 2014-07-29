@@ -1155,6 +1155,14 @@ public function run from (args is String[]) to ()
         }
         mainContext.programs = topLevels;
         function convertTimeResource from (i is Resources.TemporalResource) to TimeNode {
+            function addTimeResource from (rn is ResourceTimeNode) to () {
+                const ctx = Context.ResourceTimeNodeContext { 
+                    parent: contextModel.selectedGroupContext; 
+                    resource: rn;
+                } 
+                rn.ctx = ctx;
+                insert ctx into contextModel.selectedGroupContext.content;
+            }
             var t is TimeNode;
             if (i.url.startsWith("timenode://TransitionLayer")) {
                 t = TransitionLayer {
@@ -1217,6 +1225,9 @@ public function run from (args is String[]) to ()
                     for (x in currentResource.resources) {
                         if (u == x.url) {
                             t = x.temporal;
+                            t.playTime = i.playTime;
+                            t.playRate = i.playRate;
+                            t.playCount = i.playCount;
                             addTimeResource(x.temporal);
                             break;
                         } else {
@@ -1297,8 +1308,8 @@ public function run from (args is String[]) to ()
                 const rtn = ResourceTimeNode {
                     playCount: -1;
                     displayName: bind tf.displayName inverse;
-                    id: url;
-                    url: url;
+                    id: r.url;
+                    url: r.url;
                     spatial: tf;
                     content: bind tf.sprite.animation;
                 }
@@ -1507,14 +1518,6 @@ public function run from (args is String[]) to ()
             foreach (i in j.spatialResources) {
                 makeSpatRes(i);
             }
-        }
-        function addTimeResource from (rn is ResourceTimeNode) to () {
-            const ctx = Context.ResourceTimeNodeContext { 
-                parent: contextModel.selectedGroupContext; 
-                resource: rn;
-            } 
-            rn.ctx = ctx;
-            insert ctx into contextModel.selectedGroupContext.content;
         }
         var resulting = 
             foreach (i in sceneRes.temporalResources) {
