@@ -1,0 +1,96 @@
+package expr;
+import f3.media.scene.*;
+import f3.util.Observer.*;
+import f3.util.Observable.*;
+import f3.lang.*;
+import f3.util.*;
+import f3.math.*;
+import expr.undo.*;
+import expr.InspectedElement.*;
+
+public class SpriteResourceNode is ResourceNode {
+    public var sprite is SpriteSheet;
+    var imageWidth = bind sprite.image.getWidth();
+    var imageHeight = bind sprite.image.getHeight();
+    public const colorInspection = InspectedColorValue {
+        displayName: "Color";
+        target: &sprite.color;
+    }
+    public const spriteGroup = bind InspectionGroup {
+        displayName: "Sprite"
+        targets: [
+                  InspectedIntegerValue {
+                      displayName: "Row Count";
+                      target: &sprite.rows;
+                  },
+                  InspectedIntegerValue {
+                      displayName: "Column Count";
+                      target: &sprite.columns;
+                  },
+                  InspectedIntegerValue {
+                      displayName: "Frame Count";
+                      target: &sprite.frameCount;
+                  },
+                  InspectedDurationValue {
+                      displayName: "Duration";
+                      target: &sprite.duration;
+                  }]
+    };
+    public const sizeGroup = InspectionGroup {
+        displayName: "Size";
+        targets: 
+        [ReadonlyInspectedIntegerValue {
+            editable: false;
+            displayName: "Width";
+            target: &imageWidth;
+        },
+        ReadonlyInspectedIntegerValue {
+            editable: false;
+            displayName: "Height";
+            target: &imageHeight;
+        }]
+    };
+
+    override var content = bind sprite;
+
+    function colorPtr from (p is Ref of Color, i is Integer) to Ref of Number
+    {
+        AbstractRef of Number {
+            override function get to Number 
+            {
+                const c = p.get();
+                if (i == 0) then c.red else if i == 1 then c.green else if (i == 2) c.blue else c.opacity;
+            }
+            override function set from (n is Number) to () 
+            {
+                const c = p.get();
+                var r = c.red;
+                var g = c.green;
+                var b = c.blue;
+                var a = c.opacity;
+                if (i == 0) r = n
+                    else if (i == 1) g = n
+                        else if (i == 2) b = n
+                            else a = n;
+                p.set(new Color(r, g, b, a));
+            }
+        }
+    }
+
+    function createSpriteChannels from (parent is ChannelBoxGroup) to (Channel of Number)[]
+    {
+        const names = ["Red", "Green", "Blue"];
+        const ptr = &sprite.color;
+        const ptrs = [colorPtr(ptr, 0), colorPtr(ptr, 1), colorPtr(ptr, 2)];
+        foreach (i in [0..<names.size()]) {
+            Channel of Number {
+                id: bind "{parent.id}#{names[i]}";
+                targets: ptrs[i];
+            }
+        }
+    }   
+
+    override function createChannels from (parent is ChannelBoxGroup) to (Channel of Number)[] { 
+        [createSpriteChannels(parent), super.createChannels(parent)];
+    }
+}
