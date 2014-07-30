@@ -3806,8 +3806,9 @@ public class ParameterView is InputView {
 
     readonly var sliderField is SliderField = bind getSliderField(parameter.t, inputType);
 
-    function getSliderField from (x is F3Type, y is F3Type) to SliderField { // hack: workaround for binding bugs
-        const t = if (y == null) x else y;
+    function getSliderField from (x is F3Type, _ is F3Type) to SliderField { // hack: workaround for binding bugs
+        const t = if (inputType == null) x else inputType;
+        println("GET SLIDER FIELD {x}, {inputType}");
         const slider = 
             if (Reflect.INTEGER_TYPE.isConvertibleFrom(t))
                 then intSlider()

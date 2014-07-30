@@ -99,6 +99,18 @@ public class Treemodel is Foldable of Treenode {
 }
 
 
+function getBackgroundGray
+    from (indentLevel is Integer) 
+    to Number
+{  
+    const g = 0.8 - (2-(indentLevel mod 2)) * .1;
+    return g;
+}	 
+
+const MAX_DEPTH = 120;
+
+const bgs = foreach (i in [0..<MAX_DEPTH]) ColorPaint(Color.gray(getBackgroundGray(i)));
+
 public abstract class Treenode is Foldable of Treenode {
     public var row is Integer;
     public var column is Integer;
@@ -323,7 +335,6 @@ public class Treecell is AbstractNode {
 
 }
 
-const MAX_DEPTH = 20;
 
 class Content is Group, Scissored {
     override var contentBounds = bind scissorBounds;
@@ -345,7 +356,6 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
     public var foreground is Paint = 
 	ColorPaint(Color.color(.2, .2 , .2));
     
-    const bgs = foreach (i in [0..<MAX_DEPTH]) ColorPaint(Color.gray(getBackgroundGray(i)));
 
     public var cellHeight is Number = 16;
     public readonly var cellWidth = bind width;
@@ -431,13 +441,6 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
 	selectionRow == row
     }
 
-    protected function getBackgroundGray
-       from (indentLevel is Integer) 
-       to Number
-    {  
-	const g = 0.8 - (2-(indentLevel mod 2)) * .1;
-	return g;
-    }	 
 
     var scrollOffset is Integer;
     var selectionRow is Integer on replace {

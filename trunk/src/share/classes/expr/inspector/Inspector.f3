@@ -872,7 +872,7 @@ public class DurationField is SliderField {
     }
 
     override var t on replace {
-        println("t={t}, fps={fps}, i.get()={i.get()}");
+        // println("t={t}, fps={fps}, i.get()={i.get()}");
         var n = min + (max - min)*t;
         i.set(fps * n);
     }
