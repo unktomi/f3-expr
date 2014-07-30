@@ -118,6 +118,8 @@ public class ResourceTimeNode is TimeGroup, ResourceTarget {
 
     public var subclips is Subclip[];
 
+    // hack for inspector
+    public readonly var duration = bind contentBounds.duration();
 }
 
 

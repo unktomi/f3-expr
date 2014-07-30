@@ -167,6 +167,7 @@ public interface Float4 {
     public const x is Number;
     public const y is Number;
     public const z is Number;
+    public const w is Number;
 
     public function abs from () to Float4;
     public function acos from () to Float4;
