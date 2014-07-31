@@ -393,7 +393,11 @@ public class TimeNodeView is AbstractNode
             else 
                 trax.durationToX(target.contentBounds.start);//Math.min(trax.durationToX(target.contentBounds.start), 0.0);
     bound var rectY = Math.max(rows-1, 0) * -trax.getViewHeight()/2;
-
+    var visStart = bind trax.durationToX(trax.visibleInterval.start);
+    var visW = bind trax.durationToX(trax.visibleInterval.duration());
+    var repeatStart = bind trax.durationToX(target.contentBounds.start);
+    var repeatW = bind Math.max(trax.durationToX(target.contentBounds.duration()), 1);
+    
     override var internalContent = Group {
 	content:
 	Group {
@@ -534,10 +538,6 @@ public class TimeNodeView is AbstractNode
 		     }
 		 },
                  Group {
-                     var visStart = bind trax.durationToX(trax.visibleInterval.start);
-                     var visW = bind trax.durationToX(trax.visibleInterval.duration());
-                     var repeatStart = bind trax.durationToX(target.contentBounds.start)
-                     var repeatW = bind Math.max(trax.durationToX(target.contentBounds.duration()), 1);
                      transform: bind translate(repeatStart + ((visStart - repeatStart) as Integer) / (repeatW as Integer) * repeatW,  0);
                      content: bind getRepeatMesh(-w/2, repeatW, h, target.playCount, visW);
                  },
@@ -603,18 +603,22 @@ public class TimeNodeView is AbstractNode
                           transform: bind translate(-w/2, if expanded then -trax.getViewHeight() else 0);
                           var ch = bind target as Channel of Number;
                           content: 
-                          [MeshNode {
-                              visible: bind expanded;
-                              transform: bind translate(0, trax.getViewHeight() /2);
-                              var line = PathLine {
-                                  path: bind makeCurve3(target as Channel of Number, 
-                                                        (target as Channel of Number).sortedKeys,
-                                                        bnds,
-                                                        if (expanded) then graphHeight else trax.getViewHeight()).path;
-                              };
-                              pickable: false;
-                              mesh: bind line.mesh;
-                              shader: bind effectLoader.loadPaintShader(CURVE_PAINT);
+                          [Group {
+                                  transform: bind translate(repeatStart + ((visStart - repeatStart) as Integer) / (repeatW as Integer) * repeatW,  0);
+                                  var line = PathLine {
+                                      path: bind makeCurve3(target as Channel of Number, 
+                                                            (target as Channel of Number).sortedKeys,
+                                                            bnds,
+                                                            if (expanded) then graphHeight else trax.getViewHeight()).path;
+                                  };
+                                  var count = Math.ceil(Math.min(w, visW) / repeatW) as Integer;
+                                  content: bind foreach (i in [0..<count]) MeshNode {
+                                      visible: bind expanded;
+                                      transform: bind translate(repeatW * i, trax.getViewHeight() /2);
+                                      pickable: false;
+                                      mesh: bind line.mesh;
+                                      shader: bind effectLoader.loadPaintShader(CURVE_PAINT);
+                                  }
                           },
                           Group {
                               var extent = bind bnds.y - bnds.x;
