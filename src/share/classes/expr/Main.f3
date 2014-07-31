@@ -246,6 +246,8 @@ public function run from (args is String[]) to ()
 
     var lastContext is Context;
 
+    var loaders is Disposable[];
+
     function handleContextVisibility from (ctx is Context, v is Boolean) to ()
     {
         //if (true) return;
@@ -1043,6 +1045,7 @@ public function run from (args is String[]) to ()
         temporalHierarchy2.clearSelection();
         playerUrl = "";
 	MasterUndoable.reset();
+        java.lang.System.gc();
     }
 
     function findTypeAsset from (t is String) to TypeAsset 
@@ -2486,7 +2489,9 @@ Tabview.Tab {
                           MenuItem {
                               label: formatURL(x);
                               action: function to () {
-                                  open(x);
+                                  if (saveChangesIfNecessary()) {
+                                      open(x);
+                                  }
                               }
                           }
                       }

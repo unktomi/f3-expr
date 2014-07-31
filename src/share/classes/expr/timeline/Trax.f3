@@ -198,11 +198,16 @@ public class TimeNodeView is AbstractNode
 
     var repeatMesh is LineMesh;
 
-    function getRepeatMesh from (x is Number, w is Number, h is Number, repeats is Number) to MeshNode 
+    function getRepeatMesh from (x is Number, w is Number, h is Number, repeats0 is Number, visible is Number) to MeshNode 
     {
+        var repeats = repeats0;
         if (repeats <= 1) {
-            repeatMesh = null;
-            return null;
+            if (repeats < 0) {
+                repeats = Integer.MAX_VALUE;
+            } else {
+                repeatMesh = null;
+                return null;
+            }
         }
         if (repeatMesh == null) {
             repeatMesh = LineMesh {};
@@ -211,6 +216,9 @@ public class TimeNodeView is AbstractNode
         for (i in [0..<Math.floor(repeats) as Integer]) {
             repeatMesh.moveTo(x + w * i, -h/2);
             repeatMesh.lineTo(x + w * i, h/2);
+            if (w * i > visible) {
+                break;
+            }
         }
         const mesh = repeatMesh.getMesh();
         mesh.updateBounds();
@@ -516,9 +524,13 @@ public class TimeNodeView is AbstractNode
                          dragging = false;
 		     }
 		 },
-                 if (true) null else Group {
-                     transform: bind translate(trax.durationToX(target.contentBounds.start), 0)
-                     content: bind getRepeatMesh(-w/2, trax.durationToX(target.contentBounds.duration()), h, target.playCount);
+                 Group {
+                     var visStart = bind trax.durationToX(trax.visibleInterval.start);
+                     var visW = bind trax.durationToX(trax.visibleInterval.duration());
+                     var repeatStart = bind trax.durationToX(target.contentBounds.start)
+                     var repeatW = bind Math.max(trax.durationToX(target.contentBounds.duration()), 1);
+                     transform: bind translate(repeatStart + ((visStart - repeatStart) as Integer) / (repeatW as Integer) * repeatW,  0);
+                     content: bind getRepeatMesh(-w/2, repeatW, h, target.playCount, visW);
                  },
 		 Text.Label {
 		     blocksPointer: false;
@@ -1806,6 +1818,9 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
             const n = selectedTimeNodeView.target;
             if (not n.hasIndefiniteDuration()) {
                 bounds = n.bounds;
+            } else {
+                bounds = Interval { start: n.bounds.start, end: n.bounds.start + n.contentBounds.duration() * n.playRate };
+                println("frame bounds: {bounds}");
             }
         } else {
             for (t in timeNodeViews) {
