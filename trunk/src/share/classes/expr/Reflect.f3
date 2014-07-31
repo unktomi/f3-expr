@@ -111,28 +111,14 @@ public function getFunctions from (clazz0 is F3ClassType, all is Boolean) to F3F
 
 public function getFunction from (c is F3ClassType, name is String, params is F3Type[]) to F3FunctionMember 
 {
-    const ps = params;
+    const f0 = c.getFunction(name, params);
     const fs = getFunctions(c, true);
+    const i = f0 as F3Local.FunctionMember;
     for (f in fs) {
-	if (f.getName() == name and f.getType().minArgs() == params.size()) {
-	    const ft = f.getType();
-            var found = true;
-	    for (j in [0..<ft.minArgs()]) {
-		const p0 = ft.getArgumentType(j);
-		const p1 = ps[j];
-		if (p0 <> p1) {
-                    println("{p0} <> {p1}");
-                    found = false;
-                    break;
-                }
-	    }
-            if (found) { 
-                println("found {f}");
-                return f;
-            } else {
-                println("not a match {f}");
-            }
-	}
+       const j = f as F3Local.FunctionMember;
+       if (i.getUnderlying() == j.getUnderlying()) {
+            return f;
+        }
     }
     println("not found: {c.getName()}.{name}({params})");
     return null;

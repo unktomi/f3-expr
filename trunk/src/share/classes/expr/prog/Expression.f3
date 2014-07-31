@@ -6178,18 +6178,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         }
     }
 
-    const printlnFun = Function {
-	fun: getFunction("expr.Console", "println", ["Object"]);
-    };
-
     public var views is ExpressionView[] = [] on replace { canvas.dumpSrc() }
-    /*
-     = FunctionView {
-	pos: new Point3(100, 0, 0);
-	canvas: this;
-	fun: printlnFun;
-    };
-    */
 
     var arrows is TransformNode[];
 

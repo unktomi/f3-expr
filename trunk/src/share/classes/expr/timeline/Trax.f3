@@ -195,6 +195,15 @@ public class TimeNodeView is AbstractNode
     public var playX is Number = bind getPlayX(target.playTime);
     public var content is TransformNode[] = bind getContent(target);
     public var expanded = false;
+    const undoList = UndoList {};
+
+    postinit {
+        if (trax is GraphEditor and target is Channel of Number) {
+            const ch = target as Channel of Number;
+            const ptr = &ch.keys;
+            undoList.addTarget("keys", ptr);
+        }
+    }
 
     var repeatMesh is LineMesh;
 
