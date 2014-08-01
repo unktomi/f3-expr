@@ -596,25 +596,24 @@ public class TimeNodeView is AbstractNode
                           }
                       } else null;
               },
-              if (not trax.graph or not (target is Channel of Number)) then null else Group {
+              if (not trax.graph or not (target is Channel of Number) or not expanded) then null else Group {
                                             visible: bind row > trax.scrollY;
                           //                  pickable: false;
                           var graphHeight = bind h - trax.getViewHeight();
-                          transform: bind translate(-w/2, if expanded then -trax.getViewHeight() else 0);
+                          transform: bind translate(-w/2, -trax.getViewHeight());
                           var ch = bind target as Channel of Number;
                           content: 
                           [Group {
-                                  transform: bind translate(repeatStart + ((visStart - repeatStart) as Integer) / (repeatW as Integer) * repeatW,  0);
+                                  transform: bind translate(repeatStart + Math.min(((visStart - repeatStart) as Integer) / (repeatW as Integer) * repeatW, w-repeatW),  0);
                                   var line = PathLine {
                                       path: bind makeCurve3(target as Channel of Number, 
                                                             (target as Channel of Number).sortedKeys,
                                                             bnds,
-                                                            if (expanded) then graphHeight else trax.getViewHeight()).path;
+                                                            graphHeight).path;
                                   };
-                                  var count = Math.ceil(Math.min(w, visW) / repeatW) as Integer;
+                                  var count = Math.ceil(Math.min(w, visW+repeatW) / repeatW) as Integer;
                                   content: bind foreach (i in [0..<count]) MeshNode {
-                                      visible: bind expanded;
-                                      transform: bind translate(repeatW * i, trax.getViewHeight() /2);
+                                      transform: bind translate(repeatW * i, trax.getViewHeight() /2) * scale(trax.frameRate / 24, 1);
                                       pickable: false;
                                       mesh: bind line.mesh;
                                       shader: bind effectLoader.loadPaintShader(CURVE_PAINT);
@@ -622,14 +621,13 @@ public class TimeNodeView is AbstractNode
                           },
                           Group {
                               var extent = bind bnds.y - bnds.x;
-                              var sy = bind if (extent == 0) then 1.0 else (if (expanded) then graphHeight else h) / extent;
+                              var sy = bind if (extent == 0) then 1.0 else graphHeight / extent;
                               var hoff = bind -graphHeight + 1.0 * trax.getViewHeight();
                               var chKeys = bind ch.keys;
                               content: 
                               [Group { 
-                                      visible: bind expanded;
                                       transform: bind translate(-50+trax.frameToX(trax.currentFrame)-trax.durationToX(ch.boundsInScene.start), hoff+3);
-                                      content: bind if not expanded or extent == 0 then null else foreach (i in [0..<rows]) {
+                                      content: bind if extent == 0 then null else foreach (i in [0..<rows]) {
                                           Text.Label {
                                               width: 100;
                                               transform: bind translate(0, trax.getViewHeight() * i);
@@ -642,13 +640,13 @@ public class TimeNodeView is AbstractNode
                                       }
                                   },
                                   Group {
-                                  transform: bind translate(0, if (expanded) then -trax.getViewHeight()/2 else 0);
+                                  transform: bind translate(0, -trax.getViewHeight()/2);
                                   var channelVis = bind target.toSceneTransform.inverse() * trax.visibleInterval;
                                   content: bind foreach (k in chKeys) {
                                       KeyMark {
                                           visible: bind channelVis.intersects(k.position);
                                           view: this;
-                                          transform: bind translate(trax.durationToX(k.position) / target.toSceneTransform.rate, if (expanded) then hoff+(sy * (k.value - bnds.x)) else 0);                                      
+                                          transform: bind translate(trax.durationToX(k.position) / target.toSceneTransform.rate, hoff+(sy * (k.value - bnds.x)));                                      
                                           ch: bind ch;
                                           k: k;
                                           trax: bind trax;
@@ -1016,6 +1014,11 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
     public bound function durationToX from (d0 is Duration) to Number
     {
 	durationToX(d0, false);
+    }
+
+    public function durationToX from (d is Duration, fps is Number) to Number
+    {
+	var pixels = d / 1s * PIXELS_PER_FRAME * fps;
     }
 
     public bound function durationToX from (d0 is Duration, loop is Boolean) to Number
@@ -1806,9 +1809,9 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
         var ty = valueBounds.x;
         var dy = valueBounds.y - valueBounds.x;
         var sy = if (dy == 0 or viewHeight == 0) then 1.0 else (viewHeight) / dy;
-        [moveTo(new Vec2(durationToX(keys[0].position), -viewHeight+(keys[0].value - ty)*sy)),
+        [moveTo(new Vec2(durationToX(keys[0].position, 24), -viewHeight+(keys[0].value - ty)*sy)),
          foreach (k in keys[1..]) {
-                lineTo(new Vec2(durationToX(k.position), -viewHeight+(k.value - ty)*sy))
+                lineTo(new Vec2(durationToX(k.position, 24), -viewHeight+(k.value - ty)*sy))
         }]
     }
 
