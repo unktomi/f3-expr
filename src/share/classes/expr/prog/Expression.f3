@@ -22,6 +22,15 @@ import expr.undo.*;
 import expr.inspector.*;
 import expr.Context.ClosureVarContext;
 import expr.AssetTree.TypeAsset;
+import expr.AssetTree.sort;
+
+bound function getDisplayName from (n is Node) to String {
+    if (n is ResourceTarget) then (n as ResourceTarget).displayName else n.id;
+}
+
+bound function getDisplayName from (n is TimeNode) to String {
+    if (n is ResourceTarget) then (n as ResourceTarget).displayName else n.id;
+}
 
 function getTypeVars from (t is F3Type) to F3Type[] 
 {
@@ -965,7 +974,7 @@ function argCount from (f is F3FunctionMember) to Integer
 
 function formatName from (f is F3FunctionMember) to String 
 {
-    const name = if argCount(f) == 2 and reverseOperatorMap.containsKey(f.getName()) then reverseOperatorMap.get(f.getName()) else f.getName();
+    const name = if argCount(f) == 1 and f.getName() == "-" then "Negate" else if argCount(f) == 2 and reverseOperatorMap.containsKey(f.getName()) then reverseOperatorMap.get(f.getName()) else f.getName();
     "{Names.formatName(name)} {formatFunctionType(if f.isStatic() then null else f.getDeclaringClass(), f.getType())}"
 }
 
@@ -1087,19 +1096,36 @@ class OutputExpressionRef is OutputMemberExpression {
     public var ref is Expression;
 }
 
+class StaticInputMemberExpression is InputMemberExpression {};
+
 public abstract class ObjectExpression is Expression {
     public var inputMembers is Member[];
     public var outputMembers is Member[];
-    public var inputs is InputMemberExpression[] = bind foreach (p in inputMembers) 
+    public var hasStaticAccess is Boolean = yes;
+    public var inputs is InputMemberExpression[] = bind 
+    [if (not hasStaticAccess) then null else StaticInputMemberExpression {                 
+        member: typeToMember(UNIT_TYPE);
+        target: this;
+    },
+    foreach (p in inputMembers) 
         InputMemberExpression {
         target: this;
         member: p;
-    }
+    }];
     public var outputs is OutputMemberExpression[] = bind foreach (p in outputMembers) 
         OutputMemberExpression {
         source: this;
         member: p;
+    };
+    
+    override public function getTerminals to Expression[]
+    {
+        const terms = foreach (x in outputs) x.getTerminals();
+        if (terms == []) {
+            foreach (x in inputs[1..] where x.observable <> null)  x;
+        } else terms;
     }
+        
 }
 
 class TypeVariableExpression is ObserverExpression {
@@ -1166,7 +1192,7 @@ abstract class TimeNodeExpression is ObjectExpression {
         }
         return t.id;
     }
-    override bound function getName to String { timeNode.id }
+    override bound function getName to String { getDisplayName(timeNode) }
     override function toSource from (context is IContext) to String { "(getClip(\"{getId(timeNode)}\") as {getType().getName()})" }
 
     override function toEnglish to String {
@@ -1188,7 +1214,7 @@ function formatURL from (url is String) to String
 
 abstract class NodeExpression is ObjectExpression {
     public var node is Node;
-    override bound function getName to String { node.id }
+    override bound function getName to String { getDisplayName(node) }
     override function toSource from (context is IContext) to String { "(getNode(\"{node.id}\") as {getType().getName()})" }
     override function toEnglish to String {
         //formatEnglishName(getName())
@@ -1452,6 +1478,9 @@ public class IPath {
         }
         if (observer is InputMemberExpression) {
             const i = observer as InputMemberExpression;
+            if (i is StaticInputMemberExpression) {
+                return i.target.toEnglish();
+            }
             if (i.member.m is F3VarMember and i.member.isObserver) {
                 return "Assign {parents[0].getEnglishAccess()} to the {formatEnglishName(i.member.name)} of {i.target.toEnglish()}"
             } 
@@ -1459,7 +1488,7 @@ public class IPath {
                 const sep = if (i.member.name.startsWith("set")) then " to " else " " ;
                 return "{formatEnglishName(i.member.name)} of {i.target.toEnglish()}{sep}{parents[0].getEnglishAccess()}";
             } else if (i.target is VarContextExpression) {
-                return "Assign {parents[0].getEnglishAccess()} to {i.target.toEnglish()} "
+                return "Assign {parents[0].getEnglishAccess()} to {i.target.toEnglish()} ";
             } else {
                 const sep = if (i.member.m is F3VarMember) then " of " else " ";
                 return "{parents[0].getEnglishAccess()}, {formatEnglishName(i.member.name)}{sep}{i.target.toEnglish()}";
@@ -1607,6 +1636,9 @@ public class IPath {
         }
         if (observer is InputMemberExpression) {
             const i = observer as InputMemberExpression;
+            if (i is StaticInputMemberExpression) {
+                return i.target.toSource(null);
+            }
             if (i.member.m is F3VarMember and i.member.isObserver) {
                 return "\{ {i.target.toSource(null)}.{i.member.toApply()} = {parents[0].getWorldAccess()}; \}";
             } else if (i.target is VarContextExpression) {
@@ -1694,6 +1726,11 @@ class IContext {
                 for (p in br.source.inputs) {
                     insert getIPath(p) into result.parents;
                 }
+            }
+        } else if (ob is OutputMemberExpression) {
+            const j = ob as OutputMemberExpression;
+            for (p in j.source.inputs) {
+                insert getIPath(p) into result.parents;
             }
         } else if (b is ObserverExpression) {
             const obs = b as ObserverExpression;
@@ -2617,6 +2654,7 @@ class SetterView is ObjectView {
     override var objectExpr = bind VarContextExpression { 
         varContext: variable, override function getType to F3Type { variable.varType.t }
         inputMembers: bind introspectMembers(variable);
+        hasStaticAccess: no;
         //outputMembers: foreach (x1 in members where x1.isObservable) x1;
         override function toSource from (context is IContext) to String { variable.variableName }
     }
@@ -2629,7 +2667,8 @@ public class InputMemberExpression is MemberExpression, ObserverExpression {
 
     override function getTerminals to Expression[] 
     {
-        [this]
+        const terms = target.getTerminals();
+        return if (terms == []) then [this] else terms;
     }
 
     override public function toSource from (context is IContext) to String {
@@ -3792,12 +3831,12 @@ public class ParameterView is InputView {
             const f = sliderField;
             if (Reflect.INTEGER_TYPE.isConvertibleFrom(getInputType())) {
                 const nf = f as IntegerField;
-                nf.onChange(parameter.constantValue as Integer);
+                nf.onChange(constValue as Integer);
             } else if (Reflect.NUMBER_TYPE.isConvertibleFrom(getInputType())) {
                 const nf = f as NumberField;
-                nf.onChange(parameter.constantValue as Number);
+                nf.onChange(constValue as Number);
             } else if (Reflect.BOOLEAN_TYPE.isConvertibleFrom(getInputType())) {
-                f.setT(if parameter.constantValue is Boolean and (parameter.constantValue as Boolean) then 1.0 else 0.5);
+                f.setT(if constValue is Boolean and (constValue as Boolean) then 1.0 else 0.5);
             }
         }
     }
@@ -4841,7 +4880,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             k: k;
             font: font;
             transform: translate(popupScene.mousePosition.x + 100, popupScene.mousePosition.y, 0);
-            members: [SHORTCUT, FORK, members];
+            members: [SHORTCUT, FORK, sort(members)];
             height: 200;
             width: 340; 
         }
@@ -5866,7 +5905,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     const sourceCode = XHTML.Text {
         width: bind width;
-        style: "body \{ font-family:Lucida Grande; font-weight:normal; font-size: 11pt; color: #333333; \} a:link \{ text-decoration:none; \} a:hover \{text-decoration:underline;\}";
+        style: "body \{ font-family:Lucida Grande; font-weight:normal; font-size: 11pt; color: #2B1B17; \} a:link \{ text-decoration:none; \} a:hover \{text-decoration:underline;\}";
         transform: bind translate(-width/2, -height/2);
         content: bind if not showSource then "<a href='source://'>Source Code</a>" else "<a href='graph://'>Hide</a><p/><div>{englishOutput}</div>";
         visible: bind englishOutput <> "";

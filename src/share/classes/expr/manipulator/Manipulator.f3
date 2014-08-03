@@ -462,6 +462,7 @@ public class Manipulator is AbstractNode
                 rotateZ.visible = rz;
                 scaleZ.visible = sz;
                 moveZ.visible = tz;
+                moveGuideZ.visible = true;
             }
         } else if (scene.camera is Camera2D) {
             if (not was2d) {

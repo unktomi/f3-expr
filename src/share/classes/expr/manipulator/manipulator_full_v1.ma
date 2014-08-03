@@ -5386,6 +5386,7 @@ createNode transform -n "ScaleAll";
 	setAttr ".rp" -type "double3" 0.42327154942202772 0.4368821890522937 0.42865880333547679 ;
 	setAttr ".sp" -type "double3" 0.42327154942202772 0.4368821890522937 0.42865880333547679 ;
 createNode mesh -n "mScaleAll" -p "ScaleAll";
+
 	setAttr -k off ".v";
 	setAttr ".vir" yes;
 	setAttr ".vif" yes;

@@ -339,7 +339,7 @@ public class TimeNodeView is AbstractNode
     bound var selected1 = selected and trax.focused;
 
     bound function blendColor from (c is Color, a is Number) to ColorPaint {
-        ColorPaint(if (a == 1.0) then c else Color.color(c.red, c.green, c.blue, c.opacity * a));
+        ColorPaint(if (a == 1.0) then c else Color.color(c.red, c.green, c.blue, c.opacity * a +0.6));
     }
 
     bound function getFill from (target is TimeNode) to Paint 
@@ -408,7 +408,7 @@ public class TimeNodeView is AbstractNode
             var dragOk = false;
 	    content: bind
 	    [if (target == null) then null else Group { 
-                visible: bind row + rows - 1 > trax.scrollY;
+                visible: bind row + rows - 1 > trax.scrollY and row < trax.scrollY + trax.visibleRows;
 		content: 
                 [Rectangle {
                      var ww = bind w + trax.durationToX(target.contentBounds.start) / target.toSceneTransform.rate;              
@@ -604,19 +604,33 @@ public class TimeNodeView is AbstractNode
                           var ch = bind target as Channel of Number;
                           content: 
                           [Group {
-                                  transform: bind translate(repeatStart + Math.min(((visStart - repeatStart) as Integer) / (repeatW as Integer) * repeatW, w-repeatW),  0);
+                                  var x1 = bind repeatStart + Math.min(((visStart - repeatStart) as Integer) / (repeatW as Integer) * repeatW, Math.max(w-repeatW, 0));
+                                  transform: bind translate(x1,  0);
+                                  // this mesh is baked at 24 fps - then scaled below by current frame rate
                                   var line = PathLine {
                                       path: bind makeCurve3(target as Channel of Number, 
                                                             (target as Channel of Number).sortedKeys,
                                                             bnds,
                                                             graphHeight).path;
                                   };
-                                  var count = Math.ceil(Math.min(w, visW+repeatW) / repeatW) as Integer;
-                                  content: bind foreach (i in [0..<count]) MeshNode {
-                                      transform: bind translate(repeatW * i, trax.getViewHeight() /2) * scale(trax.frameRate / 24, 1);
-                                      pickable: false;
-                                      mesh: bind line.mesh;
-                                      shader: bind effectLoader.loadPaintShader(CURVE_PAINT);
+                                  var count = bind Math.ceil(Math.min(w, visW+repeatW) / repeatW) as Integer;
+                                  var curveShader = bind effectLoader.loadPaintShader(CURVE_PAINT);
+                                  var ty1 = bind trax.getViewHeight() / 2;
+                                  content: Group {
+                                      var sx1 = bind trax.frameRate / 24;
+                                      var cx1 = bind line.path.getBounds().center.x;
+                                      transform: bind translate(0, ty1);
+                                      content: bind foreach (i in [0..<count]) 
+                                      TransformNode {
+                                          tx: bind repeatW * i - sx1*cx1 + repeatW/2;
+                                          sx: bind sx1;
+                                          content:
+                                          [MeshNode {
+                                              pickable: false;
+                                              mesh: bind line.mesh;
+                                              shader: bind curveShader;
+                                          }]
+                                      }
                                   }
                           },
                           Group {

@@ -518,25 +518,21 @@ public function run from (args is String[]) to ()
                 webBrowserFactory: TheWebBrowserFactory
 		url: url;
                 isInteractive: bind interactive;
-                standalone: true;
+                standalone: false
 	    }
 	    const rn = ResourceNode {
                 url: url;
                 content: bind model;
 	    }
 	    addResource(rn, pt);
-            if (not model.standalone) {
-                const rtn = ResourceTimeNode {
-                    url: url;
-                    displayName: bind rn.displayName inverse;
-                    content: bind model.temporalRoot;
-                    spatial: rn;
-                }
-                if (rtn.bounds.duration() > 0s) {
-                    rn.temporal = rtn;
-                    addTimeResource(rtn);
-                }
+            const rtn = ResourceTimeNode {
+                url: url;
+                displayName: bind rn.displayName inverse;
+                content: bind model.temporalRoot;
+                spatial: rn;
             }
+            rn.temporal = rtn;
+            addTimeResource(rtn);
 	} else if (loweredUrl.endsWith(".mp4") or loweredUrl.endsWith(".mov")) {
             const movie = Movie {
                 url: url;

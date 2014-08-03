@@ -23,8 +23,8 @@ public class ExprNode is AbstractNode {
     public const webBrowserFactory is AbstractWebBrowserFactory = the AbstractWebBrowserFactory;
     public var url is String;
     override var id = bind url;
-    public var spatialRoot is Node = bind modelContent.spatialRoot;
-    public var temporalRoot is TimeNode = bind modelContent.temporalRoot;
+    public var spatialRoot is Node = Group { id: "Content", content: bind modelContent.spatialRoot };
+    public var temporalRoot is TimeNode = TimeGroup { id: "Content", content: bind modelContent.temporalRoot };
     public var modelContent is ModelContent = bind if url.endsWith(".expr") then loadExpr(url) else loadResource(url);
     var instanceSpace is Group = Group {};
     public var programs is Program[];
@@ -64,13 +64,18 @@ public class ExprNode is AbstractNode {
         } 
     } else null;
 
+    const contentRoot is Group = Group {id: "__Content__"};
+
     function loadExpr from (url is String) to ModelContent {
         var r is SceneResource = Resources.open(url);
         var allPrograms is Program[];
+        
         var ns is ExprNode[] = foreach (x in r.spatialResources) {
             const currentTransform = ExprNode {
+                parent: contentRoot;
                 isInteractive: bind isInteractive;
                 url: x.url
+                standalone: false;
             }
             currentTransform.programs = 
             foreach (prog in x.programs) {
@@ -103,9 +108,7 @@ public class ExprNode is AbstractNode {
             }
             currentTransform;
         }
-        const spatialRoot = Group {
-            id: "Main Scene";
-            content: foreach (x in r.spatialResources) {
+        for (x in r.spatialResources) {
                 const n = ns[indexof x];
                 const tn = TransformNode {
                     id: "transform"
@@ -135,8 +138,11 @@ public class ExprNode is AbstractNode {
                                 else RigidBodyType.Static;
                     tn.collider = c;
                 }
-                tn
-            }
+                insert tn into contentRoot.content;
+            };
+        const spatialRoot = Group {
+            id: "Main Scene";
+            content: contentRoot;
         }
         for (j in r.spatialResources, anim in j.animation) {
             // @TODO handle layers
@@ -232,7 +238,7 @@ public class ExprNode is AbstractNode {
             convertTimeResource(x)
         };
         ModelContent {
-            spatialRoot: if (spatialRoot.content.size() == 1) then spatialRoot.content[0] else spatialRoot;
+            spatialRoot: contentRoot;
             temporalRoot: if (temps.size() == 1) then temps[0] else TimeGroup { content: temps };
         }
     }
@@ -292,11 +298,13 @@ public class ExprNode is AbstractNode {
                    loweredUrl.endsWith(".ndo")
                    ) {
             const model = F3Assimp {
+                sceneRoot: parent;
+                monitorForChanges: yes;
                 url: url;
             }
             ModelContent {
-                spatialRoot: bind model.getSpatialRoot();
-                temporalRoot: bind model.getTemporalRoot();
+                spatialRoot: bind model.spatialRoot;
+                temporalRoot: bind model.temporalRoot;
             }
 	} else if (loweredUrl.endsWith(".mp4") or 
                    loweredUrl.endsWith(".mov")) {
