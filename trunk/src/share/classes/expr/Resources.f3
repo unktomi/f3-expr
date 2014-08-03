@@ -178,6 +178,14 @@ class ResourceBuilder {
                         sourceCode: x.getValue().sourceCode;
                         code: x.getValue().code;
                         contextPath: x.getKey().parent.fullName();        
+                        programs: foreach (c in x.getKey().content where c is Context.MemberContext) {
+                            const c1 = c as Context.MemberContext;
+                            const p1 = c1.program;
+                            ProgramResource {
+                                code: p1.code;
+                                compiled: p1.sourceCode;
+                            }
+                        }
                     }
                 }
                 event: p.event.serialize();
@@ -451,6 +459,7 @@ public class VarDecl {
     public var code is ExprScene;
     public var isShortcut is Boolean = true;
     public var contextPath is String;
+    public var programs is ProgramResource[];
 }
 
 class ExportingBuilder is ResourceBuilder {
@@ -566,6 +575,14 @@ public function save
                             sourceCode: x.getValue().sourceCode;
                             code: x.getValue().code;
                             contextPath: x.getKey().parent.fullName();
+                            programs: foreach (c in x.getKey().content where c is Context.MemberContext) {
+                                const c1 = c as Context.MemberContext;
+                                const p1 = c1.program;
+                                ProgramResource {
+                                    code: p1.code;
+                                    compiled: p1.sourceCode;
+                                }
+                            }
                         }
                     }
                     code: p.code;

@@ -99,8 +99,26 @@ public class EvalContext {
             println("created variable {v.variableName} = {source} => {ref}");
             java.lang.Thread.currentThread().dumpStack();
             registerVar(v.variableName, ref);
+            for (g in prog.observers) {
+                const v0 = g.evalContext.eventContext.parent as Context.ClosureVarContext;
+                if (v0 == v) {
+                    const f1 = evaluator.compileAndRun(g.getSourceCode()) 
+                        as function from (ObservableDebugger, Object, 
+                                          function from String to Object, function from String to Node, function from String to TimeNode, function from (Object) to ()) to (Observable of ?)[];
+                    const obs1 = f1(debugger, targetNode, lookupVarDebug, lookupSpatialDebug, lookupTemporalDebug, function from (x is Object) to () {
+                        });
+                    if (varSubscriberMap.containsKey(v0)) {
+                        const oldSubs = varSubscriberMap.get(v0);
+                        for (x in oldSubs) x.dispose();
+                    }
+                    const subs1 = foreach (ob1 in obs1) subscribe(ob1);
+                    varSubscriberMap.put(v0, subs1);
+                }
+            }
         }
     }
+
+    var varSubscriberMap = new java.util.HashMap of (Context.ClosureVarContext, Disposable[]);
 
     public function registerVar from (name is String, value is ObservableRef of ?) to ()
     {
@@ -164,6 +182,15 @@ public class EvalContext {
     }
 
     var subs is Disposable[];
+
+    public function subscribe of a from (obsvb is Observable of a) to Disposable
+    {
+        obsvb.subscribe(DefaultObserver of a {
+                override function onNext from (x is a) to () {
+                    println("var change...");
+                }
+            });
+    }
 
     public function subscribe of a from (obsvb is Observable of a, prog is Program) to ()
     {
@@ -241,6 +268,18 @@ public class Program {
     public const evalContext is EvalContext;
 
     public const varSources = new java.util.HashMap of (Context.ClosureVarContext, Program);
+
+    const observers is java.util.Set of Program = new java.util.HashSet of Program();
+
+    public function addObserver from (p is Program) to () 
+    {
+        parent.observers.add(p);
+    }
+
+    public function removeObserver from (p is Program) to () 
+    {
+        parent.observers.remove(p);
+    }
 
     public function undefineVar from (v is Context.ClosureVarContext) to ()
     {

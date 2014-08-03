@@ -1049,6 +1049,7 @@ public function run from (args is String[]) to ()
         temporalHierarchy.clearSelection();
         temporalHierarchy2.clearSelection();
         playerUrl = "";
+        mainContext.createStart();
 	MasterUndoable.reset();
         java.lang.System.gc();
     }
@@ -1156,6 +1157,26 @@ public function run from (args is String[]) to ()
                 }
                 v.program = vp;
                 p.defineVar(v, vp);
+                foreach (prog1 in d.programs) {
+                    const m = v.addEvent();
+                    const vpp = Program {
+                        event: m.member;
+                        code: prog1.code;
+                        sourceCode: prog1.compiled;
+                        evalContext: Program.EvalContext {
+                            eventContext: m;
+                            varContext: null;
+                            interactive: function from () to Boolean { interactive } 
+                            targetNode: null;
+                            instanceSpace: currentScene.instanceSpace;
+                            lookupSpatial: currentScene.root.lookup;
+                            targetTimeline: player;
+                            lookupTemporal: mainTimeLayer.lookup;
+                        }
+                    }
+                    m.program = vpp;
+                    vp.addObserver(vpp);
+                }
                 insert vp into ps;
             }
             insert p into allPrograms;
@@ -1164,12 +1185,15 @@ public function run from (args is String[]) to ()
         mainContext.programs = topLevels;
         function convertTimeResource from (i is Resources.TemporalResource) to TimeNode {
             function addTimeResource from (rn is ResourceTimeNode) to () {
-                const ctx = Context.ResourceTimeNodeContext { 
-                    parent: contextModel.selectedGroupContext; 
-                    resource: rn;
-                } 
-                rn.ctx = ctx;
-                insert ctx into contextModel.selectedGroupContext.content;
+                var ctx = contextModel.rootContext.resolveTimeNodeContext(rn);
+                if (ctx == null) {
+                    ctx = Context.ResourceTimeNodeContext { 
+                        parent: contextModel.selectedGroupContext; 
+                        resource: rn;
+                    } 
+                    insert ctx into contextModel.selectedGroupContext.content;
+                    rn.ctx = ctx;
+                }
             }
             var t is TimeNode;
             if (i.url.startsWith("timenode://TransitionLayer")) {
@@ -1236,6 +1260,7 @@ public function run from (args is String[]) to ()
                     for (x in currentResource.resources) {
                         if (u == x.url) {
                             t = x.temporal;
+                            t.blendWeight = i.blendWeight;
                             t.playTime = i.playTime;
                             t.playRate = i.playRate;
                             t.playCount = i.playCount;
@@ -1489,6 +1514,8 @@ public function run from (args is String[]) to ()
                 q.playTime = i.playTime;
                 q.playRate = i.playRate;
                 q.playCount = i.playCount;
+                q.blendWeight = i.blendWeight;
+                q.paused = i.paused;
                 const qt = q as ResourceTimeNode;
                 insert qt into currentAnimResource.resources;
                 qt.programs = foreach (prog in i.programs) {
@@ -1736,6 +1763,20 @@ public function run from (args is String[]) to ()
                                                                                 ]
                                                                         }]
                                                                     };
+                                                                    e.stage.showPopupMenu(e.screenx, e.screeny+contextTree.cellHeight, menu);
+                                                                } else if (ctx is Context.ClosureVarContext) {
+                                                                    const v = ctx as Context.ClosureVarContext;
+                                                                    const menu = Menu {
+                                                                        items: Menu {
+                                                                            label: "Events";
+                                                                            items: MenuItem {
+                                                                                label: "Observe Change";
+                                                                                action: function to () {
+                                                                                    v.addEvent();
+                                                                                }
+                                                                            }
+                                                                        }
+                                                                    }
                                                                     e.stage.showPopupMenu(e.screenx, e.screeny+contextTree.cellHeight, menu);
                                                                 }
                                                             }
@@ -2786,6 +2827,7 @@ Tabview.Tab {
         }
     };
     Program.resetEvaluator();
+    mainContext.createStart();
     Inspector.allFontFamilies = (the Text.LayoutEngine).allFontFamilies;
     currentScenes = [mainScene];
     undoList.addTarget("currentScenes", &currentScenes);

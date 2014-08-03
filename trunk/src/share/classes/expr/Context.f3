@@ -126,14 +126,25 @@ public class Context is Foldable of Context {
     }
     public function resolveTimeNodeContext from (n is ResourceTimeNode) to ResourceTimeNodeContext
     {
+        var unwrapped is TimeNode;
+        if (n is ResourceTimeNodeWrapper) {
+            unwrapped = (n as ResourceTimeNodeWrapper).wrapped;
+        }
+        println("resolve context {n.id}, unwrapped={unwrapped.id}");
         var result is ResourceTimeNodeContext;
         foldLeft((), 
                  function from (_ is (), c is Context) to ()
                  {
                      if (c is ResourceTimeNodeContext) {
                          const x = (c as ResourceTimeNodeContext);
-                         if (x.resource == n) {
+                         if (x.resource.id == n.id) {
                              result = x;
+                         } else if (x.resource is ResourceTimeNodeWrapper) {
+                             const u = (x.resource as ResourceTimeNodeWrapper).wrapped;
+                             if (u == unwrapped) {
+                                 result = x;
+                             }
+                             println("x.unwrapped={u.id} {u == unwrapped}");
                          }
                      }
                  });
@@ -333,6 +344,7 @@ public class ClosureVarContext is GroupContext, ProgramContext {
     override var name = bind variableName;
     override var label = bind "{variableName} [{varType.name}]";
     public var scope is GroupContext;
+
     // hack...
     var value is Number;
     var valueSubject = Subject of Number {};
@@ -418,6 +430,26 @@ public class ClosureVarContext is GroupContext, ProgramContext {
     override public bound function getContent to Context[] 
     { 
         myContent
+    }
+
+    public function addEvent to MemberContext
+    {
+        var r is MemberContext;
+        insert r = MemberContext {
+            parent: this;
+            member: Member {
+                name: "observeChange";
+                t: varType.t;
+                rt: varType.t;
+                isObservable: yes;
+                isObserver: no;
+                override function equals from (obj is Object) to Boolean
+                {
+                    f3.lang.Builtins.isSameObject(this, obj);
+                }
+            }
+        } into content;
+        return r;
     }
 }
 
@@ -521,7 +553,7 @@ public class ContextTreemodel is Treemodel {
             }
             p = p.parent;
         }
-        selectedVarContext = v;
+        selectedVarContext = if m.parent == v then null else v; // ugh: hack
         selectedMemberContext = m;
         println("selected context => {selectedContext}");
         p = tn;
