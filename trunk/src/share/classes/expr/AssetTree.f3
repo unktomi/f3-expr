@@ -330,10 +330,32 @@ public class ClassAsset is TypeAsset {
         return null;
     }
     override var t = bind clazz;
-    override var containedAssets = bind [classes, foreach (m in Expression.introspect(clazz, true)) MemberAsset {
+    override var containedAssets = bind [classes, foreach (m in sort(Expression.introspect(clazz, true))) MemberAsset {
         member: m;
         }];
 }
+
+public function sort from (xs is Member[]) to Member[]
+{
+    f3.util.Sequences.sort(xs, java.util.Comparator of Member {
+            override function compare from (x is Member, y is Member) to Integer 
+            {
+                var cmp = 
+                    if (x.m.getDeclaringClass() == y.m.getDeclaringClass()) {
+                        0;
+                    } else if (x.m.getDeclaringClass().isAssignableFrom(y.m.getDeclaringClass())) {
+                        1;
+                    } else if (y.m.getDeclaringClass().isAssignableFrom(x.m.getDeclaringClass())) {
+                        -1;
+                    } else 0;
+                if (cmp == 0) {
+                    cmp = x.name.compareTo(y.name);
+                } 
+                return cmp;
+            }
+        });
+}
+
 
 public class MemberAsset is Asset {
     public const member is Member;

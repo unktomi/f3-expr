@@ -1537,7 +1537,19 @@ function inspect0 from (obj is Object, classType is F3ClassType) to (Inspected o
                                 inspectedFontFamily(ptr, m, m.m.getName(), allFontFamilies);
                             } else if (m.m is F3VarMember and m.t == FONT_SIZE_TYPE) {
                                 const ptr = (m.m as F3Local.VarMember).getPointer(obj as F3Object) as ObservableRef of FontSizeSelection;
-                                inspectedFontSize(ptr, m, m.m.getName(), [8..128]);
+                                InspectedInteger {
+                                    low: 1;
+                                    hi: 128;
+                                    label: "Font Size";
+                                    editable: yes;
+                                    observable: foreach (x in Observables.observe(ptr)) x.selection;
+                                    override function get to Integer {
+                                        ptr.get().selection;
+                                    }
+                                    override function set from (i is Integer) to () {
+                                        ptr.set(new FontSizeSelection(i));
+                                    }
+                                }
                             } else if (m.m is F3VarMember and m.t == FONT_TEXT_DECORATION_TYPE) {
                                 const ptr = (m.m as F3Local.VarMember).getPointer(obj as F3Object) as ObservableRef of FontTextDecorationSelection;
                                 inspectedFontTextDecoration(ptr, m, m.m.getName());
