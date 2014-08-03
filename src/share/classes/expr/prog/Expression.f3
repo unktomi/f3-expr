@@ -1504,6 +1504,9 @@ public class IPath {
         if (parents.size() == 0) {
             if (observer is Parameter) {
                 const p = observer as Parameter;
+                if (p.constantValue == null) {
+                    return "null as <<{p.getType().getName()}>>";
+                }
                 return "{p.constantValue}";
             }
             if (observer.observable is OutputMemberExpression) {
@@ -6509,7 +6512,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
         const mem = e as MemberExpression;
 	var itype = if mem.member.m.isStatic() then OBJECT_TYPE else mem.member.m.getDeclaringClass();
-        if (itype == null) return "";
+        if (itype == null) itype = OBJECT_TYPE;
 	var result = "var _ = function from (debugger is f3.util.ObservableDebugger, i$ is Object, getVar is function from String to Object, getNode is function from String to f3.media.scene.Node, getClip is function from String to f3.media.scene.TimeNode, $register is function from (Object) to ()) to (f3.util.Observable of ?)[] \{ var i0 = i$ as {itype.getName()};  var obsvbs$ is f3.util.Observable[]; \{ ";
         if (terms == []) {
             var rs = foreach (x in eventContext.content) {
@@ -6565,9 +6568,15 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 }
                 const p = context.getIPath(t as ObserverExpression);
                 const d = p.getContainingObservableDepth();
-                var app = mem.member.toApply();
-                if (not mem.member.m.isStatic()) {
-                    app = "i0.{app}";
+                var app is String;
+                if (eventContext.parent is Context.ClosureVarContext) { // hack
+                    const vc = eventContext.parent as Context.ClosureVarContext;
+                    app = "f3.util.Observables.observe(getVar(\"{vc.variableName}\") as f3.lang.ObservableRef of {vc.varType.t.getName()})";
+                } else {
+                    app = mem.member.toApply();
+                    if (not mem.member.m.isStatic()) {
+                        app = "i0.{app}";
+                    }
                 }
                 //                result = "{result} const obs{p.getRootId()} = foreach (i in {app}) \{ %VARS%; {p.getWorldAccess()} \}";
                 result = "{result} \{ const obs0 = foreach (i in {app}) \{ $register(i); %VARS%; {p.getWorldAccess()} \}";
