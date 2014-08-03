@@ -19,9 +19,11 @@ import expr.Context;
 import expr.Context.*;
 import expr.EventLayer;
 
-public var evaluator is org.f3.tools.script.ScriptShell = {
+public var evaluator is org.f3.tools.script.ScriptShell;
+
+public function resetEvaluator to () {
     const loader = java.lang.Thread.currentThread().getContextClassLoader();
-    new org.f3.tools.script.ScriptShell(loader);
+    evaluator = new org.f3.tools.script.ScriptShell(loader);
 }
 
 class Value {

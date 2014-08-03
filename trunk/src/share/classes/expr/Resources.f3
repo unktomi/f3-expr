@@ -122,6 +122,7 @@ function parseColor from (argb is Integer) to Color
 }
 
 public interface Temporal {
+    public var paused is Boolean = false;
     public var blendWeight is Number = 1.0;
     public var playTime is Duration = 0s;
     public var playRate is Number = 1.0;
@@ -344,6 +345,7 @@ class ResourceBuilder {
         ChannelBoxResource {
             var x = n as ResourceTarget.ChannelBoxGroup;
             n_id: x.n_id;
+            paused: x.paused;
             blendWeight: x.blendWeight;
             playTime: x.playTime;
             playRate: x.playRate;
@@ -352,6 +354,7 @@ class ResourceBuilder {
                 const c = j as Channel;
                 ChannelResource {
                     target: c.id;
+                    paused: x.paused;
                     blendWeight: c.blendWeight;
                     playTime: c.playTime;
                     playRate: c.playRate;
@@ -377,6 +380,7 @@ class ResourceBuilder {
             r.playRate = n.playRate;
             r.playCount = n.playCount;
             r.blendWeight = n.blendWeight;
+            r.paused = n.paused;
             r;
         } else if (n is ResourceTimeNode) {
             makeResource(n as ResourceTimeNode);
@@ -389,6 +393,7 @@ class ResourceBuilder {
         TemporalResource {
             displayName: n.displayName;
             url: convertUrl(n.url);
+            paused: n.paused;
             blendWeight: n.blendWeight;
             playTime: n.playTime;
             playRate: n.playRate;
