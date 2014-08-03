@@ -93,6 +93,17 @@ public class ResourceScene is Scene, Inspectable {
     public var selectedResource is ResourceNode;
     public var selectedMesh is MeshNode;
 
+    public function reset to ()
+    {
+        currentResource.url = "";
+        currentResource.resources = [];
+        instanceSpace.content = [];
+        selectedMesh = null;
+        selectedResource = null;
+        selection.onNext(null);
+        meshSelection.onNext(null);
+    }
+
     override function injectMouseDown from (event is MouseEvent) to ()
     {
         super.injectMouseDown(event);

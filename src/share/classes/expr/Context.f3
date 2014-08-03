@@ -124,6 +124,21 @@ public class Context is Foldable of Context {
                  });
         return result;
     }
+    public function resolveTimeNodeContext from (n is ResourceTimeNode) to ResourceTimeNodeContext
+    {
+        var result is ResourceTimeNodeContext;
+        foldLeft((), 
+                 function from (_ is (), c is Context) to ()
+                 {
+                     if (c is ResourceTimeNodeContext) {
+                         const x = (c as ResourceTimeNodeContext);
+                         if (x.resource == n) {
+                             result = x;
+                         }
+                     }
+                 });
+        return result;
+    }
     override function toString to String {
         "{getClass()} {fullName()}";
     }

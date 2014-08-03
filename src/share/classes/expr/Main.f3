@@ -314,7 +314,7 @@ public function run from (args is String[]) to ()
     }
 
 
-    const temporalHierarchy = TemporalHierarchy { root: bind currentAnimResource }
+    const temporalHierarchy = TemporalHierarchy { root: currentAnimResource }
     const temporalHierarchy2 = TemporalHierarchy { root: ResourceTimeGroup {
             override var id = "Hierarchy";
             override protected function updateParent to () { // hack...
@@ -454,27 +454,29 @@ public function run from (args is String[]) to ()
         } else {
             insert rn into currentResource.resources;
         } 
-        var ctx is Context.ResourceNodeContext;
-        if (rn is ResourceTextField) {
-            ctx = Context.ResourceTextFieldContext { 
-                parent: groupContext;
-                resource: rn;
+        var ctx is Context.ResourceNodeContext = mainContext.resolveNodeContext(rn);
+        if (ctx == null) {
+            if (rn is ResourceTextField) {
+                ctx = Context.ResourceTextFieldContext { 
+                    parent: groupContext;
+                    resource: rn;
+                }
+            } else if (rn is ResourceLabel) {
+                ctx = Context.ResourceLabelContext { 
+                    parent: groupContext;
+                    resource: rn;
+                }
+            } else {
+                ctx = Context.ResourceNodeContext { 
+                    parent: groupContext;
+                    resource: rn;
+                }
             }
-        } else if (rn is ResourceLabel) {
-            ctx = Context.ResourceLabelContext { 
-                parent: groupContext;
-                resource: rn;
+            insert ctx into groupContext.content;
+            rn.ctx = ctx;
+            if (rn.displayName == "") {
+                rn.displayName = if (rn.$useLiteralId) then rn.id else Names.formatName(rn.id);
             }
-        } else {
-            ctx = Context.ResourceNodeContext { 
-                parent: groupContext;
-                resource: rn;
-            }
-        }
-        insert ctx into groupContext.content;
-        rn.ctx = ctx;
-        if (rn.displayName == "") {
-            rn.displayName = if (rn.$useLiteralId) then rn.id else Names.formatName(rn.id);
         }
         if (currentScene == mainScene) {
             viewer.focusCamera(rn);
@@ -500,12 +502,16 @@ public function run from (args is String[]) to ()
         mainTimeLayer.content = currentAnimResource;
         mainTimeLayer.updateParent();
         println("all bounds = {mainTimeLayer.bounds}");
-        const ctx = Context.ResourceTimeNodeContext { 
-            parent: contextModel.selectedGroupContext; 
-            resource: rn;
-        } 
-        rn.ctx = ctx;
-        insert ctx into contextModel.selectedGroupContext.content;
+        var ctx = mainContext.resolveTimeNodeContext(rn);
+        if (ctx == null) {
+            ctx = Context.ResourceTimeNodeContext { 
+                parent: contextModel.selectedGroupContext; 
+                resource: rn;
+            } 
+            rn.ctx = ctx;
+            insert ctx into contextModel.selectedGroupContext.content;
+        }
+
     }
 
     function doDrop from (url is String, pt is Point3) to () 
@@ -1021,6 +1027,7 @@ public function run from (args is String[]) to ()
         for (scene in currentScenes) {
             scene.dynamicsWorld.reset();
         }
+        mainScene.reset();
         mainScene.currentResource.url = "";
         currentScenes = [mainScene];
 	mainScene.currentResource.resources = [];
@@ -1029,9 +1036,11 @@ public function run from (args is String[]) to ()
 	currentAnimResource.resources = [];
         mainTimeLayer.content = [];
         mainTimeLayer.content = currentAnimResource;
+        println("bounds={currentAnimResource.contentBounds}");
         mainContext = MainContext {
             name: "Start";
         }
+        Program.resetEvaluator();
         ExprNode.Start.disposeAll();
         contextModel.reset();
         contextTree.select(contextModel.root);
@@ -1174,6 +1183,7 @@ public function run from (args is String[]) to ()
                     url: i.url;
                     displayName: i.displayName;
                     wrapped: t as TimeGroup;
+                    paused: i.paused;
                     blendWeight: i.blendWeight;
                     playTime: i.playTime;
                     playRate: i.playRate;
@@ -1191,6 +1201,7 @@ public function run from (args is String[]) to ()
                const rtn = ResourceTimeNodeWrapper {
                     displayName: i.displayName;
                     blendWeight: i.blendWeight;
+                    paused: i.paused;
                     playTime: i.playTime;
                     playRate: i.playRate;
                     playCount: i.playCount;
@@ -1209,6 +1220,7 @@ public function run from (args is String[]) to ()
                 const rtn = ResourceTimeNodeWrapper {
                     displayName: i.displayName;
                     blendWeight: i.blendWeight;
+                    paused: i.paused;
                     playTime: i.playTime;
                     playRate: i.playRate;
                     playCount: i.playCount;
@@ -1239,6 +1251,7 @@ public function run from (args is String[]) to ()
                                         wrapped: t as TimeGroup;
                                         displayName: i.displayName;
                                         blendWeight: i.blendWeight;
+                                        paused: i.paused;
                                         playTime: i.playTime;
                                         playRate: i.playRate;
                                         playCount: i.playCount;
@@ -1421,12 +1434,14 @@ public function run from (args is String[]) to ()
                     channelBox.playRate = box.playRate;
                     channelBox.playCount = box.playCount;
                     channelBox.blendWeight = 1.0;//i.animation.blendWeight;
+                    channelBox.paused = box.paused;
                     foreach (x in box.channels) {
                         const c = channelBox.resolveChannel(x.target);
                         c.playTime = x.playTime;
                         c.playCount = x.playCount;
                         c.playRate = x.playRate;
                         c.blendWeight = x.blendWeight;
+                        c.paused = x.paused;
                         c.keys = foreach (k in x.keys) {
                             c.createKey(k.keyTime, k.keyValue, f3.media.scene.KeyFrame.Linear);
                         }
@@ -2770,6 +2785,7 @@ Tabview.Tab {
             }
         }
     };
+    Program.resetEvaluator();
     Inspector.allFontFamilies = (the Text.LayoutEngine).allFontFamilies;
     currentScenes = [mainScene];
     undoList.addTarget("currentScenes", &currentScenes);
