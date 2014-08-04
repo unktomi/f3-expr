@@ -22,6 +22,15 @@ public class CreateVar is ResizableNode, Focuser {
     bound var fieldWidth is Number = width - 40 - labelWidth;
     public var popupLayer is PopupLayer;
     public var popupScene is Scene;
+    public var editorScene is Scene;
+
+    function toPopup from (pt is Point3) to Point3 {
+        editorScene.convertToScene(pt, popupScene);
+    }
+
+    function toEditor from (pt is Point3) to Point3 {
+        popupScene.convertToScene(pt, editorScene);
+    }
 
     public var create is function from (String, AssetTree.TypeAsset) to ();
     public var cancel is function from () to ();
@@ -70,15 +79,6 @@ public class CreateVar is ResizableNode, Focuser {
         font: bind font;
         foreground: bind textFg;
         background: bind textBg;
-    };
-    public const typeField is Text.Field = Text.Field {
-        transform: bind translate(fieldOffset-20, 0);
-        width: bind fieldWidth;
-        height: bind cellHeight;      
-        font: bind font;
-        foreground: bind textFg;
-        background: bind textBg;
-        editable: bind not isShortcut;
     };
     var chooseTypeTransform is Mat4 = Mat4.<<1>>;
     const self = this;
@@ -139,6 +139,7 @@ public class CreateVar is ResizableNode, Focuser {
         selectedType = t;
         chooseType.searchField.setText(t.name);
         hideChooser();
+        checkButtons();
     }
 
     function hideChooser to ()
@@ -151,7 +152,7 @@ public class CreateVar is ResizableNode, Focuser {
     {
         if (not chooseType.visible) {
             chooseType.visible = true;
-            chooseTypeTransform = translate(target); 
+            chooseTypeTransform = translate(toPopup(chooseType.searchField.toSceneTransform.getTranslation()) - vector(0, chooseType.bounds.extent.y + cellHeight / 2.0 + 3, 0));
             insert chooseType into popupLayer.content;
             popupScene.setFocus(chooseType.getTargetOfFocus());
         }
@@ -169,15 +170,18 @@ public class CreateVar is ResizableNode, Focuser {
     const d1 = nameField.observeText().subscribe(function from (s is String) to () {
         checkButtons();
         });
-
     const d2 = chooseType.searchField.observeText().subscribe(function from (s is String) to () { 
+            showChooser(null);
             checkButtons();
         });
     
-    function checkButtons to ()
+    public function start() {
+        popupScene.setFocus(nameField);
+        checkButtons();
+    }
+    
+    public function checkButtons to ()
     {
-        if (selectedType == null) {
-        }
         const enable = selectedType <> null and nameField.text <> "";
         applyButton.enabled = enable;
     }

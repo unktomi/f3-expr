@@ -181,6 +181,9 @@ class ResizableStageNode is ResizableNode, Focuser {
     {
 	return stage;
     }
+    public function getScene to Scene {
+        stage.content[0];
+    }
 }
 
 function readTextFile from (url is String) to (String, Integer)
@@ -746,15 +749,8 @@ public function run from (args is String[]) to ()
                 id: url;
 		url: url
 	    }
-	    const rn = ResourceNode {
-                $useLiteralId: true;
-		url: url;
-                id: url;
-		content: browser;
-                override function getFocusable to Focusable 
-                {
-                    browser
-                }
+	    const rn = WebResourceNode {
+                browser: browser;
 	    }
 	    const rtn = ResourceTimeNode {
                 $useLiteralId: true;
@@ -1676,6 +1672,7 @@ public function run from (args is String[]) to ()
                                                      assetModel: bind assetModel;
                                                      popupLayer: bind popupLayer;
                                                      popupScene: bind editorScene;
+                                                     editorScene: bind editorScene;
                                                      create: function from (name is String, asset is AssetTree.TypeAsset) to () {
                                                          handleCreate(name, asset);
                                                          delete win from popupLayer.content;
@@ -1752,8 +1749,8 @@ public function run from (args is String[]) to ()
                                                                                                    
                                                                                                }
                                                                                            insert win into popupLayer.content;
-                                                                                           editorScene.setFocus(createVar.nameField);
                                                                                            popupLayer.modal = true;
+                                                                                           createVar.start();
                                                                                        }
                                                                                    },
                                                                                    MenuItem {

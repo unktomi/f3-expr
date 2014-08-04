@@ -53,29 +53,6 @@ public class SpriteResourceNode is ResourceNode {
 
     override var content = bind sprite;
 
-    function colorPtr from (p is Ref of Color, i is Integer) to Ref of Number
-    {
-        AbstractRef of Number {
-            override function get to Number 
-            {
-                const c = p.get();
-                if (i == 0) then c.red else if i == 1 then c.green else if (i == 2) c.blue else c.opacity;
-            }
-            override function set from (n is Number) to () 
-            {
-                const c = p.get();
-                var r = c.red;
-                var g = c.green;
-                var b = c.blue;
-                var a = c.opacity;
-                if (i == 0) r = n
-                    else if (i == 1) g = n
-                        else if (i == 2) b = n
-                            else a = n;
-                p.set(new Color(r, g, b, a));
-            }
-        }
-    }
 
     function createSpriteChannels from (parent is ChannelBoxGroup) to (Channel of Number)[]
     {
