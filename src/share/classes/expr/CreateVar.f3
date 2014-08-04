@@ -137,8 +137,8 @@ public class CreateVar is ResizableNode, Focuser {
     public function selectType from (t is AssetTree.TypeAsset) to ()
     {
         selectedType = t;
-        chooseType.searchField.setText(t.name);
         hideChooser();
+        chooseType.searchField.setText(t.name);
         checkButtons();
     }
 
@@ -171,11 +171,15 @@ public class CreateVar is ResizableNode, Focuser {
         checkButtons();
         });
     const d2 = chooseType.searchField.observeText().subscribe(function from (s is String) to () { 
-            showChooser(null);
+            if (selectedType.name <> s) {
+                showChooser(null);
+            }
             checkButtons();
         });
     
     public function start() {
+        nameField.selectAll();
+        nameField.deleteSelection();
         popupScene.setFocus(nameField);
         checkButtons();
     }
@@ -215,7 +219,7 @@ public class CreateVar is ResizableNode, Focuser {
             bind [typeLabel, 
                  TransformNode {
                     tx: bind fieldOffset/2-1;
-                    content: bind chooseType.searchField
+                    content: bind chooseType.searchField;
                  }, 
                  TransformNode {
                      tx: bind (fieldWidth + fieldOffset)/2  - 7;
