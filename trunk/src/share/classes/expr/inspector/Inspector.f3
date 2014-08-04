@@ -102,6 +102,11 @@ function clamp from (n is Number, lo is Number, hi is Number) to Number
     Math.min(Math.max(n, lo), hi);
 }
 
+function clamp from (n is Integer, lo is Integer, hi is Integer) to Integer
+{
+    Math.min(Math.max(n, lo), hi);
+}
+
 public class NumericSliderField is SliderField {
 
     public var onSetKey is function from () to ();
@@ -484,6 +489,9 @@ public class InspectedNumber is InspectedRange of Number
     { 
 	if (hi > low) then low + (hi - low)*t else t;
     }
+    public function apply from (n is Number) to () {
+        set(if (low <> hi) clamp(n, low, hi) else n);
+    }
 }
 
 public class InspectedInteger is InspectedRange of Integer 
@@ -494,6 +502,9 @@ public class InspectedInteger is InspectedRange of Integer
     { 
 	const n = if (hi > low) then low + (hi - low)*t else t;
         return Math.round(n) as Integer;
+    }
+    public function apply from (n is Integer) to () {
+        set(if (low <> hi) clamp(n, low, hi) else n);
     }
 }
 
@@ -656,12 +667,16 @@ public class NumberField is SliderField {
     }
 
     override function onCommit to () {
-        const n = i.get();
-        if (n < min) {
-            min = n;
-        }
-        if (n > max) {
-            max = n;
+        var n = i.get();
+        if (i.low == i.hi) {
+            if (n < min) {
+                min = n;
+            }
+            if (n > max) {
+                max = n;
+            }
+        } else {
+            n = clamp(n, min, max);
         }
         onChange(n);
         MasterUndoable.commit();
@@ -782,13 +797,18 @@ public class IntegerField is SliderField {
 
     public var i is InspectedInteger;
 
-    protected function onChange from (n is Integer) to () 
+    protected function onChange from (n0 is Integer) to () 
     {
-        if (n < min) {
-            min = n;
-        }
-        if (n > max) {
-            max = n;
+        var n = n0;
+        if (i.low == i.hi) {
+            if (n < min) {
+                min = n;
+            }
+            if (n > max) {
+                max = n;
+            }
+        } else {
+            n = clamp(n, min, max);
         }
 	t = (n-min as Number) / (max-min as Number);
     }
@@ -987,7 +1007,20 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
             const j = i as InspectedNumber;
             var n = j.get();
             n += (e.picked.dragPoint1 - e.picked.dragPoint0).x  * sx;
-            j.set(n);
+            j.apply(n);
+        }
+        else if (i is InspectedInteger) {
+            var sx = 0.1;
+            if (e.shiftKey) {
+                sx *= 10.0;
+            }
+            if (e.ctrlKey) {
+                sx *= 0.1;
+            }
+            const j = i as InspectedInteger;
+            var n is Number= j.get();
+            n += (e.picked.dragPoint1 - e.picked.dragPoint0).x  * sx;
+            j.apply(Math.round(n) as Integer);
         }
     }
 

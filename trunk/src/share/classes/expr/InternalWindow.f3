@@ -89,7 +89,7 @@ public class InternalWindow is ResizableNode, Focuser {
     };
 
     const resizeCorner is Node = Image {
-	override var transform = bind translate(self.width/2 - 8, -self.height/2 + 7);
+	override var transform = bind translate(self.width/2 - 7, -self.height/2 + 6);
         url: bind "{__DIR__}resize-corner.png";
         gridFit: no;
         override var cursor = Cursor.SouthEastResize;
