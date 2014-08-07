@@ -368,7 +368,7 @@ public class TimeNodeView is AbstractNode
         }
         super.update();
     }
-    var openRows = 10.0;
+    var openRows = 2.0;
     const self = this;
     bound var w = getWidth(if target.hasIndefiniteDuration() then Interval.<<0>> else target.bounds, trax.visibleInterval) *  target.toSceneTransform.rate;              
     public var rows is Number = 1;
@@ -428,7 +428,7 @@ public class TimeNodeView is AbstractNode
                      override function onMouseMove from  (event is MouseEvent) to ()
                      {
                          if (trax.graph and expanded and target is Channel and not dragging) {
-                             resizing = event.location.y <= rectY - trax.getViewHeight()/2 + 3;
+                             resizing = event.location.y <= rectY - trax.getViewHeight()/2 + 4;
                          }
                      }
 		     override function onMouseDown from (event is MouseEvent) to ()
@@ -597,7 +597,7 @@ public class TimeNodeView is AbstractNode
                       } else null;
               },
               if (not trax.graph or not (target is Channel of Number) or not expanded) then null else Group {
-                                            visible: bind row > trax.scrollY;
+                                            visible: bind row+rows-1 > trax.scrollY;
                           //                  pickable: false;
                           var graphHeight = bind h - trax.getViewHeight();
                           transform: bind translate(-w/2, -trax.getViewHeight());
@@ -680,7 +680,7 @@ public class TimeNodeView is AbstractNode
               }
               Group { 
                   transform: bind translate(-w/2, 0);
-                  content: bind if (expanded) then content else [] 
+                  content: bind if (expanded) then content.reverse() else [] 
               }
               ]
 	 }
@@ -933,10 +933,12 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
     public readonly var frameRate is Number = bind frameRateN on replace { frameRateGadget.setText("{Math.round(frameRate) as Integer}") };
     protected var frameRateN is Number = 24.0;
 
+    const topLineMesh = LineMesh {};
     const lineMesh = LineMesh {};
     const backgroundColor is Color = Color.color(0.6, 0.6, 0.6);//Color.color(0.90, 0.90, 0.90);
     const backgroundPaint is Paint = ColorPaint(backgroundColor);
     const foregroundPaint is Paint = ColorPaint(Color.color(0.2, 0.2, 0.2));
+    const linePaint is Paint = ColorPaint(Color.color(0.35, 0.35, 0.35));
 
     function autoScrollLeft to () {
     }
@@ -1262,7 +1264,8 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	}
     }
 
-    function drawLines from (w is Number, h is Number, viewHeight is Number, scroll is Number) to AbstractMesh {
+    function drawTopLines from (w is Number, h is Number, viewHeight is Number, scroll is Number) to AbstractMesh 
+    {
 	//println("TIMELINE={target} pp={pixelsPerFrame()}");
 	const x0 = -w / 2 + 15;
 	const y0 = Math.round(h / 2 - viewHeight-5);
@@ -1270,8 +1273,8 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
         var slop = scroll mod 2;
 	var y is Number = y0;
 	var mid is Boolean = false;
-	lineMesh.reset();
-	lineMesh.moveTo(x, y);
+	topLineMesh.reset();
+	topLineMesh.moveTo(x, y);
         const pp = PIXELS_PER_FRAME;
         var offset = 0;
         var off0 = offset mod pp;
@@ -1284,11 +1287,29 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	    mid = not mid;
             const x1 = -off1+x+i;
             if (x1 >= x0) {
-                lineMesh.moveTo(x1, y);
-                lineMesh.lineTo(x1, y+n);
+                topLineMesh.moveTo(x1, y);
+                topLineMesh.lineTo(x1, y+n);
             }
 	}
-        x = x0;
+	const mesh = topLineMesh.getMesh();
+	mesh.updateBounds();
+	//println("draw lines: {mesh.bounds} {mesh.vertices.getVertexCount()}");
+	return mesh;
+        
+    }
+
+    function drawLines from (w is Number, h is Number, viewHeight is Number, scroll is Number) to AbstractMesh {
+	const x0 = -w / 2 + 15;
+	const y0 = Math.round(h / 2 - viewHeight-5);
+	var x is Number = x0;
+        var slop = scroll mod 2;
+	var y is Number = y0;
+	var mid is Boolean = false;
+        const pp = PIXELS_PER_FRAME;
+        var offset = 0;
+        var off0 = offset mod pp;
+	var off = (offset - off0) * pp;
+        var off1 = off0 * pp;
 	for (i in [0..<h step pp]) {
 	    lineMesh.moveTo(x, y);
 	    lineMesh.lineTo(x + width, y);
@@ -1372,7 +1393,6 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 		    }
 		}
 	 },
-	 Group { pickable: false, content: bind labels },
          MeshNode {
 	     id: "lines"
 	     pickable: false;
@@ -1404,6 +1424,20 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
                  strokePaint: ColorPaint(Color.RED);
              }]
          },
+         Rectangle {
+             width: bind width;
+             height: 20;
+             fillPaint: bind ColorPaint(backgroundColor);
+             transform: bind translate(0, height/2-10);
+             pickable: false;
+         },
+	 Group { pickable: false, content: bind labels },
+         MeshNode {
+	     id: "lines1"
+	     pickable: false;
+	     override var mesh = bind getSelf().drawTopLines(getSelf().width, getSelf().height, getViewHeight(), scrollOffset);
+	     shader: bind effectLoader.loadPaintShader(foregroundPaint);
+	 },
          TransformNode { 
              tx: bind -width/2+15-scrollX;
              content: 

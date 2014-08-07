@@ -224,6 +224,7 @@ public class ResourceNodeContext is GroupContext, ResourceObjectContext {
             const pc = c as MemberContext;
             pc.program.reset();
             delete pc from programs;
+            delete pc.program from getTarget().programs;
         }
         super.deleteContent(c);
         
@@ -320,6 +321,17 @@ public class ResourceTimeNodeContext is GroupContext, ResourceObjectContext {
     public override bound function getContent to Context[] { 
         [programs, myContent, content];
     }
+
+    public override function deleteContent from (c is Context) to ()
+    {
+        if (c is MemberContext) {
+            const pc = c as MemberContext;
+            pc.program.reset();
+            delete pc from programs;
+            delete pc.program from getTarget().programs;
+        }
+        super.deleteContent(c);
+    }
 }
 
 public class AssetContext is Context {
@@ -341,6 +353,8 @@ public class ClosureVarContext is GroupContext, ProgramContext {
     public var variableName is String = "variable";
     public var isShortcut is Boolean;
     public var isSubject is Boolean = false;
+    public var isBound is Boolean;
+    public var accessMode is VariableType = VariableType.Subject;
     override var name = bind variableName;
     override var label = bind "{variableName} [{varType.name}]";
     public var scope is GroupContext;
@@ -501,6 +515,13 @@ public class MemberContext is GroupContext, ProgramContext {
     public var member is Member;
     override var name = bind Names.formatName(member.name);
     override var label = bind "{name} [Event]";
+    override function deleteContent from (c is Context) to ()
+    {
+        super.deleteContent(c);
+        if (c is ClosureVarContext) {
+            program.undefineVar(c as ClosureVarContext);
+        }
+    }
 }
 
 public class ContextTreemodel is Treemodel {
