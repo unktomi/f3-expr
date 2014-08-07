@@ -52,6 +52,7 @@ public class InternalWindowState {
     public var cy is Number;
     public var width is Number;
     public var height is Number;
+    public var minimized is Boolean = false;
 }
 
 
@@ -62,7 +63,7 @@ class MinimizedInternalWindow is AbstractNode, MouseInputHandler {
     override var internalContent = Text.Label {
         font: bind layoutEngine.createFont("font-size:16;font-family:Lucida Grande;font-weight:bold;");
         text: bind ((win.content as ResizableStageNode).content as Tabview).selectedTab.title;
-        background: ColorPaint(Color.GRAY);
+        background: ColorPaint(Color.TRANSPARENT);
         foreground: bind if (containsPointer) then ColorPaint(Color.color(0, 0, .9)) else ColorPaint(Color.color(.9, .9, .9));
         pickable: true;
         rightJustified: true;
@@ -109,6 +110,7 @@ function saveEditorState from (scene is Scene, player is Timeline, trax is Trax,
                         cy: w.cy;
                         width: w.width;
                         height: w.height;
+                        minimized: w.minimized;
                     } into internalWindows;
                 }
             }
@@ -145,6 +147,7 @@ function loadEditorState from (stage is JoglStage, scene is Scene, player is Tim
                         w.cy = x.cy;
                         w.width = x.width;
                         w.height = x.height;
+                        w.minimized = x.minimized;
                         break;
                     }
                 }
@@ -1662,8 +1665,7 @@ public function run from (args is String[]) to ()
             }
             background: null;
             camera: Camera2D {near: -10000, far: 10000, tz: 5000}; 
-            override var content =
-		    [Group {
+            var minimizedGroup = Group {
                             visible: bind internalWindowsLayer.visible;
                             var labels = bind foreach (x in internalWindowsLayer.content) MinimizedInternalWindow {
                                     win: x as InternalWindow;
@@ -1689,7 +1691,9 @@ public function run from (args is String[]) to ()
                             } 
                             transform: bind translate(mainScene.width-woff-10, 25);
                             content: bind labelGroup;
-                        },
+            };
+            override var content =
+		    [
         
                     internalWindowsLayer = Group { 
 
@@ -2534,8 +2538,10 @@ Tabview.Tab {
 				 ]
 			    }
                         }
-		    }]
+                     }
+                     ]
                    },
+            minimizedGroup,
 	    toolMenu, 
             sceneMenu,
             popupLayer]

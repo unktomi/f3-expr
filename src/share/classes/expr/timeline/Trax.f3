@@ -1310,6 +1310,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
         var off0 = offset mod pp;
 	var off = (offset - off0) * pp;
         var off1 = off0 * pp;
+        lineMesh.reset();
 	for (i in [0..<h step pp]) {
 	    lineMesh.moveTo(x, y);
 	    lineMesh.lineTo(x + width, y);
@@ -1397,7 +1398,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	     id: "lines"
 	     pickable: false;
 	     override var mesh = bind getSelf().drawLines(getSelf().width, getSelf().height, getViewHeight(), scrollOffset);
-	     shader: bind effectLoader.loadPaintShader(foregroundPaint);
+	     shader: bind effectLoader.loadPaintShader(linePaint);
 	 },
          ContentHolder {
              var sb = bind Bounds {
@@ -1428,15 +1429,15 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
              width: bind width;
              height: 20;
              fillPaint: bind ColorPaint(backgroundColor);
-             transform: bind translate(0, height/2-10);
+             transform: bind translate(0, height/2-10+1);
              pickable: false;
          },
 	 Group { pickable: false, content: bind labels },
          MeshNode {
-	     id: "lines1"
+	     id: "topLines"
 	     pickable: false;
 	     override var mesh = bind getSelf().drawTopLines(getSelf().width, getSelf().height, getViewHeight(), scrollOffset);
-	     shader: bind effectLoader.loadPaintShader(foregroundPaint);
+	     shader: bind effectLoader.loadPaintShader(linePaint);
 	 },
          TransformNode { 
              tx: bind -width/2+15-scrollX;
