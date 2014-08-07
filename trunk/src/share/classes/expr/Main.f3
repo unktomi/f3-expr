@@ -2,6 +2,7 @@ package expr;
 import f3.jogl.awt.JoglStage;
 import f3.jogl.awt.JoglStage.*;
 import f3.math.*;
+import f3.media.scene.Shape2D.*;
 import f3.math.LinearMath.*;
 import f3.util.Bits;
 import f3.util.*;
@@ -51,6 +52,34 @@ public class InternalWindowState {
     public var cy is Number;
     public var width is Number;
     public var height is Number;
+}
+
+
+class MinimizedInternalWindow is AbstractNode, MouseInputHandler {
+    public var win is InternalWindow;
+    public var index is Integer;
+    override var visible = bind win.minimized;
+    override var internalContent = Text.Label {
+        font: bind layoutEngine.createFont("font-size:16;font-family:Lucida Grande;font-weight:bold;");
+        text: bind ((win.content as ResizableStageNode).content as Tabview).selectedTab.title;
+        background: ColorPaint(Color.GRAY);
+        foreground: bind if (containsPointer) then ColorPaint(Color.color(0, 0, .9)) else ColorPaint(Color.color(.9, .9, .9));
+        pickable: true;
+        rightJustified: true;
+        override var width = bind indent+font.width(text);
+        override var cursor = bind if (containsPointer) then Cursor.Hand else null;
+        transform: bind translate(0, index * 18) ;
+    };
+
+    bound function getWidth to Number {
+        (internalContent as Text.Label).width;
+    }
+    override function onMouseUp from (e is MouseEvent) to ()
+    {
+        if (containsPointer) {
+            win.minimized = false;
+        }
+    }
 }
 
 public class EditorState {
@@ -1408,13 +1437,13 @@ public function run from (args is String[]) to ()
                 var targetNodeContext = mainContext.resolveNodeContext(rn);
                 println("RESOLVED CONTEXT {rn} => {targetContext}");
                 for (d in prog.variables) {
+                    const container = mainContext.resolve(d.contextPath) as Context.GroupContext;
                     const v = Context.ClosureVarContext {
-                        parent: targetNodeContext;
+                        parent: container;
                         variableName: d.varName;
                         varType: findTypeAsset(d.varType);
                         isShortcut: d.isShortcut;
                     }
-                    const container = mainContext.resolve(d.contextPath) as Context.GroupContext;
                     insert v into container.content;
                     var c1 = container as Context.MemberContext;
                     var p1 = c1.program;
@@ -1632,12 +1661,78 @@ public function run from (args is String[]) to ()
                 super.update();
             }
             background: null;
-            camera: Camera2D {}; 
+            camera: Camera2D {near: -10000, far: 10000, tz: 5000}; 
             override var content =
-		    [internalWindowsLayer = Group { 
+		    [Group {
+                            visible: bind internalWindowsLayer.visible;
+                            var labels = bind foreach (x in internalWindowsLayer.content) MinimizedInternalWindow {
+                                    win: x as InternalWindow;
+                            };
+                            var woff is Number;
+                            var labelGroup = Group {
+                                content: bind labels;
+                                override function update to () {
+                                    var i = 0;
+                                    var lastWoff = woff;
+                                    woff = 15;
+                                    for (j in labels) {
+                                        if (j.visible) {
+                                            j.index = i++;
+                                            woff = Math.max(woff, j.bounds.extent.x);
+                                        }
+                                    }
+                                    if (lastWoff <> woff) {
+                                        println("woff={woff}");
+                                    }
+                                    super.update();
+                                }
+                            } 
+                            transform: bind translate(mainScene.width-woff-10, 25);
+                            content: bind labelGroup;
+                        },
+        
+                    internalWindowsLayer = Group { 
 
                        content: 
-                       [windowContainingAssets = InternalWindow {
+                       [InternalWindow {
+			containerBounds: bind Bounds.boundsFromRect(0, 
+                                                                    0, 
+                                                                    width,
+                                                                    height-MENU_HEIGHT)
+		    	height: 400, width: 300;
+                                    content: ResizableStageNode {
+                                        content: Tabview  {
+                                            tabs: 
+                                            [
+                                             Tabview.Tab {
+                                                 title: bind if (contextModel.selectedVarContext <> null) then "Variable: {contextModel.selectedVarContext.name}" else "Event: {contextModel.selectedMemberContext.name}";
+                                                 content: expr.prog.Expression.Editor {
+                                                     assetModel: bind assetModel;
+                                                     go: function from (c is Context) to ()
+                                                     {
+                                                         const tn = contextModel.toTreeNode(c);
+                                                         contextTree.select(tn);
+                                                         contextModel.selectionObserver.onNext(tn);
+                                                     }
+                                                     menuFactory: THE_MENU_FACTORY;
+                                                     //event: bind inspector1.inspecting[inspector1.selectedIndex].member;
+                                                     stepping: bind stepping;
+                                                     varContext: bind contextModel.selectedVarContext;
+                                                     eventContext: bind contextModel.selectedMemberContext;
+                                                     targetObject: bind contextModel.selectedObjectContext.getTarget();
+                                                     targetSpace: bind currentScene.root;
+                                                     instanceSpace: bind currentScene.instanceSpace;
+                                                     targetTime: bind mainTimeLayer;
+                                                     targetTimeline: bind player;
+                                                     popupLayer: bind popupLayer;
+                                                     popupScene: bind editorScene;
+                                                     interactive: function from () to Boolean { interactive } 
+                                                 }
+                                             }];
+                                        }
+                                    }
+                       },
+                       windowContainingAssets = InternalWindow {
 
                         id: "Editor3";
                         //debugGadget: true;
@@ -1707,11 +1802,11 @@ public function run from (args is String[]) to ()
                                                         {
                                                             if (e.isMouseButton3Down()) {
                                                                 const ctx = (contextTree.selectedTreenode as Context.ContextTreenode).context;
+                                                                var menuItems is MenuItem[];
                                                                 if (ctx is Context.ResourceObjectContext) {
                                                                     const r = ctx as Context.ResourceObjectContext;
                                                                     const members = r.getMembers();
-                                                                    const menu = Menu {
-                                                                        items: 
+                                                                    const items = 
                                                                         [if (members == []) then null else Menu {
                                                                             label: "Events"
                                                                             items: 
@@ -1725,9 +1820,12 @@ public function run from (args is String[]) to ()
                                                                                     }
                                                                                 }
                                                                             }]
-                                                                        },
-                                                                        if not (ctx is Context.MemberContext) then null else Menu {
-                                                                            label: "New";
+                                                                                    }];
+                                                                    insert items into menuItems;
+                                                                }
+                                                                if (ctx is Context.MemberContext) {           
+                                                                    const item = Menu {
+                                                                        label: "New";
                                                                             items:[
                                                                                    MenuItem {
                                                                                        label: "Variable"
@@ -1758,21 +1856,25 @@ public function run from (args is String[]) to ()
                                                                                        enabled: no;
                                                                                    }
                                                                                 ]
-                                                                        }]
                                                                     };
-                                                                    e.stage.showPopupMenu(e.screenx, e.screeny+contextTree.cellHeight, menu);
-                                                                } else if (ctx is Context.ClosureVarContext) {
+                                                                    insert item into menuItems;
+                                                                }
+                                                                if (ctx is Context.ClosureVarContext) {
                                                                     const v = ctx as Context.ClosureVarContext;
-                                                                    const menu = Menu {
-                                                                        items: Menu {
-                                                                            label: "Events";
-                                                                            items: MenuItem {
-                                                                                label: "Observe Change";
-                                                                                action: function to () {
-                                                                                    v.addEvent();
-                                                                                }
+                                                                    const item = Menu {
+                                                                        label: "Events";
+                                                                        items: MenuItem {
+                                                                            label: "Observe Change";
+                                                                            action: function to () {
+                                                                                v.addEvent();
                                                                             }
                                                                         }
+                                                                    }
+                                                                    insert item into menuItems;
+                                                                }
+                                                                if (menuItems.size() > 0) {
+                                                                    const menu = Menu {
+                                                                        items: menuItems;
                                                                     }
                                                                     e.stage.showPopupMenu(e.screenx, e.screeny+contextTree.cellHeight, menu);
                                                                 }
@@ -1785,7 +1887,8 @@ public function run from (args is String[]) to ()
                                                                 const toDelete = contextModel.selectedContext;
                                                                 if (toDelete.parent is Context.GroupContext) {
                                                                     println("delete parent={toDelete.parent}");
-                                                                    var par = toDelete.parent;
+                                                                    var par = toDelete.parent as Context.GroupContext;
+                                                                    /*
                                                                     while (par <> null) {
                                                                         if (par is Context.ResourceObjectContext) {
                                                                             const targ = (par as Context.ResourceObjectContext).getTarget();
@@ -1806,7 +1909,8 @@ public function run from (args is String[]) to ()
                                                                     }
                                                                     if (par == null) par = toDelete.parent;
                                                                     const gp = (par as Context.GroupContext);
-                                                                    gp.deleteContent(toDelete);
+                                                                    */
+                                                                    par.deleteContent(toDelete);
                                                                     println("deleted {toDelete} from {toDelete.parent}");
                                                                     toDelete.foldLeft((), function from (_ is (), c is Context) to () 
                                                                                       {
@@ -1814,6 +1918,7 @@ public function run from (args is String[]) to ()
                                                                                               (c as Context.ProgramContext).program.reset();
                                                                                           }
                                                                                       });
+                                                                    MasterUndoable.commit();
                                                                 }
                                                             } else super.onKeyDown(e);
                                                         }                                       
@@ -2426,31 +2531,7 @@ Tabview.Tab {
                                                     }
                                                 }
                                             },
-				 Tabview.Tab {
-				    title: bind if (contextModel.selectedVarContext <> null) then "Variable: {contextModel.selectedVarContext.name}" else "Event: {contextModel.selectedMemberContext.name}"
-				    content: expr.prog.Expression.Editor {
-                                                 assetModel: bind assetModel;
-                                                 go: function from (c is Context) to ()
-                                                 {
-                                                     const tn = contextModel.toTreeNode(c);
-                                                     contextTree.select(tn);
-                                                     contextModel.selectionObserver.onNext(tn);
-                                                 }
-                                                 menuFactory: THE_MENU_FACTORY;
-                                                 //event: bind inspector1.inspecting[inspector1.selectedIndex].member;
-                                                 stepping: bind stepping;
-                                                 varContext: bind contextModel.selectedVarContext;
-                                                 eventContext: bind contextModel.selectedMemberContext;
-                                                 targetObject: bind contextModel.selectedObjectContext.getTarget();
-                                                 targetSpace: bind currentScene.root;
-                                                 instanceSpace: bind currentScene.instanceSpace;
-                                                 targetTime: bind mainTimeLayer;
-                                                 targetTimeline: bind player;
-                                                 popupLayer: bind popupLayer;
-                                                 popupScene: bind editorScene;
-                                                 interactive: function from () to Boolean { interactive } 
-                                             }
-				 }]
+				 ]
 			    }
                         }
 		    }]

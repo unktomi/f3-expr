@@ -2,6 +2,9 @@ package expr;
 import f3.media.scene.*;
 import f3.media.input.*;
 
+class ContentHolder is Scissored, Group {
+}
+
 
 public class Scrollpane is ResizableNode, Focuser {
 
@@ -67,7 +70,10 @@ public class Scrollpane is ResizableNode, Focuser {
         content: bind
         [TransformNode {
             tx: -W/2, ty: H/2
-            content: bind content
+            content: ContentHolder {
+                    //scissorBounds: bind Bounds.boundsFromRect(content.width, content.height);
+                 content: bind content;
+            }
         },
         TransformNode {
             tx: bind width/2 - W / 2;

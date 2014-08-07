@@ -1156,7 +1156,7 @@ public class VarContextExpression is ObjectExpression {
     public var varContext is Context.ClosureVarContext;
     override bound function getName to String { varContext.variableName }
     override function toSource from (context is IContext) to String { "(getVar(\"{varContext.variableName}\") as f3.lang.Ref of {getType().getName()})" }
-    override function toEnglish to String { formatEnglishName(varContext.variableName, id, false) }
+    override function toEnglish to String { formatEnglishName(varContext.variableName, id, true) }
     override function getType to F3Type {
         varContext.varType.t;
     }
@@ -1196,7 +1196,7 @@ abstract class TimeNodeExpression is ObjectExpression {
     override function toSource from (context is IContext) to String { "(getClip(\"{getId(timeNode)}\") as {getType().getName()})" }
 
     override function toEnglish to String {
-        formatEnglishName(getName())
+        formatEnglishName(getName(), id, true)
     }
 }
 
@@ -1217,8 +1217,7 @@ abstract class NodeExpression is ObjectExpression {
     override bound function getName to String { getDisplayName(node) }
     override function toSource from (context is IContext) to String { "(getNode(\"{node.id}\") as {getType().getName()})" }
     override function toEnglish to String {
-        //formatEnglishName(getName())
-        "<code>\"{formatURL(getName())}\"</code>"
+        formatEnglishName(getName(), id, true)
     }
 }
 
@@ -1597,10 +1596,19 @@ public class IPath {
                 }
                 for (p in parents[1..]) {
                     var j = p.getWorldAccess();
-                    if (obDepth < 0 and p.needsLift()) {
+                    if (p.needsLift()) {
                         obDepth = p.getContainingObservableDepth();
                         prefix = j;
                         j = "obs{p.getContainingObservableDepth()-1}";
+                    } else if (p.needsLower()) {
+                        println("NON STATIC LOWER: {p}");
+                        println("NON STATIC LOWER j: {j}");
+                        prefix = j;
+                        j = "i{p.getDepth()-1}";
+                    } else if (p.needsMappableLower()) {
+                        prefix = j;
+                        lowered = p.getDepth()-1;
+                        j = "i{p.getDepth()-1}";
                     }
                     args = "{args}{sep}{j}";
                     sep = ", ";
@@ -1620,6 +1628,8 @@ public class IPath {
                 }
                 if (obDepth >= 0) {
                     return "{prefix} \}; const obs{obDepth} = foreach (i{getDepth()} in {j0}.{app}({args})) \{";
+                } else if (lowered >= 0) {
+                    return "foreach (i{lowered} in {prefix}) {j0}.{app}({args})";
                 }
                 return "{parents[0].getWorldAccess()}.{app}({args})";                
             }
@@ -1645,8 +1655,10 @@ public class IPath {
             if (i.member.m is F3VarMember and i.member.isObserver) {
                 return "\{ {i.target.toSource(null)}.{i.member.toApply()} = {parents[0].getWorldAccess()}; \}";
             } else if (i.target is VarContextExpression) {
+                if (needsLower()) {
+                    return "{i.target.toSource(null)}.set(i{getDepth()-1})";
+                }
                 return "{i.target.toSource(null)}.set({parents[0].getWorldAccess()})";
-                //return parents[0].getWorldAccess();
             } else { 
                 if (i.member.isObserver and is1ArgFunction(i.member)) {
                     return "{i.target.toSource(null)}.{i.member.toApply("{parents[0].getWorldAccess()}")}";
@@ -5081,6 +5093,19 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     public function onDrop from (where is Pick, clip is Context) to ()
     {
+        const parent = clip.parent;
+        var me is Context = eventContext;
+        var found = false;
+        while (me <> null) {
+            if (me == parent) {
+                found = true;
+                break;
+            }
+            me = me.parent;
+        }
+        if (not found) {
+            return ;
+        }
         if (clip is Context.ClosureVarContext) {
             const v = clip as Context.ClosureVarContext;
             var p = v.parent;
@@ -5972,7 +5997,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     readonly var selectionTransformInverse = bind selectionTransform.inverse();
 
     override var internalContent = Holder { 
-	//scissorBounds: bind bgRect.bounds;
+	scissorBounds: bind bgRect.bounds;
 	content:
 	Group {
 	    content:
@@ -6556,7 +6581,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             } else if (subject.isSubject) {
                 prog.defineVar(subject, "var <<{subject.variableName}>> is f3.util.Subject of {subject.varType.t.getName()}; <<{subject.variableName}.onNext({init}); <<{subject.variableName}>>");
             } else {
-                prog.defineVar(subject, "var _ = function from (i$ is Object, <<{subject.variableName}>> is f3.lang.Ref of {subject.varType.t.getName()}) to () \{ {init}; \}");
+                prog.defineVar(subject, "var _ = function from (i$ is Object, <<{subject.variableName}>> is f3.lang.Ref of {subject.varType.t.getName()}, getVar is function from String to Object, getNode is function from String to f3.media.scene.Node, getClip is function from String to f3.media.scene.TimeNode) to () \{ {init}; \}");
             }
             englishOutput = eng;
         } else {
@@ -7172,7 +7197,7 @@ public class Editor is ResizableNode, Focuser {
         from (target is ResourceTarget, 
               targetPath is String,
               programs is Program[],
-              eventContext is Context.MemberContext, 
+              eventContext0 is Context.MemberContext, 
               varContext is Context.ClosureVarContext) 
         to Canvas
     {
@@ -7194,7 +7219,8 @@ public class Editor is ResizableNode, Focuser {
             }
 	}
         */
-        prog = if (varContext <> null) then varContext.program else eventContext.program;
+        prog = if (varContext <> null) then varContext.program else eventContext0.program;
+        var eventContext = if (prog == null) then eventContext0 else prog.evalContext.eventContext;
         var parentProg = if (varContext <> null) then eventContext.program else null;
         const event = eventContext.event.member;
         const found = prog == null;

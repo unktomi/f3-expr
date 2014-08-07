@@ -40,7 +40,7 @@ public class EvalContext {
         c = c.parent;
         while (c <> null and not (c is ProgramContext)) { c = c.parent }
         const c1 = c as ProgramContext;
-        //println("get parent context: {eventContext.member} / {varContext.variableName} => {c}, {c1.program}, {c1.program.evalContext}");
+        println("get parent context: {eventContext.member} / {varContext.variableName} => {c}, {c1.program}, {c1.program.evalContext}");
         return c1.program.evalContext;
     }
     public var debugger is ObservableDebugger = DebuggerEngine {
@@ -88,9 +88,9 @@ public class EvalContext {
             var ref is ObservableRef of Object;
             if (not ent.getKey().isSubject) {
                 const vo = Value {};
-                const f = evaluator.compileAndRun(source) as function from (Object, Ref of Object) to ();
+                const f = evaluator.compileAndRun(source) as function from (Object, Ref of Object, function from String to Object, function from String to Node, function from String to TimeNode) to ();
                 ref = &vo.value;
-                f(target, ref);
+                f(target, ref, lookupVar, lookupSpatial, lookupTemporal);
 
             } else {
                 const value = evaluator.compileAndRun(source) as Subject of Object;
@@ -124,6 +124,12 @@ public class EvalContext {
     {
         varMap.put(name, value);
         varRefSubject.onNext(new org.f3.runtime.Pair of (String, ObservableRef of ?)(name, value));
+    }
+
+    function undefineVar from (v is Context.ClosureVarContext) to ()
+    {
+        varMap.remove(v.variableName);
+        varSubscriberMap.remove(v);
     }
 
     const varMap is java.util.Map of (String, ObservableRef of ?) = new java.util.HashMap of (String, ObservableRef of ?);
@@ -284,6 +290,7 @@ public class Program {
     public function undefineVar from (v is Context.ClosureVarContext) to ()
     {
         varSources.remove(v);
+        evalContext.undefineVar(v);
     }
 
     public function defineVar from (v is Context.ClosureVarContext, p is Program) to ()
