@@ -45,9 +45,9 @@ public class InternalWindow is ResizableNode, Focuser {
     override var transform = bind translate(cx, cy);
     const self = this;
     const closeButton = Group { 
-            visible: false;
 	    var svg = SVG {
-		url: "{__DIR__}close.svg";
+		//url: "{__DIR__}close.svg";
+                url:  "{__DIR__}minus.svg";
 	    }
             content: bind
             [Rectangle {
@@ -56,7 +56,7 @@ public class InternalWindow is ResizableNode, Focuser {
                     fillPaint: ColorPaint(Color.TRANSPARENT);
             },
             svg.root]
-            transform: bind translate(-width/2+6.5, 1);
+            transform: bind translate(-width/2+6.5, 2);
             
     };
 
@@ -66,7 +66,7 @@ public class InternalWindow is ResizableNode, Focuser {
         [Rectangle is Focuser {
                 gridFit: false;
                 override function getTargetOfFocus from () to Focusable {  self.getTargetOfFocus() }
-                height: 14;
+                height: 16;
                 arcHeight: 7; arcWidth: 7;
                 override var width = bind self.width + 1;
                 fillPaint: bind if selected then selectedTitlePaint else titlePaint;

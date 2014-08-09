@@ -814,6 +814,29 @@ function getTypeMembers from (classType is F3ClassType) to Member[]
     }
 }
 
+// Make static vars function out of ()
+public class StaticVariableMember is FunctionMember {
+    public var member is Member;
+    override var ft = bind ctx.makeFunctionType([Reflect.UNIT_TYPE], member.rt);
+    override var m = F3FunctionMember {
+        override function getName to String {
+            member.name;
+        }
+        override function getDeclaringClass to F3ClassType {
+            null;
+        }
+        override function isStatic to Boolean { true }
+        override function isPublic to Boolean { true }
+        override function isPackage to Boolean { false }
+        override function isProtected to Boolean { false }
+        override function getType to F3FunctionType { return ft }
+        override function invoke from (owner is F3ObjectValue, args is nativearray of F3Value) to F3Value
+        {
+            null;
+        }
+    }
+}
+
 public class Member {
     protected var substs is java.util.Map of (F3Type, F3Type);
     override function equals from (obj is Object) to Boolean {
@@ -3585,6 +3608,13 @@ public class InputView is LinkedInputView {
     override bound function getLinkPos to Point3 { canvas.toLocal * (toSceneTransform * new Point3(-cellWidth/2, 0, 0) ) }
     
     override function getInputLinks to LinkView[] { links }
+
+    override var labelVisible = bind checkLabel(canvas.dropType, getInputType());
+    function checkLabel from (dt is F3Type, t is F3Type) to Boolean
+    {
+        const result = canvas.canAssignTo(t);
+        return result;
+    }
 }
 
 
@@ -4173,6 +4203,7 @@ class TreecellGetVarView is GetVarView {
 
 public class MemberTreecell is Treeview.Treecell 
 {
+
     public var canvas is Canvas;
     const self = this;
     public var active is Boolean;
@@ -4228,9 +4259,11 @@ public class MemberTreecell is Treeview.Treecell
 
     const linkedView is GetVarView = TreecellGetVarView {
         parentLink: bind parentLink;
+        canvas: bind canvas;
+        visible: false;
         override function select to () {
             self.tv.select(self.tn);
-            canvas.setSelectedExpr(this);
+            self.canvas.setSelectedExpr(this);
             selected = true;
             showSelection = true;
         }
@@ -4412,7 +4445,7 @@ class GetTreeview is AbstractNode {
 	    r = MemberTreecell {
                 parentCell: parentCell;
                 active: parentCell == null;
-		canvas: canvas;
+		canvas: self.canvas;
 		tn: tn;
 		tv: tv;
 	    }
@@ -4920,16 +4953,16 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     {
         const set = new java.util.HashSet of ExpressionView;
         for (v in vs) {
-            v.selected = true;
+            v.select();
             set.add(v);
         }
         for (v in views) {
             if (not set.contains(v)) {
-                v.selected = false;
+                v.deselect();
             }
         }
         if (not set.contains(selectedExpr)) {
-            selectedExpr = vs[0];
+            setSelectedExpr(vs[0]);
         } 
     }
 
@@ -4941,6 +4974,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     }
 
     var selectedExpr is ExpressionView on replace old {
+        println("DESELECT {old}");
         old.deselect();
         if (selectedExpr <> null) {
             for (v in views where v <> selectedExpr) v.deselect();
@@ -5058,9 +5092,15 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         createMemberView(pt, m, offset, false);
     }
 
-    function createMemberView from (pt is Point3, m is Member, offset is Integer, external is Boolean) to ExpressionView
+    function createMemberView from (pt is Point3, m0 is Member, offset is Integer, external is Boolean) to ExpressionView
     {
         var r is ExpressionView;
+        var m =
+            if (false and not (m0 is FunctionMember)) {
+                StaticVariableMember {
+                    member: m0;
+                }
+            } else m0;
         if (m is FunctionMember) {
             const fun = Function {
                 funMember: m as FunctionMember;
@@ -5471,8 +5511,11 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 	content: bind makeArrow(ARROW_COLOR);
     }
 
+    public var inputs is Context.ClosureVarContext[];
+    public var outputs is Context.ClosureVarContext[];
+
     public var event is Member;
-    public var parameters is Context.ClosureVarContext[];
+
     public var subject is Context.ClosureVarContext;
     public var eventContext is Context.MemberContext;
     public var varContext is Context.ClosureVarContext;
@@ -6012,7 +6055,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                        id: "lines"
                        pickable: false;
                        override var mesh = bind linkMesh;
-                       shader: effectLoader.loadPaintShader(ColorPaint(Color.color(.1, .1, .1)));
+                       shader: effectLoader.loadPaintShader(ColorPaint(Color.color(.2, .2, .2)));
                    },
                    Group { content: bind arrows},
                    Group { content: bind selectionRect}, 
@@ -6251,7 +6294,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     public var links is LinkView[] on replace { canvas.dumpSrc() }
 
-    var lines = LineMesh {};
+    var lines = LineMesh {gridFit: true};
 
     var linkMesh is AbstractMesh;
 
@@ -6566,7 +6609,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 context.getIPath(link.target.expression as ObserverExpression);
             }
             const t = terminalExprView.getInputLinks()[0].target.expression as ObserverExpression;
-            var init = nil(subject.varType.t);
+            var init = "";
             if (t <> null) {
                 const p = context.getIPath(t);
                 const j = p.getWorldAccess();
@@ -6575,6 +6618,13 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 println("code => {j}");
             } else {
                 eng = "Assign {nil(subject.varType.t)} to <i>{subject.variableName}</i>";
+            }
+            if (init == "") {
+                if (subject == null or subject.isShortcut or subject.isSubject) {
+                    init = nil(subject.varType.t);
+                } else {
+                    init = "<<{subject.variableName}>>.set({nil(subject.varType.t)})";
+                }
             }
             if (subject.isShortcut) {
                 prog.defineVar(subject, "var <<{subject.variableName}>> is {subject.varType.t.getName()} = {init};");

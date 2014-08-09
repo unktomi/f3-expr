@@ -40,7 +40,7 @@ public class EvalContext {
         c = c.parent;
         while (c <> null and not (c is ProgramContext)) { c = c.parent }
         const c1 = c as ProgramContext;
-        println("get parent context: {eventContext.member} / {varContext.variableName} => {c}, {c1.program}, {c1.program.evalContext}");
+        //println("get parent context: {eventContext.member} / {varContext.variableName} => {c}, {c1.program}, {c1.program.evalContext}");
         return c1.program.evalContext;
     }
     public var debugger is ObservableDebugger = DebuggerEngine {

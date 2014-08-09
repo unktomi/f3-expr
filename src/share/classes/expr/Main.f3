@@ -2910,6 +2910,7 @@ Tabview.Tab {
             }
         }
     };
+
     Program.resetEvaluator();
     mainContext.createStart();
     Inspector.allFontFamilies = (the Text.LayoutEngine).allFontFamilies;
