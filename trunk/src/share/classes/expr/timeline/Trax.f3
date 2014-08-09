@@ -219,7 +219,7 @@ public class TimeNodeView is AbstractNode
             }
         }
         if (repeatMesh == null) {
-            repeatMesh = LineMesh {};
+            repeatMesh = LineMesh {gridFit: true};
         }
         repeatMesh.reset();
         for (i in [0..<Math.floor(repeats) as Integer]) {
@@ -653,7 +653,7 @@ public class TimeNodeView is AbstractNode
                                          }
                                       }
                                   },
-                                  Group {
+                                  Billboard.Billboard2D {
                                   transform: bind translate(0, -trax.getViewHeight()/2);
                                   var channelVis = bind target.toSceneTransform.inverse() * trax.visibleInterval;
                                   content: bind foreach (k in chKeys) {
@@ -933,8 +933,8 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
     public readonly var frameRate is Number = bind frameRateN on replace { frameRateGadget.setText("{Math.round(frameRate) as Integer}") };
     protected var frameRateN is Number = 24.0;
 
-    const topLineMesh = LineMesh {};
-    const lineMesh = LineMesh {};
+    const topLineMesh = LineMesh {gridFit: true};
+    const lineMesh = LineMesh {gridFit: true};
     const backgroundColor is Color = Color.color(0.6, 0.6, 0.6);//Color.color(0.90, 0.90, 0.90);
     const backgroundPaint is Paint = ColorPaint(backgroundColor);
     const foregroundPaint is Paint = ColorPaint(Color.color(0.2, 0.2, 0.2));
