@@ -5,6 +5,7 @@ import f3.util.*;
 import f3.util.Observer.*;
 import expr.Names.*;
 import expr.ResourceTarget.*;
+import f3.math.*;
 
 function shouldFormat from (n is TimeNode) to Boolean {
     not (n is ResourceTimeNode and (n as ResourceTimeNode).$useLiteralId);
@@ -81,8 +82,88 @@ public class TemporalHierarchy
             println("SELECTION => {p}");
             selectedTransform = p as ResourceTimeNode;
         }
+        var tx is Channel of Number;
+        var ty is Channel of Number;
+        var tz is Channel of Number;
+
+        var sx is Channel of Number;
+        var sy is Channel of Number;
+        var sz is Channel of Number;
+
+        var rx is Channel of Number;
+        var ry is Channel of Number;
+        var rz is Channel of Number;
+
+        var rq is Channel of Quat;
+
+        p = selectedTimeNode;
+        if (p is ResourceTimeNodeWrapper) {
+            p = (p as ResourceTimeNodeWrapper).wrapped;
+        }
+        if (p is TimeGroup) {
+            const g = p as TimeGroup;
+            for (c in g.content) {
+                if (c is Channel) {
+                    if (c.id.toLowerCase().endsWith("tx")) {
+                        tx = c as Channel of Number;
+                    }
+                    else if (c.id.toLowerCase().endsWith("ty")) {
+                        ty = c as Channel of Number;
+                    }
+                    else if (c.id.toLowerCase().endsWith("tz")) {
+                        tz = c as Channel of Number;
+                    }
+                    else if (c.id.toLowerCase().endsWith("sx")) {
+                        sz = c as Channel of Number;
+                    }
+                    else if (c.id.toLowerCase().endsWith("sy")) {
+                        sz = c as Channel of Number;
+                    }
+                    else if (c.id.toLowerCase().endsWith("sz")) {
+                        sz = c as Channel of Number;
+                    }
+                    else if (c.id.toLowerCase().endsWith("rx")) {
+                        rx = c as Channel of Number;
+                    }
+                    else if (c.id.toLowerCase().endsWith("ry")) {
+                        ry = c as Channel of Number;
+                    }
+                    else if (c.id.toLowerCase().endsWith("r")) {
+                        rq = c as Channel of Quat;
+                    }
+                }
+            }
+        }
+        selectedTranslateX = tx;
+        selectedTranslateY = ty;
+        selectedTranslateZ = tz;
+
+        selectedScaleX = sx;
+        selectedScaleY = sy;
+        selectedScaleZ = sz;
+
+        selectedRotateX = rx;
+        selectedRotateY = ry;
+        selectedRotateZ = rz;
+
+        selectedRotateQ = rq;
+        println("selected t {tx}, {ty}, {tz}");
         selection.onNext(selectedTimeNode);
     };
+
+    public var selectedTranslateX is Channel of Number;
+    public var selectedTranslateY is Channel of Number;
+    public var selectedTranslateZ is Channel of Number;
+
+    public var selectedScaleX is Channel of Number;
+    public var selectedScaleY is Channel of Number;
+    public var selectedScaleZ is Channel of Number;
+
+    public var selectedRotateX is Channel of Number;
+    public var selectedRotateY is Channel of Number;
+    public var selectedRotateZ is Channel of Number;
+    
+    public var selectedRotateQ is Channel of Quat;
 
     public function clearSelection {
 	selectedTimeNode = null;

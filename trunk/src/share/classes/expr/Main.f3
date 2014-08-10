@@ -1630,6 +1630,31 @@ public function run from (args is String[]) to ()
                 target: bind currentTransform;
                 scene: this;
             }, 
+            SpatialAnimationVisualizer {
+                fps: bind fps;
+                scene: bind currentScene;
+                playHead: bind player.playhead;
+                translateX: bind temporalHierarchy.selectedTranslateX;
+                translateY: bind temporalHierarchy.selectedTranslateY;
+                translateZ: bind temporalHierarchy.selectedTranslateZ;
+                scaleX: bind temporalHierarchy.selectedScaleX;
+                scaleY: bind temporalHierarchy.selectedScaleY;
+                scaleZ: bind temporalHierarchy.selectedScaleZ;
+
+                rotateX: bind temporalHierarchy.selectedRotateX;
+                rotateY: bind temporalHierarchy.selectedRotateY;
+                rotateZ: bind temporalHierarchy.selectedRotateZ;
+
+                rotateQ: bind temporalHierarchy.selectedRotateQ;
+
+                setPlayhead: function from (p is Duration) to ()
+                {
+                    var b = player.paused;
+                    player.paused = true;
+                    player.setPlayhead(p);
+                    player.paused = b;
+                }
+            }
             Group {
                 var viewScale = bind uniformScale(manip.viewScale*.5);
                 content: bind foreach  (cam in currentScene.currentCameras) {
