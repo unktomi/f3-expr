@@ -1,0 +1,110 @@
+package expr;
+import f3.media.scene.*;
+import f3.media.input.*;
+import f3.media.scene.KeyFrame.*;
+import f3.media.scene.Shape2D.*;
+import f3.math.*;
+import f3.math.LinearMath.*;
+import java.lang.Math;
+import f3.lang.MemberRef;
+
+public class SpatialAnimationVisualizer is AbstractNode {
+    public var fps is Duration;
+    public var scene is Scene;
+    public var start is Duration;
+    public var end is Duration;
+    var target is Node;
+    var resourceTarget is ResourceNode;
+    override var transform = bind if (resourceTarget == null) then Mat4.<<1>> else bakedWm.inverse() * resourceTarget.toSceneTransform;
+    public var sampleDelta is Duration = bind fps;
+    public var translateX is Channel of Number;
+    public var translateY is Channel of Number;
+    public var translateZ is Channel of Number;
+    public var scaleX is Channel of Number;
+    public var scaleY is Channel of Number;
+    public var scaleZ is Channel of Number;
+    public var rotateX is Channel of Number;
+    public var rotateY is Channel of Number;
+    public var rotateZ is Channel of Number;
+    public var rotateQ is Channel of Quat;
+
+    public var setPlayhead is function from Duration to ();
+    public var playHead is Duration = 0s;
+    public var viewScaleFactor is Number = 1.0;
+    var points is Point3[];
+    const bg = ColorPaint(Color.color(1, 1, 1, 0.3));
+    const fg = ColorPaint(Color.color(.8, .8, .8, 1));
+    const linePaint is Paint = ColorPaint(Color.YELLOW);
+    var t is Duration;
+
+    public function buildPoints to () {
+        var merged = Interval.merge(Interval.merge(translateX.boundsInScene, 
+                                                   translateY.boundsInScene),
+                                    translateZ.boundsInScene);
+        println("build points: {merged}");
+        const start = merged.start;
+        const end = merged.end;
+        const dur = merged.duration();
+        const count = ((dur / sampleDelta) + 0.5) as Integer;
+        var saved = playHead;
+        const points = foreach (i in [0..<count]) {
+            const t = start + sampleDelta * i;
+            setPlayhead(t);
+            target.toSceneTransform.getTranslation();
+        }
+        setPlayhead(saved);
+        if (points <> this.points) {
+            println("points={points.size()}");
+            this.points = points;
+        }
+    }
+
+    var bakedWm is Mat4 = Mat4.<<1>>;
+
+    override function update to () {
+        const ptr = translateX.targets[0];
+        var n is Node;
+        if (ptr is MemberRef of Node) {
+            n = (ptr as MemberRef of Node).getF3Object();
+        }
+        const cameraPos = scene.camera.toSceneTransform.getTranslation();
+        var p = n.parent;
+        var rn is ResourceNode;
+        while (p <> null) {
+            if (p is ResourceNode) {
+                rn = (p as ResourceNode);
+                break;
+            }
+            p = p.parent;
+        }
+        resourceTarget = rn;
+        if (target <> n) {
+            bakedWm = if (resourceTarget <> null) then resourceTarget.toSceneTransform else Mat4.<<1>>;
+            target = n;
+            buildPoints();
+            currentMesh = createMesh(points);
+        }
+        super.update();
+    }
+    
+    const lineMesh = LineMesh {};
+
+    var currentMesh is AbstractMesh;
+
+    function createMesh from (pts is Tuple3[]) to AbstractMesh {
+        lineMesh.reset();
+        lineMesh.moveTo(pts[0].x, pts[0].y, pts[0].z);
+        for (pt in pts[1..]) {
+            lineMesh.lineTo(pt.x, pt.y, pt.z);
+        }
+        return lineMesh.getMesh();
+    }
+
+    const lines = MeshNode {
+        mesh: bind currentMesh;
+        shader: bind effectLoader.loadPaintShader(linePaint);
+    };
+
+    override var internalContent = bind lines;
+
+}

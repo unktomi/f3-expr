@@ -437,7 +437,7 @@ public class TimeNodeView is AbstractNode
                              var menu = Menu {
                                  factory: trax.menuFactory;
                              };
-                             if (trax.graph) {
+                             if (trax is GraphEditor) {
                                  insert Menu {
                                      label: "Add";
                                      factory: trax.menuFactory;
@@ -486,7 +486,7 @@ public class TimeNodeView is AbstractNode
                                       }]
                                  } into menu.items;
                              }
-                             if ((trax.graph and not (target is ResourceTarget.ChannelBoxesGroup)) or (target is ResourceTimeNode)) {
+                             if (false) {//(trax is GraphEditor) and not (target is ResourceTarget.ChannelBoxesGroup)) or (target is ResourceTimeNode) {
                                  insert MenuItem {
                                      factory: trax.menuFactory;
                                      label: "Delete"
@@ -494,6 +494,12 @@ public class TimeNodeView is AbstractNode
                                      {
                                          trax.removeClip(target);
                                      }
+                                 } into menu.items;
+                             }
+                             if (target.parent is Player) {
+                                 insert MenuItem {
+                                     label: "Play";
+                                     action: target.play;
                                  } into menu.items;
                              }
                              if (menu.items <> []) {
@@ -538,6 +544,7 @@ public class TimeNodeView is AbstractNode
 		     }
 		 },
                  Group {
+                     pickable: false;
                      transform: bind translate(repeatStart + ((visStart - repeatStart) as Integer) / (repeatW as Integer) * repeatW,  0);
                      content: bind getRepeatMesh(-w/2, repeatW, h, target.playCount, visW);
                  },
@@ -604,6 +611,7 @@ public class TimeNodeView is AbstractNode
                           var ch = bind target as Channel of Number;
                           content: 
                           [Group {
+                                  pickable: false
                                   var x1 = bind repeatStart + Math.min(((visStart - repeatStart) as Integer) / (repeatW as Integer) * repeatW, Math.max(w-repeatW, 0));
                                   transform: bind translate(x1,  0);
                                   // this mesh is baked at 24 fps - then scaled below by current frame rate
@@ -640,6 +648,7 @@ public class TimeNodeView is AbstractNode
                               var chKeys = bind ch.keys;
                               content: 
                               [Group { 
+                                      pickable: false;
                                       transform: bind translate(-50+trax.frameToX(trax.currentFrame)-trax.durationToX(ch.boundsInScene.start), hoff+3);
                                       content: bind if extent == 0 then null else foreach (i in [0..<rows]) {
                                           Text.Label {
