@@ -252,10 +252,8 @@ public class MainContext is Context.MemberContext, Context.ResourceObjectContext
         []
     }
 
-    function createStart to ()
-    {
-        createProgram(member);
-    }
+    override function getMembers to Expression.Member[] { [] }
+
 }
 
 var canUndo is Boolean;
@@ -1077,7 +1075,6 @@ public function run from (args is String[]) to ()
         temporalHierarchy.clearSelection();
         temporalHierarchy2.clearSelection();
         playerUrl = "";
-        mainContext.createStart();
 	MasterUndoable.reset();
         java.lang.System.gc();
     }
@@ -2952,7 +2949,12 @@ Tabview.Tab {
 	    }
 	});
     doUpdate = DefaultObserver of (()) {
+        var firstTimeThru = true;
         override function onNext from (_ is ()) to () {
+            if (firstTimeThru) {
+                firstTimeThru = false;
+                MasterUndoable.reset();
+            };
             (the SoundLoader).update();
             canUndo = MasterUndoable.canUndo();
             canRedo = MasterUndoable.canRedo();
@@ -2963,14 +2965,13 @@ Tabview.Tab {
     };
 
     Program.resetEvaluator();
-    mainContext.createStart();
     Inspector.allFontFamilies = (the Text.LayoutEngine).allFontFamilies;
     currentScenes = [mainScene];
     undoList.addTarget("currentScenes", &currentScenes);
     transformHierarchy.selectedScene = mainScene;
     println("SET MAIN SCENE {transformHierarchy.selectedScene}");
     stage.observeUpdate().subscribe(doUpdate);
-    MasterUndoable.commit();
+
 }
 
 

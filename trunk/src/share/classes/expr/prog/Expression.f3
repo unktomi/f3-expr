@@ -7485,6 +7485,7 @@ public class Editor is ResizableNode, Focuser {
               varContext is Context.ClosureVarContext) 
         to Canvas
     {
+        if (target == null) return null;
 	var prog is Program;
         println("TARGET: {target}, programs={target.programs.size()}, targetPath={targetPath}");
         /*
