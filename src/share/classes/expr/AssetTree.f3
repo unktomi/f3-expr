@@ -250,6 +250,11 @@ public class RootPackageAsset is PackageAsset {
           member: FunctionMember {m: Reflect.getFunction("expr.ExprNode", "printLine", ["Object"]) }
     };
 
+    const formatText = MemberAsset {
+          name: "Format Text"
+          member: Expression.FORMAT_TEXT;
+    };
+
     public const primitives is TypeAsset[] = 
         [PrimitiveTypeAsset {
                 name: "Boolean";
@@ -305,7 +310,7 @@ public class RootPackageAsset is PackageAsset {
                     }
                 }
         }*/];
-    override var containedAssets = bind [println, /*filter,*/ primitives, packages, classes]
+    override var containedAssets = bind [println, formatText, /*filter,*/ primitives, packages, classes]
 }
 
 public class TypeAsset is Asset {

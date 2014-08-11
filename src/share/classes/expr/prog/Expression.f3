@@ -163,7 +163,15 @@ const exprMap2 = new java.util.HashMap of (F3ClassType, Member[]);
 
 const SelectionPaint = ColorPaint(Color.ORANGE);
 
-const SHORTCUT is Member = Member {
+public const FORMAT_TEXT is Member = Member {
+    override function equals from (obj is Object) to Boolean {
+        return isSameObject(this, obj);
+    }
+    override var name = "Format Text";
+    override var members = [];
+}
+
+public const SHORTCUT is Member = Member {
     override function equals from (obj is Object) to Boolean {
         return isSameObject(this, obj);
     }
@@ -171,7 +179,7 @@ const SHORTCUT is Member = Member {
     override var members = [];
 }
 
-const FORK is Member = Member {
+public const FORK is Member = Member {
     override function equals from (obj is Object) to Boolean {
         return isSameObject(this, obj);
     }
@@ -179,7 +187,7 @@ const FORK is Member = Member {
     override var members = [];
 }
 
-const BRANCH is Member = Member {
+public const BRANCH is Member = Member {
     override function equals from (obj is Object) to Boolean {
         return isSameObject(this, obj);
     }
@@ -400,11 +408,19 @@ function typeApply from (target is F3Type,
     return target;
 }
 
-function makeFunMember from (name is String, params is F3Type[], ret is F3Type) to FunctionMember 
+function makeFunMember from (name is String, params is F3Type[], ret is F3Type) to FunctionMember {
+    makeFunMember(name, [], params, ret, false);
+}
+
+function makeFunMember from (name is String, argnames is String[], params is F3Type[], ret is F3Type, isStatic1 is Boolean) 
+    to FunctionMember 
 {
     const ft = ctx.makeFunctionType(params, ret);
     println("Make fun member {name} => {ft}");
     FunctionMember {
+        override function argName from (i is Integer) to String {
+            argnames[i]
+        }
         m: F3FunctionMember {
             override function getName to String {
                 name;
@@ -412,7 +428,7 @@ function makeFunMember from (name is String, params is F3Type[], ret is F3Type) 
             override function getDeclaringClass to F3ClassType {
                null;
             }
-            override function isStatic to Boolean { false }
+            override function isStatic to Boolean { isStatic1 }
             override function isPublic to Boolean { true }
             override function isPackage to Boolean { false }
             override function isProtected to Boolean { false }
@@ -420,6 +436,14 @@ function makeFunMember from (name is String, params is F3Type[], ret is F3Type) 
             override function invoke from (owner is F3ObjectValue, args is nativearray of F3Value) to F3Value
             {
                 null;
+            }
+            override function equals from (x0 is Object) to Boolean {
+                if (x0 is F3FunctionMember) {
+                    const x = x0 as F3FunctionMember;
+                    return x.getDeclaringClass() == null and x.getName() == getName() and 
+                        x.getType() == getType() and x.isStatic() == isStatic();
+                }
+                return false;
             }
         }
     }
@@ -936,6 +960,11 @@ public class FunctionMember is Member {
         }
     }
     override var name = formatName(m as F3FunctionMember);
+
+    public function argName from (i is Integer) to String
+    {
+        Expression.argName(this, ft, i);
+    }
 }
 
 function formatTypeVar from (t is F3Type) to String
@@ -1527,7 +1556,7 @@ public class IPath {
             if (observer is Parameter) {
                 const p = observer as Parameter;
                 if (p.constantValue == null) {
-                    return "null as <<{p.getType().getName()}>>";
+                    return "null as {p.getType().getName()}";
                 }
                 return "{p.constantValue}";
             }
@@ -1568,7 +1597,8 @@ public class IPath {
             if (fun.isStatic()) {
                 var args = "";
                 var sep = "";
-                for (p in parents[1..]) {
+                const start = if (func is FormatTextFunction) then 2 else 1;
+                for (p in parents[start..]) {
                     var j = p.getWorldAccess();
                     if (p.needsLift()) {
                         println("NON STATIC LIFT: {p}");
@@ -1588,7 +1618,21 @@ public class IPath {
                     args = "{args}{sep}{j}";
                     sep = ", ";
                 }
-                var app = formStaticMethodCall(fun);
+                var app is String;
+                if (func is FormatTextFunction) {
+                    const ftf = func as FormatTextFunction;
+                    app = "(function from (";
+                    sep = "";
+                    const ftx = ftf.ft;
+                    for (i in [1..<ftx.minArgs()]) {
+                        const px = func.funMember.argName(i);
+                        app = "{app}{sep}<<{px}>> is java.lang.Object";
+                        sep = ", ";
+                    }
+                    app = "{app}) to String \{ {ftf.body} \})";
+                } else {
+                    app = formStaticMethodCall(fun);
+                }
                 var targs = foreach (x in func.typeInputs) {
                     x.getInputType();
                 }
@@ -1759,11 +1803,14 @@ class IContext {
             while (b <> null and not (b is Result)) {
                 b = (b as ObserverExpression).observable;
             }
-            if (b <> null) {
+            if (b is Result) {
                 const br = b as Result;
+                println("result {br} of {br.source} => {br.source.inputs.size()}");
                 for (p in br.source.inputs) {
                     insert getIPath(p) into result.parents;
                 }
+            } else {
+                println("EXPECTED Result but got: {b}");
             }
         } else if (ob is OutputMemberExpression) {
             const j = ob as OutputMemberExpression;
@@ -1881,7 +1928,7 @@ public class Function is MemberExpression {
     public var ft is F3FunctionType = bind funMember.ft;
     public var fun is F3FunctionMember = bind member.m as F3FunctionMember;
     override function getType { ft }
-    var isStatic = bind fun.isStatic();
+    public readonly var isStatic = bind fun.isStatic();
     var clazz = bind fun.getDeclaringClass();
     var isNull = bind clazz == null;
     var argCount1 = bind ft.minArgs();
@@ -1889,7 +1936,7 @@ public class Function is MemberExpression {
     public var typeInputs is TypeVariableExpression[] = bind foreach (t in typeParams) TypeVariableExpression {typevar: t};
     public var inputs is Parameter[] = 
 	bind 
-        [if (isNull) then null else 
+        [if (isNull and not isStatic) then null else 
          Parameter {
              name: "";
              target: this;
@@ -1897,7 +1944,7 @@ public class Function is MemberExpression {
          },           
          foreach (i in [0..<argCount1]) {
              Parameter {
-                 name: bind argName(funMember, ft, i);
+                 name: bind funMember.argName(i);
                  target: this;
                  t: bind ft.getArgumentType(i);
              }
@@ -2229,6 +2276,7 @@ public abstract class ExpressionView is AbstractNode {
     protected var linkFont is Text.Font = bind font.derive("text-decoration:underline;");
     bound function constructLabel to Text.Label {
         Text.Label {
+            blocksPointer: false;
             text: bind getLabel();
             height: bind cellHeight;
             width: bind cellWidth;
@@ -2387,6 +2435,166 @@ function unifyInputs
     }
 }
 
+const BACKSLASH = "\\".charAt(0);
+const LEFTBRACE = "\{".charAt(0);
+const RIGHTBRACE = "\}".charAt(0);
+
+class FormatTextFunction is Function {
+    public var body is String;
+    public override function isObservable to Boolean { yes }
+    override var inputs = [];
+    override var output = Result {
+        source: this;
+        t: STRING_TYPE;
+    }
+}
+
+class FormatText extends FunctionView {
+
+    public var idents is String[];
+    override var fun = FormatTextFunction {
+        isStatic: yes;
+        funMember: makeFunMember("formatText", 
+                                 ["String"],
+                                 [Reflect.STRING_TYPE], 
+                                  Reflect.STRING_TYPE,
+                                  yes);
+    };
+
+    override function serializeFunction to FunNode 
+    {
+        const n = FormatTextNode {
+            template: text;
+            id: "{id}";
+            x: pos.x;
+            y: pos.y;
+            member: null;
+        }
+        serializeFunNode(n);
+    }
+
+    public function setText from (text is String) to ()
+    {
+        updateText();
+        inputs[1].parameter.constantValue = text;
+        updateText();
+    }
+
+    var text is String = bind inputs[1].constValue.toString();
+
+    var parsedText is String;
+
+    override function unify2 to () {}
+    override function ununify to () { updateText() }
+
+    function updateText() {
+        if (text <> parsedText or inputs.size() == 0) {
+            parsedText = text;
+            parseText();
+        }
+    }
+
+    override function update to ()
+    {
+        updateText();
+        super.update();
+    }
+
+    function parseText to () {
+        const chs = parsedText.toCharArray();
+        const identBuff = new java.lang.StringBuffer();
+        const identSet = new java.util.HashSet of String;
+        var idents is String[];
+        var i = 0;
+        var inIdent is Boolean;
+        var esc is Boolean;
+        var bodyBuff = new java.lang.StringBuffer();
+        while (i < chs.length) {
+            const ch = chs[i++];
+            if (ch == BACKSLASH) {
+                esc = not inIdent;
+                continue;
+            } 
+            if (not esc) {
+                if (ch == LEFTBRACE) {
+                    inIdent = true;
+                    continue;
+                } else if (ch == RIGHTBRACE) {
+                    inIdent = false;
+                    const ident = identBuff.toString().trim();
+                    identBuff.setLength(0);
+                    if (ident.length() > 0) {
+                        if (identSet.add(ident)) {
+                            insert ident into idents;
+                            bodyBuff.append("\{<<");
+                            bodyBuff.append(ident);
+                            bodyBuff.append(">>");
+                        }
+                    } else continue;
+                }
+            }
+            if (inIdent) {
+                identBuff.append(ch);
+            } else {
+                bodyBuff.append(ch);
+            }
+            esc = false;
+        }
+        println("parsed text: {parsedText}");
+        println("idents={identSet}");
+        println("body={bodyBuff.toString()}");
+        this.idents = idents;
+        this.fun.funMember = makeFunMember("formatText", 
+                                           ["String", idents],
+                                           [Reflect.STRING_TYPE, 
+                                            foreach (j in idents) Reflect.OBJECT_TYPE], 
+                                           Reflect.STRING_TYPE,
+                                           yes);
+        (this.fun as FormatTextFunction).body = bodyBuff.toString();
+        const newArgCount = idents.size() + 1;
+        const newInputs is Parameter[] = 
+        [
+         Parameter {
+             name: "";
+             target: fun;
+             t: UNIT_TYPE;
+         },           
+         foreach (j in [0..<newArgCount]) {
+             Parameter {
+                 name: fun.funMember.argName(j);
+                 target: fun;
+                 t: fun.ft.getArgumentType(j);
+             }
+         }];
+        const merged is Parameter[] = foreach (j in [0..<newInputs.size()]) {
+            if i < fun.inputs.size() then { 
+                    const p = fun.inputs[j];
+                    p.t = newInputs[j].t;
+                    p;
+                } else newInputs[j];
+        }
+        const links = foreach (x in inputs) LinkRef { link: x.links[0] };
+        var oldInputs = inputs;
+        fun.inputs = merged;
+        inputs[1].parameter.constantValue = parsedText;
+        for (ref in links) {
+            const j = indexof ref;
+            if (ref.link <> null) {
+                const src = ref.link.source;
+                ref.link.unlink();
+                ref.link.target = inputs[j];
+                if (ref.link.target <> null) {
+                    ref.link.link();
+                }
+            }
+        }
+    }
+}
+
+class LinkRef {
+    const link is LinkView;
+}
+
 class FunctionView is ExpressionView {
 
     override var title = bind borderedTitle();
@@ -2421,6 +2629,11 @@ class FunctionView is ExpressionView {
             y: pos.y;
             member: fun.member.serialize();
         }
+        serializeFunNode(n);
+    }
+    
+    protected function serializeFunNode from (n is FunNode) to FunNode
+    {
         canvas.serializationMap.put(this, n);
         n.typeInputs = foreach (i in typeInputs) {
             TargetNode {
@@ -2471,7 +2684,7 @@ class FunctionView is ExpressionView {
         }
     }
 
-    function ununify to () 
+    protected function ununify to () 
     {
         for (x in inputs) {
             x.inputType = null;
@@ -2483,7 +2696,7 @@ class FunctionView is ExpressionView {
 
     const substs = new java.util.HashMap of (F3Type, F3Type);
 
-    function unify2 to () 
+    protected function unify2 to () 
     {
         substs.clear();
         unify(substs);
@@ -3651,7 +3864,7 @@ class TypeParameterView is InputView {
     }
 
     override var labelVisible = bind checkLabel(canvas.dropType, getInputType());
-    function checkLabel from (dt is F3Type, t is F3Type) to Boolean
+    override function checkLabel from (dt is F3Type, t is F3Type) to Boolean
     {
         const result = infer == null and canvas.canAssignTo(t);
         return result;
@@ -3727,7 +3940,7 @@ public class ParameterView is InputView {
     public var inputType is F3Type;
     public var inferred is ParameterView[];
     override var labelVisible = bind checkLabel(canvas.dropType, getInputType());
-    function checkLabel from (dt is F3Type, t is F3Type) to Boolean
+    override function checkLabel from (dt is F3Type, t is F3Type) to Boolean
     {
         const result = canvas.canAssignTo(t);
         println("{parameter.name} of {targetView.fun.funMember.name} {dt} =>{result} => {t}");
@@ -5101,7 +5314,11 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                     member: m0;
                 }
             } else m0;
-        if (m is FunctionMember) {
+        if (m == FORMAT_TEXT) {
+            insert r = FormatText { 
+                canvas: this;
+            } into views;
+        } else if (m is FunctionMember) {
             const fun = Function {
                 funMember: m as FunctionMember;
             }
@@ -5660,12 +5877,12 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         visible: false;
         strokePaint: ColorPaint(Color.color(.2, .2, .2, 1));
         pickable: false;
-        /*
         stroke: Stroke {
-            miterlimit: 2;
-            dash: [2];
+            width: 1.0;
+            miterlimit: 1;
+            dash: [4, 2];
         }
-        */
+
     };
 
     function createFunctionFromSelection 
@@ -5877,15 +6094,17 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         
     function endSelection from (e is MouseEvent) to ()
     {
-        canvas.setSelectedExpr(null);
-        const selected = new java.util.HashSet of ExpressionView;
-        for (v in views) {
-            if (Bounds.intersect(v.bounds, selectionRect.bounds) <> null) {
-                selected.add(v)
+        if (selectionRect.width <> 0 or selectionRect.height <> 0) {
+            canvas.setSelectedExpr(null);
+            const selected = new java.util.HashSet of ExpressionView;
+            for (v in views) {
+                if (Bounds.intersect(v.bounds, selectionRect.bounds) <> null) {
+                    selected.add(v)
+                        }
             }
-        }
-        for (v in views) {
-            v.selected = selected.contains(v)
+            for (v in views) {
+                v.selected = selected.contains(v);
+            }
         }
         selectionRect.visible = false;
     }
@@ -6846,6 +7065,21 @@ public class BranchNode is ExprNode {
         v.pos = new Point3(x, y, 0);
         insert v into canvas.views;
         return v;
+    }
+}
+
+class FormatTextNode is FunNode {
+    public var template is String;
+    public override function createView from (canvas is Canvas) to FunctionView {
+        const v = FormatText {
+            canvas: canvas;
+            pathFactory: canvas.pathFactory;
+            layoutEngine: canvas.layoutEngine;
+            imageLoader: canvas.imageLoader;
+            effectLoader: canvas.effectLoader;
+        }
+        v.setText(template);
+        linkView(canvas, v);
     }
 }
 

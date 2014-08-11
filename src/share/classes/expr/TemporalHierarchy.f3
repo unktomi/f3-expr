@@ -209,38 +209,40 @@ public class TemporalHierarchy
 	selectTimeNode(t);
     }
 
-    public function move from (src is TimeNode, target is TimeNode) to ()
+    public function move from (src is TimeNode, target is TimeNode) to Boolean
     {
         if (not (src is ResourceTimeNode)) {
-            return;
+            return false;
         }
-	const srcParent = src.parent as TimeGroup;
-        if (srcParent is ResourceTimeGroup) {
-            const r = srcParent as ResourceTimeGroup;
-            delete src as ResourceTimeNode from r.resources;
+        var targ = target;
+        var index is Integer;
+        if (not (targ is TimeGroup)) {
+            index = Sequences.indexOf((targ.parent as TimeGroup).content, targ);
+            targ = targ.parent;
         } else {
-            delete src from srcParent.content;
+            index = (targ as TimeGroup).content.size();
         }
-	var targetTimeGroup is TimeGroup;
-	if (not (target is TimeGroup)) {
-	    const parent = target.parent as TimeGroup;
-            if (parent is ResourceTimeGroup) {
-                const r = parent as ResourceTimeGroup;
-                const i = f3.util.Sequences.indexOf(r.resources, target);
-                insert src as ResourceTimeNode after r.resources[i];
+        if (not (targ is ResourceTimeGroup) and not (targ.parent is ResourceTimeNodeWrapper)) {
+            return false;
+        } 
+	const srcParent = src.parent as TimeGroup;
+        if (srcParent <> null) {
+            if (srcParent is ResourceTimeGroup) {
+                const r = srcParent as ResourceTimeGroup;
+                delete src as ResourceTimeNode from r.resources;
             } else {
-                const i = f3.util.Sequences.indexOf(parent.content, target);
-                insert src after parent.content[i];
+                delete src from srcParent.content;
             }
-	} else {
-	    const parent = target as TimeGroup;
-            if (parent is ResourceTimeGroup) {
-                const r = parent as ResourceTimeGroup;
-                insert src as ResourceTimeNode into r.resources;
-            } else {
-                insert src into parent.content;
-            }
-	}
+        }
+        if (targ is ResourceTimeGroup) {
+            const rn = src as ResourceTimeNode;
+            const g = targ as ResourceTimeGroup;
+            insert rn before g.resources[index];
+        } else {
+            const g = targ as TimeGroup;
+            insert src before g.content[index];
+        }
+        return true;
     }
 
     const selection = Subject of TimeNode {}
