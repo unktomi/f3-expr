@@ -72,7 +72,8 @@ class MinimizedInternalWindow is AbstractNode, MouseInputHandler {
         transform: bind translate(0, index * 18) ;
     };
 
-    bound function getWidth to Number {
+    bound function getWidth to Number 
+    {
         (internalContent as Text.Label).width;
     }
     override function onMouseUp from (e is MouseEvent) to ()
@@ -86,7 +87,7 @@ class MinimizedInternalWindow is AbstractNode, MouseInputHandler {
 public class EditorState {
     public var windowWidth is Integer;
     public var windowHeight is Integer;
-    public var internalWindows: InternalWindowState[];
+    public var internalWindows is InternalWindowState[];
     public var cameraX is Number;
     public var cameraY is Number;
     public var cameraZ is Number;
@@ -350,6 +351,7 @@ public function run from (args is String[]) to ()
 
 
     const temporalHierarchy = TemporalHierarchy { root: currentAnimResource }
+    var temporalTreeview is Treeview;
     const temporalHierarchy2 = TemporalHierarchy { root: ResourceTimeGroup {
             override var id = "Hierarchy";
             override protected function updateParent to () { // hack...
@@ -433,8 +435,6 @@ public function run from (args is String[]) to ()
             return super.lookup(id);
         }
     }
-
-    
 
     const player = Timeline {
 	override var paused = true on replace {
@@ -2015,26 +2015,52 @@ public function run from (args is String[]) to ()
 					     if (asset is AssetTree.ClipAsset) {
 						 const clip = (asset as AssetTree.ClipAsset).getClip();
                                                  const picked = getUnderMouseInEditor();
+                                                 const rtn = 
+                                                 if (clip is ResourceTimeNode) 
+                                                     then clip as ResourceTimeNode 
+                                                     else ResourceTimeNodeWrapper {
+                                                             playCount: if clip is BlendLayer then -1 else 1; // hack...
+                                                             url: asset.url;
+                                                             displayName: Names.formatName(clip.id);
+                                                             wrapped: clip as TimeGroup;
+                                                         };
 						 for (j in picked) {
 						     println("j={j.node}");
 						     if (j.node is Trax) { 
-                                                         const rtn = 
-                                                             if (clip is ResourceTimeNode) 
-                                                                 then clip as ResourceTimeNode 
-                                                                 else ResourceTimeNodeWrapper {
-                                                                         playCount: if clip is BlendLayer then -1 else 1; // hack...
-                                                                         url: asset.url;
-                                                                         displayName: Names.formatName(clip.id);
-                                                                         wrapped: clip as TimeGroup;
-                                                                     };
 							 (j.node as Trax).onDrop(j, rtn, 
                                                                                  function from (t is TimeNode) to ()
                                                                                  {
                                                                                      const rtn = t as ResourceTimeNode;
                                                                                      addTimeResource(rtn);
                                                                                  });
+                                                         selectTimeNodeLater(rtn);
 							 break;
-						     }
+						     } else if (j.node == temporalTreeview) {
+                                                         const pt = j.node.toSceneTransform.inverse() * j.scenePoint;
+                                                         const tn = temporalTreeview.pick(pt.y) as TemporalHierarchy.Treenode;
+                                                         println("PICKED => {tn} for {e.location.y}");
+                                                         if (tn <> null) {
+                                                             const n = tn.n;
+                                                             if (n is ResourceTimeGroup) {
+                                                                 addTimeResource(rtn);
+                                                             } else {
+                                                                 if (temporalHierarchy.move(rtn, n)) {
+                                                                     var ctx = 
+                                                                         mainContext.resolveTimeNodeContext(rtn);
+                                                                     if (ctx == null) {
+                                                                         ctx = Context.ResourceTimeNodeContext { 
+                                                                             parent: contextModel.selectedGroupContext; 
+                                                                             resource: rtn;
+                                                                         } 
+                                                                         rtn.ctx = ctx;
+                                                                         insert ctx into contextModel.selectedGroupContext.content;
+                                                                     }
+                                                                 }
+                                                             }
+                                                             selectTimeNodeLater(rtn);
+                                                         }
+                                                         break;
+                                                     }
 						 }
 					     }
                                              if (asset is AssetTree.ResourceNodeAsset) {
@@ -2334,7 +2360,7 @@ public function run from (args is String[]) to ()
                                      Scrollpane {
                                          canZoomVertical: false;
                                          content:
-                                         Treeview {
+                                         temporalTreeview = Treeview {
                                              model: TemporalHierarchy.Model {
                                                  h: bind temporalHierarchy
                                                      }
