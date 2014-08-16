@@ -59,9 +59,9 @@ public class EvalContext {
     public var lookupSpatial is function from String to Node;
     public var lookupTemporal is function from String to TimeNode;
 
-    const varRefSubject = Subject of ((String, ObservableRef of ?)) {}
+    const varRefSubject = Subject of ((String, ObservableRef of Object)) {}
 
-    public function observeVars to Observable of ((String, ObservableRef of ?)) {
+    public function observeVars to Observable of ((String, ObservableRef of Object)) {
         varRefSubject;
     }
 
@@ -120,10 +120,10 @@ public class EvalContext {
 
     var varSubscriberMap = new java.util.HashMap of (Context.ClosureVarContext, Disposable[]);
 
-    public function registerVar from (name is String, value is ObservableRef of ?) to ()
+    public function registerVar of a from (name is String, value is ObservableRef of a) to ()
     {
         varMap.put(name, value);
-        varRefSubject.onNext(new org.f3.runtime.Pair of (String, ObservableRef of ?)(name, value));
+        varRefSubject.onNext((name, value as ObservableRef of Object));
     }
 
     function undefineVar from (v is Context.ClosureVarContext) to ()
