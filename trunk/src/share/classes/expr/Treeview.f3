@@ -208,9 +208,7 @@ public abstract class Treenode is Foldable of Treenode {
 
     public function open to ()
     {
-	if (not parent.isOpen) {
-	    parent.open();
-	}
+        parent.open();
 	isOpen = true;
     }
 
@@ -510,14 +508,16 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
     var openNodes = new java.util.HashSet of (Treenode);
 
     override function preupdate {
-	model.update();
 	if (nextSelection <> null) {
+            model.open(nextSelection);
+            model.update();
 	    const row = nextSelection.row;
 	    nextSelection = null;
 	    selectionRow = row;
-            model.open(selectedTreenode);
             println("OPENING: {selectedTreenode.label}");
-	}
+	} else { 
+            model.update();
+        }
         modelSelection = selectedTreenode;
 	const i = scrollOffset;
 	const j = scrollOffset + visibleRows;

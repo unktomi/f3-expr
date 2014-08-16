@@ -76,6 +76,7 @@ public class HScrollbar is ResizableNode {
 
         override function onMouseDrag from (e is MouseEvent) to ()
         {
+            dragging = true;
             dx += e.drag.x;
             var tx = tx0 * width + dx;
             var sx = ((x0 + w0) - tx) / width;
@@ -96,6 +97,7 @@ public class HScrollbar is ResizableNode {
         }
 
         override function onMouseUp from (e is MouseEvent) to () {
+            dragging = false;
             endScroll();
         }
     };
@@ -109,6 +111,10 @@ public class HScrollbar is ResizableNode {
     {
         onScroll(false);
     }
+
+    var dragging is Boolean;
+
+    public bound function isAdjusting to Boolean { dragging }
 
     var runWidth = bind width - 4;
     var thumbWidth = bind Math.max(runWidth-5, 1);

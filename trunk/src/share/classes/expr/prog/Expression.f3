@@ -503,6 +503,7 @@ public const INT_MEMBERS =
     }];
 
 const IF_EXPR = Reflect.getFunction("f3.lang.Builtins$BooleanOperators", "If", ["Boolean", "Object", "Object"]);
+const IF_STMT = Reflect.getFunction("f3.lang.Builtins$BooleanOperators", "If", ["Boolean", "Object"]);
 const NUM_NEGATE = Reflect.getFunction("f3.lang.Builtins$NumberOperators", "negate", ["Number"]);
 const INT_NEGATE = Reflect.getFunction("f3.lang.Builtins$IntegerOperators", "negate", ["Integer"]);
 
@@ -527,6 +528,9 @@ public const BOOL_MEMBERS is Member[] =
     }
     FunctionMember {
         m: IF_EXPR;
+    },
+    FunctionMember {
+        m: IF_STMT;
     }];
 
 
@@ -1475,6 +1479,8 @@ public class IPath {
             const fun = func.fun;
             if (fun == IF_EXPR) {
                 return "{formatEnglishName("if", func.id, html)} ({parents[1].getEnglishAccess()}) then {parents[2].getEnglishAccess()} else {parents[3].getEnglishAccess()}";
+            } else if (fun == IF_STMT) {
+                return "if not ({parents[1].getEnglishAccess()}) Stop; Otherwise {parents[2].getEnglishAccess()}";
             } else if (fun == NUM_NEGATE or fun == INT_NEGATE) {
                 return "{formatEnglishName("-", func.id, html)}{parents[1].getEnglishAccess()}";
             } else if (infix) {
@@ -4554,11 +4560,11 @@ public class MemberTreecell is Treeview.Treecell
     function createRect to Rectangle {
         Rectangle {
             visible: bind showSelection;
-            height: bind tv.cellHeight;
+            height: bind tv.cellHeight-1;
             width: bind tv.cellWidth;
             pickable: false;
             stroke: Stroke {
-                width: 2;
+                width: 1;
             }
             strokePaint: bind SelectionPaint;
         }
@@ -5182,7 +5188,6 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     function setSelectedExpr from (e is ExpressionView) to ()
     {
         selectionRect.visible = false;
-        selectedExpr.deselect();
         selectedExpr = e;
     }
 
@@ -5206,46 +5211,47 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             insert exp after views[views.size()-1];
         }
     }
-    override public bound function getTx to Number { 1.0-(cx + width/2.0) / width }
+    var viewportBounds = bind Bounds.boundsFromRect(width, height);
+    var localContentBounds is Bounds;
+    var mergedBounds = bind Bounds.merge(viewportBounds, localContentBounds);
+    override public bound function getTx to Number {
+        (cx - mergedBounds.left()) / mergedBounds.width() - 0.5;
+    }
     override public bound function getSx to Number { 
-        //Math.min(width / localSpace.contentBounds.width(), 1.0);
-        //zoomx;
-        .1
+        width / mergedBounds.width();
     }    
 
-    override public bound function getTy to Number { (cy + height/2.0) / height }
+    override public bound function getTy to Number { 
+        ( mergedBounds.top()-height/2.0) / mergedBounds.height();
+    }
 
     override public bound function getSy to Number { 
-        //Math.min(height / localSpace.contentBounds.height(), 1.0);
-        //zoomy;
-        .2
+        height / mergedBounds.height();
     }
 
     override public function setX from (tx is Number, sx is Number) to ()
     {
-        //println("SET X {tx} {sx}");
-        cx = (0.5-tx) * width
-        //zoomx = sx;
+        println("merged={mergedBounds}");
+        cx = mergedBounds.left() + (tx+0.5) * mergedBounds.width();
+        //println("tx={tx}, d={d}, left={left}, cx={cx0}=>{cx}");
     }
 
     override public function setY from (ty is Number, sy is Number) to ()
     {
-        //println("SET Y {ty} {sy}");
-        cy = ty * height - height/2.0;
-        //zoomy = sy;
+        cy = mergedBounds.bottom() + ty * mergedBounds.height();
     }
 
     public function onDrop from (where is Pick, m is Member) to ()
     {
         const r = createMemberView(toLocal * where.scenePoint, m, 0, true);
-        setSelectedExpr(r);
+        setSelection([r]);
         MasterUndoable.commit();
     }
 
     public function onDrop from (where is Pick, t is F3Type) to ()
     {
         const r = createTypeView(toLocal * where.scenePoint, t, 0);
-        setSelectedExpr(r);
+        setSelection([r]);
         MasterUndoable.commit();
     }
 
@@ -5773,14 +5779,18 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     }
 
     const terminalView is TransformNode = TransformNode { 
-        tx: bind (1.0/zoomx)*(width / 2.0 - cx) - 120;
-        ty: bind (1.0/zoomy)*(height / 2 - cy) - 20;
+        //tx: bind (1.0/zoomx)*(width / 2.0 - cx) - 120;
+        //ty: bind (1.0/zoomy)*(height / 2 - cy) - 20;
+        //tx: bind (width / 2.0 - cx) - 120;
+        //ty: bind (height / 2 - cy) - 20;
         content: bind terminalExprView;
     };
 
     const initialView is TransformNode = TransformNode { 
-        tx: bind (1.0/zoomx)*(-width / 2.0 - cx) + 120;
-        ty: bind (1.0/zoomy)*(height / 2 - cy) - 20;
+       // tx: bind (1.0/zoomx)*(-width / 2.0 - cx) + 120;
+       // ty: bind (1.0/zoomy)*(height / 2 - cy) - 20;
+        //tx: bind (-width / 2.0 - cx) + 120;
+        //ty: bind (height / 2 - cy) - 20;
         content: bind initialExprView;  
     };
 
@@ -5830,10 +5840,11 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                         override function getLocalAccess to String { "i" }
 			member: event;
 		    }
-                    dragFilter: new Tuple3(1.0, 0.0, 0.0);
+                    //dragFilter: new Tuple3(1.0, 0.0, 0.0);
 		}
 		r.updateParent();
                 MasterUndoable.commit();
+                //                r.pos = new Point3(-width/2 - cx+ 120, height /2 - cy -20, 0);
 		r;
 	    }
     }
@@ -5843,6 +5854,26 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     var sourceUpdate = 0;
     var sourceVersion = 0;
     var sourceUpdateTime is Long = 0;
+
+    var scrolling is Integer;
+    override function onScrollVertically from (value is Boolean) to () {
+        //        if (not value) updateViewBounds()
+        if (value) { scrolling++ } else { scrolling-- };
+    }
+
+    override function onScrollHorizontally from (value is Boolean) to () {
+        //if (not value) updateViewBounds()
+        if (value) { scrolling++ } else { scrolling-- };
+    }
+
+    function updateViewBounds to () {
+        if (scrolling == 0) {
+            localContentBounds = viewportBounds;
+            while (not localContentBounds.contains(localSpace.bounds)) {
+                localContentBounds = scale(2, 2, 2) * localContentBounds;
+            }
+        }
+    }
 
     override function update to () {
         super.update();
@@ -6099,8 +6130,8 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             const selected = new java.util.HashSet of ExpressionView;
             for (v in views) {
                 if (Bounds.intersect(v.bounds, selectionRect.bounds) <> null) {
-                    selected.add(v)
-                        }
+                    selected.add(v);
+                }
             }
             for (v in views) {
                 v.selected = selected.contains(v);
@@ -6111,6 +6142,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         
     function beginSelection from (e is MouseEvent) to ()
     {
+        setSelection([]);
         selectionRect.visible = true;
         selectionPoint = selectionTransformInverse * e.location;
         selectionRect.width = 0;
@@ -6447,17 +6479,17 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     function zoomIn to ()
     {
         if (fontSize < 0) {
-            fontSize = font.height();
+            fontSize = font.size;
         }
         const smaller = fontSize-1.0;
-        zoomx = zoomy = smaller / font.height();
-        fontSize = smaller;
+        fontSize = Math.max(smaller, 6);
+        zoomx = zoomy = fontSize / font.size;
         MasterUndoable.commit();
     }
 
     function resetZoom to ()
     {
-        fontSize = font.height();
+        fontSize = font.size;
         zoomx = zoomy = 1.0;
         cx = cy = 0;
         MasterUndoable.commit();
@@ -6466,10 +6498,10 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     function zoomOut to ()
     {
         if (fontSize < 0) {
-            fontSize = font.height();
+            fontSize = font.size;
         }
         const bigger = fontSize+1.0;
-        zoomx = zoomy = bigger / font.height();
+        zoomx = zoomy = bigger / font.size;
         fontSize = bigger;
         MasterUndoable.commit();
     }
@@ -6479,6 +6511,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         cx = cy = 0;
         zoomx = zoomy = 1;
         var bounds is Bounds;
+        const views = [initialExprView, terminalExprView, this.views];
         for (v in views where v.selected) bounds = Bounds.merge(bounds, v.boundsInScene);
         if (bounds == null) {
             for (v in views) bounds = Bounds.merge(bounds, v.boundsInScene);
@@ -6487,7 +6520,9 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         const w = bounds.width();
         const h = bounds.height();
         const max_zoom = Math.max(1.0, (width-100) / ((if terminalExprView <> null then 2  else 1) * cellWidth + 20));
-        const zoom = Math.min(max_zoom, Math.min(height / (h+100), width / (w+100)));
+        var zoom = Math.min(max_zoom, Math.min(height / (h+100), width / (w+100)));
+        fontSize = Math.round(zoom * font.size) as Integer;
+        zoom = fontSize / font.size;
         frameBounds = bounds;
         cx = -bounds.center.x * zoom;
         cy = -bounds.center.y * zoom;
@@ -6501,8 +6536,15 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     override function onMouseWheel from (e is MouseWheelEvent) to ()
     {
         if (e.metaKey) {
-            zoomy *= 1.0 + e.scroll.y * 0.1;
-            zoomx = zoomy;
+            const baseFontSize = font.size;
+            if (fontSize < 0) {
+                fontSize = baseFontSize;
+            }
+            const inc = e.scroll.y;
+            fontSize += Math.round(inc) as Integer;
+            fontSize = Math.max(fontSize, 6);
+            const zoom = fontSize / baseFontSize;
+            zoomx = zoomy = zoom;
             MasterUndoable.commit();
         }
     }
@@ -6671,7 +6713,10 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     function dumpSrc to () {
         sourceVersion++;
-        sourceUpdateTime = java.lang.System.currentTimeMillis()+1000;
+        sourceUpdateTime = java.lang.System.currentTimeMillis()+128;
+    }
+
+    public function genSource to () {
         const x = new java.util.HashSet of ExpressionView();
         const y = new java.util.ArrayList of FunctionView;
         for (v in views where v is FunctionView) {
@@ -6689,9 +6734,6 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         for (v in y) {
             v.unify2();
         }
-    }
-
-    public function genSource to () {
 	println("DUMP SRC:");
 	unsubscribe();
 	println(visit(varRoot, foreach (v in views where v.expression <> varRoot and v is GetVarView) v.expression));

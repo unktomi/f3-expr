@@ -470,12 +470,7 @@ public function run from (args is String[]) to ()
 	camera: camera;
     }
 
-    const browser = if TheWebBrowserFactory == null then null else WebBrowser {
-	//factory: TheWebBrowserFactory;
-	//effectLoader: CGEffectLoader_INSTANCE;
-	//pathFactory: ThePath2DFactory;
-    }
-
+    const browser = if TheWebBrowserFactory == null then null else WebBrowser {}
     
     function addResource from (rn is ResourceNode, pt is Point3) to ()
     {
@@ -712,7 +707,7 @@ public function run from (args is String[]) to ()
             addTimeResource(rtn);
 	} else if (loweredUrl.endsWith(".xhtmli")) {
 	    const xhtml = XHTML.Text {
-		content: readTextFile(url).first;
+		content: readTextFile(url).former;
 	    }
 	    const rn = ResourceNode {
 		url: url;

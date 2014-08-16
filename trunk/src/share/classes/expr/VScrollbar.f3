@@ -18,6 +18,7 @@ public class VScrollbar is ResizableNode {
     public readonly var scrolling is Boolean = bind hsb.scrolling;
     public function onScroll from (b is Boolean) to () {}
     override var internalContent = bind hsb;
+    public bound function isAdjusting to Boolean { hsb.isAdjusting() }
     const hsb = HScrollbar {
         hack: false;
         canZoom: bind canZoom;

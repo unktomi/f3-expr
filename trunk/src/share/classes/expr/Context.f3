@@ -404,10 +404,10 @@ public class ClosureVarContext is GroupContext, ProgramContext {
     var d is Disposable;
 
     override var program on replace {
-        d = program.evalContext.observeVars().subscribe(function from (p is (String, ObservableRef of ?)) to () {
-                println("observer var: {p.first} {p.second}");
-                if (p.first == variableName) {
-                    animationTarget = p.second;
+        d = program.evalContext.observeVars().subscribe(function from (p is (String, ObservableRef of Object)) to () {
+                println("observer var: {p.former} {p.latter}");
+                if (p.former == variableName) {
+                    animationTarget = p.latter;
                     if (varType.t == Reflect.NUMBER_TYPE) {
                         disp2.dispose();
                         const ob = Observables.observe(animationTarget as ObservableRef of Number);
