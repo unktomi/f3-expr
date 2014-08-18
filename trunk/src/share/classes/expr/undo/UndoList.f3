@@ -80,7 +80,7 @@ public class UndoList
         }
 	if (dirty) {
 	    list = UndoableList {
-		todo: foreach (t in targets) Undoable.make(tags[indexof t], t)
+		todo: foreach (t in targets) Undoable.make(tags[indexof t], t as Ref of Object)
 	    }
 	}
 	insert list into history;

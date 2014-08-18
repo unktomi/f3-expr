@@ -111,7 +111,7 @@ public class EvalContext {
                         const oldSubs = varSubscriberMap.get(v0);
                         for (x in oldSubs) x.dispose();
                     }
-                    const subs1 = foreach (ob1 in obs1) subscribe(ob1);
+                    const subs1 = foreach (ob1 in obs1) subscribe(ob1 as Observable of Object);
                     varSubscriberMap.put(v0, subs1);
                 }
             }
@@ -174,7 +174,7 @@ public class EvalContext {
                     createVars(prog, x);
                 });
             for (o in obs) {
-                subscribe(o, prog);
+                subscribe(o as Observable of Object, prog);
             }
         } catch (e is java.lang.Throwable) {
             e.printStackTrace();
