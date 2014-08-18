@@ -5111,7 +5111,7 @@ function canConvert from (target is F3Type, src is F3Type) to Boolean
 public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollable, MouseInputHandler {
 
     public const menuFactory is MenuFactory;
-
+    public const clipboard is Clipboard;
     public var go is function from Context to ();
 
     public var assetModel is AssetTree.AssetModel;
@@ -5215,14 +5215,16 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     var localContentBounds is Bounds;
     var mergedBounds = bind Bounds.merge(viewportBounds, localContentBounds);
     override public bound function getTx to Number {
-        (cx - mergedBounds.left()) / mergedBounds.width() - 0.5;
+        (-cx -width / 2.0 - mergedBounds.left()) / mergedBounds.width();
     }
-    override public bound function getSx to Number { 
+
+    override public bound function getSx to Number 
+    { 
         width / mergedBounds.width();
     }    
 
     override public bound function getTy to Number { 
-        ( mergedBounds.top()-height/2.0) / mergedBounds.height();
+        (cy + mergedBounds.top()-height/2.0) / mergedBounds.height();
     }
 
     override public bound function getSy to Number { 
@@ -5231,14 +5233,13 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     override public function setX from (tx is Number, sx is Number) to ()
     {
-        println("merged={mergedBounds}");
-        cx = mergedBounds.left() + (tx+0.5) * mergedBounds.width();
-        //println("tx={tx}, d={d}, left={left}, cx={cx0}=>{cx}");
+        //tx = (-cx -width / 2.0 - mergedBounds.left()) / mergedBounds.width();
+        cx = -(tx * mergedBounds.width() + width / 2.0 + mergedBounds.left());
     }
 
     override public function setY from (ty is Number, sy is Number) to ()
     {
-        cy = mergedBounds.bottom() + ty * mergedBounds.height();
+        cy = -mergedBounds.top()+height/2.0+ty*mergedBounds.height();
     }
 
     public function onDrop from (where is Pick, m is Member) to ()
@@ -5660,6 +5661,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 code: todo;
             }
             const newCanvas = Canvas {
+                clipboard: clipboard;
                 go: bind go;
                 assetModel: assetModel;
                 menuFactory: menuFactory;
@@ -5865,17 +5867,18 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         //if (not value) updateViewBounds()
         if (value) { scrolling++ } else { scrolling-- };
     }
-
+    const double = scale(2, 2, 2);      
     function updateViewBounds to () {
         if (scrolling == 0) {
-            localContentBounds = viewportBounds;
+            localContentBounds = double * viewportBounds;
             while (not localContentBounds.contains(localSpace.bounds)) {
-                localContentBounds = scale(2, 2, 2) * localContentBounds;
+                localContentBounds = double * localContentBounds;
             }
         }
     }
 
     override function update to () {
+        updateViewBounds();
         super.update();
         debuggerEngine.update();
     }
@@ -6032,6 +6035,72 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         MasterUndoable.commit();
     }
 
+    function cutSelection from () to String
+    {
+        const result = copySelection();
+        deleteSelection();
+        return result;
+    }
+
+    function copySelection from () to String
+    {
+        const selection = views[v | v.selected];
+        if (selection.size() == 0) return "";
+        const linked = new java.util.HashSet of ExpressionView;
+        const links = new java.util.HashSet of LinkView;
+        var center is Vec3 = Vec3.<<0>>;
+        for (v in selection) {
+            linked.add(v);
+            for (link in v.getInputLinks()) links.add(link);
+            center += (v.pos - Point3.<<0>>);
+        }
+        center /= selection.size();
+        serializationMap.clear();
+        for (e in linked) {
+            serialize(e);
+        }
+        const todo = ExprScene {};
+        for (e in serializationMap.values()) {
+            insert e into todo.views;
+        }
+        for (link in links) {
+            insert link.serialize() into todo.links;
+        }
+        const w = new java.io.StringWriter();
+        IO.writeObject(w, todo);
+        const result = w.toString();
+        println("copy=>{clipboard} => {result}");
+        clipboard.copyStringToClipboard(result);
+        return result;
+    }
+
+    public function pasteSelection from (pt is Point3) to () {
+        if (not clipboard.isEmpty()) {
+            const data = clipboard.copyStringFromClipboard();
+            println("data=>{data}");
+            try {
+                const todo = IO.readObject(new java.io.StringReader(data)) as ExprScene;
+                deserializationMap.clear();
+                const newSelection = new java.util.HashSet of ExpressionView;
+                for (v in todo.views) {
+                    const j = v.createView(this);
+                    //j.pos += pt - center; 
+                    newSelection.add(j);
+                }
+                installLinks();
+                for (v in views) {
+                    v.selected = newSelection.contains(v);
+                }
+                this.links = [this.links];
+                this.views = [this.views];
+                MasterUndoable.commit();
+            } catch (e is java.lang.Exception) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+
     function extract from () to () 
     {
         const linked = new java.util.HashSet of ExpressionView();
@@ -6078,6 +6147,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             code: todo;
         }
         const newCanvas = Canvas {
+            clipboard: clipboard;
             go: bind go;
             menuFactory: menuFactory;
             interactive: interactive;
@@ -6195,7 +6265,24 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                     MenuItem {
                         label: "Duplicate";
                         action: function to () { canvas.duplicateSelection(e.location) }
+                    }
+                    Menu.Separator {},
+                    MenuItem {
+                        enabled: bind canvas.selectedExpr <> null;
+                        label: "Cut";
+                        action: function to () { canvas.cutSelection() }
+                    },
+                    MenuItem {
+                        enabled: bind canvas.selectedExpr <> null;
+                        label: "Copy";
+                        action: function to () { canvas.copySelection() }
+                    },
+                    MenuItem {
+                        enabled: bind not clipboard.isEmpty();
+                        label: "Paste";
+                        action: function to () { canvas.pasteSelection(e.location) }
                     }]
+
                 }
                 println("menu factory => {menuFactory}");
                 e.stage.showPopupMenu(e.screenx, e.screeny, menu);
@@ -6471,6 +6558,12 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             resetZoom();
         } else if (e.keyCode == Keys.Minus) {
             zoomIn();
+        } else if (e.keyCode == Keys.X and e.metaKey) {
+            cutSelection();
+        } else if (e.keyCode == Keys.C and e.metaKey) {
+            copySelection();
+        } else if (e.keyCode == Keys.V and e.metaKey) {
+            pasteSelection(new Point3(cx, cy, 0));
         } else if (e.keyCode == Keys.A and e.metaKey) {
             selectAll();
         }
@@ -6535,7 +6628,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     override function onMouseWheel from (e is MouseWheelEvent) to ()
     {
-        if (e.metaKey) {
+        if (true or e.metaKey) {
             const baseFontSize = font.size;
             if (fontSize < 0) {
                 fontSize = baseFontSize;
@@ -7458,7 +7551,7 @@ public class SourceNode is ExprNode {
 }
 
 public class Editor is ResizableNode, Focuser {
-
+    public const clipboard is Clipboard;
     public var go is function from Context to ();
     public var menuFactory is MenuFactory;
     public var popupLayer is PopupLayer;
@@ -7595,6 +7688,7 @@ public class Editor is ResizableNode, Focuser {
 	if (prog.canvas == null) {
             println("creating canvas with {pathFactory}");
 	    prog.canvas = Canvas {
+                clipboard: clipboard;
                 go: bind go;
                 assetModel: assetModel;
                 menuFactory: menuFactory;

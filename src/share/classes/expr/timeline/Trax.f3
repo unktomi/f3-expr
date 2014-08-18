@@ -746,7 +746,6 @@ public class Playhead is AbstractNode
 	override function onNext from (event is MouseEvent) to ()
 	{
 	    tx += (event.picked.dragPoint1 - event.picked.dragPoint0).x;
-	    println("drag {tx}");
 	    trax.movePlayheadTo(tx, event.shiftKey);
 	}
     };
@@ -1104,7 +1103,6 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
 	const scrollX = frameToX(scrollOffset);
 	const d = xToDuration(x+scrollX);
 	target.setPlayhead(frameToDuration(durationToFrame(d)));
-	println("move playhead to {x}, scrollX={scrollX} d={d} frame={durationToFrame(d)}");
         if (shift) {
             selectionEndTime = target.playhead;
         } else {
