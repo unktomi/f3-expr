@@ -2425,13 +2425,18 @@ public abstract class ExpressionView is AbstractNode {
 
 function unifyInputs 
     from (l is LinkView, 
+          visitedLinks is java.util.Set of LinkView,
           visited is java.util.Set of ExpressionView, 
           result is java.util.List of FunctionView) 
     to () 
 {
+    if (visitedLinks.contains(l)) {
+        return;
+    }
+    visitedLinks.add(l);
     println("unify inputs {l}");
     for (link in l.source.getInputLinks()) {
-        unifyInputs(link, visited, result);
+        unifyInputs(link, visitedLinks, visited, result);
     }
     if (l.target is ParameterView) {
         const f = (l.target as ParameterView).targetView;
@@ -2852,6 +2857,7 @@ class FunctionView is ExpressionView {
                 width: bind cellWidth;
                 height: bind h;
                 stroke: Stroke {
+                    scale: 1.0;
                     width: 2;
                 }
                 strokePaint: SelectionPaint;
@@ -3124,6 +3130,7 @@ public class ObjectView is ExpressionView {
                 width: bind cellWidth;
                 height: bind innerContent.bounds.height();
                 stroke: Stroke {
+                    scale: 1.0;
                     width: 2;
                 }
                 strokePaint: SelectionPaint;
@@ -3266,6 +3273,7 @@ public class GetVarView is OutputView {
                 width: bind cellWidth;
                 height: bind h;
                 stroke: Stroke {
+                    scale: 1.0;
                     width: 2;
                 }
                 strokePaint: SelectionPaint;
@@ -3488,6 +3496,7 @@ public class ForkView is ExpressionView {
                width: bind width*2;
                height: bind height;
                stroke: Stroke {
+                   scale: 1.0;
                    width: 2;
                }
                strokePaint: SelectionPaint;
@@ -3928,6 +3937,7 @@ class TypeRefView is OutputView {
                 width: bind cellWidth;
                 height: bind cellHeight;
                 stroke: Stroke {
+                    scale: 1.0;
                     width: 2;
                 }
                 strokePaint: SelectionPaint;
@@ -4564,6 +4574,7 @@ public class MemberTreecell is Treeview.Treecell
             width: bind tv.cellWidth;
             pickable: false;
             stroke: Stroke {
+                scale: 1.0;
                 width: 1;
             }
             strokePaint: bind SelectionPaint;
@@ -5822,6 +5833,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             effectLoader: effectLoader;
             variable: c;
             canvas: bind canvas;
+            pos: new Point3(width / 2.0 - 120, 0, 0);
         }
         result.updateParent();
         subjectExp = result.expression;
@@ -5836,6 +5848,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 		    parent: initialView;
 		    canvas: this;
                     isLabeled: true;
+                    selectable: true;
                     override bound function getLabel to String { Names.formatName(event.name) }
 		    get: varRoot = TreeGetVar {
                         override function toEnglish to String { "the event" }
@@ -5846,7 +5859,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 		}
 		r.updateParent();
                 MasterUndoable.commit();
-                //                r.pos = new Point3(-width/2 - cx+ 120, height /2 - cy -20, 0);
+                r.pos = new Point3(-width/2 + 120, height /2 - cy -20, 0);
 		r;
 	    }
     }
@@ -5907,14 +5920,15 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     var selectionPoint is Tuple3;
 
     var selectionRect = Rectangle {
-        transform: bind translate(selectionPoint);
+        transform: bind translate(selectionPoint.map(LinearMath.round));
         visible: false;
         strokePaint: ColorPaint(Color.color(.2, .2, .2, 1));
         pickable: false;
-        stroke: Stroke {
+        stroke: bind Stroke {
+            scale: 1.0 / zoomx;
             width: 1.0;
             miterlimit: 1;
-            dash: [4, 2];
+            dash: [6, 2];
         }
 
     };
@@ -6181,16 +6195,9 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         const drag0 = selectionTransformInverse * e.dragStart;
         const drag1 = selectionTransformInverse * e.dragEnd;
         const drag = drag1 - drag0;
-        selectionPoint += new Vec3(drag.x, drag.y, 0) / 2;
+        selectionPoint += new Vec3(drag.x, drag.y, 0) / 2.0;
         selectionRect.width += drag.x;
         selectionRect.height += -drag.y;
-        println("dragStart: {e.dragStart}, dragEnd: {e.dragEnd}, location: {e.location}, drag: {e.drag}");
-        println("modified selection : {selectionPoint.x}, {selectionPoint.y}, {selectionRect.width}, {selectionRect.height}");
-        println("BOUNDS fill={selectionRect.fillMesh.bounds}");
-        println("BOUNDS stroke ={selectionRect.strokeMesh.bounds}");
-        println("CONTENT BOUNDS={selectionRect.contentBounds}");
-        println("BOUNDS={selectionRect.bounds}");
-        println("BOUNDS IN SCENE={selectionRect.boundsInScene}");
     }
         
     function endSelection from (e is MouseEvent) to ()
@@ -6235,6 +6242,23 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         {
             mousePosition = e.location;
         }
+
+        override function onMouseWheel from (e is MouseWheelEvent) to ()
+        {
+            if (true or e.metaKey) {
+                const baseFontSize = font.size;
+                if (fontSize < 0) {
+                    fontSize = baseFontSize;
+                }
+                const inc = e.scroll.y;
+                fontSize += Math.round(inc) as Integer;
+                fontSize = Math.max(fontSize, 6);
+                const zoom = fontSize / baseFontSize;
+                zoomx = zoomy = zoom;
+                MasterUndoable.commit();
+            }
+        }
+
         override function onMouseDown from (e is MouseEvent) to ()
         {
             if (e.isMouseButton1Down()) {
@@ -6421,10 +6445,10 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         for (v in views) v.selected = false;
     }
 
-    
     function moveSelection from (amount is Tuple3) to ()
     {
         for (v in views where v.selected) v.pos += amount;
+        if (terminalExprView.selected) terminalExprView.pos += amount;
     }
 
     public function collapseSelection from (p is Point3) to ()
@@ -6552,9 +6576,9 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             frameContent();
         } else if (e.keyCode == Keys.W and e.ctrlKey) {
             duplicateSelection(mousePosition);
-        } else if ((e.keyCode == Keys.Equals and e.shiftKey) or e.keyCode == Keys.Plus) {
+        } else if (e.keyCode == Keys.Equals or e.keyCode == Keys.Plus) {
             zoomOut();
-        } else if (e.keyCode == Keys.Equals) {
+        } else if (e.keyCode == Keys._0) {
             resetZoom();
         } else if (e.keyCode == Keys.Minus) {
             zoomIn();
@@ -6626,21 +6650,6 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     var frameBounds is Bounds;
 
-    override function onMouseWheel from (e is MouseWheelEvent) to ()
-    {
-        if (true or e.metaKey) {
-            const baseFontSize = font.size;
-            if (fontSize < 0) {
-                fontSize = baseFontSize;
-            }
-            const inc = e.scroll.y;
-            fontSize += Math.round(inc) as Integer;
-            fontSize = Math.max(fontSize, 6);
-            const zoom = fontSize / baseFontSize;
-            zoomx = zoomy = zoom;
-            MasterUndoable.commit();
-        }
-    }
 
     public var views is ExpressionView[] = [] on replace { canvas.dumpSrc() }
 
@@ -6810,13 +6819,17 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     }
 
     public function genSource to () {
-        const x = new java.util.HashSet of ExpressionView();
+        const visitedLinks = new java.util.HashSet of LinkView;
+        const x = new java.util.HashSet of ExpressionView;
         const y = new java.util.ArrayList of FunctionView;
         for (v in views where v is FunctionView) {
             const f = v as FunctionView;
             f.ununify();
+        }
+        for (v in views where v is FunctionView) {
+            const f = v as FunctionView;
             for (j in f.getInputLinks()) {
-                unifyInputs(j, x, y);
+                unifyInputs(j, visitedLinks, x, y);
             }
             if (x.add(f)) {
                 y.add(f);
