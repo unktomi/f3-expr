@@ -388,7 +388,7 @@ public class TimeNodeView is AbstractNode
         }
     }   
     bound var labelX = 
-        if (target.hasIndefiniteDuration() and trax.visibleInterval.start > target.playTime + target.contentBounds.start)
+        if (trax.visibleInterval.start > target.playTime + target.contentBounds.start)
             then trax.durationToX(trax.visibleInterval.start) - playX
             else 
                 trax.durationToX(target.contentBounds.start);//Math.min(trax.durationToX(target.contentBounds.start), 0.0);
