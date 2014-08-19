@@ -79,7 +79,8 @@ public class Console is ResizableNode, Scrollable {
     
     function listener from (line is Object) to ()
     {
-        textArea.appendText("{line}\n");
+        var text = "{line}\n";
+        textArea.appendText(text);
         checkHeight();
     }
 
