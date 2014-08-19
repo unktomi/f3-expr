@@ -1475,6 +1475,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
         strokePaint: SelectionPaint;
         fillPaint: ColorPaint(Color.color(1, 1, 1, 0.2));
         stroke: Stroke {
+            scale: 1;
             width: 1;
         }
         override function onMouseDown from (event is MouseEvent) to ()
