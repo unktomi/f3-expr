@@ -1316,7 +1316,7 @@ public interface ObserverExpression is Expression {
     public var observable is ObservableExpression;
 
     postinit {
-        undoList.addTarget("observers", AbstractRef of ObservableExpression {
+        undoList.addTarget("observable", AbstractRef of ObservableExpression {
                 override function get to ObservableExpression { observable } 
                 override function set from (x is ObservableExpression) to () 
                 {
@@ -2856,8 +2856,8 @@ class FunctionView is ExpressionView {
                 pickable: false;
                 width: bind cellWidth;
                 height: bind h;
-                stroke: Stroke {
-                    scale: 1.0;
+                stroke: bind Stroke {
+                    scale: 1.0 / canvas.zoomx;
                     width: 2;
                 }
                 strokePaint: SelectionPaint;
@@ -3129,8 +3129,8 @@ public class ObjectView is ExpressionView {
                 pickable: false;
                 width: bind cellWidth;
                 height: bind innerContent.bounds.height();
-                stroke: Stroke {
-                    scale: 1.0;
+                stroke: bind Stroke {
+                    scale: 1.0 / canvas.zoomx;
                     width: 2;
                 }
                 strokePaint: SelectionPaint;
@@ -3272,8 +3272,8 @@ public class GetVarView is OutputView {
                 pickable: false;
                 width: bind cellWidth;
                 height: bind h;
-                stroke: Stroke {
-                    scale: 1.0;
+                stroke: bind Stroke {
+                    scale: 1.0 / canvas.zoomx;
                     width: 2;
                 }
                 strokePaint: SelectionPaint;
@@ -3495,8 +3495,8 @@ public class ForkView is ExpressionView {
                pickable: false;
                width: bind width*2;
                height: bind height;
-               stroke: Stroke {
-                   scale: 1.0;
+               stroke: bind Stroke {
+                   scale: 1.0 / canvas.zoomx;
                    width: 2;
                }
                strokePaint: SelectionPaint;
@@ -3703,8 +3703,8 @@ public class LinkView is ExpressionView {
         n.target = target.id;
         return n;
     }
-    public var target is LinkedInputView;
-    public var source is LinkedOutputView;
+    public var target is LinkedInputView on replace { canvas.dumpSrc() }
+    public var source is LinkedOutputView on replace { canvas.dumpSrc() }
     public function link from () to () {
 	insert this into target.links;
 	insert this into source.links;
@@ -3936,8 +3936,8 @@ class TypeRefView is OutputView {
                 pickable: false;
                 width: bind cellWidth;
                 height: bind cellHeight;
-                stroke: Stroke {
-                    scale: 1.0;
+                stroke: bind Stroke {
+                    scale: 1.0 / canvas.zoomx;
                     width: 2;
                 }
                 strokePaint: SelectionPaint;
@@ -4573,8 +4573,8 @@ public class MemberTreecell is Treeview.Treecell
             height: bind tv.cellHeight-1;
             width: bind tv.cellWidth;
             pickable: false;
-            stroke: Stroke {
-                scale: 1.0;
+            stroke: bind Stroke {
+                scale: 1.0 / canvas.zoomx;
                 width: 1;
             }
             strokePaint: bind SelectionPaint;
@@ -6641,10 +6641,10 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         fontSize = Math.round(zoom * font.size) as Integer;
         zoom = fontSize / font.size;
         frameBounds = bounds;
-        cx = -bounds.center.x * zoom;
-        cy = -bounds.center.y * zoom;
         zoomx = zoom;
         zoomy = zoom;
+        cx = -bounds.center.x * zoom;
+        cy = -bounds.center.y * zoom;
         MasterUndoable.commit();
     }
 
