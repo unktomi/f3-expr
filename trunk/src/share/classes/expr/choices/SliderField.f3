@@ -55,6 +55,7 @@ public class SliderField is AbstractNode
         font: bind if (font == null) then layoutEngine.createFont(Names.DEFAULT_FONT) else font;
 	transform: translate(-1, 1);
 	rightJustified: true;
+        indent: 2;
         pickable: bind editable and textAreaEnabled and textInputEnabled;
         editable: bind editable and textInputEnabled;
         override function onKeyInput from (event is KeyboardEvent) to ()
