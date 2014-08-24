@@ -50,10 +50,10 @@ public class SliderField is AbstractNode
     public const textArea is Text.Field = Text.Field {
 	foreground: FG;
         background: null;
-	width: bind width+4;
+	width: bind width;
         height: bind height;
         font: bind if (font == null) then layoutEngine.createFont(Names.DEFAULT_FONT) else font;
-	transform: translate(0, 1);
+	transform: translate(-1, 1);
 	rightJustified: true;
         pickable: bind editable and textAreaEnabled and textInputEnabled;
         editable: bind editable and textInputEnabled;

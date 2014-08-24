@@ -45,15 +45,23 @@ public abstract class Listview of a is ResizableNode, Focusable, KeyboardInputHa
     bound function render1 from (e is Element of a) to Node {
         render(e);
     }
-    function makeElement of a from (v is a) to Element of a 
+
+    const elementMap is java.util.Map of (a, Element of a) = new java.util.HashMap of (a, Element of a);
+
+    function makeElement from (v is a) to Element of a 
     {
-        Element of a {
-            value: v;
-            override bound function render from () to Node
-            {
-                render1(this);
+        var result = elementMap.get(v);
+        if (result == null) {
+            result = Element of a {
+                value: v;
+                override bound function render from () to Node
+                {
+                    render1(this);
+                }
             }
+            elementMap.put(v, result);
         }
+        return result;
     };
     readonly var elements is (Element of a)[] = bind foreach (v in values) makeElement(v);
     readonly var txs = bind foreach (e in elements) TransformNode { content: bind e.view };
@@ -64,12 +72,13 @@ public abstract class Listview of a is ResizableNode, Focusable, KeyboardInputHa
 
     var visibleRows is Integer = bind Math.floor(height / cellHeight) as Integer;
     
-    override function update {
+    override function update to () 
+    {
         var y = height/2 - cellHeight/2.0;
         var i = scrollOffset;
         var j = 0;
         while (j < visibleRows and i < model.size) {
-            var v = model.getValue(i);
+            const v = model.getValue(i);
             if (j == values.size()) {
                 insert v into values;
             } else {

@@ -60,24 +60,38 @@ class MinimizedInternalWindow is AbstractNode, MouseInputHandler {
     public var win is InternalWindow;
     public var index is Integer;
     override var visible = bind win.minimized;
-    override var internalContent = Text.Label {
+    const label = Text.Label {
         font: bind layoutEngine.createFont("font-size:16;font-family:Lucida Grande;font-weight:bold;");
         text: bind ((win.content as ResizableStageNode).content as Tabview).selectedTab.title;
-        background: ColorPaint(Color.TRANSPARENT);
+        background: null;
         foreground: bind if (containsPointer) then ColorPaint(Color.color(0, 0, .9)) else ColorPaint(Color.color(.9, .9, .9));
         pickable: true;
         rightJustified: true;
-        override var width = bind indent+font.width(text);
+        override var width = bind font.width(text);
+        indent: 0;
         override var cursor = bind if (containsPointer) then Cursor.Hand else null;
-        transform: bind translate(0, index * 18) ;
     };
+
+    override var internalContent = bind Group 
+    {
+        transform: bind translate(0, index * 21) ;
+        content: 
+        [Rectangle {
+                fillPaint: ColorPaint(Color.GRAY);
+                width: bind getWidth();
+                height: bind label.font.height()+2;
+                transform: bind translate(0, -2);
+        }, 
+        label];
+    }
 
     bound function getWidth to Number 
     {
-        (internalContent as Text.Label).width;
+        label.width + 4;
     }
     override function onMouseUp from (e is MouseEvent) to ()
     {
+        println("label bounds={label.contentBounds}, label.width={label.width}, font.width={label.font.width(label.text)}, text shape={label.content.textShape.getBounds()}, text mesh={label.content.textMesh.bounds}");
         if (containsPointer) {
             win.minimized = false;
             win.toFront();
