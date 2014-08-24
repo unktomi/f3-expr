@@ -36,8 +36,8 @@ public class InternalWindow is ResizableNode, Focuser {
 
     override function resize from (w0 is Number, h0 is Number) to ()
     {
-	const w = Math.round(w0);
-	const h = Math.round(h0);
+	var w = Math.round(w0) as Integer;
+	var h = Math.round(h0) as Integer;
 	super.resize(w, h);
 	content.resize(w, h-26);
     }

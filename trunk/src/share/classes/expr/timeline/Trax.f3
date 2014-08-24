@@ -190,8 +190,8 @@ public class TimeNodeView is AbstractNode
     public var keyEditor is KeyEditor;
     public var cy is Number;
     public var row is Number;
-    public var trax is Trax;
-    public var target is TimeNode;
+    public const trax is Trax;
+    public const target is TimeNode;
     public var playX is Number = bind getPlayX(target.playTime);
     public var content is TransformNode[] = bind getContent(target);
     public var expanded = false;

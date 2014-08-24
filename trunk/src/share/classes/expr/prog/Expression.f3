@@ -24,6 +24,15 @@ import expr.Context.ClosureVarContext;
 import expr.AssetTree.TypeAsset;
 import expr.AssetTree.sort;
 
+class Seq of a {
+    var content is (..a)[];
+    bound function concat from (x is Seq of a) to Seq of a {
+        Seq of a {
+            content: bind [content, x.content];
+        }
+    }
+}
+
 bound function getDisplayName from (n is Node) to String {
     if (n is ResourceTarget) then (n as ResourceTarget).displayName else n.id;
 }
@@ -365,14 +374,17 @@ function typeApply from (target is F3Type,
     } 
     if (target is F3FunctionType) {
         const funType = target as F3FunctionType;
+        println("funType: {formatType(funType)}");
         const retType = typeApply(funType.getReturnType(), srcType, subst, substs);
-        var matches = retType <> funType.getReturnType();
+        println("retType {funType.getReturnType()}=>{retType}");
+        var matches = not isSameObject(retType, funType.getReturnType());
         const typeParams = 
         {
             foreach (i in [0..<funType.getTypeParameters().length]) 
             {
-                const pt = typeApply(funType.getTypeParameters()[i], srcType, subst, substs);
-                if (not matches) matches = pt <> funType.getTypeParameters()[i];
+                const parm = funType.getTypeParameters()[i];
+                const pt = typeApply(parm, srcType, subst, substs);
+                if (not matches) matches = not isSameObject(pt, parm);
                 pt
             }
         }
@@ -380,7 +392,7 @@ function typeApply from (target is F3Type,
             foreach (i in [0..<funType.minArgs()]) 
             {
                 const pt = typeApply(funType.getArgumentType(i), srcType, subst, substs);
-                if (not matches) matches = pt <> funType.getArgumentType(i);
+                if (not matches) matches = not isSameObject(pt, funType.getArgumentType(i));
                 pt
             };
         if (matches) {
@@ -394,14 +406,14 @@ function typeApply from (target is F3Type,
             foreach (x in targs) 
             {
                 const pt = typeApply(x, srcType, subst, substs);
-                //println("target={clsType}: checking type arg {srcType} against {x}, {subst} => {pt}");
-                if (not matches) matches = pt <> x;
+                println("target={formatType(clsType)}: checking type arg {srcType} against {x}, {subst} => {pt}");
+                if (not matches) matches = not isSameObject(pt, x);
                 pt;
             };
         if (matches) {
-            //println("instantiating {clsType} with {parms}");
+            println("instantiating {clsType} with {parms}");
             const rt = ctx.instantiateType(clsType, parms);
-            //println("result={formatClassName(rt)}");
+            println("result={formatClassName(rt)}");
             return rt;
         }
     }
@@ -545,7 +557,14 @@ public function introspectMembers from (v is Context.ClosureVarContext) to Membe
 
 function typeToMember from (t is F3Type) to Member 
 {
-    const name = t.getName();
+    const name = formatType(t);
+    const m = typeToMember(t, name);
+    println("TYPE TO MEMBER {name} => {m.name}");
+    return m;
+}
+
+function typeToMember from (t is F3Type, name is String) to Member 
+{
     const newMember = if (t is F3ClassType) then {
         Member {
             name: name;
@@ -648,6 +667,18 @@ class Instantiator {
 
     public const clazz is F3ClassType;
     const substs = new java.util.HashMap of (F3Type, F3Type);
+
+    postinit {
+        const parms = clazz.getTypeParameters();
+        const args = clazz.getTypeArguments();
+        for (i in [0..<parms.length]) {
+            const p = parms[i];
+            const a = args[i];
+            if (not (a.isTypeVariable())) {
+                substs.put(p, a);
+            }
+        }
+    }
 
     public function G of (T is F3Type) from (t is T) to T 
     {
@@ -1277,7 +1308,10 @@ abstract class NodeExpression is ObjectExpression {
     }
 }
 
-function simplify from (s is String) to String {
+function simplify from (s is String) to String { // hack
+    if (not s.contains("\u2192")) {
+        return s;
+    }
     const paren = s.indexOf("(");
     if (paren > 0) then s.substring(0, paren) else s
 }
@@ -1928,6 +1962,23 @@ function descendsFromObservableRoot from (p is Expression) to Boolean {
     return false;
 }
 
+function functionTypeToObjectExp from (ft is F3FunctionType, name is String) to ObjectExpression 
+{
+    ObjectExpression {
+        hasStaticAccess: no;
+        outputMembers: foreach (i in [0..<ft.minArgs()]) {
+            const t = ft.getArgumentType(i);
+            typeToMember(t, name);
+        }
+        inputMembers: typeToMember(ft.getReturnType());
+        override bound function getName to String
+        {
+            formatType(ft);
+        }
+        override function getType to F3Type { ft }
+    }
+}
+
 public class Function is MemberExpression {
     public var funMember is FunctionMember;
     override var member = bind funMember;
@@ -2242,6 +2293,7 @@ class ControlArrow is MeshNode.Instance {
 }
 
 public abstract class ExpressionView is AbstractNode {
+    public var index is Integer;
     const undoList = UndoList {}
     public function setDebugValue from (x is Object) to () 
     {
@@ -2683,15 +2735,27 @@ class FunctionView is ExpressionView {
 
     public function assignLinkIds to () {
         var j = 0;
+        var k = 0;
         for (x in typeInputs) {
             for (y in x.links) {
                 y.targetLinkId = j++;
             }
         }
-        for (x in inputs.reverse()) {
-            for (y in x.links) {
-                y.targetLinkId = j++;
+        for (q in inputExps.reverse()) {
+            if (q is InputView) {
+                const x = q as InputView;
+                for (y in x.links) {
+                    y.targetLinkId = j++;
+                }
+            } else if (q is OutputView) {
+                const x = q as OutputView;
+                for (y in x.links) {
+                    y.sourceLinkId = k++;
+                }
             }
+        }
+        for (y in output.links) {
+            y.sourceLinkId = k++;
         }
     }
 
@@ -2816,13 +2880,22 @@ class FunctionView is ExpressionView {
         canvas: canvas;
     };
 
-
-    bound var inputs is ParameterView[] = foreach (p in fun.inputs) ParameterView {
-        targetView: this;
-	canvas: bind canvas;
-	parameter: bind p;
-	cellWidth: bind cellWidth;
-    };
+    bound var inputs is ParameterView[] = foreach (p in fun.inputs) 
+        if (p.t is F3FunctionType) then {
+                FunctionParameterView {
+                    targetView: this;
+                    canvas: bind canvas;
+                    parameter: bind p;
+                    cellWidth: bind cellWidth;
+                }
+            } else { 
+            ParameterView {
+                targetView: this;
+                canvas: bind canvas;
+                parameter: bind p;
+                cellWidth: bind cellWidth;
+            }
+        }
 
     const output is ResultView = ResultView {
         sourceView: this;
@@ -2830,15 +2903,52 @@ class FunctionView is ExpressionView {
 	result: bind fun.output;
     };
 
+    bound function parameterToView from (x is ParameterView) to Object//ExpressionView[]
+    {
+        var self = this;
+        var dummy is ExpressionView[] = 
+        if (x.getInputType() is F3FunctionType) {
+            var ft = x.getInputType() as F3FunctionType;
+            var objExp = functionTypeToObjectExp(ft, x.getLabel());
+            var objView = ObjectView {
+                canvas: bind canvas;
+                objectExpr: objExp;
+                override function assignLinkIds to ()
+                {
+                    self.assignLinkIds();
+                }
+            };
+            var outs is ExpressionView[] = objView.outputViews;
+            var ins is ExpressionView[] = objView.inputViews;
+            var dummy1 is ExpressionView[] = [outs, ins];
+        } else {
+            var dummy2 is ExpressionView[]  = [x as ExpressionView]
+        }
+        return dummy;
+    }
+
+    bound var inputExps is ExpressionView[] = { flatten(foreach (x in inputs) (parameterToView(x) as Object)) };
+
+    function flatten from (xs is Object[]) to ExpressionView[] 
+    {
+        var result is ExpressionView[];
+        for (x in xs) {
+            var ys = x as ExpressionView[];
+            insert ys into result; 
+        }
+        return result;
+    }
+
+
     const io = Group {
 	transform: bind translate(0, -cellHeight);
 	content: 
 	[	 
 	 Group {
-	     content: bind inputs
+	     content: bind inputs;
 	 }
 	 Group {
-	     transform: bind translate(0, -(typeInputs.size() + inputs.size()) * cellHeight);
+	     transform: bind translate(0, -inputRowCount * cellHeight);
 	     content: bind output;
 	 }]
     };
@@ -2847,7 +2957,7 @@ class FunctionView is ExpressionView {
 	transform: bind translate(0, -cellHeight);
 	     content: bind typeInputs
 	 } title, funOutput, io] };
-    bound var h = output.bounds.height() + cellHeight+(typeInputs.size()+inputs.size())*cellHeight;
+    bound var h = output.bounds.height() + cellHeight+inputRowCount*cellHeight;
     override var internalContent = Group {
 	content: bind [innerContent, 
         Rectangle {
@@ -2872,9 +2982,13 @@ class FunctionView is ExpressionView {
 	    i.index = j++;
 	}
 	for (i in inputs) {
-	    i.index = j++;
+	    i.index = j;
+            j += i.getRows();
 	}
+        inputRowCount = j;
     }
+
+    var inputRowCount is Integer;
 
     public override function getInputLinks to LinkView[] 
     {
@@ -2999,6 +3113,9 @@ public class ObjectView is ExpressionView {
 
     override var title = bind borderedTitle();
 
+    public var reversed is Boolean = false;
+    public var collapsed is Boolean = false;
+
     override function onLinkClicked to ()
     {
         if (objectExpr is VarContextExpression) {
@@ -3104,21 +3221,32 @@ public class ObjectView is ExpressionView {
     {
         foreach (i in outputViews) i.getOutputLinks();
     }
-    //    var outputViews = bind foreach (r in outputs) OutputView {
-    //	canvas: bind canvas;
-    //    };
-    const io = Group {
-	transform: bind translate(0, -cellHeight);
-	content: 
-	[
-	 Group {
-	     content: bind inputViews
-	 }
-	 Group {
-	     transform: bind translate(0, -objectExpr.inputs.size() * cellHeight);
-	     content: bind outputViews
-	 }]
-    };
+    var outputRowCount is Integer;
+    var inputRowCount is Integer;
+    bound var factor is Number = if (collapsed) then 0.0 else 1.0;
+    const io = bind if reversed then Group {
+            transform: bind translate(0, -cellHeight);
+            content: 
+            [
+             Group {
+                 content: bind outputViews;
+             }
+             Group {
+                 transform: bind translate(0, outputRowCount*-cellHeight);
+                 content: bind inputViews
+             }];
+        } else Group {
+            transform: bind translate(0, -cellHeight);
+            content: 
+            [
+             Group {
+                 content: bind inputViews;
+             }
+             Group {
+                 transform: bind translate(0, inputRowCount*-cellHeight);
+                 content: bind outputViews
+             }];
+        };
 
     const innerContent = Group { content: bind [title, io] };
     override var internalContent = Group {
@@ -3139,12 +3267,25 @@ public class ObjectView is ExpressionView {
 
     override function update {
 	super.update();
-	for (i in inputViews) {
-	    i.index = indexof i;
-	}
-	for (i in outputViews) {
-	    i.index = indexof i;
-	}
+        if (collapsed) {
+            for (i in inputViews) {
+                i.index = 0;
+            }
+            for (i in outputViews) {
+                i.index = 0;
+            }
+            inputRowCount = 0;
+            outputRowCount = 0;
+        } else {
+            for (i in inputViews) {
+                i.index = indexof i;
+            }
+            for (i in outputViews) {
+                i.index = indexof i;
+            }
+            inputRowCount = inputViews.size();
+            outputRowCount = outputViews.size();
+        }
     }
 }
 
@@ -3828,7 +3969,6 @@ abstract class LinkedInputView is LinkedView {
 }
 
 public class InputView is LinkedInputView {
-    var index is Integer;
     override bound function getInputType to F3Type { expression.getType() };
     override var transform = bind translate(0, index * -cellHeight);
     override var internalContent = bind title;
@@ -3949,7 +4089,62 @@ class TypeRefView is OutputView {
     override var transform = bind translate(pos);
 }
 
+class FunctionParameterView is ParameterView {
+    function pself to FunctionParameterView { this }
+    bound var ft = getInputType() as F3FunctionType;
+    bound var objExp = functionTypeToObjectExp(ft, getLabel());
+    public var isOpen is Boolean = false;
+    bound var objView = ObjectView {
+        reversed: true;
+        override var title = Group {};
+        collapsed: bind not isOpen;
+        canvas: bind canvas;
+        objectExpr: bind objExp;
+        override function assignLinkIds to ()
+        {
+            pself().assignLinkIds();
+        }
+    };
+
+    override public bound function getRows to Integer
+    {
+        1+(if isOpen then objView.inputViews.size()+objView.outputViews.size() else 0);
+    }
+
+    const arrow = Polygon {
+	points: [-3.5, -4.5, -3.5, 4.5, 3.5, 0];
+	fillPaint: bind canvas.textFg;
+        override function onMouseDown from (e is MouseEvent) to ()
+        {
+            isOpen = not isOpen;
+            println("isOpen={isOpen}");
+        }
+    };
+
+    var arrowGroup = Group is MouseInputHandler {
+        transform: bind rotate(if isOpen then -90 else 0, Vec3.Z_AXIS);
+        content: bind arrow;
+    }
+
+    override var title = Group {
+        content: bind [titleRect, Group {
+                transform: translate(12, 0);
+                content: bind label;
+            }, 
+            Group {
+                transform: bind translate(-cellWidth/2+7.5, 0);
+                content: bind arrowGroup
+            }];
+    };
+
+    override var internalContent = Group { content: bind [objView, title] };
+}
+
 public class ParameterView is InputView {
+    public bound function getRows to Integer
+    {
+        return 1
+    }
     const parameter is Parameter;
     public var targetView is FunctionView;
     override var expression = bind parameter;    
@@ -4180,7 +4375,6 @@ public abstract class LinkedOutputView is LinkedView {
 }
 
 public class OutputView is LinkedOutputView {
-    public var index is Integer;
     override readonly var transform = bind translate(0, index * -cellHeight);
     public readonly var outputName is String = bind formatType(resultType);
     override function unlink to () 
@@ -4823,7 +5017,17 @@ class TreeLinker {
         const cell = tv.selectedTreecell as MemberTreecell;
         arrowVis = false;
         e.scene.setFocus(canvas);
-        canvas.pickInput(e, tn.m.t, function from (found is LinkedInputView) to () {
+        println("tn.m={tn.m}, substs={tn.m.substs}");
+        var t = tn.m.t;
+        const substs = tn.m.substs;
+        if (substs <> null) {
+            const tmp = new java.util.HashMap of (F3Type, F3Type);
+            tmp.putAll(substs);
+            for (x in substs.entrySet()) {
+                t = typeApply(t, x.getKey(), x.getValue(), tmp);
+            }
+        }
+        canvas.pickInput(e, t, function from (found is LinkedInputView) to () {
                 tmpLink = null;
                 tv = null;
                 delete canvas.targetArrow from canvas.arrows;
@@ -6766,6 +6970,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
               k is function from LinkedInputView to ()) 
 	to ()
     {
+    println("PICK INPUT {t}");
         var hit = false;
 	for (p in e.scene.underMouse) {
 	    const n = p.node;
