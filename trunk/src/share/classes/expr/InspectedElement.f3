@@ -32,13 +32,13 @@ public interface InspectedElement is Foldable of InspectedElement {
 }
 
 public class InspectedNumberValue is InspectedValue of Number {
-    public var min is Number = Number.MIN_VALUE;
-    public var max is Number = Number.MAX_VALUE;
+    public var min is Number = 0;
+    public var max is Number = 0;
 }
 
 public class InspectedIntegerValue is InspectedValue of Integer {
-    public var min is Integer = Integer.MIN_VALUE;
-    public var max is Integer = Integer.MAX_VALUE;
+    public var min is Integer = 0;
+    public var max is Integer = 0;
 }
 
 public class InspectedColorValue is InspectedValue of Color {
@@ -50,8 +50,8 @@ public class ReadonlyInspectedValue of a is InspectedElement {
 }
 
 public class ReadonlyInspectedNumberValue is ReadonlyInspectedValue of Number {
-    public var min is Number = Number.MIN_VALUE;
-    public var max is Number = Number.MAX_VALUE;
+    public var min is Number = 0;
+    public var max is Number = 0;
 }
 
 public class ReadonlyInspectedBooleanValue is ReadonlyInspectedValue of Boolean {
