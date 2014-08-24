@@ -1202,6 +1202,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
         foreground: bind gadgetFg;
         background: bind gadgetBg;
         text: "0"
+        indent: 2;
     };
 
     const onGadgetCommit = frameGadget.observeCommit().subscribe(function from (text is String) to () {
@@ -1216,6 +1217,7 @@ public class Trax is ResizableNode, Focusable, KeyboardInputHandler, Scrollable 
         foreground: bind gadgetFg;
         background: bind gadgetBg;
         text: "24"
+        indent: 7;
     };
 
     const onRateGadgetCommit = frameRateGadget.observeCommit().subscribe(function from (text is String) to () {

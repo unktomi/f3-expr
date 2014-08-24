@@ -59,7 +59,7 @@ public class CreateVar is ResizableNode, Focuser {
           width: bind labelWidth;
           foreground: bind labelFg;
           background: null;
-          transform: bind translate(-width/2+labelWidth, 0);
+          transform: bind translate(-width/2+labelWidth-2, 0);
           rightJustified: true;
     }
     const typeLabel is Text.Label = Text.Label {
@@ -69,7 +69,7 @@ public class CreateVar is ResizableNode, Focuser {
           width: bind labelWidth;
           foreground: bind labelFg;
           background: null;
-          transform: bind translate(-width/2+labelWidth, 0);
+          transform: bind translate(-width/2+labelWidth-2, 0);
           rightJustified: true;
     }
     public const nameField is Text.Field = Text.Field {

@@ -301,7 +301,7 @@ function formatEnglishName from (name is String) to String
 function formatEnglishName from (name is String, id is String, html is Boolean) to String 
 {
     const n = Names.formatName(name);
-    const isOp = operatorMap.containsKey(n);
+    const isOp = false;//operatorMap.containsKey(n);
     const m = if isOp then operatorMap.get(n) else n;
     if (html) {
         if (m.startsWith("Get ") and not m.endsWith(" of")) {
@@ -1028,7 +1028,7 @@ function sub2 from (t is String) to String {
     return new String(chs, 0, chs.length);
 }
 
-function formatType from (t is F3Type) to String 
+public function formatType from (t is F3Type) to String 
 {
     if t.isTypeVariable() then formatTypeVar(t) else if (t is F3SequenceType) 
         then "{formatType((t as F3SequenceType).getComponentType())}[]" 
@@ -4276,7 +4276,7 @@ public class ParameterView is InputView {
             font: bind font;
             foreground: bind canvas.textFg;
             background: bind canvas.textBg;
-            rightJustified: true;
+            rightJustified: false;
             override function handleCommit from (text is String) to ()
             {
                 parameter.constantValue = "\"{text}\"";

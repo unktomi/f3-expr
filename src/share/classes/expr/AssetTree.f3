@@ -364,7 +364,8 @@ public function sort from (xs is Member[]) to Member[]
 
 public class MemberAsset is Asset {
     public const member is Member;
-    override var name = bind member.name;
+    override var name = 
+             bind if (member.m is F3VarMember and member.m.isStatic()) then "{member.name} \u2192 {Expression.formatType(member.t)}" else member.name;
     //bind Names.formatName(member.name);
 }
 
