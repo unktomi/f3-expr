@@ -463,6 +463,10 @@ public abstract class Inspected of a
     protected var index is Integer;
     public function get to a { null } 
     public function set from (x is a) to () {}
+    public function commit to () {
+        commitSubject.onNext(());
+    }
+    public const commitSubject is Subject of (()) = Subject of (()) {};
 }
 
 public class InspectedRange of a is Inspected of a {
@@ -646,13 +650,34 @@ public class NumberField is SliderField {
     {
 	t = (n-min) / (max-min);
     }
-    postinit {
-        const n is Number = if i.get() == null then 0 else i.get();
+
+    function checkBounds from (n is Number) to ()
+    {
+        if (i.low == i.hi) {
+            if (n < min) {
+                min = n;
+            }
+            if (n > max) {
+                max = n;
+            }
+        }
         onChange(n);
-        disp = i.observable.subscribe(onChange);
     }
+
+    postinit {
+        const n is Number = if i.get() == null then min else i.get();
+	t = (n-min) / (max-min);
+        disp = i.observable.subscribe(onChange);
+        commitDisp = i.commitSubject.subscribe(function from (_ is()) to () {
+                onCommit();
+            });
+        checkBounds(n);
+    }
+
+    var commitDisp is Disposable;
+
     override var t on replace {
-        var n = min + (max - min)*t;
+        const n = min + (max - min)*t;
         i.set(n);
     }
 
@@ -662,23 +687,13 @@ public class NumberField is SliderField {
             num = java.lang.Float.parseFloat(text);
         } catch (e is java.lang.Exception) {
         }
-        onChange(num);
+        checkBounds(num);
         MasterUndoable.commit();
     }
 
     override function onCommit to () {
         var n = i.get();
-        if (i.low == i.hi) {
-            if (n < min) {
-                min = n;
-            }
-            if (n > max) {
-                max = n;
-            }
-        } else {
-            n = clamp(n, min, max);
-        }
-        onChange(n);
+        checkBounds(n);
         MasterUndoable.commit();
     }
     override function getText from (t is Number) to String
@@ -994,6 +1009,16 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
     public var fieldWidth is Number = 64;
     public var font is Text.Font = bind layoutEngine.createFont(Names.DEFAULT_FONT);
     public var border is Number = 0;
+    function up from (i is Inspected, e is MouseEvent) to ()
+    {
+        if (i is InspectedNumber) {
+            const j = i as InspectedNumber;
+            j.commit();
+        } else if (i is InspectedInteger) {
+            const j = i as InspectedInteger;
+            j.commit();
+        }
+    }
     function drag from (i is Inspected, e is MouseEvent) to ()
     {
         if (i is InspectedNumber) {
@@ -1082,6 +1107,10 @@ public class Inspector is ResizableNode, Focusable, KeyboardInputHandler, Scroll
              override function onMouseDrag from (e is MouseEvent) to ()
              {
                  drag(inspecting[selectedIndex], e)
+             }
+             override function onMouseUp from (e is MouseEvent) to ()
+             {
+                 up(inspecting[selectedIndex], e)
              }
 	},
 	Group {
