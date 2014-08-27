@@ -248,10 +248,6 @@ public abstract class Treenode is Foldable of Treenode {
     }
 }
 
-function checkVisible from (row is Integer, scrollOffset is Integer, visibleRows is Integer) to Boolean {
-    //    println("check visible {row} {scrollOffset} {visibleRows}");
-    row >= scrollOffset and row < scrollOffset + visibleRows;
-}
 
 public class Treecell is AbstractNode {
     public var tv is Treeview;
@@ -456,6 +452,11 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
 
     var selectionListener is Disposable;
         
+    protected function checkVisible from (row is Integer, scrollOffset is Integer, visibleRows is Integer) to Boolean {
+        //    println("check visible {row} {scrollOffset} {visibleRows}");
+        row >= scrollOffset and row < scrollOffset + visibleRows + 1;
+    }       
+
     public bound function isRowVisible from (row is Integer) to Boolean
     {
         checkVisible(row, scrollOffset, visibleRows);
@@ -571,7 +572,7 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
     override public bound function getSx to Number { 1.0 }
     override public bound function getTy to Number 
     { 
-        scrollOffset / (model.rowCount as Number);
+        scrollOffset / Math.max(model.rowCount, 1.0);
     }
     override public bound function getSy to Number 
     { 

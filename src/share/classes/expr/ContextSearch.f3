@@ -1,0 +1,55 @@
+package expr;
+import f3.media.scene.*;
+import f3.media.input.*;
+import f3.media.scene.Shape2D.*;
+import f3.math.LinearMath.*;
+
+const textFg = ColorPaint(Color.color(.8, .8, .8));
+const textBg = ColorPaint(Color.color(.4, .4, .4));
+
+public class ContextSearch is AbstractNode {
+    public readonly var tree is Treeview;
+    readonly var font = bind layoutEngine.createFont(Names.DEFAULT_FONT);
+    var cellHeight = 18;
+    var fieldWidth = bind tree.width - 50;
+    public const searchField is Text.Field = Text.Field {
+        //visible: bind filterText <> [];
+        width: bind fieldWidth;
+        transform: bind translate(0, 2);
+        font: bind font;
+        foreground: bind textFg;
+        background: bind textBg;
+    };
+    public var chooseAll is Boolean = true;
+    public var chooseEvents is Boolean = true;
+    var filterText is String[];
+    function filter from (tn is Treeview.Treenode) to Boolean 
+    {
+        const asset = (tn as Context.ContextTreenode).context;
+        if (not chooseAll) {
+            if (not chooseEvents and asset is Context.MemberContext) {
+                return false;
+            }
+        }
+        const s = tn.label.toLowerCase();
+        for (j in filterText) {
+            if (not s.contains(j)) return false;
+        }
+        return true;
+    }
+    const d = searchField.observeText().subscribe(function from (text is String) to () 
+                                                  {
+                                                      if (text.trim() == "") {
+                                                          filterText = [];
+                                                      } else {
+                                                          filterText = text.toLowerCase().split(" ");
+                                                      }
+                                                      if (filterText <> []) {
+                                                          tree.filter = filter;
+                                                      } else {
+                                                          tree.filter = null;
+                                                      }
+                                                  }); 
+    override var internalContent = bind searchField;
+}
+

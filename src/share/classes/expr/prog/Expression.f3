@@ -298,10 +298,20 @@ function formatEnglishName from (name is String) to String
     
 }
 
+function formatOperatorName from (name is String, id is String, html is Boolean) to String 
+{
+    formatEnglishName(name, id, html, yes);
+}
+
 function formatEnglishName from (name is String, id is String, html is Boolean) to String 
 {
+    formatEnglishName(name, id, html, false);
+}
+
+function formatEnglishName from (name is String, id is String, html is Boolean, asOp is Boolean) to String 
+{
     const n = Names.formatName(name);
-    const isOp = false;//operatorMap.containsKey(n);
+    const isOp = asOp and operatorMap.containsKey(n);
     const m = if isOp then operatorMap.get(n) else n;
     if (html) {
         if (m.startsWith("Get ") and not m.endsWith(" of")) {
@@ -1519,7 +1529,7 @@ public class IPath {
                 return "{formatEnglishName("-", func.id, html)}{parents[1].getEnglishAccess()}";
             } else if (infix) {
                 if (fun.isStatic()) {
-                    return "({parents[1].getEnglishAccess()} {formatEnglishName(fun.getName(), func.id, html)} {parents[2].getEnglishAccess()})";
+                    return "({parents[1].getEnglishAccess()} {formatOperatorName(fun.getName(), func.id, html)} {parents[2].getEnglishAccess()})";
                 }
                 return "({parents[0].getEnglishAccess()} {formatEnglishName(fun.getName(), func.id, html)} {parents[1].getEnglishAccess()})";
             } else {
@@ -2324,9 +2334,7 @@ public abstract class ExpressionView is AbstractNode {
     public bound function getLabel to String {
         Names.formatName(expression.getName());
     }
-    var exprName = bind expression.getName() on replace {
-        canvas.dumpSrc();
-    }
+    protected var exprName = bind expression.getName();
     public readonly var label is Text.Label = bind constructLabel();
     protected var labelVisible is Boolean = true;
     protected var isLinkable is Boolean;
@@ -3111,6 +3119,10 @@ class ClassView is ObjectView {
 
 public class ObjectView is ExpressionView {
 
+    override var exprName on replace {
+        canvas.dumpSrc();
+    }   
+
     override var title = bind borderedTitle();
 
     public var reversed is Boolean = false;
@@ -3883,7 +3895,7 @@ public class LinkView is ExpressionView {
 class RootLinkView is LinkView {}
 
 abstract class LinkedView is ExpressionView {
-    var links is LinkView[] on replace { canvas.dumpSrc() }
+    var links is LinkView[] on replace { if (isInitialized(links)) canvas.dumpSrc() }
     override function unlink from () to () {
         const links = this.links;
 	for (link in links) {
@@ -4071,8 +4083,7 @@ class TypeRefView is OutputView {
 
     override var internalContent = Group {
 	content: bind [innerContent, 
-        Rectangle {
-                visible: bind selected
+        if (selected) then Rectangle {
                 pickable: false;
                 width: bind cellWidth;
                 height: bind cellHeight;
@@ -4081,7 +4092,7 @@ class TypeRefView is OutputView {
                     width: 2;
                 }
                 strokePaint: SelectionPaint;
-        }]
+        } else null]
     }
     public override bound function getLabel to String { expression.getName() }
     override var outputName = "";
@@ -4884,6 +4895,9 @@ class GetTreeview is AbstractNode {
     var linkToContainer is LinkView;
     const cellsArray = new java.util.ArrayList of MemberTreecell;
     const tv is Treeview = Treeview {
+        override protected function checkVisible from (row is Integer, scrollOffset is Integer, visibleRows is Integer) to Boolean {
+            super.checkVisible(row, scrollOffset, visibleRows-1);
+        }
 	transform: bind translate(0, -treeHeight/2+cellHeight/2);
 	height: bind treeHeight;
 	width: bind width;
@@ -5422,8 +5436,10 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             return;
         }
         if (exp <> views[views.size()-1])  {
-            delete exp from views;
-            insert exp after views[views.size()-1];
+            var newViews = views;
+            delete exp from newViews;
+            insert exp after newViews[newViews.size()-1];
+            views = newViews;
         }
     }
     var viewportBounds = bind Bounds.boundsFromRect(width, height);
@@ -6123,7 +6139,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     var selectionPoint is Tuple3;
 
-    var selectionRect = Rectangle {
+    bound var selectionRect = Rectangle {
         transform: bind translate(selectionPoint.map(LinearMath.round));
         visible: false;
         strokePaint: ColorPaint(Color.color(.2, .2, .2, 1));
@@ -7021,6 +7037,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     function dumpSrc to () {
         sourceVersion++;
         sourceUpdateTime = java.lang.System.currentTimeMillis()+128;
+        java.lang.Thread.currentThread().dumpStack();
     }
 
     public function genSource to () {
