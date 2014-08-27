@@ -928,6 +928,10 @@ public function run from (args is String[]) to ()
         transform: bind translate(180, 0);
     }
 
+    var contextSearch is ContextSearch = bind ContextSearch {
+        tree: bind contextTree;
+    }
+
     const assetModel = AssetTree.AssetModel {
         resources: bind mainScene.currentResource;
     }
@@ -1786,6 +1790,7 @@ public function run from (args is String[]) to ()
                                      var browse = BrowseControl of Context {
                                          history: bind contextModel.history;
                                          transform: bind translate(-windowContainingAssets.width/2+20, 1);
+                                         searchField: bind contextSearch.searchField;
                                      }
                                      onSelect: function to ()
                                      { 
@@ -1835,6 +1840,10 @@ public function run from (args is String[]) to ()
                                                  //cx: e.sceneLocation.x, cy: e.sceneLocation.y;
                                              };
                                              model: bind contextModel;
+                                             override function onKeyInput from (e is KeyboardEvent) to ()
+                                             {
+                                                 contextSearch.searchField.onKeyInput(e);
+                                             }
                                                         override function onMouseDown from (e is MouseEvent) to ()
                                                         {
                                                             if (e.isMouseButton3Down()) {

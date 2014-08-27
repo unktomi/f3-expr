@@ -9,6 +9,8 @@ public class BrowseControl of a is AbstractNode {
 
     public const history is History of a;
 
+    public var searchField is Text.Field;
+
     const rightArrow is Polygon = Polygon {
         points: [-3.5, -4.5, -3.5, 4.5, 3.5, 0];
     };
@@ -32,7 +34,11 @@ public class BrowseControl of a is AbstractNode {
         enabled: bind history.canGoForward();
     };
     override var internalContent = Group {
-        content: bind [backButton, fwdButton];
+        content: bind [backButton, fwdButton, 
+        Group {
+              transform: bind translate(searchField.width/2+30, 0);
+              content: bind searchField;
+        }];
     };
     
         
