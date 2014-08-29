@@ -731,7 +731,7 @@ public function introspect from (clazz is F3ClassType, all is Boolean) to Member
                 m: f;
                 t: I.G(f.getType().getReturnType());
                 ft: I.G(f.getType());
-                isInfix: ((f.isStatic() and f.getType().minArgs() == 2) or f.getType().minArgs() == 1) and operatorSet.contains(f.getName())
+                isInfix: ((f.isStatic() and f.getType().minArgs() == 2) or (not f.isStatic() and f.getType().minArgs() == 1)) and operatorSet.contains(f.getName())
             }
         };
         const classVars = foreach (v in Reflect.getVars(clazz) where v.isStatic()) {
@@ -1531,7 +1531,7 @@ public class IPath {
                 if (fun.isStatic()) {
                     return "({parents[1].getEnglishAccess()} {formatOperatorName(fun.getName(), func.id, html)} {parents[2].getEnglishAccess()})";
                 }
-                return "({parents[0].getEnglishAccess()} {formatEnglishName(fun.getName(), func.id, html)} {parents[1].getEnglishAccess()})";
+                return "({parents[0].getEnglishAccess()} {formatOperatorName(fun.getName(), func.id, html)} {parents[1].getEnglishAccess()})";
             } else {
                 if (fun.isStatic()) {
                     var args = "";
@@ -1619,9 +1619,11 @@ public class IPath {
                     const v = (src as VarContextExpression).varContext;
                     return if (v.isShortcut) then "<<{src.getName()}>>" else "(getVar(\"{v.variableName}\") as f3.lang.Ref of {v.varType.t.getName()}).get()";
                 } else if (src is NodeExpression) {
-                    return "(getNode(\"{(src as NodeExpression).node.id}\") as expr.NodeAPI)";
+                    const nexp = src as NodeExpression;
+                    return "(getNode(\"{(src as NodeExpression).node.id}\") as {nexp.getType().getName()})";
                 } else if (src is TimeNodeExpression) {
-                    return "(getTimeNode(\"{(src as TimeNodeExpression).timeNode.id}\") as f3.media.scene.TimeNode)";
+                    const nexp = src as TimeNodeExpression;
+                    return "(getTimeNode(\"{(src as TimeNodeExpression).timeNode.id}\") as {nexp.getType().getName()})";
                 }
                 return "i0";
             }
@@ -5228,20 +5230,23 @@ class MemberListview is Listview of Member {
             members[i];
         }
     };
-    override function render from (elem is Listview.Element of Member) to Node 
+
+    override function render from (index is Integer, m is Member) to Node 
     {
-        var m = elem.value;
+        var select = bind isSelected(index);
+        var fg = bind if select then selectionForeground else foreground;
+        var bg = bind if select then selectionBackground else background;
         Group {
             content:
             [Rectangle {
                 height: bind cellHeight;
                 width: bind width;
-                fillPaint: bind if elem.index == selectedRow then selectionBackground else background;
+                fillPaint: bind bg;
             },
             Text.Label {
                 font: bind font;
                 text: bind m.name;
-                foreground: bind if elem.index == selectedRow then selectionForeground else foreground;
+                foreground: bind fg;
                 background: null;
                 height: bind cellHeight;
                 width: bind width;

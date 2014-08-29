@@ -199,19 +199,29 @@ function uniquify from (xs is Member[]) to Member[]
     foreach (x in xs where set.add(x.name)) x
 }
 
+function createSubResourceNodeContext from (parent is Context, x is Node, r is ResourceNode) to SubResourceNodeContext
+{
+    if (x is MeshNode) then MeshNodeContext { parent: parent, mesh: x as MeshNode, resource: r }
+    else SubResourceNodeContext { parent: parent, node: x, resource: r }
+}
+
 public class SubResourceNodeContext is ResourceNodeContext {
     public var node is Node;
-    override var name = bind "{formatName(node.id)} [Node]";
+    override var name = bind "{formatName(node.id)} [{if (node is MeshNode) then "Mesh" else "Node"}]";
     function asGroup from (n is Node) to Group 
     {
         if (n is Group) then n as Group else null
     }   
     override protected var members = bind uniquify(Expression.introspect(Reflect.getType("f3.media.scene.Node") as F3ClassType));
-    override var containedNodes = bind foreach (x in asGroup(node).content) SubResourceNodeContext {
-        parent: this;
-        resource: resource;
-        node: x
-    }
+    override var containedNodes = bind foreach (x in asGroup(node).content) createSubResourceNodeContext(this, x, resource)
+}
+
+public class MeshNodeContext is SubResourceNodeContext {
+    public var mesh is MeshNode;
+    override var node = bind mesh;
+    override var name = bind "{formatName(node.id)} [Mesh]";
+    override protected var members = bind uniquify(Expression.introspect(Reflect.getType("materials.Cg$Material") as F3ClassType));
+    override var containedNodes = [];
 }
 
 public class ResourceNodeContext is GroupContext, ResourceObjectContext {
@@ -262,11 +272,7 @@ public class ResourceNodeContext is GroupContext, ResourceObjectContext {
         bind uniquify(Expression.introspect(Reflect.getType(typeName) as F3ClassType));
 
     public readonly var memberCtxs = bind foreach (x in members) if (not x.name.startsWith("observe")) then null else x;
-    protected var containedNodes = bind foreach (x in resource.content) if (x is ResourceNode) then null else SubResourceNodeContext {
-        parent: this;
-        resource: resource;
-        node: x
-    };
+    protected var containedNodes = bind foreach (x in resource.content) if (x is ResourceNode) then null else createSubResourceNodeContext(this, x, resource);
 
     var programs is MemberContext[];
 

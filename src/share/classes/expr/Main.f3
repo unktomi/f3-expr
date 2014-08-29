@@ -1852,6 +1852,7 @@ public function run from (args is String[]) to ()
                                                                 if (ctx is Context.ResourceObjectContext) {
                                                                     const r = ctx as Context.ResourceObjectContext;
                                                                     const members = r.getMembers();
+                                                                    println("MEMBERS=>{members}");
                                                                     const items = 
                                                                         [if (members == []) then null else Menu {
                                                                             label: "Events"
