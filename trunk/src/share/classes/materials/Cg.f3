@@ -1,4 +1,7 @@
 package materials;
+import f3.util.Observable;
+import f3.media.scene.Shader;
+
 
 public function float2 from (x is Number, y is Number) to Float2 { null }
 public function float3 from (x is Number, y is Number, z is Number) to Float3 { null }
@@ -161,6 +164,7 @@ public interface Float4x4 {
     public function mul from (vector is Float4) to Float4;
     public function * from (matrix is Float4x4) to Float4x4;
     public function transpose to Float4x4;
+    public function inverse to Float4x4;
 }
 
 public interface Float4 {
@@ -244,8 +248,38 @@ public interface SamplerCUBE {
 
 public function lit from (nDotL is Number, nDotH is Number, m is Number) to Float4 { null }
 
+public class VertexEvent {
+    public const world is Float4x4;
+    public const view is Float4x4;
+    public const projection is Float4x4;
+    public const position is Float4;
+    public const normal is Float3;
+    public const binormal is Float3;
+    public const tangent is Float3;
+    public const uvs is Float4[];
+    public function setPosition from (worldPosition is Float4) to () {}
+}
 
+public class PixelEvent {
+    public const world is Float4x4;
+    public const view is Float4x4;
+    public const projection is Float4x4;
+    public const position is Float4;
+    public const worldPosition is Float4;
+    public function setColor from (albedo is Float3,
+                                   normal is Float3,
+                                   specular is Float4,
+                                   gloss is Number,
+                                   alpha is Number,
+                                   rough is Number,
+                                   metal is Number) to () {
+    }
+}
 
+public abstract class Material is Shader {
+    public function observeVertex to Observable of VertexEvent { null };
+    public function observePixel to Observable of PixelEvent { null };
+}
 
 
 

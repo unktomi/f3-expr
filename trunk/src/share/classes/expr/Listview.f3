@@ -11,7 +11,7 @@ public abstract class Listmodel of a {
 }
 
 public abstract class Element of a {
-    public var value is a;
+    public var value is java.lang.ref.WeakReference of a;
     public var index is Integer;
     public readonly var view is Node = bind render();
     public abstract bound function render from () to Node;
@@ -30,6 +30,11 @@ public abstract class Listview of a is ResizableNode, Focusable, KeyboardInputHa
     public var model is Listmodel of a;
 
     public var cellHeight is Number = 16;
+    
+    protected bound function isSelected from (index is Integer) to Boolean 
+    {
+        selectedRow == index;
+    }
 
     public var selectedRow = 0 on replace {
         const lastVisible = scrollOffset + visibleRows;
@@ -43,7 +48,7 @@ public abstract class Listview of a is ResizableNode, Focusable, KeyboardInputHa
     var scrollOffset is Integer;
     var values is a[];
     bound function render1 from (e is Element of a) to Node {
-        render(e);
+        render(e.index, e.value.get());
     }
 
     const elementMap is java.util.Map of (a, Element of a) = new java.util.HashMap of (a, Element of a);
@@ -53,7 +58,7 @@ public abstract class Listview of a is ResizableNode, Focusable, KeyboardInputHa
         var result = elementMap.get(v);
         if (result == null) {
             result = Element of a {
-                value: v;
+                value: new java.lang.ref.WeakReference of a(v);
                 override bound function render from () to Node
                 {
                     render1(this);
@@ -66,7 +71,7 @@ public abstract class Listview of a is ResizableNode, Focusable, KeyboardInputHa
     readonly var elements is (Element of a)[] = bind foreach (v in values) makeElement(v);
     readonly var txs = bind foreach (e in elements) TransformNode { content: bind e.view };
 
-    abstract function render from (value is Element of a) to Node;
+    abstract function render from (index is Integer, value is a) to Node;
 
     public var selectedValue is a = bind values[selectedRow-scrollOffset];
 
