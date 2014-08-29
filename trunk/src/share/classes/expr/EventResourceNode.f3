@@ -1,0 +1,6 @@
+package expr;
+
+public class EventResourceNode is GroupResourceNode {
+    public var event is Context.MemberContext;
+    override var ctx = bind event;
+}
