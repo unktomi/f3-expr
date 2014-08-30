@@ -111,7 +111,15 @@ public function getFunctions from (clazz0 is F3ClassType, all is Boolean) to F3F
 
 public function getFunction from (c is F3ClassType, name is String, params is F3Type[]) to F3FunctionMember 
 {
-    const f0 = c.getFunction(name, params);
+    const f0 is F3FunctionMember = {
+        var f is F3FunctionMember;
+        try {
+            f = c.getFunction(name, params);
+        } catch (exc is java.lang.Exception) {
+            exc.printStackTrace();
+        }
+        f
+    }
     const fs = getFunctions(c, true);
     const i = f0 as F3Local.FunctionMember;
     for (f in fs) {

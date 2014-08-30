@@ -1493,21 +1493,48 @@ public class IPath {
     {
         var observer is ObserverExpression = this.observer;
         if (parents.size() == 0) {
+            println("PARENTS SIZE is ZERO {observer.getClass()} {observer}, observable={observer.observable.getClass()} {observer.observable}");
             if (observer is Parameter) {
                 const p = observer as Parameter;
                 if (showHoles) {
                     return p.toEnglishParameter();
                 }
+                if (p.functionDef <> null) {
+                    println("functiondef ={p.functionDef}");
+                    const ctx = IContext {};
+                    var eng = "";
+                    var sep = "";
+                    for (i in p.functionDef.inputs) {
+                        const ipath = ctx.getIPath(i);
+                        println("ipath {i}=>{ipath.getEnglishAccess()}");
+                        eng = "{eng}{sep}{ipath.getEnglishAccess()}";
+                        sep = ", ";
+                    }
+                    return eng;
+                } 
                 return p.toEnglish();
             }
             if (observer.observable is OutputMemberExpression) {
                 const n = observer.observable as OutputMemberExpression;
+                if (n.source is FunctionObjectExpression) {
+                    const src = n.source as FunctionObjectExpression;
+                    if (src.outputs.size() == 1) {
+                        return "<i>_</i>";
+                    }
+                    var j = 1;
+                    for (x in src.outputs) {
+                        if (x == n) {
+                            break;
+                        }
+                        j++;
+                    }
+                    return "<i>_<sub>{j}</sub></i>";
+                }
                 return n.toEnglish();
             }
             if (observer is TreeGetVar) {
                 return (observer as TreeGetVar).toEnglish();
             }
-            println("PARENTS SIZE is ZERO {observer.getClass()} {observer}, observable={observer.observable.getClass()} {observer.observable}");
             if (observer is GetVar) {
                 return formatEnglishName((observer as GetVar).toEnglish(), observer.id, html);
             }
@@ -1575,13 +1602,39 @@ public class IPath {
             return "the {formatEnglishName(g.member.name, g.id, html)} of {parents[0].getEnglishAccess()}";
         }
         if (observer is Parameter) {
+            const p = observer as Parameter;
+            if (p.functionDef <> null) {
+                const ctx = IContext {};
+                var eng = "";
+                for (i in p.functionDef.inputs) {
+                    const ipath = ctx.getIPath(i);
+                    eng = "{eng}, {ipath.getEnglishAccess()}";
+                }
+                return eng;
+            } 
             return parents[0].getEnglishAccess();
         }
         if (observer is InputMemberExpression) {
             const i = observer as InputMemberExpression;
+            if (i.target is FunctionObjectExpression) {
+                const fexp = i.target as FunctionObjectExpression;
+                var parms = "";
+                if (fexp.outputs.size() == 1) {
+                    parms = "<i>_</i>";
+                } else {
+                    var psep = "";
+                    var j = 1;
+                    for (x in fexp.outputs) {
+                        parms = "{parms}{psep}<i>_<sub>{j}</sub></i>";
+                        psep = ", ";
+                    }
+                }
+                return "{parms} \u2192 {parents[0].getEnglishAccess()}";
+            }
             if (i is StaticInputMemberExpression) {
                 return i.target.toEnglish();
             }
+            println("INPUT MEMBER EXP member={i.member.getClass()} --> {i.member}");
             if (i.member.m is F3VarMember and i.member.isObserver) {
                 return "Assign {parents[0].getEnglishAccess()} to the {formatEnglishName(i.member.name)} of {i.target.toEnglish()}"
             } 
@@ -1605,6 +1658,15 @@ public class IPath {
         if (parents.size() == 0) {
             if (observer is Parameter) {
                 const p = observer as Parameter;
+                if (p.functionDef <> null) {
+                    println("functiondef ={p.functionDef}");
+                    const ctx = IContext {};
+                    const i = p.functionDef.inputs[0]; // io is flipped here: inputs[0] is the return of the function
+                    const ipath = ctx.getIPath(i);
+                    const code = ipath.getLocalAccess();
+                    println("returning: {code} for {i}");
+                    return code;
+                } 
                 if (p.constantValue == null) {
                     return "null as {p.getType().getName()}";
                 }
@@ -1615,6 +1677,20 @@ public class IPath {
                 const src = n.source;
                 //println("n={n}");
                 //println("src={src}");
+                if (src is FunctionObjectExpression) {
+                    const fexp = src as FunctionObjectExpression;
+                    if (fexp.outputs.size() == 1) {
+                        return "$_";
+                    }
+                    var j = 1;
+                    for (x in fexp.outputs) {
+                        if (x == n) {
+                            break;
+                        }
+                        j++;
+                    }
+                    return "$_{j}";
+                }
                 if (src is VarContextExpression) {
                     const v = (src as VarContextExpression).varContext;
                     return if (v.isShortcut) then "<<{src.getName()}>>" else "(getVar(\"{v.variableName}\") as f3.lang.Ref of {v.varType.t.getName()}).get()";
@@ -1768,6 +1844,21 @@ public class IPath {
         }
         if (observer is InputMemberExpression) {
             const i = observer as InputMemberExpression;
+            if (i.target is FunctionObjectExpression) {
+                const fexp = i.target as FunctionObjectExpression;
+                var parms = "";
+                if (fexp.outputs.size() == 1) {
+                    parms = "$_ is {fexp.outputs[0].getType().getName()}";
+                } else {
+                    var psep = "";
+                    var j = 1;
+                    for (x in fexp.outputs) {
+                        parms = "{parms}{psep}$_{j} is {x.getType().getName()}";
+                        psep = ", ";
+                    }
+                }
+                return "function from ({parms}) to {fexp.inputs[0].getType().getName()} \{ {parents[0].getLocalAccess()} \}";
+            }
             if (i is StaticInputMemberExpression) {
                 return i.target.toSource(null);
             }
@@ -1974,9 +2065,11 @@ function descendsFromObservableRoot from (p is Expression) to Boolean {
     return false;
 }
 
+public abstract class FunctionObjectExpression is ObjectExpression {}
+
 function functionTypeToObjectExp from (ft is F3FunctionType, name is String) to ObjectExpression 
 {
-    ObjectExpression {
+    FunctionObjectExpression {
         hasStaticAccess: no;
         outputMembers: foreach (i in [0..<ft.minArgs()]) {
             const t = ft.getArgumentType(i);
@@ -2240,6 +2333,7 @@ public class Parameter is ObserverExpression {
         } else {
         }
     }
+    public var functionDef is ObjectExpression;
     public var target is Function;
     override bound function getName to String { name }
     override function getType to F3Type { t }
@@ -2918,6 +3012,7 @@ class FunctionView is ExpressionView {
 	result: bind fun.output;
     };
 
+    /*
     bound function parameterToView from (x is ParameterView) to Object//ExpressionView[]
     {
         var self = this;
@@ -2941,7 +3036,6 @@ class FunctionView is ExpressionView {
         }
         return dummy;
     }
-    /*
     bound var inputExps is ExpressionView[] = { flatten(foreach (x in inputs) (parameterToView(x) as Object)) };
 
     function flatten from (xs is Object[]) to ExpressionView[] 
@@ -3266,22 +3360,22 @@ public class ObjectView is ExpressionView {
                  content: bind outputViews
              }];
         };
-
+    var rect = bind Rectangle {
+        cy: bind innerContent.bounds.center.y;
+        visible: bind selected
+        pickable: false;
+        width: bind cellWidth;
+        height: bind innerContent.bounds.height();
+        stroke: bind Stroke {
+            scale: 1.0 / canvas.zoomx;
+            width: 2;
+        }
+        strokePaint: SelectionPaint;
+    }
     const innerContent = Group { content: bind [title, io] };
     override var internalContent = Group {
 	content: bind [innerContent, 
-        Rectangle {
-                cy: bind innerContent.bounds.center.y;
-                visible: bind selected
-                pickable: false;
-                width: bind cellWidth;
-                height: bind innerContent.bounds.height();
-                stroke: bind Stroke {
-                    scale: 1.0 / canvas.zoomx;
-                    width: 2;
-                }
-                strokePaint: SelectionPaint;
-        }]
+        if selected then rect else null]
     }
 
     override function update {
@@ -4123,6 +4217,12 @@ class FunctionParameterView is ParameterView {
             pself().assignLinkIds();
         }
     };
+
+    override function update to ()
+    {
+        parameter.functionDef = objExp;
+        super.update();
+    }
 
     override public bound function getRows to Integer
     {
