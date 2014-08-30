@@ -2280,6 +2280,9 @@ public class Parameter is ObserverExpression {
     }
 }
 
+public class FunctionTypedParameter is Parameter {
+}
+
 public class Result is ObservableExpression {
     override bound function getName to String { formatType(t) }
     public var t is F3Type;
@@ -2751,22 +2754,24 @@ class FunctionView is ExpressionView {
                 y.targetLinkId = j++;
             }
         }
-        for (q in inputExps.reverse()) {
-            if (q is InputView) {
-                const x = q as InputView;
-                for (y in x.links) {
-                    y.targetLinkId = j++;
+        for (q in inputs) {
+            if (q is FunctionParameterView) {
+                const fp = q as FunctionParameterView;
+                for (r in fp.objView.inputViews) {
+                    for (y in r.links) {
+                        y.targetLinkId = j++;
+                    }
                 }
-            } else if (q is OutputView) {
-                const x = q as OutputView;
-                for (y in x.links) {
-                    y.sourceLinkId = k++;
+                for (r in fp.objView.outputViews) {
+                    r.linkStart = k++;
+                }
+            } else {
+                for (y in q.links) {
+                    y.targetLinkId = j++;
                 }
             }
         }
-        for (y in output.links) {
-            y.sourceLinkId = k++;
-        }
+        output.linkStart = k++;
     }
 
     protected function ununify to () 
@@ -2936,7 +2941,7 @@ class FunctionView is ExpressionView {
         }
         return dummy;
     }
-
+    /*
     bound var inputExps is ExpressionView[] = { flatten(foreach (x in inputs) (parameterToView(x) as Object)) };
 
     function flatten from (xs is Object[]) to ExpressionView[] 
@@ -2948,7 +2953,7 @@ class FunctionView is ExpressionView {
         }
         return result;
     }
-
+    */
 
     const io = Group {
 	transform: bind translate(0, -cellHeight);
@@ -2967,10 +2972,10 @@ class FunctionView is ExpressionView {
 	transform: bind translate(0, -cellHeight);
 	     content: bind typeInputs
 	 } title, funOutput, io] };
-    bound var h = output.bounds.height() + cellHeight+inputRowCount*cellHeight;
-    override var internalContent = Group {
-	content: bind [innerContent, 
-        Rectangle {
+         bound var h = output.bounds.height() + cellHeight+inputRowCount*cellHeight;
+         override var internalContent = Group {
+             content: bind [innerContent, 
+           Rectangle {
                 transform: bind translate(0, -h/2+cellHeight/2);
                 visible: bind selected
                 pickable: false;
@@ -3239,7 +3244,7 @@ public class ObjectView is ExpressionView {
     var inputRowCount is Integer;
     bound var factor is Number = if (collapsed) then 0.0 else 1.0;
     const io = bind if reversed then Group {
-            transform: bind translate(0, -cellHeight);
+            transform: bind translate(0, factor*-cellHeight);
             content: 
             [
              Group {
@@ -3315,7 +3320,6 @@ function getPath from (v is LinkView) to String {
 }
 
 public class GetVarView is OutputView {
-
     public override function serialize to ExprNode {
         if (get.member == null) {
             println("Get node member is null: {this}");
@@ -3348,6 +3352,7 @@ public class GetVarView is OutputView {
     public var get is GetVar;
     public var visibleRowCount is Number = 10;
     bound var tv is GetTreeview = GetTreeview {
+        linkStart: bind linkStart;
         canvas: bind canvas;
         width: bind cellWidth;
         visibleRowCount: bind visibleRowCount;
@@ -4376,6 +4381,7 @@ public class GetVarResult is GetVar {
 }
 
 public abstract class LinkedOutputView is LinkedView {
+    public var linkStart is Integer;
     public function getObservable to ObservableExpression 
     {
         (expression as ObservableExpression) 
@@ -4409,6 +4415,7 @@ public class OutputView is LinkedOutputView {
     protected var isStatic is Boolean = false;
 
     const getTree is GetTreeview = GetTreeview {
+        linkStart: bind linkStart;
         isStatic: bind isStatic;
         canvas: bind canvas;
         width: bind treeWidth;
@@ -4813,6 +4820,7 @@ public class MemberTreecell is Treeview.Treecell
 }
 
 class GetTreeview is AbstractNode {
+    public var linkStart is Integer;
     public var isStatic is Boolean;
     public var event is Member;
     public var canvas is Canvas;
@@ -4939,7 +4947,7 @@ class GetTreeview is AbstractNode {
                 });
             for (cell in cells) {
                 for (link in cell.linkedView.links /*where not (link.target is TreecellGetVarView)*/) {
-                    link.sourceLinkId = linkCount++;
+                    link.sourceLinkId = linkStart + linkCount++;
                 }
             }
             for (row in rows) {

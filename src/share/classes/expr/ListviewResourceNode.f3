@@ -1,0 +1,53 @@
+package expr;
+import expr.undo.*;
+import expr.undo.*;
+import f3.media.scene.*;
+import f3.media.input.*;
+import f3.util.Observer.*;
+import f3.util.Observable.*;
+import f3.util.*;
+import f3.math.*;
+import expr.undo.*;
+import expr.prog.Program;
+import expr.InspectedElement.*;
+import f3.lang.*;
+import expr.WidgetAPI.*;
+
+public class ListcellResourceNode of a is GroupResourceNode {
+    protected var renderSubject = Subject of ListcellAPI of a {};
+    public function observeRender from () to Observable of ListcellAPI of a { renderSubject }
+    function render from (api is ListcellAPI of a) to ()
+    {
+        renderSubject.onNext(api);
+    }
+}
+/*
+public class ListviewResourceNode of a is WidgetResourceNode, ListviewAPI {
+
+    const self = this;
+    override var cellWidth = bind width;
+    override var target = Listview of a 
+    {
+        width: bind width;
+        height: bind height;
+        override function render from (index is Integer, value is a) to Node
+        {
+            const cell is ListcellResourceNode of a = getListCell(index, value);
+            const api = ListcellAPI {
+                override var list = self;
+                row: index;
+                input: value;
+            }
+            cell.render(api);
+            return cell;
+        }
+    };
+    var template is ListcellResourceNode = null;//{};
+    override var content = bind [template, target];
+    function getListCell from (index is Integer, value is a) to ListcellResourceNode
+    {
+        null;
+    }
+        
+}
+*/
