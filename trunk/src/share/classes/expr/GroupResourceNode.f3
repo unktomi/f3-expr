@@ -3,6 +3,10 @@ import expr.undo.*;
 
 
 public class GroupResourceNode is ResourceNode {
+    public function addContent from (rn is ResourceNode) to ()
+    {
+        insert rn into content;
+    }
     public function deleteContent from (rn is ResourceNode) to ()
     {
         delete rn from content;

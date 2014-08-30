@@ -492,7 +492,7 @@ public function run from (args is String[]) to ()
         println("ADDING {rn} to {currentResource} th.scenes={transformHierarchy.scenes}, th.selectedScene={transformHierarchy.selectedScene}");
         var groupContext is Context.GroupContext = contextModel.selectedMemberContext;
         if (transformHierarchy.selectedNode is GroupResourceNode) {
-            insert rn into (transformHierarchy.selectedNode as GroupResourceNode).content;
+            (transformHierarchy.selectedNode as GroupResourceNode).addContent(rn);
             groupContext = mainContext.resolveNodeContext(transformHierarchy.selectedNode as ResourceNode);
         } else {
             insert rn into currentResource.resources;

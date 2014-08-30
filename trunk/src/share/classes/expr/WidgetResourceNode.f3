@@ -1,0 +1,38 @@
+package expr;
+import expr.undo.*;
+import f3.media.scene.*;
+import f3.media.input.*;
+import f3.util.Observer.*;
+import f3.util.Observable.*;
+import f3.util.*;
+import f3.math.*;
+import expr.undo.*;
+import expr.prog.Program;
+import expr.InspectedElement.*;
+import f3.lang.*;
+import expr.AbstractResourceText.*;
+
+public class WidgetResourceNode is ResourceNode, WidgetAPI {
+    public var font = bind layoutEngine.createFont("font-size:{fontSize.selection};font-family:{fontFamily.selection};font-weight:{fontWeight.selection};font-style:{fontStyle.selection};text-decoration:{fontTextDecoration.selection}");
+
+    public var target is ResizableNode;
+
+    public const sizeGroup = InspectionGroup {
+        displayName: "Size";
+        targets: 
+        [InspectedNumberValue {
+            editable: true;
+            displayName: "Width";
+            target: &target.width;
+            min: 1;
+            max: 2048;
+        },
+        InspectedNumberValue {
+            editable: true;
+            displayName: "Height";
+            target: &target.height;
+            min: 1;
+            max: 2048;
+        }]
+    };
+}

@@ -1,0 +1,30 @@
+package expr;
+import expr.AbstractResourceText.*;
+
+public interface WidgetAPI {
+    public var foreground is Color = new Color(.1, .1, .1, 1);
+    public var background is Color = new Color(.9, .9, .9, 1);
+    public var selectedForeground is Color = new Color(.9, .9, .9, 1);
+    public var selectedBackground is Color = new Color(.1, .1, .1, 1);
+    public var fontSize is FontSizeSelection = new FontSizeSelection(16);
+    public var fontFamily is FontFamilySelection = new FontFamilySelection("Helvetica");
+    public var fontWeight is FontWeightSelection = new FontWeightSelection("normal");
+    public var fontStyle is FontStyleSelection = new FontStyleSelection("normal");
+    public var fontTextDecoration is FontTextDecorationSelection = new FontTextDecorationSelection("none");
+    public var width is Number;
+    public var height is Number;
+}
+
+public interface ListviewAPI is WidgetAPI {
+    public var cellHeight is Number;
+    public var cellWidth is Number;
+}
+
+public interface ListcellAPI of a {
+    public var list is ListviewAPI;
+    public var row is Integer;
+    public var input is a;
+}
+
+
+
