@@ -35,7 +35,7 @@ function formatTypeName from (t is F3Type) to String
             args = "{args}{sep}{formatTypeName(ft.getArgumentType(i))}";
             sep = ", "
         }
-        const ret = formatType(ft.getReturnType());
+        const ret = formatTypeName(ft.getReturnType());
         return "function from ({args}) to {ret}";
     }
     return t.getName();
@@ -1795,13 +1795,13 @@ public class IPath {
                     x.getInputType();
                 }
                 if (targs.size() > 0) {
-                    app = "{app} of (";
+                    app = "({app} of (";
                     var sep1 = "";
                     for (x in targs) {
                         app = "{app}{sep1}{x.getName()}";
                         sep1 = ", ";
                     }
-                    app = "{app})";
+                    app = "{app}))";
                 }
                 if (obDepth >= 0) {
                     return "{prefix} \}; const obs{obDepth} = foreach (i{getDepth()} in {app}({args})) \{";
@@ -1852,11 +1852,11 @@ public class IPath {
                     app = "{app})";
                 }
                 if (obDepth >= 0) {
-                    return "{prefix} \}; const obs{obDepth} = foreach (i{getDepth()} in {j0}.{app}({args})) \{";
+                    return "{prefix} \}; const obs{obDepth} = foreach (i{getDepth()} in ({j0}.{app})({args})) \{";
                 } else if (lowered >= 0) {
-                    return "foreach (i{lowered} in {prefix}) {j0}.{app}({args})";
+                    return "foreach (i{lowered} in {prefix}) ({j0}.{app})({args})";
                 }
-                return "{parents[0].getWorldAccess()}.{app}({args})";                
+                return "({parents[0].getWorldAccess()}.{app})({args})";                
             }
         }
         if (observer is GetVar) {
