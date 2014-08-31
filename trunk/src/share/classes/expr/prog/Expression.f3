@@ -24,6 +24,34 @@ import expr.Context.ClosureVarContext;
 import expr.AssetTree.TypeAsset;
 import expr.AssetTree.sort;
 
+// converts t to legal source code
+function formatTypeName from (t is F3Type) to String
+{
+    if (t is F3FunctionType) {
+        var args = "";
+        var sep = "";
+        const ft = t as F3FunctionType;
+        for (i in [0..<ft.minArgs()]) {
+            args = "{args}{sep}{formatTypeName(ft.getArgumentType(i))}";
+            sep = ", "
+        }
+        const ret = formatType(ft.getReturnType());
+        return "function from ({args}) to {ret}";
+    }
+    return t.getName();
+}
+
+// converts t to legal java class argument or return type
+function serializeType from (t is F3Type) to String
+{
+    if (t is F3FunctionType) {
+        const ft = t as F3FunctionType;
+        const n = ft.minArgs();
+        return "org.f3.functions.Function{n}";
+    }
+    return t.getName();
+}
+
 class Seq of a {
     var content is (..a)[];
     bound function concat from (x is Seq of a) to Seq of a {
@@ -1000,8 +1028,8 @@ public class FunctionMember is Member {
             isInfix: isInfix;
             declaringClass: m.getDeclaringClass().getName();
             name: m.getName();
-            outputType: ft.getReturnType().getName();
-            inputTypes: foreach (i in [0..<ft.minArgs()]) ft.getArgumentType(i).getName();
+            outputType: serializeType(ft.getReturnType());
+            inputTypes: foreach (i in [0..<ft.minArgs()]) serializeType(ft.getArgumentType(i));
         }
     }
     override var name = formatName(m as F3FunctionMember);
@@ -1496,22 +1524,19 @@ public class IPath {
             println("PARENTS SIZE is ZERO {observer.getClass()} {observer}, observable={observer.observable.getClass()} {observer.observable}");
             if (observer is Parameter) {
                 const p = observer as Parameter;
+                if (p.functionDef <> null) {
+                    const ctx = IContext {};
+                    var eng = "";
+                    const i = p.functionDef.inputs[0];
+                    if (i.observable <> null) {
+                        const ipath = ctx.getIPath(i);
+                        return ipath.getEnglishAccess();
+                    }
+                    return "null";
+                } 
                 if (showHoles) {
                     return p.toEnglishParameter();
                 }
-                if (p.functionDef <> null) {
-                    println("functiondef ={p.functionDef}");
-                    const ctx = IContext {};
-                    var eng = "";
-                    var sep = "";
-                    for (i in p.functionDef.inputs) {
-                        const ipath = ctx.getIPath(i);
-                        println("ipath {i}=>{ipath.getEnglishAccess()}");
-                        eng = "{eng}{sep}{ipath.getEnglishAccess()}";
-                        sep = ", ";
-                    }
-                    return eng;
-                } 
                 return p.toEnglish();
             }
             if (observer.observable is OutputMemberExpression) {
@@ -1606,11 +1631,12 @@ public class IPath {
             if (p.functionDef <> null) {
                 const ctx = IContext {};
                 var eng = "";
-                for (i in p.functionDef.inputs) {
+                const i = p.functionDef.inputs[0];
+                if (i.observable <> null) {
                     const ipath = ctx.getIPath(i);
-                    eng = "{eng}, {ipath.getEnglishAccess()}";
+                    return ipath.getEnglishAccess();
                 }
-                return eng;
+                return "null";
             } 
             return parents[0].getEnglishAccess();
         }
@@ -1627,6 +1653,7 @@ public class IPath {
                     for (x in fexp.outputs) {
                         parms = "{parms}{psep}<i>_<sub>{j}</sub></i>";
                         psep = ", ";
+                        j++;
                     }
                 }
                 return "{parms} \u2192 {parents[0].getEnglishAccess()}";
@@ -1659,16 +1686,19 @@ public class IPath {
             if (observer is Parameter) {
                 const p = observer as Parameter;
                 if (p.functionDef <> null) {
-                    println("functiondef ={p.functionDef}");
-                    const ctx = IContext {};
                     const i = p.functionDef.inputs[0]; // io is flipped here: inputs[0] is the return of the function
-                    const ipath = ctx.getIPath(i);
-                    const code = ipath.getLocalAccess();
-                    println("returning: {code} for {i}");
-                    return code;
+                    println("functiondef ={p.functionDef}");
+                    if (i.observable <> null) {
+                        const ctx = IContext {};
+                        const ipath = ctx.getIPath(i);
+                        const code = ipath.getLocalAccess();
+                        println("returning: {code} for {i}");
+                        return code;
+                    }
+                    return "null as {formatTypeName(p.getType())}";
                 } 
                 if (p.constantValue == null) {
-                    return "null as {p.getType().getName()}";
+                    return "null as {formatTypeName(p.getType())}";
                 }
                 return "{p.constantValue}";
             }
@@ -1855,6 +1885,7 @@ public class IPath {
                     for (x in fexp.outputs) {
                         parms = "{parms}{psep}$_{j} is {x.getType().getName()}";
                         psep = ", ";
+                        j++;
                     }
                 }
                 return "function from ({parms}) to {fexp.inputs[0].getType().getName()} \{ {parents[0].getLocalAccess()} \}";
@@ -2439,6 +2470,7 @@ public abstract class ExpressionView is AbstractNode {
     protected var isLinkable is Boolean;
     protected var isLink is Boolean;
     protected var linkFont is Text.Font = bind font.derive("text-decoration:underline;");
+    public var textIndent = 4;
     bound function constructLabel to Text.Label {
         Text.Label {
             blocksPointer: false;
@@ -2449,7 +2481,7 @@ public abstract class ExpressionView is AbstractNode {
             foreground: bind if labelVisible then canvas.textFg else canvas.disabledTextFg;
             background: null;
             pickable: false;
-            indent: 4;
+            indent: bind textIndent;
         };
     }
 
@@ -3228,6 +3260,7 @@ public class ObjectView is ExpressionView {
 
     public var reversed is Boolean = false;
     public var collapsed is Boolean = false;
+    public var indent is Integer = 0;
 
     override function onLinkClicked to ()
     {
@@ -3300,6 +3333,7 @@ public class ObjectView is ExpressionView {
 
     const self = this;
     protected var inputViews is InputView[] = bind foreach (p in objectExpr.inputs) InputView {
+        textIndent: bind indent;
 	canvas: bind canvas;
 	cellWidth: bind cellWidth;
 	expression: p;
@@ -3310,6 +3344,7 @@ public class ObjectView is ExpressionView {
     };
 
     protected var outputViews is OutputView[] = bind foreach (p in objectExpr.outputs) ObjectOutputView {
+        textIndent: bind indent-2;
 	canvas: bind canvas;
 	cellWidth: bind cellWidth;
 	expression: p;
@@ -3446,6 +3481,7 @@ public class GetVarView is OutputView {
     public var get is GetVar;
     public var visibleRowCount is Number = 10;
     bound var tv is GetTreeview = GetTreeview {
+        initialIndent: bind textIndent-4;
         linkStart: bind linkStart;
         canvas: bind canvas;
         width: bind cellWidth;
@@ -4208,6 +4244,7 @@ class FunctionParameterView is ParameterView {
     public var isOpen is Boolean = false;
     bound var objView = ObjectView {
         reversed: true;
+        indent: 12;
         override var title = Group {};
         collapsed: bind not isOpen;
         canvas: bind canvas;
@@ -4240,10 +4277,10 @@ class FunctionParameterView is ParameterView {
     };
 
     var arrowGroup = Group is MouseInputHandler {
-        transform: bind rotate(if isOpen then -90 else 0, Vec3.Z_AXIS);
+        transform: bind translate(-2, -1) * rotate(if isOpen then -90 else 0, Vec3.Z_AXIS);
         content: bind arrow;
     }
-
+    override var textIndent = 0;
     override var title = Group {
         content: bind [titleRect, Group {
                 transform: translate(12, 0);
@@ -4515,6 +4552,7 @@ public class OutputView is LinkedOutputView {
     protected var isStatic is Boolean = false;
 
     const getTree is GetTreeview = GetTreeview {
+        initialIndent: bind textIndent-4;
         linkStart: bind linkStart;
         isStatic: bind isStatic;
         canvas: bind canvas;
@@ -4928,6 +4966,7 @@ class GetTreeview is AbstractNode {
     public var cellHeight = bind canvas.cellHeight;
     public var get is GetVar;
     public var width is Number;
+    public var initialIndent is Integer;
     function open to () {
         treeModel.root.open();
     }
@@ -5005,6 +5044,7 @@ class GetTreeview is AbstractNode {
     var linkToContainer is LinkView;
     const cellsArray = new java.util.ArrayList of MemberTreecell;
     const tv is Treeview = Treeview {
+        initialIndent: bind initialIndent;
         override protected function checkVisible from (row is Integer, scrollOffset is Integer, visibleRows is Integer) to Boolean {
             super.checkVisible(row, scrollOffset, visibleRows-1);
         }

@@ -283,7 +283,7 @@ public class Treecell is AbstractNode {
 	     fillPaint: bind bg;
 	 },
 	 TransformNode {
-	     tx: bind tv.indent *(tn.column+1);
+	     tx: bind tv.initialIndent+tv.indent *(tn.column+1);
 	     content:
 	     [TransformNode { 
 	         tx: bind -tv.cellWidth / 2;
@@ -355,6 +355,8 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
     public readonly var cellWidth = bind width;
 
     public var indent = 6;
+
+    public var initialIndent is Integer = 0;
 
     const arrow is Polygon = Polygon {
 	points: [-3.5, -4.5, -3.5, 4.5, 3.5, 0];
