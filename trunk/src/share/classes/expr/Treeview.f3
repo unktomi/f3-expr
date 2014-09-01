@@ -314,7 +314,7 @@ public class Treecell is AbstractNode {
 	internalContent.observeMouseDown().subscribe(function from (e is MouseEvent) to () {
                 //                println("row={tn.row} fg={fg}");
                 //                dumpCells();
-		const limit = -tv.cellWidth/2+tv.indent*(tn.column+1)+6;
+		const limit = -tv.cellWidth/2+tv.initialIndent+tv.indent*(tn.column+1)+6;
 		if (tn.canOpen and e.location.x < limit) {
 		    if (not tn.isOpen) tn.open() else tn.close();
 		}
@@ -397,6 +397,11 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
     function scroll from (amount is Integer) to ()
     {
 	scrollOffset = Math.max(0, Math.min(scrollOffset + amount, model.rowCount - visibleRows));
+    }
+
+    public function close to ()
+    {
+        model.root.close();
     }
 
     bound function closeArrow from (p is Paint) to Node { 
