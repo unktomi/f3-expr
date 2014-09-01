@@ -342,17 +342,18 @@ function formatEnglishName from (name is String, id is String, html is Boolean, 
     const isOp = asOp and operatorMap.containsKey(n);
     const m = if isOp then operatorMap.get(n) else n;
     if (html) {
+        const t = m.toLowerCase(); 
         if (m.startsWith("Get ") and not m.endsWith(" of")) {
             if (id == "") {
-                "<i>{m}</i> of";
+                "<i>{t}</i> of";
             } else {
-                "<a href='expr:{id}'><i>{m}</i></a> of";
+                "<a href='expr:{id}'><i>{t}</i></a> of";
             }
         } else {
             if (id == "") {
-                "<i>{m}</i>";
+                "<i>{t}</i>";
             } else {
-                "<a href='expr:{id}'><i>{m}</i></a>";
+                "<a href='expr:{id}'><i>{t}</i></a>";
             }
         }
     } else {
@@ -393,11 +394,11 @@ function typeApply from (target is F3Type,
         if (srcType == null) { // major hack
             const x = ent.getKey();
             const y = target;
-            if (x.isTypeVariable() and y.isTypeVariable() and x.getTypeVariable() == y.getTypeVariable()) {
+            if (isSameTypeVariable(x, y)) {
                 p = ent.getValue();
             }
         } else {
-            if (ent.getKey() == target) {
+            if (ent.getKey() == target or isSameTypeVariable(ent.getKey(), target)) {
                 p = ent.getValue();
             }
         }
@@ -1888,7 +1889,12 @@ public class IPath {
                         j++;
                     }
                 }
-                return "function from ({parms}) to {fexp.inputs[0].getType().getName()} \{ {parents[0].getLocalAccess()} \}";
+                const result = fexp.inputs[0];
+                var resultType = result.getType();
+                if (result.observable <> null) {
+                    resultType = result.observable.getType();
+                }
+                return "function from ({parms}) to {resultType.getName()} \{ {parents[0].getLocalAccess()} \}";
             }
             if (i is StaticInputMemberExpression) {
                 return i.target.toSource(null);
@@ -2098,20 +2104,25 @@ function descendsFromObservableRoot from (p is Expression) to Boolean {
 
 public abstract class FunctionObjectExpression is ObjectExpression {}
 
-function functionTypeToObjectExp from (ft is F3FunctionType, name is String) to ObjectExpression 
+bound function functionTypeToObjectExp from (ft is F3FunctionType, name is String) to ObjectExpression {
+    functionTypeToObjectExp(foreach (i in [0..<ft.minArgs()]) ft.getArgumentType(i), ft.getReturnType(), name);
+}
+
+bound function functionTypeToObjectExp from (inputs is F3Type[], output is F3Type, name is String) 
+    to ObjectExpression 
 {
     FunctionObjectExpression {
         hasStaticAccess: no;
-        outputMembers: foreach (i in [0..<ft.minArgs()]) {
-            const t = ft.getArgumentType(i);
-            typeToMember(t, name);
-        }
-        inputMembers: typeToMember(ft.getReturnType());
+        outputMembers: bind foreach (i in inputs) typeToMember(i, name);
+        inputMembers: bind typeToMember(output);
         override bound function getName to String
         {
             formatType(ft);
         }
-        override function getType to F3Type { ft }
+        var ft = bind ctx.makeFunctionType(inputs, output)
+        override function getType to F3Type { 
+            ft
+        }
     }
 }
 
@@ -2912,9 +2923,66 @@ class FunctionView is ExpressionView {
 
     const substs = new java.util.HashMap of (F3Type, F3Type);
 
+    function preunify to () {
+        substs.clear();
+        // save links in case we break some during type substitution
+        for (x in inputs) {
+            if (x is FunctionParameterView) {
+                const fx = x as FunctionParameterView;
+                const map = fx.linkMap;
+                map.clear();
+            }
+        }
+        for (x in inputs) {
+            if (x is FunctionParameterView) {
+                const fx = x as FunctionParameterView;
+                const map = fx.linkMap;
+                map.put(-1, fx.objView.inputViews[0].links);
+                for (i in [0..<fx.objView.outputViews.size()]) {
+                    map.put(i, fx.objView.outputViews[i].getTree.getLinks());
+                }
+            }
+        }
+    }
+
+    function postunify to () {
+        // restore any broken links
+        for (x in inputs) {
+            if (x is FunctionParameterView) {
+                const fx = x as FunctionParameterView;
+                const map = fx.linkMap;
+                const inLinks = map.get(-1);
+                for (link in inLinks) {
+                    if (link.target <> fx.objView.inputViews[0]) {
+                        const src = link.source;
+                        link.unlink();
+                        link.source = src;
+                        link.target = fx.objView.inputViews[0];
+                        link.link();
+                    }
+                }
+                for (i in [0..<fx.objView.outputViews.size()]) {
+                    const outLinks = map.get(i);
+                    const tree = fx.objView.outputViews[i].getTree;
+                    for (link in outLinks) {
+                        const path = getPath(link);
+                        const tn = tree.treeModel.resolvePath(path);
+                        const cell = tree.getCell(tn);
+                        if (link.source <> cell.linkedView) {
+                            const target = link.target;
+                            link.unlink();
+                            link.source = cell.linkedView;
+                            link.target = target;
+                            link.link();
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     protected function unify2 to () 
     {
-        substs.clear();
         unify(substs);
         println("unify1: {this} => {substs}");
         unify(substs);
@@ -2952,18 +3020,42 @@ class FunctionView is ExpressionView {
             }
         }
         for (x in inputs) {
+            if (x is FunctionParameterView) {
+                if (x.links.size() == 0) {
+                    const y = x as FunctionParameterView;
+                    const objv = y.objView;
+                    const inp = objv.inputViews[0];
+                    if (inp.links.size() > 0) {
+                        const inp_t = inp.getInputType();
+                        for (link in inp.links) {
+                            const inferred = (link.source as LinkedOutputView).getResultType();
+                            if (inp_t.isTypeVariable()) {
+                                substs.put(inp_t, inferred);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        for (x in inputs) {
             var t = x.parameter.t;
             var infer is F3Type = null;
             if (x.links.size() > 0) {
                 for (link in x.links) {
                     infer = (link.source as LinkedOutputView).getResultType();
                 }
-            }  else {
+            } else {
                 infer = substs.get(t);
             }
             const canAssign = observeType(t).isConvertibleFrom(infer);
             println("INFERRED {infer} for {t} => {canAssign}");
-            if (canAssign) {
+            if (not canAssign) {
+                const app = typeApply(x.parameter.t, null, x.parameter.t, substs);
+                if (not isSameObject(x.parameter.t, app) ) {
+                    x.inputType = app;
+                    substs.put(x.parameter.t, app);
+                }
+            } else {
                 x.inputType = infer;
                 var targs is F3Type[];
                 var tparms is F3Type[];
@@ -2972,13 +3064,15 @@ class FunctionView is ExpressionView {
                     targs = ct.getTypeArguments();
                     tparms = ct.getTypeParameters();
                 }
+                for (q in targs) {
+                    const r = tparms[indexof q];
+                    if (not q.isTypeVariable()) {
+                        substs.put(r, q);
+                    }
+                }
                 for (j in inputs) {
                     if (j <> x and j.links.size() == 0) {
                         var t1 = typeApply(j.parameter.t, x.parameter.t, x.inputType, substs);
-                        for (q in targs) {
-                            const r = tparms[indexof q];
-                            t1 = typeApply(t1, r, q, substs);
-                        }
                         println("t1={t1} for {j.parameter.t}");
                         if (t1 <> j.parameter.t and j.inputType == null) {
                             println("SETTING type of {j} to {t1}");
@@ -3028,6 +3122,7 @@ class FunctionView is ExpressionView {
                     canvas: bind canvas;
                     parameter: bind p;
                     cellWidth: bind cellWidth;
+                    cellHeight: bind cellHeight;
                 }
             } else { 
             ParameterView {
@@ -3260,7 +3355,8 @@ public class ObjectView is ExpressionView {
 
     public var reversed is Boolean = false;
     public var collapsed is Boolean = false;
-    public var indent is Integer = 0;
+    public var indent is Integer = bind textIndent;
+    public var outputIndent is Integer = bind textIndent;
 
     override function onLinkClicked to ()
     {
@@ -3344,7 +3440,7 @@ public class ObjectView is ExpressionView {
     };
 
     protected var outputViews is OutputView[] = bind foreach (p in objectExpr.outputs) ObjectOutputView {
-        textIndent: bind indent-2;
+        textIndent: bind outputIndent;
 	canvas: bind canvas;
 	cellWidth: bind cellWidth;
 	expression: p;
@@ -3372,7 +3468,8 @@ public class ObjectView is ExpressionView {
     var outputRowCount is Integer;
     var inputRowCount is Integer;
     bound var factor is Number = if (collapsed) then 0.0 else 1.0;
-    const io = bind if reversed then Group {
+    bound function io to Node {
+        if reversed then Group {
             transform: bind translate(0, factor*-cellHeight);
             content: 
             [
@@ -3394,33 +3491,35 @@ public class ObjectView is ExpressionView {
                  transform: bind translate(0, inputRowCount*-cellHeight);
                  content: bind outputViews
              }];
-        };
-    var rect = bind Rectangle {
-        cy: bind innerContent.bounds.center.y;
-        visible: bind selected
-        pickable: false;
-        width: bind cellWidth;
-        height: bind innerContent.bounds.height();
-        stroke: bind Stroke {
-            scale: 1.0 / canvas.zoomx;
-            width: 2;
-        }
-        strokePaint: SelectionPaint;
+            }
     }
-    const innerContent = Group { content: bind [title, io] };
-    override var internalContent = Group {
-	content: bind [innerContent, 
-        if selected then rect else null]
-    }
+    bound function innerContent to Node {  Group { content: bind [title, io()] } }
+    override var internalContent = bind if (title == null) then io() else Group {
+                var c = bind innerContent();
+                var rect = bind if (not selectable) then null else Rectangle {
+                            cy: bind c.bounds.center.y;
+                            visible: bind selected
+                            pickable: false;
+                            width: bind cellWidth;
+                            height: bind c.bounds.height();
+                            stroke: bind Stroke {
+                                scale: 1.0 / canvas.zoomx;
+                                width: 2;
+                            }
+                            strokePaint: SelectionPaint;
+                        };
+                content: bind [c, if selected then rect else null]
+            };
 
-    override function update {
-	super.update();
+    override function update to () 
+    {
         if (collapsed) {
             for (i in inputViews) {
                 i.index = 0;
             }
             for (i in outputViews) {
                 i.index = 0;
+                i.getTree.close();
             }
             inputRowCount = 0;
             outputRowCount = 0;
@@ -3428,12 +3527,18 @@ public class ObjectView is ExpressionView {
             for (i in inputViews) {
                 i.index = indexof i;
             }
+            var j = 0;
             for (i in outputViews) {
-                i.index = indexof i;
+                i.index = j;
+                j += i.getRows();
             }
+            outputRowCount = j;
             inputRowCount = inputViews.size();
-            outputRowCount = outputViews.size();
         }
+	super.update();
+    }
+    public bound function getRows to Integer {
+        inputRowCount + outputRowCount;
     }
 }
 
@@ -4191,6 +4296,8 @@ class TypeParameterView is InputView {
 
 class TypeRefView is OutputView {
 
+    override var selectable = true;
+
     public var ref is TypeExpression;
 
     override public function serialize to ExprNode {
@@ -4242,13 +4349,24 @@ class FunctionParameterView is ParameterView {
     bound var ft = getInputType() as F3FunctionType;
     bound var objExp = functionTypeToObjectExp(ft, getLabel());
     public var isOpen is Boolean = false;
-    bound var objView = ObjectView {
+    const linkMap is java.util.Map of (Integer, LinkView[]) = new java.util.TreeMap of (Integer, LinkView[]);
+    override function unlink from () to () {
+        super.unlink();
+        objView.unlink();
+    }
+    const objView = ObjectView {
+        override var defaultTitle = null;
+        override var title = null;
+        override var selectable = false;
+        override var transform = Mat4.<<1>>;
         reversed: true;
         indent: 12;
-        override var title = Group {};
+        outputIndent: 10;
         collapsed: bind not isOpen;
+        visible: bind isOpen;
         canvas: bind canvas;
         objectExpr: bind objExp;
+        cellWidth: bind cellWidth;
         override function assignLinkIds to ()
         {
             pself().assignLinkIds();
@@ -4258,12 +4376,15 @@ class FunctionParameterView is ParameterView {
     override function update to ()
     {
         parameter.functionDef = objExp;
+        rowCount = 1+(if isOpen then objView.getRows() else 0);
         super.update();
     }
 
+    var rowCount is Integer = 1;
+
     override public bound function getRows to Integer
     {
-        1+(if isOpen then objView.inputViews.size()+objView.outputViews.size() else 0);
+        rowCount;
     }
 
     const arrow = Polygon {
@@ -4276,11 +4397,12 @@ class FunctionParameterView is ParameterView {
         }
     };
 
-    var arrowGroup = Group is MouseInputHandler {
-        transform: bind translate(-2, -1) * rotate(if isOpen then -90 else 0, Vec3.Z_AXIS);
+    const arrowGroup = Group is MouseInputHandler {
+        transform: bind rotate(if isOpen then -90 else 0, Vec3.Z_AXIS);
         content: bind arrow;
     }
     override var textIndent = 0;
+    override var defaultTitle = null;
     override var title = Group {
         content: bind [titleRect, Group {
                 transform: translate(12, 0);
@@ -4560,6 +4682,10 @@ public class OutputView is LinkedOutputView {
         get: bind getter;
         exprView: this;
     };
+
+    public bound function getRows to Integer {
+        (getTree.treeHeight / cellHeight) as Integer;
+    }
 
     override public function getOutputLinks to LinkView[] 
     {
@@ -5039,6 +5165,11 @@ class GetTreeview is AbstractNode {
 	    cellMap.put(tn, r);
 	}
 	return r;
+    }
+
+    public function close to ()
+    {
+        tv.close();
     }
 
     var linkToContainer is LinkView;
@@ -7210,11 +7341,11 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 y.add(f);
             }
         }
-        println("UNIFICATION ORDER:");
-        for (v in y) { println(v) }
+        for (v in y) v.preunify();
         for (v in y) {
             v.unify2();
         }
+        for (v in y) v.postunify();
 	println("DUMP SRC:");
 	unsubscribe();
 	println(visit(varRoot, foreach (v in views where v.expression <> varRoot and v is GetVarView) v.expression));
@@ -7400,11 +7531,11 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 result = "{result} insert obs{p.getContainingObservableDepth()} into obsvbs$; \} ";
                 sep = ", ";
                 println(p.getWorldAccess());
-                eng = "{eng}For each {formatEnglishName(mem.member.name)} event: ";
+                eng = "{eng}For each {formatEnglishName(mem.member.name, mem.id, true)} event: ";
                 eng = "{eng}{p.getEnglishAccess()}. ";
             }
             if (eng == "") {
-                eng = "For each {formatEnglishName(mem.member.name)} event: the event";
+                eng = "For each {formatEnglishName(mem.member.name, mem.id, true)} event: the event";
             }
             englishOutput = eng;
             result = "{result}{ret};\}";

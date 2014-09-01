@@ -45,6 +45,7 @@ public class InternalWindow is ResizableNode, Focuser {
     override var transform = bind translate(cx, cy);
     const self = this;
     const closeButton = Group { 
+            visible: bind not isTransient
 	    var svg = SVG {
 		//url: "{__DIR__}close.svg";
                 url:  "{__DIR__}minus.svg";
