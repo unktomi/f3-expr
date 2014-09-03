@@ -4,49 +4,90 @@ import org.json.simple.JSONValue;
 import expr.Reflect.*;
 import f3.reflect.*;
 
+const LEFT_BRACKET = "[".charAt(0);
+const RIGHT_BRACKET = "]".charAt(0);
+const COMMA = ",".charAt(0);
+const LEFT_BRACE = "\{".charAt(0);
+const RIGHT_BRACE = "\}".charAt(0);
+
 public class JSONWriter is ContentHandler {
 
     public var writer is java.io.Writer;
 
-    override public function startJSON {
+    var indent is Integer;
+
+    public function startArrayElement to ()
+    {
     }
 
-    override public function endJSON {
+    public function endArrayElement to ()
+    {
+        writer.write(", ");
+    }
+
+    function newLine from (x is Integer) to () {
+        writer.write("\n");
+        indent += x;
+        writeIndentation();
+    }
+
+    function writeIndentation to ()
+    {
+        for (i in [0..<indent]) {
+            writer.write("    ");
+        }
+    }
+
+    override public function startJSON to () 
+    {
+    }
+
+    override public function endJSON to () 
+    {
+        writer.flush();
     }
 
     override function startObject to Boolean 
     {
 	writer.write("\{");
+        newLine(1);
 	true
     }
 
     override function endObject to Boolean 
     {
+        newLine(-1);
 	writer.write("\}");
 	true
     }
 
+    var objectDepth = 0;
+
     override function startObjectEntry from (key is String) to Boolean 
     {
 	JSONValue.writeJSONString(key, writer);
-	writer.write(":");
+	writer.write(": ");
 	true
     }
 
     override function endObjectEntry from () to Boolean 
     {
 	writer.write(",");
+        newLine(0);
 	true
     }
+
 
     override function startArray to Boolean 
     {
 	writer.write("[");
+        newLine(1);
 	true;
     }
 
     override function endArray to Boolean 
     {
+        newLine(-1);
 	writer.write("]");
 	true;
     }
@@ -190,6 +231,29 @@ function writeObject from (writer is ContentHandler, obj is Object) to ()
     writer.endJSON();
 }
 
+const defaults = new java.util.HashMap of (F3ClassType, F3ObjectValue);
+
+function isDefault from (obj is F3ObjectValue, v is F3VarMember) to Boolean 
+{
+    const klass = obj.getClassType();
+    var defaultObj = defaults.get(klass);
+    if (defaultObj == null) {
+        defaultObj = klass.newInstance();
+        defaults.put(klass, defaultObj);
+        println("CREATED DEFAULT FOR {klass.getName()} => {defaultObj}");
+    }
+    try {
+        const v1 = v.getValue(obj);
+        const v2 = v.getValue(defaultObj);
+        return (v1 as F3Local.Value).asObject() == (v2 as F3Local.Value).asObject();
+    } catch (e is java.lang.Exception) {
+        println("klass: {klass}");
+        println("var: {v}");
+        e.printStackTrace(java.lang.System.out);
+    }
+    return false;
+}
+
 function writeValue from (writer is ContentHandler, k is F3Value) to ()
 {
     if (k == null or k.isNull()) {
@@ -201,8 +265,10 @@ function writeValue from (writer is ContentHandler, k is F3Value) to ()
 	writer.startArray();
 	const s = k as F3SequenceValue;
 	for (i in [0..<s.getItemCount()]) {
+            (writer as JSONWriter).startArrayElement();
 	    const item = s.getItem(i);
 	    writeValue(writer, item);
+            (writer as JSONWriter).endArrayElement();
 	}
 	writer.endArray();
     } else {
@@ -221,11 +287,12 @@ function writeValue from (writer is ContentHandler, k is F3Value) to ()
 	    const o = k as F3ObjectValue;
 	    for (v in vars) {
 		const j = v.getValue(o);
-		if (not j.isNull()) {
+		if (not j.isNull() and not isDefault(o, v)) {
 		    writer.startObjectEntry(v.getName());
 		    try {
 			writeValue(writer, j);
 		    } catch (all is java.lang.Throwable) {
+                        all.printStackTrace();
 			//println("error");
 		    }
 		    writer.endObjectEntry();

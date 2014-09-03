@@ -337,11 +337,11 @@ public class Program {
 
     public function deserialize to () 
     {
-        canvas.deserializationMap.clear();
+        canvas.beginDeserialize();
         for (v in code.views) {
             const view = v.createView(canvas);
             println("deserialized {v} into {view}");
         }
-        canvas.installLinks();
+        canvas.endDeserialize();
     }
 }
