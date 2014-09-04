@@ -1,0 +1,32 @@
+package expr;
+import f3.media.scene.*;
+import f3.media.input.*;
+import java.lang.Math;
+
+public class ResizableStageNode is ResizableNode, Focuser {
+    const stage is StageNode = StageNode {
+        background: Color.GRAY;
+	content: Scene {
+            background: Color.color(.3, .3, .3);
+	    camera: Camera2D { tx: bind Math.round(-width / 2.0), ty: bind Math.round(-height / 2.0) }
+	    content: bind content;
+	}
+    }
+    override function resize from (w0 is Number, h0 is Number) to ()
+    {
+	const w = Math.ceil(w0);
+	const h = Math.ceil(h0);
+	super.resize(w, h);
+	content.resize(w, h);
+	stage.resize(w as Integer, h as Integer);
+    }
+    override var internalContent = Group { content: bind stage cursor: bind stage.cursor};
+    public var content is ResizableNode;
+    override public function getTargetOfFocus to Focusable 
+    {
+	return stage;
+    }
+    public function getScene to Scene {
+        stage.content[0];
+    }
+}

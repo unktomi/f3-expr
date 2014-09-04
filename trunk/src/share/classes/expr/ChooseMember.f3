@@ -1,4 +1,5 @@
 package expr;
+import expr.prog.Expression;
 import f3.media.scene.*;
 import f3.media.input.*;
 import f3.media.scene.Shape2D.*;
@@ -7,13 +8,14 @@ import f3.reflect.*;
 const textFg = ColorPaint(Color.color(.8, .8, .8));
 const textBg = ColorPaint(Color.color(.4, .4, .4));
 
-public class ChooseType is ResizableNode, Focuser {
+public class ChooseMember is ResizableNode, Focuser {
     override public function getTargetOfFocus to Focusable {
 	tv
     }
     public var treeModel is AssetTree.AssetModel;
     const tv is Treeview = Treeview {
-        model: treeModel.getCodeModel();
+        filter: bind filter;
+        model: treeModel.getMemberModel();
         override function onKeyInput from (e is KeyboardEvent) to ()
         {
             searchField.onKeyInput(e);
@@ -83,18 +85,18 @@ public class ChooseType is ResizableNode, Focuser {
     function filter from (tn is Treeview.Treenode) to Boolean 
     {
         const asset = (tn as AssetTree.AssetTreenode).asset;
-        if (not chooseTypes and asset is AssetTree.TypeAsset) {
-            return false;
-        }
-        if (not chooseMembers and asset is AssetTree.MemberAsset) {
-            return false;
-        }
         if (filterReturnType <> null) {
             if (asset is AssetTree.MemberAsset) {
                 const m = asset as AssetTree.MemberAsset;
-                if (not filterReturnType.isConvertibleFrom(m.member.rt)) {
+                const t = if (m.member.m is F3FunctionMember) then {
+                        Expression.observeType((m.member.m as F3FunctionMember).getType().getReturnType())
+                    } else m.member.rt;
+                const matches = filterReturnType.isConvertibleFrom(t);
+                if (not matches) {
                     return false;
                 }
+            } else {
+                return false;
             }
         }       
         if (filterText <> []) {
@@ -111,11 +113,6 @@ public class ChooseType is ResizableNode, Focuser {
                                                           filterText = [];
                                                       } else {
                                                           filterText = text.toLowerCase().split(" ");
-                                                      }
-                                                      if (filterText <> []) {
-                                                          tv.filter = filter;
-                                                      } else {
-                                                          tv.filter = null;
                                                       }
                                                   });
     override function resize from (w is Number, h is Number) to ()

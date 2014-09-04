@@ -22,7 +22,8 @@ public class JSONWriter is ContentHandler {
 
     public function endArrayElement to ()
     {
-        writer.write(", ");
+        writer.write(",\n");
+        writeIndentation();
     }
 
     function newLine from (x is Integer) to () {
