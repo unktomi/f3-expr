@@ -596,6 +596,16 @@ public class AssetModel is Treemodel {
         }
     }
 
+    public function getMemberModel to Treemodel {
+        Treemodel {
+            root: AssetTreenode {
+                override var label = "Eventual";
+                override function filter from (assets is Asset[]) to Asset[] { assets }
+                asset: packageAssets;
+            }
+        }
+    }
+
     public function getShaderModel to Treemodel {
         Treemodel {
             root: AssetTreenode {
