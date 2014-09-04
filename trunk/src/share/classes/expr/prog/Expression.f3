@@ -2145,8 +2145,10 @@ public class Function is MemberExpression {
     var clazz = bind fun.getDeclaringClass();
     var isNull = bind clazz == null;
     var argCount1 = bind ft.minArgs();
+    bound var isJavaCtor = fun is F3Local.CtorMember;
+    public var classTypeParams is F3Type[] = bind fun.getDeclaringClass().getTypeParameters();
     public var typeParams is F3Type[] = bind ft.getTypeParameters();
-    public var typeInputs is TypeVariableExpression[] = bind foreach (t in typeParams) TypeVariableExpression {typevar: t};
+    public var typeInputs is TypeVariableExpression[] = bind foreach (t in [if isJavaCtor then classTypeParams else null, typeParams]) TypeVariableExpression {typevar: t};
     public var inputs is Parameter[] = 
 	bind 
         [if (isNull and not isStatic) then null else 
@@ -2929,6 +2931,12 @@ class FunctionView is ExpressionView {
                     println("output member={output.getter.member}");
                 } 
             } 
+            if (output.unifiedType == null) {
+                const t0 = typeApply(output.result.getType(), null, null, substs);
+                if (t0 <> output.result.getType()) {
+                    output.unifiedType = t0;
+                }
+            }
         }
     }
 
@@ -4079,7 +4087,8 @@ abstract class LinkedInputView is LinkedView {
                     });
                 canvas.dropType = null;
             } else if (link1 <> null) {
-                canvas.pickOutput(e, 
+                canvas.pickOutput(not (this is TypeParameterView),
+                                  e, 
                                   observeType(getInputType()), 
                                   function from (found is LinkedOutputView) to () {
                                       println("found=>{found}");
@@ -4545,6 +4554,10 @@ public class OutputView is LinkedOutputView {
             name: outputName;
         }
     };
+
+    public function getRootLinkedView to LinkedOutputView {
+        getTree.getRootLinkedView();
+    }
 
     protected var treeWidth = bind cellWidth;
     protected var isStatic is Boolean = false;
@@ -5564,9 +5577,9 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             if (r is FunctionView) {
                 const f = r as FunctionView;
                 k(f.output.getTree.getRootLinkedView());
-            } else if (r is GetVarView) {
-                const g = r as GetVarView;
-                k(g.tv.getRootLinkedView());
+            } else if (r is OutputView) {
+                const g = r as OutputView;
+                k(g.getRootLinkedView());
             } else {
                 k(null);
             }
@@ -5597,6 +5610,52 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             });
         return stage;
     }
+
+
+    function getTypePopup from (e is MouseEvent, k is function from LinkedOutputView to ()) to Node 
+    {
+        function hideChooser to ()
+        {
+            delete chooseType from popupLayer.content;
+            k(null);
+        }
+        function selectType from (m is AssetTree.TypeAsset) to ()
+        {
+            const r = createTypeView(toLocal * e.sceneLocation, m.t, 0);
+            setSelection([r]);
+            MasterUndoable.commit();
+            if (r is OutputView) {
+                k((r as OutputView).getRootLinkedView());
+            } else {
+                k(null);
+            }
+        }
+        const chooseType = ChooseType {
+            onLoseFocus: hideChooser;
+            treeModel: bind assetModel;
+            visible: true;
+            chooseMembers: false;
+            chooseTypes: true;
+            onSelectType: bind selectType;
+            onEscape: hideChooser;
+        };
+        const stage = ResizableStageNode {
+            height: 315, width: 200;
+            content: chooseType;
+            transform: translate(popupScene.mousePosition.x-100, popupScene.mousePosition.y, 0);
+        }
+        stage.resize(315, 200);
+        insert stage into popupLayer.content;
+        popupScene.setFocus(stage.getTargetOfFocus());
+        popupLayer.modal = true;
+        popupDisp = popupLayer.observeBackgroundClicked.subscribe(function from (_ is ()) to () {
+                println("BACKGROUND CLICKED");
+                popupDisp.dispose();
+                k(null)
+            });
+        return stage;
+    }
+
 
     public var interactive is function from () to Boolean;
 
@@ -7169,7 +7228,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     }
 
 
-    function pickOutput from (e is MouseEvent, t is F3Type, k is function from LinkedOutputView to ()) to ()
+    function pickOutput from (value is Boolean, e is MouseEvent, t is F3Type, k is function from LinkedOutputView to ()) to ()
     {
         var hit is Boolean;
 	for (p in e.scene.underMouse) {
@@ -7186,13 +7245,23 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         if (hit){ 
             k(null);
         }
-        getPopup(e, t, function from (j is LinkedOutputView) to () 
+        if (value) {
+            getPopup(e, t, function from (j is LinkedOutputView) to () 
                  {
                      delete popupLayer.content;
                      popupLayer.modal = false;
                      popupDisp.dispose();
                      k(j);
-                 })
+                 });
+        } else {
+            getTypePopup(e, function from (j is LinkedOutputView) to () 
+                 {
+                     delete popupLayer.content;
+                     popupLayer.modal = false;
+                     popupDisp.dispose();
+                     k(j);
+                 });
+        }
     }
 
     function endPickInput to ()
