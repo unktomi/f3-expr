@@ -4027,6 +4027,7 @@ abstract class LinkedInputView is LinkedView {
     var link1 is LinkView;
     var dx = 0.0;
     var dy = 0.0;
+    protected var linkOffset is Number = bind -cellWidth/2;
     const onDown1 = observeMouseDown().subscribe(function from (e is MouseEvent) to () {
             dx = 0; dy = 0;
             if (links.size() == 1) {
@@ -4043,7 +4044,7 @@ abstract class LinkedInputView is LinkedView {
                 link0.target = tmpLink;
                 link0.link();
                 canvas.dropType = observeType(getInputType());
-            } else if (e.location.x < 0) {
+            } else if (e.location.x < 0 and e.location.x > linkOffset) {
                 println("event={e}");
                 // create a source link
                 tmpOut = LinkedOutputView {
@@ -4281,6 +4282,8 @@ class FunctionParameterView is ParameterView {
             println("isOpen={isOpen}");
         }
     };
+
+    override var linkOffset = bind -cellWidth/2+20;
 
     const arrowGroup = Group is MouseInputHandler {
         transform: bind rotate(if isOpen then -90 else 0, Vec3.Z_AXIS);
@@ -5540,7 +5543,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     var popupDisp is Disposable;
 
-    function getPopup from (e is MouseEvent, members is Member[], k is function from LinkedInputView to ()) to Node 
+    function getPopup0 from (e is MouseEvent, members is Member[], k is function from LinkedInputView to ()) to Node 
     {
        const r = MemberListview  {
             targetPosition: toLocal * e.picked.dragPoint1;
@@ -5562,7 +5565,65 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         return r;
     }
 
-    function getPopup from (e is MouseEvent, retType is F3Type, k is function from LinkedOutputView to ()) to Node 
+    var stage is ResizableStageNode = ResizableStageNode {
+        height: 315, width: 200;
+    }
+
+    function getInputPopup from (e is MouseEvent, argType is F3Type, k is function from LinkedInputView to ()) to Node 
+    {
+        function hideChooser to ()
+        {
+            delete chooseType from popupLayer.content;
+            k(null);
+        }
+        function selectMember from (ma is AssetTree.MemberAsset) to ()
+        {
+            const targetPosition = toLocal * e.picked.dragPoint1;
+            const m = ma.member;
+            if (m == null) {
+                k(null);
+            } else if (m == SHORTCUT) {
+                k(canvas.createShortcutTarget(targetPosition));
+            } else if (m == FORK) {
+                const fork = canvas.createFork(targetPosition);
+                k(fork.sourcePort);
+            } else if (m == BRANCH) {
+                const fork = canvas.createBranch(targetPosition);
+                k(fork.sourcePort);
+            } else {
+                const f = canvas.createMemberView(targetPosition, m, 0) as FunctionView; // hack
+                const i = if (f.fun.funMember.m.isStatic() and UNIT_TYPE <> argType) then 1 else 0;
+                k(f.inputs[i]);
+            }
+        }
+        const chooseType = ChooseMember {
+            treeModel: bind assetModel.getMemberOutputModel();
+            onLoseFocus: hideChooser;
+            visible: true;
+            chooseMembers: true;
+            chooseTypes: false;
+            filterArgumentType: argType;
+            onSelectMember: bind selectMember;
+            onEscape: hideChooser;
+        };
+        stage.content = chooseType;
+        stage.resize(315, 200);
+        insert Group { 
+            transform: translate(popupScene.mousePosition.x+100, popupScene.mousePosition.y, 0);
+            content: stage;
+        }
+        into popupLayer.content;
+        popupScene.setFocus(stage.getTargetOfFocus());
+        popupLayer.modal = true;
+        popupDisp = popupLayer.observeBackgroundClicked.subscribe(function from (_ is ()) to () {
+                println("BACKGROUND CLICKED");
+                popupDisp.dispose();
+                k(null)
+            });
+        return stage;
+    }
+
+    function getOutputPopup from (e is MouseEvent, retType is F3Type, k is function from LinkedOutputView to ()) to Node 
     {
         function hideChooser to ()
         {
@@ -5576,7 +5637,12 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             MasterUndoable.commit();
             if (r is FunctionView) {
                 const f = r as FunctionView;
-                k(f.output.getTree.getRootLinkedView());
+                const ft = f.fun.ft;
+                if (retType.isConvertibleFrom(ft.getReturnType())) {
+                    k(f.output.getTree.getRootLinkedView());
+                } else {
+                    k(f.funOutput.getTree.getRootLinkedView());
+                }
             } else if (r is OutputView) {
                 const g = r as OutputView;
                 k(g.getRootLinkedView());
@@ -5585,8 +5651,8 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             }
         }
         const chooseType = ChooseMember {
+            treeModel: bind assetModel.getMemberInputModel();
             onLoseFocus: hideChooser;
-            treeModel: bind assetModel;
             visible: true;
             chooseMembers: true;
             chooseTypes: false;
@@ -5594,13 +5660,13 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             onSelectMember: bind selectMember;
             onEscape: hideChooser;
         };
-        const stage = ResizableStageNode {
-            height: 315, width: 200;
-            content: chooseType;
-            transform: translate(popupScene.mousePosition.x-100, popupScene.mousePosition.y, 0);
-        }
+        stage.content = chooseType;
         stage.resize(315, 200);
-        insert stage into popupLayer.content;
+        insert Group { 
+            transform: translate(popupScene.mousePosition.x-100, popupScene.mousePosition.y, 0);
+            content: stage;
+        }
+        into popupLayer.content;
         popupScene.setFocus(stage.getTargetOfFocus());
         popupLayer.modal = true;
         popupDisp = popupLayer.observeBackgroundClicked.subscribe(function from (_ is ()) to () {
@@ -5639,13 +5705,13 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             onSelectType: bind selectType;
             onEscape: hideChooser;
         };
-        const stage = ResizableStageNode {
-            height: 315, width: 200;
-            content: chooseType;
-            transform: translate(popupScene.mousePosition.x-100, popupScene.mousePosition.y, 0);
-        }
+        stage.content = chooseType;
         stage.resize(315, 200);
-        insert stage into popupLayer.content;
+        insert Group { 
+            transform: translate(popupScene.mousePosition.x-100, popupScene.mousePosition.y, 0);
+            content: stage;
+        }
+        into popupLayer.content;
         popupScene.setFocus(stage.getTargetOfFocus());
         popupLayer.modal = true;
         popupDisp = popupLayer.observeBackgroundClicked.subscribe(function from (_ is ()) to () {
@@ -5742,7 +5808,12 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     public function onDrop from (where is Pick, m is Member) to ()
     {
-        const r = createMemberView(toLocal * where.scenePoint, m, 0, true);
+        var r is ExpressionView;
+        if (m == FORK) {
+            r = createFork(toLocal * where.scenePoint);
+        } else {
+            r = createMemberView(toLocal * where.scenePoint, m, 0, true);
+        }
         setSelection([r]);
         MasterUndoable.commit();
     }
@@ -7246,7 +7317,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             k(null);
         }
         if (value) {
-            getPopup(e, t, function from (j is LinkedOutputView) to () 
+            getOutputPopup(e, t, function from (j is LinkedOutputView) to () 
                  {
                      delete popupLayer.content;
                      popupLayer.modal = false;
@@ -7285,7 +7356,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 		if (canConvert(pv.getInputType(), t)) {
 		    println("IS ASSIGNABLE {pv.getClass()} {pv.getInputType()} <- {t}");
 		    k(pv);
-                    return;
+                    return ();
 		} else {
 		    println("NOT ASSIGNABLE {pv.getInputType()} <- {t}");
 		}
@@ -7295,32 +7366,12 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             k(null);
             return;
         }
-        println("introspecting: {t}");
-        var members = introspect(t, true);
-        println("members=>{members}");
-        if (t is F3ClassType) {
-            members = members[m | m.m == null or not m.m.isStatic()];
-        }
-        if (isMappable(t)) {
-            const t1 = (t as F3ClassType).getTypeArguments()[0];
-            println("is mappable {t} => {t1}");
-            members = [introspect(t1, true), members];
-            if (t1 is F3ClassType) {
-                members = members[m | m.m == null or not m.m.isStatic()];
-            }
-        }
-        if (members <> []) {
-            var popup is Node = getPopup(e, members, function (j is LinkedInputView) to () {
-                    delete popupLayer.content;
-                    popupLayer.modal = false;
-                    popupDisp.dispose();
-                    k(j)
-                });
-            println("POPUP AT {popup} => {e.sceneLocation}");
-            insert popup into popupLayer.content;
-        } else {
-            k(null);
-        }
+        var popup is Node = getInputPopup(e, t, function (j is LinkedInputView) to () {
+                delete popupLayer.content;
+                popupLayer.modal = false;
+                popupDisp.dispose();
+                k(j)
+            });
     }
 
     var inGenSrc is Integer;
@@ -7348,7 +7399,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 y.add(f);
             }
         }
-        for (i in [0..<1]) {
+        for (i in [0..<2]) {
             for (v in y) v.preunify();
             if (i == 0) {
                 for (v in y) v.ununify();

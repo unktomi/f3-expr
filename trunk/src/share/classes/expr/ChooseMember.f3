@@ -12,10 +12,10 @@ public class ChooseMember is ResizableNode, Focuser {
     override public function getTargetOfFocus to Focusable {
 	tv
     }
-    public var treeModel is AssetTree.AssetModel;
+    public var treeModel is Treeview.Treemodel;
     const tv is Treeview = Treeview {
         filter: bind filter;
-        model: treeModel.getMemberModel();
+        model: bind treeModel;
         override function onKeyInput from (e is KeyboardEvent) to ()
         {
             searchField.onKeyInput(e);
@@ -80,6 +80,7 @@ public class ChooseMember is ResizableNode, Focuser {
     public var chooseMembers is Boolean = true;
     var filterText is String[];
     public var filterReturnType is F3Type;
+    public var filterArgumentType is F3Type;
     public var onSelectMember is function from AssetTree.MemberAsset to ();
 
     function filter from (tn is Treeview.Treenode) to Boolean 
@@ -88,13 +89,53 @@ public class ChooseMember is ResizableNode, Focuser {
         if (filterReturnType <> null) {
             if (asset is AssetTree.MemberAsset) {
                 const m = asset as AssetTree.MemberAsset;
-                const t = if (m.member.m is F3FunctionMember) then {
-                        Expression.observeType((m.member.m as F3FunctionMember).getType().getReturnType())
-                    } else m.member.rt;
-                const matches = filterReturnType.isConvertibleFrom(t);
+                var matches is Boolean;
+                if (m.member.m is F3FunctionMember) {
+                    const f = m.member.m as F3FunctionMember;
+                    const ft = f.getType();
+                    matches = filterReturnType.isConvertibleFrom(ft.getReturnType());
+                    if (not matches) {
+                        matches = filterReturnType.isConvertibleFrom(ft);
+                    }
+                } else {
+                    const t = m.member.rt;
+                    matches = filterReturnType.isConvertibleFrom(t);
+                }
                 if (not matches) {
                     return false;
                 }
+            } else {
+                return false;
+            }
+        } else if (filterArgumentType <> null) {
+            if (asset is AssetTree.MemberAsset) {
+                const m = asset as AssetTree.MemberAsset;
+                var matched = m.member == Expression.FORK ;
+                if (not matched) {
+                    if (m.member.m is F3FunctionMember) {
+                        const f = m.member.m as F3FunctionMember;
+                        const ft = f.getType();
+                        if (Reflect.UNIT_TYPE == filterArgumentType) {
+                            matched = f.isStatic();
+                        } else {
+                            if (f.isStatic()) {
+                                for (i in [0..<ft.minArgs()]) {
+                                    const t = ft.getArgumentType(i);
+                                    if (t.isConvertibleFrom(filterArgumentType)) {
+                                        matched = true;
+                                    }
+                                    if (true) break; // only check arg 1
+                                }
+                            } else {
+                                const t = f.getDeclaringClass();
+                                if (t.isConvertibleFrom(filterArgumentType)) {
+                                    matched = true;
+                                }
+                            }
+                        }
+                    }
+                }
+                if (not matched) return false;
             } else {
                 return false;
             }
