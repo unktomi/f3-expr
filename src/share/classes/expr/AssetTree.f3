@@ -255,6 +255,11 @@ public class RootPackageAsset is PackageAsset {
           member: Expression.FORMAT_TEXT;
     };
 
+    const fork = MemberAsset {
+          name: "Fork";
+          member: Expression.FORK;
+    };
+
     public const primitives is TypeAsset[] = 
         [PrimitiveTypeAsset {
                 name: "Boolean";
@@ -310,7 +315,7 @@ public class RootPackageAsset is PackageAsset {
                     }
                 }
         }*/];
-    override var containedAssets = bind [println, formatText, /*filter,*/ primitives, packages, classes]
+    override var containedAssets = bind [fork, println, formatText, /*filter,*/ primitives, packages, classes]
 }
 
 public class TypeAsset is Asset {
@@ -596,7 +601,17 @@ public class AssetModel is Treemodel {
         }
     }
 
-    public function getMemberModel to Treemodel {
+    public function getMemberInputModel to Treemodel {
+        Treemodel {
+            root: AssetTreenode {
+                override var label = "Eventual";
+                override function filter from (assets is Asset[]) to Asset[] { assets }
+                asset: packageAssets;
+            }
+        }
+    }
+
+    public function getMemberOutputModel to Treemodel {
         Treemodel {
             root: AssetTreenode {
                 override var label = "Eventual";
