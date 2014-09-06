@@ -46,34 +46,26 @@ public class Treemodel is Foldable of Treenode {
         return result;
     }
 
+    const list is java.util.List of Treenode = new java.util.ArrayList of Treenode;
+    var lastRows is Treenode[];
+
     function getRows from (filter is function from Treenode to Boolean) to Treenode[]
     {
-	var result is Treenode[];
-        /*
-        var added = new java.util.HashSet of Treenode;
-	root.getRows(0, Integer.MAX_VALUE, true,
-		     function from (n is Treenode) to ()
-		     {
-                         if (filter(n)) {
-                             added.add(n);
-                             var p = n.parent;
-                             var toAdd is Treenode[];
-                             while (p <> null and not added.contains(p)) {
-                                 insert p into toAdd;
-                                 added.add(p);
-                                 p = p.parent;
-                             }
-                             insert toAdd.reverse() into result;
-                             insert n into result;
-                         }
-		     });
-        */
+	var result is Treenode[] = lastRows;
+        var diff = false;
+        var i = 0;
         root.getRows(0, Integer.MAX_VALUE, filter, function from (tn is Treenode) to () {
-                insert tn into result
+                list.add(tn);
+                if (not diff) diff = lastRows[i] <> tn;
+                tn.row = i++;
             });
-        for (n in result) n.row = indexof n;
+        if (diff) {
+            result = lastRows = foreach (n in list) n;
+            list.clear();
+        }
         return result;
     }
+
 
     function getRows 
 	from (low is Integer, hi is Integer) 
@@ -457,6 +449,8 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
 
     public readonly var visibleRows = bind Math.max(1, (Math.round(height / cellHeight - 0.5) as Integer));
 
+    bound var visibleCells = cells[scrollOffset..scrollOffset+visibleRows];
+
     var selectionListener is Disposable;
         
     protected function checkVisible from (row is Integer, scrollOffset is Integer, visibleRows is Integer) to Boolean {
@@ -506,7 +500,7 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
 
     public function getView from (tn is Treenode) to Treecell {
 	for (h in cells) {
-	    if (h.cell.tn == tn) return h.cell
+	    if (h.n == tn) return h.cell
 	}
 	return null;
     }
@@ -540,7 +534,7 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
         rows = newRows;
 	super.preupdate();
     }
-    public var filterLimit is Integer = 100;
+    public var filterLimit is Integer = 512;
     public var filter is function from Treenode to Boolean;
 
     var treeBg is Paint = bind bgs[0];
@@ -557,7 +551,7 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
 	 },
 	 TransformNode {
 	     ty: bind height/2 - cellHeight/2 + scrollOffset * cellHeight;
-	     content: bind foreach (c in cells) c.cell;
+	     content: bind foreach (c in visibleCells) c.cell;
 	 }]
     };
 

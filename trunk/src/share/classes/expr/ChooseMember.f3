@@ -61,7 +61,7 @@ public class ChooseMember is ResizableNode, Focuser {
     const searchTv is Treeview = tv;
     readonly var tree is Treeview = bind if filterText <> [] then searchTv else tv;
     readonly var font = bind layoutEngine.createFont(Names.DEFAULT_FONT);
-    var cellHeight = 18;
+    var cellHeight = bind searchField.height+4;
     public const searchField is Text.Field = Text.Field {
         //visible: bind filterText <> [];
         width: bind width;
@@ -118,10 +118,10 @@ public class ChooseMember is ResizableNode, Focuser {
                         if (Reflect.UNIT_TYPE == filterArgumentType) {
                             matched = f.isStatic();
                         } else {
-                            if (f.isStatic()) {
+                            if (false and f.isStatic()) {
                                 for (i in [0..<ft.minArgs()]) {
                                     const t = ft.getArgumentType(i);
-                                    if (t.isConvertibleFrom(filterArgumentType)) {
+                                    if (not (t.isTypeVariable()) and t.isConvertibleFrom(filterArgumentType)) {
                                         matched = true;
                                     }
                                     if (true) break; // only check arg 1
@@ -159,26 +159,26 @@ public class ChooseMember is ResizableNode, Focuser {
     override function resize from (w is Number, h is Number) to ()
     {
         super.resize(w, h);
-        sp.resize(w, h);
+        sp.resize(w, h-cellHeight);
     }
+
+    const rect = Rectangle {
+        pickable: false;
+        width: bind sp.bounds.width();
+        height: bind sp.bounds.height();
+        strokePaint: (ColorPaint(Color.color(.2, .2, .2)));
+    };
 
     override var internalContent = Group {
         content: bind 
-        [/*
+        [
         TransformNode {
             ty: bind height / 2 - cellHeight / 2
             content: bind searchField;
         },
-        */
         TransformNode {
-            //            ty: bind -cellHeight/2;
-            content: bind sp;
-        },
-        Rectangle {
-            pickable: false;
-            width: bind sp.bounds.width();
-            height: bind sp.bounds.height();
-            strokePaint: (ColorPaint(Color.color(.2, .2, .2)));
+            ty: bind -cellHeight/2;
+            content: bind [sp, rect]
         }]
     }
 }
