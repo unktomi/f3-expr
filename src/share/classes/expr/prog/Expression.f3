@@ -24,6 +24,27 @@ import expr.Context.ClosureVarContext;
 import expr.AssetTree.TypeAsset;
 import expr.AssetTree.sort;
 
+const QUOT = "\"";
+const BACK = "\\";
+
+function toSourceCode from (str is String) to String
+{
+    var strBuff = new java.lang.StringBuffer();
+    strBuff.append("\"");
+    for (c in str.toCharArray()) {
+        if (c == QUOT.charAt(0) or c == BACK.charAt(0)) {
+            strBuff.append(BACK);
+        }
+        strBuff.append(c);
+    }
+    strBuff.append("\"");
+    return strBuff.toString();
+}
+
+function isNonPrimitive from (t is F3Type) to Boolean {
+    t <> null and not (t is F3PrimitiveType)
+}
+
 function blank from (i is Integer) to String
 {
     if (i <= 0) then "<u>&nbsp;&nbsp;&nbsp;&nbsp;</u>" else  "<u>&nbsp;&nbsp;&nbsp;&nbsp;</u><sub><sub><i>{i}</i></sub></sub>";
@@ -315,7 +336,7 @@ const MAT4_TYPE = Reflect.findClass("f3.math.Mat4");
 function sourceFunName from (fun is F3FunctionMember) to String 
 {
     if (fun.isStatic()) {
-        if (fun.getName().startsWith("new")) {
+        if (fun.isJavaCtor) {
             fun.getName();
         } else {
             "{fun.getDeclaringClass().getName()}.{fun.getName()}";
@@ -444,6 +465,16 @@ function typeApply from (target is F3Type,
         }
     } else if (target is F3ClassType) {
         const clsType = target as F3ClassType;
+        const superclasses = clsType.getSuperClasses(false);
+        for (x in superclasses) {
+            const xs = x.getTypeArguments();
+            const ys = x.getTypeParameters();
+            for (i in [0..<xs.length]) {
+                if (not xs[i].isTypeVariable()) {
+                    substs.put(ys[i], xs[i]);
+                }
+            }
+        }
         const targs is F3Type[] = clsType.getTypeArguments();
         var matches = false;
         const parms = 
@@ -530,10 +561,13 @@ public const UNIT_MEMBER = FunctionMember {
     m: Reflect.getFunction("f3.lang.Builtins", "nothing", []);
 }
 
+const NUM_CTOR = 
+    FunctionMember {
+    m: Reflect.getFunction("f3.lang.Builtins$NumberOperators", "Number", ["Number"]);
+};
+
 public const NUM_MEMBERS = 
-    [FunctionMember {
-            m: Reflect.getFunction("f3.lang.Builtins$NumberOperators", "Number", ["Number"]);
-    },
+    [NUM_CTOR,
     foreach (op in ["add", "subtract", "multiply", "divide", "remainder", "lessThan", "lessOrEqual", "greaterThan", "greaterOrEqual", "equal", "notEqual"]) {
         FunctionMember {
             isInfix: true;
@@ -544,10 +578,12 @@ public const NUM_MEMBERS =
             m: Reflect.getFunction("f3.lang.Builtins$NumberOperators", "negate", ["Number"]);
     }];
 
+const INT_CTOR is FunctionMember =  FunctionMember {
+    m: Reflect.getFunction("f3.lang.Builtins$IntegerOperators", "Integer", ["Integer"]);
+};
+
 public const INT_MEMBERS = 
-    [FunctionMember {
-            m: Reflect.getFunction("f3.lang.Builtins$IntegerOperators", "Integer", ["Integer"]);
-    },
+    [INT_CTOR,
     foreach (op in ["add", "subtract", "multiply", "divide", "remainder","lessThan", "lessOrEqual", "greaterThan", "greaterOrEqual", "equal", "notEqual"]) {
         FunctionMember {
             isInfix: true;
@@ -1579,7 +1615,11 @@ public class IPath {
             const func = (exp as Result).source;
             const infix = func.funMember.isInfix;
             const fun = func.fun;
-            if (fun == IF_EXPR) {
+            if (fun == INT_CTOR.m) {
+                return formatEnglishName(parents[1].getEnglishAccess(), func.id, html);
+            } else if (fun == NUM_CTOR.m) {
+                return formatEnglishName(parents[1].getEnglishAccess(), func.id, html);
+            } else if (fun == IF_EXPR) {
                 return "{formatEnglishName("if", func.id, html)} ({parents[1].getEnglishAccess()}) then {parents[2].getEnglishAccess()} else {parents[3].getEnglishAccess()}";
             } else if (fun == IF_STMT) {
                 return "if not ({parents[1].getEnglishAccess()}) Stop; Otherwise {parents[2].getEnglishAccess()}";
@@ -1590,7 +1630,7 @@ public class IPath {
                     return "({parents[1].getEnglishAccess()} {formatOperatorName(fun.getName(), func.id, html)} {parents[2].getEnglishAccess()})";
                 }
                 return "({parents[0].getEnglishAccess()} {formatOperatorName(fun.getName(), func.id, html)} {parents[1].getEnglishAccess()})";
-            } else {
+            } else { 
                 if (fun.isStatic()) {
                     var args = "";
                     var sep = "";
@@ -1705,6 +1745,9 @@ public class IPath {
                 } 
                 if (p.constantValue == null) {
                     return "null as {formatTypeName(p.getType())}";
+                }
+                if (p.constantValue is String) {
+                    return toSourceCode(p.constantValue as String);
                 }
                 return "{p.constantValue}";
             }
@@ -1858,11 +1901,27 @@ public class IPath {
                     app = "{app})";
                 }
                 if (obDepth >= 0) {
-                    return "{prefix} \}; const obs{obDepth} = foreach (i{getDepth()} in ({j0}.{app})({args})) \{";
+                    if (targs.size() > 0) {
+                        app = "({j0}.{app})";
+                    } else {
+                        app = "{j0}.{app}";
+                    }
+                    return "{prefix} \}; const obs{obDepth} = foreach (i{getDepth()} in {app}({args})) \{";
                 } else if (lowered >= 0) {
-                    return "foreach (i{lowered} in {prefix}) ({j0}.{app})({args})";
+                    if (targs.size() > 0) {
+                        app = "({j0}.{app})";
+                    } else {
+                        app = "{j0}.{app}";
+                    }
+                    return "foreach (i{lowered} in {prefix}) {app}({args})";
                 }
-                return "({parents[0].getWorldAccess()}.{app})({args})";                
+                j0 = parents[0].getWorldAccess();
+                if (targs.size() > 0) {
+                    app = "({j0}.{app})";
+                } else {
+                    app = "{j0}.{app}";
+                }
+                return "{app}({args})";                
             }
         }
         if (observer is GetVar) {
@@ -2211,7 +2270,7 @@ public class Parameter is ObserverExpression {
     {
         if (observable == null) then { 
                 const v = "{constantValue}";  
-                if (Reflect.STRING_TYPE.isConvertibleFrom(t)) then (if v == "" then "\"\"" else v) else if (v.startsWith("(null as")) then "_" else { if (v == "true") then "Yes" else if v == "false" then "No" else v } 
+                if (Reflect.STRING_TYPE.isConvertibleFrom(t)) then ("\"{v}\"") else if (v.startsWith("(null as")) then "_" else { if (v == "true") then "Yes" else if v == "false" then "No" else v } 
             } else observable.toEnglish();
     }
     override public function toSource from (context is IContext) to String 
@@ -2745,7 +2804,7 @@ class FunctionView is ExpressionView {
 
     protected function ununify to () 
     {
-   if (true) return ();
+        substs.clear();
         for (x in inputs) {
             x.inputType = null;
             x.inferred = [];
@@ -2757,7 +2816,6 @@ class FunctionView is ExpressionView {
     const substs = new java.util.HashMap of (F3Type, F3Type);
 
     function preunify to () {
-        substs.clear();
         // save links in case we break some during type substitution
         for (x in inputs) {
             if (x is FunctionParameterView) {
@@ -2820,6 +2878,7 @@ class FunctionView is ExpressionView {
     protected function unify1 to () 
     {
         unify(substs);
+        println("unify {fun.ft}, substs={substs}");
     }
     protected function unify2 to () 
     {
@@ -2897,19 +2956,7 @@ class FunctionView is ExpressionView {
                 }
             } else {
                 x.inputType = infer;
-                var targs is F3Type[];
-                var tparms is F3Type[];
-                if (infer is F3ClassType) {
-                    const ct = infer as F3ClassType;
-                    targs = ct.getTypeArguments();
-                    tparms = ct.getTypeParameters();
-                }
-                for (q in targs) {
-                    const r = tparms[indexof q];
-                    if (not q.isTypeVariable()) {
-                        substs.put(r, q);
-                    }
-                }
+                applySubsts(infer);
                 for (j in inputs) {
                     if (j <> x and j.links.size() == 0) {
                         var t1 = typeApply(j.parameter.t, x.parameter.t, x.inputType, substs);
@@ -2935,6 +2982,28 @@ class FunctionView is ExpressionView {
                 const t0 = typeApply(output.result.getType(), null, null, substs);
                 if (t0 <> output.result.getType()) {
                     output.unifiedType = t0;
+                }
+            }
+        }
+    }
+
+    function applySubsts from (t is F3Type) to ()
+    {
+        if (t is F3ClassType) {
+            const clsType = t as F3ClassType;
+            const superclasses = clsType.getSuperClasses(true);
+            for (x in superclasses) {
+                const xs is F3Type[]= x.getTypeArguments();
+                const ys is F3Type[] = x.getTypeParameters();
+                println(x);
+                if (xs.size() > 0) {
+                    for (i in [0..<xs.size()]) {
+                        println(foreach (j in xs) "{j},");
+                        println(foreach (j in ys) "{j},");
+                        if (not xs[i].isTypeVariable()) {
+                            substs.put(ys[i], xs[i]);
+                        }
+                    }
                 }
             }
         }
@@ -4030,7 +4099,7 @@ abstract class LinkedInputView is LinkedView {
     protected var linkOffset is Number = bind -cellWidth/2;
     const onDown1 = observeMouseDown().subscribe(function from (e is MouseEvent) to () {
             dx = 0; dy = 0;
-            if (links.size() == 1) {
+            if (links.size() == 1 and not e.shiftKey) {
                 link0 = links[0];
                 tmpLink = LinkedInputView {
                     override function serialize to ExprNode { null }
@@ -4054,6 +4123,9 @@ abstract class LinkedInputView is LinkedView {
                     pos: canvas.toLocal * e.sceneLocation;
                 };
                 insert tmpOut into canvas.views;
+                if (links <> []) {
+                    links[0].unlink();
+                }
                 link1 = LinkView {
                     canvas: canvas;
                     source: tmpOut;
@@ -4337,7 +4409,7 @@ public class ParameterView is InputView {
 
     override public bound function getInputType to F3Type 
     {
-        if inputType <> null then inputType else parameter.t;
+        if isNonPrimitive(parameter.t) and inputType <> null then inputType else parameter.t;
     }
 
     override public function assignLinkIds to () 
@@ -4444,7 +4516,7 @@ public class ParameterView is InputView {
             rightJustified: false;
             override function handleCommit from (text is String) to ()
             {
-                parameter.constantValue = "\"{text}\"";
+                parameter.constantValue = text;
                 canvas.dumpSrc();
             }
         }
@@ -4460,7 +4532,7 @@ public class ParameterView is InputView {
 
     public function noteConstantValue from (constValue is Object) to () {
         if (textField <> null) {
-            textField.setText(removeQuotes(constValue.toString()));
+            textField.setText("{constValue}");
         } else if (sliderField <> null) {
             const f = sliderField;
             if (Reflect.INTEGER_TYPE.isConvertibleFrom(getInputType())) {
@@ -5571,6 +5643,32 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     function getInputPopup from (e is MouseEvent, argType is F3Type, k is function from LinkedInputView to ()) to Node 
     {
+        if (true) {
+            const t = argType;
+            var members = introspect(t, true);
+            if (t is F3ClassType) {
+                members = members[m | m.m == null or not m.m.isStatic()];
+            }
+            if (isMappable(t)) {
+                const t1 = (t as F3ClassType).getTypeArguments()[0];
+                members = [introspect(t1, true), members];
+                if (t1 is F3ClassType) {
+                    members = members[m | m.m == null or not m.m.isStatic()];
+                }
+            }
+            if (members <> []) {
+                var popup is Node = getPopup0(e, members, function (j is LinkedInputView) to () {
+                        delete popupLayer.content;
+                        popupLayer.modal = false;
+                        popupDisp.dispose();
+                        k(j)
+                    });
+                insert popup into popupLayer.content;
+            } else {
+                k(null);
+            }
+            return null;
+        }
         function hideChooser to ()
         {
             delete chooseType from popupLayer.content;
@@ -7302,17 +7400,21 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     function pickOutput from (value is Boolean, e is MouseEvent, t is F3Type, k is function from LinkedOutputView to ()) to ()
     {
         var hit is Boolean;
+        var done = false;
 	for (p in e.scene.underMouse) {
 	    const n = p.node;
-	    if (n is MemberTreecell) {
+	    if (not done and n is MemberTreecell) {
 		const rv = (n as MemberTreecell).linkedView;
 		if (t.isConvertibleFrom(rv.getResultType())) {
                     k(rv);
-                    return ();
+                    done = true;
 		}
                 hit = true;
 	    }
 	}
+        if (done) {
+            return;
+        }
         if (hit){ 
             k(null);
         }
@@ -7723,6 +7825,12 @@ public class TypeRefNode is ExprNode {
 public class ExprScene {
     public var views is ExprNode[];
     public var links is LinkNode[];
+}
+
+function autoLayout from (scene is ExprScene, cellHeight is Number, cellWidth is Number) to () 
+{
+    for (link in scene.links) {
+    }
 }
 
 public class ForkNode is ExprNode {
@@ -8302,7 +8410,6 @@ public class Editor is ResizableNode, Focuser {
 	}
 	return prog.canvas;
     }
-    
 
 }
 
