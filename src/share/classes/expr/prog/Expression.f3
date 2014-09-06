@@ -336,7 +336,7 @@ const MAT4_TYPE = Reflect.findClass("f3.math.Mat4");
 function sourceFunName from (fun is F3FunctionMember) to String 
 {
     if (fun.isStatic()) {
-        if (fun.isJavaCtor) {
+        if (fun is F3Local.CtorMember) {
             fun.getName();
         } else {
             "{fun.getDeclaringClass().getName()}.{fun.getName()}";
@@ -595,7 +595,8 @@ public const INT_MEMBERS =
     }];
 
 const IF_EXPR = Reflect.getFunction("f3.lang.Builtins$BooleanOperators", "If", ["Boolean", "Object", "Object"]);
-const IF_STMT = Reflect.getFunction("f3.lang.Builtins$BooleanOperators", "If", ["Boolean", "Object"]);
+const IF_STMT = Reflect.getFunction("f3.lang.Builtins$BooleanOperators", "If", ["Object", "Boolean"]);
+const UNLESS_STMT = Reflect.getFunction("f3.lang.Builtins$BooleanOperators", "Unless", ["Object", "Boolean"]);
 const NUM_NEGATE = Reflect.getFunction("f3.lang.Builtins$NumberOperators", "negate", ["Number"]);
 const INT_NEGATE = Reflect.getFunction("f3.lang.Builtins$IntegerOperators", "negate", ["Integer"]);
 
@@ -623,6 +624,9 @@ public const BOOL_MEMBERS is Member[] =
     },
     FunctionMember {
         m: IF_STMT;
+    },
+    FunctionMember {
+        m: UNLESS_STMT;
     }];
 
 
@@ -1622,7 +1626,9 @@ public class IPath {
             } else if (fun == IF_EXPR) {
                 return "{formatEnglishName("if", func.id, html)} ({parents[1].getEnglishAccess()}) then {parents[2].getEnglishAccess()} else {parents[3].getEnglishAccess()}";
             } else if (fun == IF_STMT) {
-                return "if not ({parents[1].getEnglishAccess()}) Stop; Otherwise {parents[2].getEnglishAccess()}";
+                return "{parents[1].getEnglishAccess()} {formatEnglishName("if", func.id, html)} {parents[2].getEnglishAccess()}";
+            } else if (fun == UNLESS_STMT) {
+                return "{parents[1].getEnglishAccess()} {formatEnglishName("unless", func.id, html)} {parents[2].getEnglishAccess()}";
             } else if (fun == NUM_NEGATE or fun == INT_NEGATE) {
                 return "{formatEnglishName("-", func.id, html)}{parents[1].getEnglishAccess()}";
             } else if (infix) {
@@ -4981,7 +4987,7 @@ public class MemberTreecell is Treeview.Treecell
         if (mtn.value == null) then null else showValue1(mtn.depth, mtn.value);
     }
 
-    function showValue1 from (depth is Integer, value is F3Value) to Node 
+    bound function showValue1 from (depth is Integer, value is F3Value) to Node 
     {
         /*if (value == null) then null else*/ {
                 if (NUMBER_TYPE.isAssignableFrom(value.getType()) or 
@@ -4994,9 +5000,10 @@ public class MemberTreecell is Treeview.Treecell
                     TransformNode {
                         tx: bind width / 2 - fieldWidth / 2.0 - depth * 6;
                         content: Text.Label {
+                            blocksPointer: true;
+                            pickable: true;
                             rightJustified: true;
                             font: bind canvas.font;
-                            height: bind tv.cellHeight;
                             width: bind fieldWidth;
                             foreground: bind if isSelected() then getFg() else canvas.textFg;
                             background: bind if isSelected() then getBg() else canvas.textBg;
@@ -5035,8 +5042,14 @@ public class MemberTreecell is Treeview.Treecell
         if (BOOLEAN_TYPE.isAssignableFrom(v.getType())) 
             {
                 const b is Boolean = obj as Boolean;
-                if b then "Yes" else "No"
-            } else obj.toString()
+                if b then "Yes" else "No";
+            }
+        else if (NUMBER_TYPE.isAssignableFrom(v.getType())) 
+            {
+                const n = if obj == null then 0.0 else obj as Number;
+                "{%.4f n}";
+            } 
+        else obj.toString();
     }
 
     override bound function getValueContent to Node 
@@ -5087,7 +5100,7 @@ class GetTreeview is AbstractNode {
 	    m: bind get.member;
             isStatic: bind isStatic;
             override var label = bind rootName;
-            value: bind debugValue;
+            override var value =  bind debugValue;
             override function getType to F3Type
             {
                 exprView.getResultType();
@@ -5461,6 +5474,7 @@ class Holder is Group, Scissored {
 
 class MemberListview is Listview of Member {
     public var targetPosition is Point3;
+    public var targetType is F3Type;
     public var canvas is Canvas;
     public var k is function from LinkedInputView to ();
     public var font is Text.Font;
@@ -5509,7 +5523,12 @@ class MemberListview is Listview of Member {
             } else {
                 const f = canvas.createMemberView(targetPosition, m, 0) as FunctionView; // hack
                 const i = if (f.fun.funMember.m.isStatic()) then 1 else 0;
-                k(f.inputs[i]);
+                for (j  in [i..<f.inputs.size()]) {
+                    if (f.inputs[j].getInputType().isAssignableFrom(targetType)) {
+                        k(f.inputs[j]);
+                        break;
+                    }
+                }
             }
         });
 }
@@ -5551,7 +5570,7 @@ public class ExprDebugger is DebuggerEngine {
         } else {
             println("NOT STEPPING");
             update();
-            if (canvas.interactive()) {
+            if (true or canvas.interactive()) {
                 k.onNext(x);
             }
         }
@@ -5615,9 +5634,10 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     var popupDisp is Disposable;
 
-    function getPopup0 from (e is MouseEvent, members is Member[], k is function from LinkedInputView to ()) to Node 
+    function getPopup0 from (e is MouseEvent, t is F3Type, members is Member[], k is function from LinkedInputView to ()) to Node 
     {
        const r = MemberListview  {
+            targetType: t;
             targetPosition: toLocal * e.picked.dragPoint1;
             canvas: this;
             k: k;
@@ -5657,7 +5677,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 }
             }
             if (members <> []) {
-                var popup is Node = getPopup0(e, members, function (j is LinkedInputView) to () {
+                var popup is Node = getPopup0(e, t, members, function (j is LinkedInputView) to () {
                         delete popupLayer.content;
                         popupLayer.modal = false;
                         popupDisp.dispose();
@@ -6334,7 +6354,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 menuFactory: menuFactory;
                 interactive: interactive;
                 stepping: bind stepping;
-                debugger: debugger;
+                //                debugger: debugger;
                 popupLayer: popupLayer;
                 popupScene: popupScene;
                 pathFactory: pathFactory;
@@ -6806,7 +6826,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             evalContext: Program.EvalContext {
                 interactive: interactive;
                 targetNode: targetNode;
-                debugger: debugger;
+                //debugger: debugger;
                 instanceSpace: instanceSpace;
                 lookupSpatial: targetSpace.lookup;
                 targetTimeline: targetTimeline;
@@ -6822,7 +6842,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             menuFactory: menuFactory;
             interactive: interactive;
             stepping: bind stepping;
-            debugger: debugger;
+            //debugger: debugger;
             popupLayer: popupLayer;
             popupScene: popupScene;
             pathFactory: pathFactory;
@@ -7704,7 +7724,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                     }
                 }
                 //                result = "{result} const obs{p.getRootId()} = foreach (i in {app}) \{ %VARS%; {p.getWorldAccess()} \}";
-                result = "{result} \{ const obs0 = foreach (i in {app}) \{ $register(i); %VARS%; {p.getWorldAccess()} \}";
+                result = "{result} \{ const obs0 = foreach (i in debugger.debug({app}, {mem.id})) \{ %VARS%; {p.getWorldAccess()} \}";
                 result = "{result} insert obs{p.getContainingObservableDepth()} into obsvbs$; \} ";
                 sep = ", ";
                 println(p.getWorldAccess());
@@ -8356,7 +8376,7 @@ public class Editor is ResizableNode, Focuser {
                     varContext: varContext;
                     interactive: interactive;
                     targetNode: target;
-                    debugger: debugger;
+                    //debugger: debugger;
                     instanceSpace: instanceSpace;
                     lookupSpatial: targetSpace.lookup;
                     targetTimeline: targetTimeline;
@@ -8379,7 +8399,7 @@ public class Editor is ResizableNode, Focuser {
                 menuFactory: menuFactory;
                 interactive: interactive;
                 stepping: bind stepping;
-                debugger: debugger;
+                //                debugger: debugger;
                 popupLayer: popupLayer;
                 popupScene: popupScene;
                 pathFactory: pathFactory;
