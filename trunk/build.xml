@@ -65,7 +65,7 @@
                 <path path="lib/jogl-all.jar"/>
                 <path path="lib/gluegen-rt.jar"/>
                 <path path="lib/jogl-cg.jar"/>
-                <path path="lib/f3rt.jar"/>
+                <path path="lib/f3c.jar"/>
 		<path path="lib/f3.svg.awt.jar"/>
 		<path path="lib/f3.xhtml.awt.jar"/>
 		<path path="lib/f3.cg.jogl.awt.jar"/>

@@ -39,7 +39,7 @@ public class DebugTarget of a is DefaultObservable of a {
         target.subscribe(DefaultObserver of a {
                 override function onNext from (x is a) to ()
                 {
-                println("DEBUG TARGET {id} {x} {obs}");
+                println("DEBUG TARGET {id} {x} {obs}, engine={debugger}");
                     debugger.step(id, x, obs);
                 }
                 override function onError from (e is java.lang.Exception) to ()

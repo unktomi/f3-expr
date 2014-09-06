@@ -92,6 +92,7 @@ public class ToolMenu is ResizableNode {
             const free = java.lang.Runtime.getRuntime().freeMemory();
             println("used memory: {total-free}");
             println("free memory: {free}");
+            toggleStepping();
         }
     };
 

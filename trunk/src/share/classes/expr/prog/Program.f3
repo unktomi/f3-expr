@@ -46,7 +46,7 @@ public class EvalContext {
     public var debugger is ObservableDebugger = DebuggerEngine {
         override public function step of a from (location is Object, x is a, k is Observer of a) to ()
         {
-            if (interactive()) {
+            if (true or interactive()) {
                 k.onNext(x);
             }
         }
