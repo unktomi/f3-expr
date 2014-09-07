@@ -253,16 +253,30 @@ const IMAGE_LOADER = f3.jogl.awt.JoglStage.ImageLoader_INSTANCE;
 
 public function run from (args is String[]) to ()
 {
-    var mainContext is MainContext = MainContext {
-        name: "Start";
-    }
-
     var contextTree is Treeview;
 
     var contextModel is Context.ContextTreemodel = Context.ContextTreemodel {
         rootContext: bind mainContext;
         transformHierarchy: bind transformHierarchy;
     } 
+
+    function createMainContext to MainContext {
+        MainContext {
+            name: "Start";
+            override function getContextModel to Context.ContextTreemodel 
+            {
+                contextModel
+            }
+            override function selectContext from (c is Context) to ()
+            {
+                const tn = contextModel.toTreeNode(c);
+                println("Main Context SELECT {c}, {tn}");
+                contextTree.select(tn)
+            }
+        }    
+    }
+
+    var mainContext is MainContext = createMainContext();
 
     contextModel.reset();
 
@@ -1033,7 +1047,6 @@ public function run from (args is String[]) to ()
         return true;
     }
 
-    
     function close from () to () 
     {
 	savePoint = 0;
@@ -1050,9 +1063,7 @@ public function run from (args is String[]) to ()
         mainTimeLayer.content = [];
         mainTimeLayer.content = currentAnimResource;
         println("bounds={currentAnimResource.contentBounds}");
-        mainContext = MainContext {
-            name: "Start";
-        }
+        mainContext = createMainContext();
         Program.resetEvaluator();
         ExprNode.Start.disposeAll();
         contextModel.reset();
@@ -1132,6 +1143,7 @@ public function run from (args is String[]) to ()
                 evalContext: Program.EvalContext {
                     eventContext: mainContext;
                     interactive: function from () to Boolean { interactive } 
+                    stepping: function from () to Boolean { stepping } 
                     targetNode: mainContext.getTarget();
                     instanceSpace: currentScene.instanceSpace;
                     lookupSpatial: currentScene.root.lookup;
@@ -1160,6 +1172,7 @@ public function run from (args is String[]) to ()
                         eventContext: mainContext;
                         varContext: v;
                         interactive: function from () to Boolean { interactive } 
+                        stepping: function from () to Boolean { stepping } 
                         targetNode: mainContext.getTarget();
                         instanceSpace: currentScene.instanceSpace;
                         lookupSpatial: currentScene.root.lookup;
@@ -1179,6 +1192,8 @@ public function run from (args is String[]) to ()
                             eventContext: m;
                             varContext: null;
                             interactive: function from () to Boolean { interactive } 
+                            stepping: function from () to Boolean { stepping } 
+
                             targetNode: null;
                             instanceSpace: currentScene.instanceSpace;
                             lookupSpatial: currentScene.root.lookup;
@@ -1412,6 +1427,8 @@ public function run from (args is String[]) to ()
                     targetPath: prog.targetPath;
                     evalContext: Program.EvalContext {
                         interactive: function from () to Boolean { interactive } 
+                        stepping: function from () to Boolean { stepping } 
+
                         targetNode: (currentTransform as ResourceTarget).findTarget(prog.targetPath);
                         instanceSpace: currentScene.instanceSpace;
                         lookupSpatial: currentScene.root.lookup;
@@ -1445,6 +1462,8 @@ public function run from (args is String[]) to ()
                             eventContext: c1;
                             varContext: v;
                             interactive: function from () to Boolean { interactive } 
+                            stepping: function from () to Boolean { stepping } 
+
                             targetNode: (currentTransform as ResourceTarget).findTarget(prog.targetPath);
                             instanceSpace: currentScene.instanceSpace;
                             lookupSpatial: currentScene.root.lookup;
@@ -1538,6 +1557,7 @@ public function run from (args is String[]) to ()
                         targetPath: prog.targetPath;
                         evalContext: Program.EvalContext {
                             interactive: function from () to Boolean { interactive } 
+                            stepping: function from () to Boolean { stepping } 
                             targetNode: qt;
                             instanceSpace: currentScene.instanceSpace;
                             lookupSpatial: currentScene.root.lookup;
@@ -1730,7 +1750,7 @@ public function run from (args is String[]) to ()
                                                      }
                                                      menuFactory: THE_MENU_FACTORY;
                                                      //event: bind inspector1.inspecting[inspector1.selectedIndex].member;
-                                                     stepping: bind stepping;
+                                                     steppingVar: bind stepping;
                                                      varContext: bind contextModel.selectedVarContext;
                                                      eventContext: bind contextModel.selectedMemberContext;
                                                      targetObject: bind contextModel.selectedObjectContext.getTarget();
@@ -1741,6 +1761,7 @@ public function run from (args is String[]) to ()
                                                      popupLayer: bind popupLayer;
                                                      popupScene: bind editorScene;
                                                      interactive: function from () to Boolean { interactive } 
+                                                     stepping: function from () to Boolean { stepping } 
                                                  }
                                              }];
                                         }

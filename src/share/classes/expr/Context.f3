@@ -29,9 +29,21 @@ public class Context is Foldable of Context {
     public readonly var label is String = bind name;
     public var contextType is F3Type;
     public bound function getContent to Context[]  { [] }
-
-    public readonly var event is MemberContext = bind if this is MemberContext then this as MemberContext else parent.event;
-
+    public function getContextModel to ContextTreemodel 
+    {
+        parent.getContextModel();
+    }
+    protected function selectContext from (c is Context) to ()
+    {
+        parent.selectContext(c);
+    }
+    public function select to ()
+    {
+        println("ctx SELECT {this}");
+        selectContext(this);
+    }
+    public readonly var event is MemberContext = 
+        bind if this is MemberContext then this as MemberContext else parent.event;
     override function foldLeft of a from (z is a, f is function from (a, Context) to a) to a
     {
         var r = f(z, this);
@@ -611,10 +623,20 @@ public class ContextTreemodel is Treemodel {
             this.tn = tn;
         });
 
+    public function selectContext from (c is Context) to ()
+    {
+        const treenode = toTreeNode(c);
+        treenode.open();
+        tn = treenode;
+    }
+
     public function toTreeNode from (c is Context) to ContextTreenode 
     {
+        if (c == rootContext) return root as ContextTreenode;
         var result is ContextTreenode;
-        root.foldLeft((), function from (_ is (), tn is Treenode) to () {
+        const pn = toTreeNode(c.parent);
+        pn.open();
+        pn.foldLeft((), function from (_ is (), tn is Treenode) to () {
                 const x = tn as ContextTreenode;
                 if (x.context == c) {
                     result = x;
