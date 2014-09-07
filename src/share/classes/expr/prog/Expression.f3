@@ -1754,10 +1754,10 @@ public class IPath {
                         println("returning: {code} for {i}");
                         return code;
                     }
-                    return "null as {formatTypeName(p.getType())}";
+                    return "(null as {formatTypeName(p.getType())})";
                 } 
                 if (p.constantValue == null) {
-                    return "null as {formatTypeName(p.getType())}";
+                    return "(null as {formatTypeName(p.getType())})";
                 }
                 if (p.constantValue is String) {
                     return toSourceCode(p.constantValue as String);

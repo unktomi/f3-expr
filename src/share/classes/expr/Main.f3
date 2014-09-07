@@ -1839,91 +1839,98 @@ public function run from (args is String[]) to ()
                                              {
                                                  contextSearch.searchField.onKeyInput(e);
                                              }
-                                                        override function onMouseDown from (e is MouseEvent) to ()
-                                                        {
-                                                            if (e.isMouseButton3Down()) {
-                                                                const ctx = (contextTree.selectedTreenode as Context.ContextTreenode).context;
-                                                                var menuItems is MenuItem[];
-                                                                if (ctx is Context.ResourceObjectContext) {
-                                                                    const r = ctx as Context.ResourceObjectContext;
-                                                                    const members = r.getMembers();
-                                                                    println("MEMBERS=>{members}");
-                                                                    const items = 
-                                                                        [if (members == []) then null else Menu {
-                                                                            label: "Events"
-                                                                            items: 
-                                                                            [foreach (j in members) {
-                                                                                MenuItem {
-                                                                                    label: Names.formatName(j.name);
-                                                                                    action: function to () 
-                                                                                    {
-                                                                                        println("calling create program {j} on {r}");
-                                                                                        r.createProgram(j);
+                                             override function onMouseDown from (e is MouseEvent) to ()
+                                             {
+                                                 if (e.isMouseButton3Down()) {
+                                                     const ctx = (contextTree.selectedTreenode as Context.ContextTreenode).context;
+                                                     var menuItems is MenuItem[];
+                                                     if (ctx is Context.ResourceObjectContext) {
+                                                         const r = ctx as Context.ResourceObjectContext;
+                                                         const members = r.getMembers();
+                                                         println("MEMBERS=>{members}");
+                                                         const items = 
+                                                             [if (members == []) then null else Menu {
+                                                                             label: "Events"
+                                                                             items: 
+                                                                             [foreach (j in members) {
+                                                                                     MenuItem {
+                                                                                         label: Names.formatName(j.name);
+                                                                                         action: function to () 
+                                                                                         {
+                                                                                             println("calling create program {j} on {r}");
+                                                                                             r.createProgram(j);
+                                                                                         }
+                                                                                     }
+                                                                                 }]
+                                                                         }];
+                                                         insert items into menuItems;
+                                                     }
+                                                     if (ctx is Context.MemberContext) {           
+                                                         const item = Menu {
+                                                             label: "New";
+                                                             items:[
+                                                                    MenuItem {
+                                                                        label: "Variable"
+                                                                            action: function to () 
+                                                                        {
+                                                                            createVar.reset();
+                                                                            win.cx = windowContainingAssets.boundsInScene.center.x;
+                                                                            win.cy = windowContainingAssets.boundsInScene.center.y;
+                                                                            handleCreate = function from (name is String, asset is AssetTree.TypeAsset) to () 
+                                                                                {
+                                                                                    var g = ctx as Context.GroupContext;
+                                                                                    insert Context.ClosureVarContext { 
+                                                                                        variableName: name;
+                                                                                        varType: asset;
+                                                                                        parent: g;
+                                                                                        isShortcut: false;
                                                                                     }
+                                                                                    into g.content;
+                                                                                    
                                                                                 }
-                                                                            }]
-                                                                                    }];
-                                                                    insert items into menuItems;
-                                                                }
-                                                                if (ctx is Context.MemberContext) {           
-                                                                    const item = Menu {
-                                                                        label: "New";
-                                                                            items:[
-                                                                                   MenuItem {
-                                                                                       label: "Variable"
-                                                                                           action: function to () 
-                                                                                       {
-                                                                                           createVar.reset();
-                                                                                           win.cx = windowContainingAssets.boundsInScene.center.x;
-                                                                                           win.cy = windowContainingAssets.boundsInScene.center.y;
-                                                                                           handleCreate = function from (name is String, asset is AssetTree.TypeAsset) to () 
-                                                                                               {
-                                                                                                   var g = ctx as Context.GroupContext;
-                                                                                                   insert Context.ClosureVarContext { 
-                                                                                                       variableName: name;
-                                                                                                       varType: asset;
-                                                                                                       parent: g;
-                                                                                                       isShortcut: false;
-                                                                                                   }
-                                                                                                   into g.content;
-                                                                                                   
-                                                                                               }
-                                                                                           insert win into popupLayer.content;
-                                                                                           popupLayer.modal = true;
-                                                                                           createVar.start();
-                                                                                       }
-                                                                                   },
-                                                                                   MenuItem {
-                                                                                       label: "Function";
-                                                                                       enabled: no;
-                                                                                   }
-                                                                                ]
-                                                                    };
-                                                                    insert item into menuItems;
-                                                                }
-                                                                if (ctx is Context.ClosureVarContext) {
-                                                                    const v = ctx as Context.ClosureVarContext;
-                                                                    const item = Menu {
-                                                                        label: "Events";
-                                                                        items: MenuItem {
-                                                                            label: "Observe Change";
-                                                                            action: function to () {
-                                                                                v.addEvent();
-                                                                            }
+                                                                            insert win into popupLayer.content;
+                                                                            popupLayer.modal = true;
+                                                                            createVar.start();
                                                                         }
+                                                                    },
+                                                                    MenuItem {
+                                                                        label: "Function";
+                                                                        enabled: no;
                                                                     }
-                                                                    insert item into menuItems;
-                                                                }
-                                                                if (menuItems.size() > 0) {
-                                                                    const menu = Menu {
-                                                                        items: menuItems;
-                                                                    }
-                                                                    e.stage.showPopupMenu(e.screenx, e.screeny+contextTree.cellHeight, menu);
-                                                                }
-                                                            }
-                                                        }
-                                                        override function onKeyDown from (e is KeyboardEvent) to ()
-                                                        {
+                                                                    ]
+                                                         };
+                                                         insert item into menuItems;
+                                                     }
+                                                     if (ctx is Context.ClosureVarContext) {
+                                                         const v = ctx as Context.ClosureVarContext;
+                                                         const item = Menu {
+                                                             label: "Events";
+                                                             items: MenuItem {
+                                                                 label: "Observe Change";
+                                                                 action: function to () {
+                                                                     v.addEvent();
+                                                                 }
+                                                             }
+                                                         }
+                                                         insert item into menuItems;
+                                                     }
+                                                     if (menuItems.size() > 0) {
+                                                         const menu = Menu {
+                                                             items: menuItems;
+                                                         }
+                                                         e.stage.showPopupMenu(e.screenx, e.screeny+contextTree.cellHeight, menu);
+                                                     }
+                                                 } else if (e.isMouseButton1Down()) {
+                                                     if (e.clickCount > 1) {
+                                                         const target = contextTree.selectedTreenode;
+                                                         contextSearch.searchField.setText("");
+                                                         target.open();
+                                                         contextTree.select(target);
+                                                     }
+                                                 }
+                                             }
+                                             override function onKeyDown from (e is KeyboardEvent) to ()
+                                             {
                                                             if (e.keyCode == Keys.Delete or
                                                                 e.keyCode == Keys.Backspace) {
                                                                 const toDelete = contextModel.selectedContext;
