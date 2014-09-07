@@ -34,6 +34,7 @@ public class EvalContext {
     public var eventContext is Context.MemberContext;
     public var varContext is Context.ClosureVarContext;
     public var interactive is function from () to Boolean;
+    public var stepping is function from () to Boolean;
     public const targetNode is Object;
     public function getParentContext to EvalContext {
         var c is Context = if (varContext <> null) varContext else eventContext;
@@ -46,6 +47,15 @@ public class EvalContext {
     public var debugger is ObservableDebugger = DebuggerEngine {
         override public function step of a from (location is Object, x is a, k is Observer of a) to ()
         {
+            if (stepping()) {
+                var c = if (varContext <> null) varContext else eventContext;
+                c.select();
+                const program = (c as Context.ProgramContext).program; 
+                if (program.canvas <> null) {
+                    program.canvas.debuggerEngine.step(location, x, k);
+                    return;
+                }
+            }
             if (true or interactive()) {
                 k.onNext(x);
             }
@@ -163,7 +173,10 @@ public class EvalContext {
             unsubscribe();
             return;
         }
-        const debugger = if externalDebugger <> null then externalDebugger else this.debugger;
+        if (externalDebugger <> null) {
+            java.lang.Thread.currentThread().dumpStack();
+        }
+        const debugger = if (false and externalDebugger <> null) then externalDebugger else this.debugger;
         try {
             const f = evaluator.compileAndRun(prog.getSourceCode()) 
                 as function from (ObservableDebugger, Object, 

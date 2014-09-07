@@ -5543,12 +5543,16 @@ public class ExprDebugger is DebuggerEngine {
 
     var todo is (function from () to ())[];
 
-    public function update to () {
+    public function update to () 
+    {
         if (not (canvas.stepping and canvas.targetTimeline.paused) and todo.size() > 0) {
             var xs = todo;
             todo = [];
             for (x in xs) {
                 x();
+                if (canvas.stepping and canvas.targetTimeline.paused) {
+                    break;
+                }
             }
         }
     }
@@ -5556,17 +5560,22 @@ public class ExprDebugger is DebuggerEngine {
     public override function step of a from (location is Object, x is a, k is Observer of a) to ()
     {
         if (canvas.stepping) {
-            //canvas.makeVisible();
-            const view = canvas.lookup(location.toString());
-            debugCanvas.clearSelection();
-            debugCanvas = canvas;
-            const pc = view as ExpressionView;
-            debugPC = pc;
-            pc.select();
-            pc.setDebugValue(x);
-            println("STEP {location} => {view} event={x}");
-            canvas.targetTimeline.paused = true;
-            insert function from () to () { k.onNext(x) } into todo;
+            if (debugCanvas == null) {
+                debugCanvas == canvas;                
+                const view = canvas.lookup(location.toString());
+                const pc = view as ExpressionView;
+                debugPC = pc;
+                pc.select();
+                pc.setDebugValue(x);
+                println("STEP {location} => {view} event={x}");
+                canvas.targetTimeline.paused = true;
+                insert function from () to () { 
+                    debugCanvas = null;
+                    k.onNext(x); 
+                } into todo;
+            }  else {
+                insert function from () to () { step(location, x, k) } into todo;
+            }
         } else {
             println("NOT STEPPING");
             update();
@@ -6337,7 +6346,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                 evalContext: Program.EvalContext {
                     interactive: interactive;
                     targetNode: targetNode;
-                    debugger: debugger;
+                    //debugger: debugger;
                     instanceSpace: instanceSpace;
                     lookupSpatial: targetSpace.lookup;
                     targetTimeline: targetTimeline;
@@ -8264,7 +8273,7 @@ public class Editor is ResizableNode, Focuser {
 
     public var assetModel is AssetTree.AssetModel;
 
-    public var stepping is Boolean;
+    public var steppingVar is Boolean;
 
     override var scissorBounds = bind Bounds.boundsFromRect(width, height);
 
@@ -8308,6 +8317,7 @@ public class Editor is ResizableNode, Focuser {
     override var internalContent = bind sp;
 
     public const interactive is function from () to Boolean;
+    public const stepping is function from () to Boolean;
 
     const sp = Scrollpane {
         width: bind width;
@@ -8360,6 +8370,7 @@ public class Editor is ResizableNode, Focuser {
                         eventContext: eventContext;
                         varContext: null;
                         interactive: interactive;
+                        stepping: stepping;
                         targetNode: target;
                     }
                 }
@@ -8375,6 +8386,7 @@ public class Editor is ResizableNode, Focuser {
                     eventContext: eventContext;
                     varContext: varContext;
                     interactive: interactive;
+                    stepping: stepping;
                     targetNode: target;
                     //debugger: debugger;
                     instanceSpace: instanceSpace;
@@ -8398,7 +8410,7 @@ public class Editor is ResizableNode, Focuser {
                 assetModel: assetModel;
                 menuFactory: menuFactory;
                 interactive: interactive;
-                stepping: bind stepping;
+                stepping: bind steppingVar;
                 //                debugger: debugger;
                 popupLayer: popupLayer;
                 popupScene: popupScene;
