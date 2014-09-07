@@ -61,8 +61,8 @@ public class Treemodel is Foldable of Treenode {
             });
         if (diff) {
             result = lastRows = foreach (n in list) n;
-            list.clear();
         }
+        list.clear();
         return result;
     }
 
