@@ -41,6 +41,13 @@ function toSourceCode from (str is String) to String
     return strBuff.toString();
 }
 
+function isVisuallyPrimitive from (t is F3Type) to Boolean {
+    t <> null and (NUMBER_TYPE.isAssignableFrom(t) or 
+                   INTEGER_TYPE.isAssignableFrom(t) or  
+                   BOOLEAN_TYPE.isAssignableFrom(t) or
+                   STRING_TYPE.isAssignableFrom(t))
+}
+
 function isNonPrimitive from (t is F3Type) to Boolean {
     t <> null and not (t is F3PrimitiveType)
 }
@@ -4773,7 +4780,7 @@ class MemberTreenode is Treenode {
     }
 
     public function setValue from (m is F3Member, value is F3Value) to () {
-        const myValue = this.value;
+        var myValue = parentValue;
         if (m is F3VarMember) {
             const v = m as F3VarMember;
             try {
@@ -4785,8 +4792,10 @@ class MemberTreenode is Treenode {
         } 
     }
 
-    function getValue from (myValue is F3Value, m is F3Member) to F3Value 
+    function getValue from (myValue0 is F3Value, m0 is F3Member) to F3Value 
     {
+        var myValue = parentValue;
+        var m = this.m.m;
         if (m is F3VarMember) {
             var v = m as F3VarMember;
             if (v.isStatic()) then v.getValue(null) else if myValue == null then null else v.getValue(myValue as F3ObjectValue);
@@ -4984,34 +4993,30 @@ public class MemberTreecell is Treeview.Treecell
 
     bound function showValue from (mtn is MemberTreenode) to Node 
     {
-        if (mtn.value == null) then null else showValue1(mtn.depth, mtn.value);
+        showValue1(mtn, mtn.depth, mtn.value);
     }
 
-    bound function showValue1 from (depth is Integer, value is F3Value) to Node 
+    bound function showValue1 from (mtn is MemberTreenode, depth is Integer, value0 is F3Value) to Node 
     {
-        /*if (value == null) then null else*/ {
-                if (NUMBER_TYPE.isAssignableFrom(value.getType()) or 
-                    INTEGER_TYPE.isAssignableFrom(value.getType()) or  
-                    BOOLEAN_TYPE.isAssignableFrom(value.getType()) or
-                    STRING_TYPE.isAssignableFrom(value.getType())
-                    )  {
-                    var fieldWidth = 64;
-                    var width = bind tv.cellWidth;
-                    TransformNode {
-                        tx: bind width / 2 - fieldWidth / 2.0 - depth * 6;
-                        content: Text.Label {
-                            blocksPointer: true;
-                            pickable: true;
-                            rightJustified: true;
-                            font: bind canvas.font;
-                            width: bind fieldWidth;
-                            foreground: bind if isSelected() then getFg() else canvas.textFg;
-                            background: bind if isSelected() then getBg() else canvas.textBg;
-                            text: bind formatValue(value);
-                        }
-                    }
-                } else null
+        var value = mtn.value;
+        if (isVisuallyPrimitive(value.getType())) {
+            var fieldWidth = 64;
+            var width = bind tv.cellWidth;
+            TransformNode {
+                tx: bind width / 2 - fieldWidth / 2.0 - depth * 6;
+                ty: bind (canvas.cellHeight - canvas.font.height())/2;
+                content: Text.Label {
+                    blocksPointer: true;
+                    pickable: true;
+                    rightJustified: true;
+                    font: bind canvas.font;
+                    width: bind fieldWidth;
+                    foreground: bind if isSelected() then getFg() else canvas.textFg;
+                    background: bind if isSelected() then getBg() else canvas.textBg;
+                    text: bind formatValue(value);
+                }
             }
+        } else null
     }
 
     bound var rect is Rectangle = createRect();
@@ -5075,9 +5080,10 @@ class GetTreeview is AbstractNode {
     function setDebugValue from (obj is Object) to ()
     {
         debugValue = Reflect.ctx.mirrorOf(obj, get.getType());
+        tv.doUpdates();
     }
 
-    var debugValue is F3Value;
+    public readonly var debugValue is F3Value;
 
     public var rootName is String = bind exprView.outputName; //formatType(get.member.t);
 
@@ -5100,7 +5106,7 @@ class GetTreeview is AbstractNode {
 	    m: bind get.member;
             isStatic: bind isStatic;
             override var label = bind rootName;
-            override var value =  bind debugValue;
+            override var value = bind debugValue;
             override function getType to F3Type
             {
                 exprView.getResultType();

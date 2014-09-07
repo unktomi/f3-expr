@@ -271,7 +271,8 @@ public function run from (args is String[]) to ()
             {
                 const tn = contextModel.toTreeNode(c);
                 println("Main Context SELECT {c}, {tn}");
-                contextTree.select(tn)
+                contextTree.select(tn);
+                contextTree.doUpdates();
             }
         }    
     }
