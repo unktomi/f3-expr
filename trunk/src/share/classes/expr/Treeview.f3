@@ -524,7 +524,9 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
 	    selectionRow = row;
             println("OPENING: {selectedTreenode.label}");
 	} else { 
+            const sel = selectedTreenode;
             model.update();
+	    selectionRow = sel.row;
         }
         modelSelection = selectedTreenode;
 	const i = scrollOffset;
