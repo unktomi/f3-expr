@@ -509,6 +509,12 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
 
     var openNodes = new java.util.HashSet of (Treenode);
 
+    public function doUpdates to ()
+    {
+        preupdate();
+        update();
+    }
+
     override function preupdate {
 	if (nextSelection <> null) {
             model.open(nextSelection);
