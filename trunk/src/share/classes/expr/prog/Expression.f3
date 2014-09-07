@@ -5077,6 +5077,7 @@ class GetTreeview is AbstractNode {
     function open to () {
         treeModel.root.open();
     }
+
     function setDebugValue from (obj is Object) to ()
     {
         debugValue = Reflect.ctx.mirrorOf(obj, get.getType());
@@ -5127,7 +5128,7 @@ class GetTreeview is AbstractNode {
     public bound function getTreeHeight to Number { treeHeight }
     const self = this;
     const cellMap is java.util.Map of (MemberTreenode, MemberTreecell) =        
-	new java.util.HashMap of (MemberTreenode, MemberTreecell);
+	new LRUMap of (MemberTreenode, MemberTreecell)(128);
 
     public function getCell from (tn is MemberTreenode) to MemberTreecell {
         if (tn == null) return null;
@@ -5141,6 +5142,7 @@ class GetTreeview is AbstractNode {
 		tn: tn;
 		tv: tv;
 	    }
+            println("created cell: {tn.label}");
             if (tn == treeModel.root) {
                 r.parentLink = RootLinkView { source: self.exprView }
             }
@@ -5203,6 +5205,7 @@ class GetTreeview is AbstractNode {
                     link.sourceLinkId = linkStart + linkCount++;
                 }
             }
+            cells.clear();
             for (row in rows) {
                 const cell = cellMap.get(row);
                 cell.active = true;
