@@ -3521,8 +3521,8 @@ public class GetVarView is OutputView {
         visibleRowCount: bind visibleRowCount;
         get: bind get;
         exprView: bind this;
-    }
-
+    };
+    override var getTree = bind tv;
     override var transform = bind translate(pos);
     override var expression = bind get;
     public var isLabeled is Boolean = false;
