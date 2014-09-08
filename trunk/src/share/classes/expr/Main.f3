@@ -1992,7 +1992,20 @@ public function run from (args is String[]) to ()
                                              {
                                                  assetSearch.searchField.onKeyInput(e);
                                              }
-
+                                             var selectCurrent = function to ()
+                                             {
+                                                 const target = assetTreeview.selectedTreenode;
+                                                 assetSearch.searchField.setText("");
+                                                 target.open();
+                                                 assetTreeview.select(target);
+                                                 
+                                             }
+                                             override function onKeyDown from (e is KeyboardEvent) to ()
+                                             {
+                                                 if (e.keyCode == Keys.Enter) {
+                                                     selectCurrent();
+                                                 } else super.onKeyDown(e);
+                                             }
 					 var dragger is TransformNode;
                                          var tn is AssetTree.AssetTreenode;
 
@@ -2011,6 +2024,14 @@ public function run from (args is String[]) to ()
 					     dragger.ty = editorScene.mousePosition.y;
                                              tn = (selectedTreenode as AssetTreenode);
 					 }
+                                         override function onMouseDown from (e is MouseEvent) to ()
+                                             {
+                                                 if (e.isMouseButton1Down()) {
+                                                     if (e.clickCount > 1) {
+                                                         selectCurrent();
+                                                     }
+                                                 }
+                                             }
 
 					 override function onMouseUp from (e is MouseEvent) to () 
 					 {
