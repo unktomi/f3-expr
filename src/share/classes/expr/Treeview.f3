@@ -516,29 +516,27 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
     }
 
     override function preupdate {
-	if (nextSelection <> null) {
-            model.open(nextSelection);
-            model.update();
-	    const row = nextSelection.row;
-	    nextSelection = null;
-	    selectionRow = row;
-            println("OPENING: {selectedTreenode.label}");
-	} else { 
-            const sel = selectedTreenode;
-            model.update();
-	    selectionRow = sel.row;
-        }
-        modelSelection = selectedTreenode;
 	const i = scrollOffset;
 	const j = scrollOffset + visibleRows;
 	//const newRows = model.getRows(i, j+1);
 	var newRows is Treenode[];
+        const sel = if nextSelection <> null then nextSelection else selectedTreenode;
+        nextSelection.open();
+        nextSelection = null;
+        sel.row = -1;
+        model.update();
         if (filter <> null) {
             newRows = model.getRows(filter)[0..<filterLimit];
             model.rowCount = newRows.size();
         } else {
             newRows = model.getRows(0, model.rowCount);
         }
+        if (sel.row >= 0) {
+            selectionRow = sel.row;
+        } else {
+            selectionRow = 0;
+        }
+        modelSelection = sel;
         rows = newRows;
 	super.preupdate();
     }
