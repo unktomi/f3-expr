@@ -7742,7 +7742,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                     }
                 }
                 //                result = "{result} const obs{p.getRootId()} = foreach (i in {app}) \{ %VARS%; {p.getWorldAccess()} \}";
-                result = "{result} \{ const obs0 = foreach (i in debugger.debug({app}, {mem.id})) \{ %VARS%; {p.getWorldAccess()} \}";
+                result = "{result} \{ const obs0 = foreach (i in debugger.debug({app}, {mem.id})) \{ $register(i); %VARS%; {p.getWorldAccess()} \}";
                 result = "{result} insert obs{p.getContainingObservableDepth()} into obsvbs$; \} ";
                 sep = ", ";
                 println(p.getWorldAccess());
