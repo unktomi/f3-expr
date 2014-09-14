@@ -479,7 +479,7 @@ public class Treeview is ResizableNode, Focusable, KeyboardInputHandler, Scrolla
             });
     }
 
-    protected var rows is Treenode[];
+    public readonly var rows is Treenode[];
 
     protected var cells is Holder[] = bind foreach (i in [0..<rows.size()]) 
 	Holder { 

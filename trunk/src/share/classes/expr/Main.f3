@@ -1752,6 +1752,7 @@ public function run from (args is String[]) to ()
                                                      menuFactory: THE_MENU_FACTORY;
                                                      //event: bind inspector1.inspecting[inspector1.selectedIndex].member;
                                                      steppingVar: bind stepping;
+                                                     methodTarget: bind contextModel.selectedMethodContext;
                                                      varContext: bind contextModel.selectedVarContext;
                                                      eventContext: bind contextModel.selectedMemberContext;
                                                      targetObject: bind contextModel.selectedObjectContext.getTarget();
@@ -1815,12 +1816,17 @@ public function run from (args is String[]) to ()
                                                          popupLayer.modal = false;
                                                      }
                                              };
+                                             var windowTitle = "Create Variable";
+                                             function setWindowTitle from (str is String) to ()
+                                             {
+                                                 windowTitle = str;
+                                             }
                                              var win = InternalWindow {
                                                  isMovable: false;
                                                  isResizable: false;
                                                  isTransient: true;
                                                  gadget: Text.Label {
-                                                     text: "Create Variable";
+                                                     text: bind windowTitle;
                                                      override var font = bind layoutEngine.createFont(Names.DEFAULT_FONT); 
                                                      background: null;
                                                      foreground: Shape2D.ColorPaint(Color.color(.8, .8, .8));
@@ -1832,6 +1838,10 @@ public function run from (args is String[]) to ()
                                                                                              height-MENU_HEIGHT);
                                                  content: createVar;
                                                  height: 140, width: 300;
+                                                 override function resize from (w is Number, h is Number) to ()
+                                                 {
+                                                     super.resize(w, createVar.typeArgs.size() *createVar.cellHeight+140);
+                                                 }
                                                  //cx: e.sceneLocation.x, cy: e.sceneLocation.y;
                                              };
                                              model: bind contextModel;
@@ -1865,15 +1875,40 @@ public function run from (args is String[]) to ()
                                                                          }];
                                                          insert items into menuItems;
                                                      }
-                                                     if (ctx is Context.MemberContext) {           
+                                                     if (ctx is Context.GroupContext) {           
                                                          const item = Menu {
                                                              label: "New";
                                                              items:[
+                                                                    MenuItem {
+                                                                        label: "Class"
+                                                                            action: function to () 
+                                                                        {
+                                                                            createVar.reset();
+                                                                            setWindowTitle("Create Class");
+                                                                            win.cx = windowContainingAssets.boundsInScene.center.x;
+                                                                            win.cy = windowContainingAssets.boundsInScene.center.y;
+                                                                            handleCreate = function from (name is String, asset is AssetTree.TypeAsset) to () 
+                                                                                {
+                                                                                    var g = ctx as Context.GroupContext;
+                                                                                    insert Context.ClassContext { 
+                                                                                        className: name;
+                                                                                        baseType: asset;
+                                                                                        parent: g;
+                                                                                    }
+                                                                                    into g.content;
+                                                                                    
+                                                                                }
+                                                                            insert win into popupLayer.content;
+                                                                            popupLayer.modal = true;
+                                                                            createVar.start();
+                                                                        }
+                                                                    },
                                                                     MenuItem {
                                                                         label: "Variable"
                                                                             action: function to () 
                                                                         {
                                                                             createVar.reset();
+                                                                            setWindowTitle("Create Variable");
                                                                             win.cx = windowContainingAssets.boundsInScene.center.x;
                                                                             win.cy = windowContainingAssets.boundsInScene.center.y;
                                                                             handleCreate = function from (name is String, asset is AssetTree.TypeAsset) to () 
@@ -1895,7 +1930,29 @@ public function run from (args is String[]) to ()
                                                                     },
                                                                     MenuItem {
                                                                         label: "Function";
-                                                                        enabled: no;
+                                                                        enabled: yes;
+                                                                        action: function to ()
+                                                                        {
+                                                                            createVar.reset();
+                                                                            setWindowTitle("Create Function");
+
+                                                                            win.cx = windowContainingAssets.boundsInScene.center.x;
+                                                                            win.cy = windowContainingAssets.boundsInScene.center.y;
+                                                                            handleCreate = function from (name is String, asset is AssetTree.TypeAsset) to () 
+                                                                                {
+                                                                                    var g = ctx as Context.GroupContext;
+                                                                                    insert Context.MethodContext { 
+                                                                                        methodName: name;
+                                                                                        returnType: asset;
+                                                                                        parent: g;
+                                                                                    }
+                                                                                    into g.content;
+                                                                                    
+                                                                                }
+                                                                            insert win into popupLayer.content;
+                                                                            popupLayer.modal = true;
+                                                                            createVar.start();
+                                                                        }
                                                                     }
                                                                     ]
                                                          };

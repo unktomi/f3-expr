@@ -366,6 +366,33 @@ public class FunctionDefinitionContext is MemberContext, ResourceObjectContext {
 }
 */
 
+public class MethodContext is GroupContext, ProgramContext {
+    public var returnType is TypeAsset;
+    public var methodName is String = "variable";
+    override var label = bind "{methodName} \u2192 {returnType.name}";
+    public bound var inputs is ClosureVarContext[] = 
+        [if parent is ClassContext then {
+                    var p = parent as ClassContext;
+                    ClosureVarContext {
+                        varType: TypeAsset {
+                            name: p.className;
+                        }
+                        variableName: "this";
+                    }
+                } else null, foreach (c in getContent()) if (c is ClosureVarContext) then c as ClosureVarContext else null];
+    public readonly var methodType is F3FunctionType = bind getMethodType();
+    bound function getMethodType to F3FunctionType {
+        Reflect.ctx.makeFunctionType(foreach (i in inputs) i.varType.t, returnType.t);
+    }
+    
+}
+
+public class ClassContext is GroupContext {
+    public var baseType is TypeAsset;
+    public var className is String = "class";
+    override var label = bind "{className} \u2192 {baseType.name}";
+}
+
 public class ClosureVarContext is GroupContext, ProgramContext {
     public var varType is TypeAsset;
     public var variableName is String = "variable";
@@ -374,7 +401,7 @@ public class ClosureVarContext is GroupContext, ProgramContext {
     public var isBound is Boolean;
     public var accessMode is VariableType = VariableType.Subject;
     override var name = bind variableName;
-    override var label = bind "{variableName} [{varType.name}]";
+    override var label = bind "{variableName} \u2192 {varType.name}";
     public var scope is GroupContext;
 
     // hack...
@@ -581,6 +608,7 @@ public class ContextTreemodel is Treemodel {
         selectedGroupContext = (p as ContextTreenode).context as GroupContext;
         p = tn;
         var m is MemberContext = null;
+        var m1 is MethodContext = null;
         var v is ClosureVarContext;
         while (p <> null) {
             var j = (p as ContextTreenode).context;
@@ -590,10 +618,14 @@ public class ContextTreemodel is Treemodel {
             if (v == null) {
                 v = if (j is ClosureVarContext) then j as ClosureVarContext else null;
             }
+            if (m1 == null) {
+                m1 = if (j is MethodContext) then j as MethodContext else null;
+            }
             p = p.parent;
         }
         selectedVarContext = if m.parent == v then null else v; // ugh: hack
         selectedMemberContext = m;
+        selectedMethodContext = m1;
         println("selected context => {selectedContext}");
         p = tn;
         var o is ResourceObjectContext;
@@ -614,6 +646,7 @@ public class ContextTreemodel is Treemodel {
     public var selectedGroupContext is GroupContext;
     public var selectedMember is Member = bind selectedMemberContext.member;
     public var selectedMemberContext is MemberContext;
+    public var selectedMethodContext is MethodContext;
     public readonly var selectedVarContext is ClosureVarContext;
     override var root = bind createRoot(rootContext);
     function createRoot from (rootContext is Context) to ContextTreenode {
