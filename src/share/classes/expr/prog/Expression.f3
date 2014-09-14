@@ -257,6 +257,14 @@ public const FORK is Member = Member {
     override var members = [];
 }
 
+public const JOIN is Member = Member {
+    override function equals from (obj is Object) to Boolean {
+        return isSameObject(this, obj);
+    }
+    override var name = "Join";
+    override var members = [];
+}
+
 public const BRANCH is Member = Member {
     override function equals from (obj is Object) to Boolean {
         return isSameObject(this, obj);
@@ -564,7 +572,8 @@ public const OBSVB_MEMBERS = {
     };
 }
 
-public const UNIT_MEMBER = FunctionMember {
+public const UNIT_MEMBER = 
+FunctionMember {
     m: Reflect.getFunction("f3.lang.Builtins", "nothing", []);
 }
 
@@ -1333,7 +1342,13 @@ class TypeExpression is Expression {
 public class VarContextExpression is ObjectExpression {
     public var varContext is Context.ClosureVarContext;
     override bound function getName to String { varContext.variableName }
-    override function toSource from (context is IContext) to String { "(getVar(\"{varContext.variableName}\") as f3.lang.Ref of {getType().getName()})" }
+    override function toSource from (context is IContext) to String { 
+        if (varContext.isShortcut) {
+            "<<{varContext.variableName}>>";
+        } else {
+            "(getVar(\"{varContext.variableName}\") as f3.lang.Ref of {getType().getName()})" ;
+        }
+    }
     override function toEnglish to String { formatEnglishName(varContext.variableName, id, true) }
     override function getType to F3Type {
         varContext.varType.t;
@@ -1572,6 +1587,12 @@ public class IPath {
 
     function getEnglishAccess to String 
     {
+        const result = getEnglishAccess0();
+        println("get english access {observer} => {result}");
+        return result;
+    }
+    function getEnglishAccess0 to String 
+    {
         var observer is ObserverExpression = this.observer;
         if (parents.size() == 0) {
             println("PARENTS SIZE is ZERO {observer.getClass()} {observer}, observable={observer.observable.getClass()} {observer.observable}");
@@ -1649,6 +1670,7 @@ public class IPath {
                     var sep = "";
                     var lowered = -1;
                     var prefix = "";
+                    var j0 = if func.inputs[0].observable == null  then "" else "{parents[0].getEnglishAccess()}; ";
                     for (p in parents[1..]) {
                         var j = p.getEnglishAccess();
                         if (p.needsMappableLower()) {
@@ -1666,7 +1688,7 @@ public class IPath {
                     if (lowered >= 0) {
                         return "For each<sub>{lowered}</sub> in {"{prefix}".trim()}, {formatEnglishName(sourceFunName(fun), func.id, html)} {args}";
                     }
-                    return "{formatEnglishName(sourceFunName(fun), func.id, html)} {args}";
+                    return "{j0}{formatEnglishName(sourceFunName(fun), func.id, html)} {args}";
                 } else {
                     var args = "";
                     var sep = "";
@@ -1718,11 +1740,14 @@ public class IPath {
                 return "{parms} \u2192 {parents[0].getEnglishAccess()}";
             }
             if (i is StaticInputMemberExpression) {
+                if (i.observable <> null) {
+                    return "{parents[0].getEnglishAccess()}; {i.target.toEnglish()}";
+                }
                 return i.target.toEnglish();
             }
             println("INPUT MEMBER EXP member={i.member.getClass()} --> {i.member}");
             if (i.member.m is F3VarMember and i.member.isObserver) {
-                return "Assign {parents[0].getEnglishAccess()} to the {formatEnglishName(i.member.name)} of {i.target.toEnglish()}"
+                return "Assign {parents[0].getEnglishAccess()} to the {formatEnglishName(i.member.name)} of {i.target.toEnglish()}";
             } 
             if (i.member.isObserver and is1ArgFunction(i.member)) {
                 const sep = if (i.member.name.startsWith("set")) then " to " else " " ;
@@ -1733,6 +1758,24 @@ public class IPath {
                 const sep = if (i.member.m is F3VarMember) then " of " else " ";
                 return "{parents[0].getEnglishAccess()}, {formatEnglishName(i.member.name)}{sep}{i.target.toEnglish()}";
             }
+        }
+        if (observer is JoinObserverExpression) {
+            var sep = "";
+            var result = "";
+            for (p in parents) {
+                result = "{result}{sep}{p.getEnglishAccess()}";
+                sep = "; ";
+            }
+            return result;
+        }
+        if (observer is JoinExpression) {
+            var sep = "";
+            var result = "";
+            for (p in parents) {
+                result = "{result}{sep}{p.getEnglishAccess()}";
+                sep = "; ";
+            }
+            return result;
         }
         return "";
     }
@@ -1818,6 +1861,7 @@ public class IPath {
                 var args = "";
                 var sep = "";
                 const start = if (func is FormatTextFunction) then 2 else 1;
+                var j0 = parents[start-1].getWorldAccess();
                 for (p in parents[start..]) {
                     var j = p.getWorldAccess();
                     if (p.needsLift()) {
@@ -1839,7 +1883,11 @@ public class IPath {
                     sep = ", ";
                 }
                 var app is String;
+                if (j0 == "(null as ())") {
+                    j0 = "";
+                }
                 if (func is FormatTextFunction) {
+                    j0 = "";
                     const ftf = func as FormatTextFunction;
                     app = "(function from (";
                     sep = "";
@@ -1857,20 +1905,24 @@ public class IPath {
                     x.getInputType();
                 }
                 if (targs.size() > 0) {
-                    app = "({app} of (";
+                    app = "{app} of (";
                     var sep1 = "";
                     for (x in targs) {
                         app = "{app}{sep1}{x.getName()}";
                         sep1 = ", ";
                     }
-                    app = "{app}))";
+                    app = "{app})";
                 }
+                var result = 
                 if (obDepth >= 0) {
-                    return "{prefix} \}; const obs{obDepth} = foreach (i{getDepth()} in {app}({args})) \{";
+                    "{prefix} \}; {j0}; const obs{obDepth} = foreach (i{getDepth()} in {app}({args})) \{";
                 } else if (lowered >= 0) {
-                    return "foreach (i{lowered} in {prefix}) {app}({args})";
+                     "foreach (i{lowered} in {prefix}) \{ {j0}; {app}({args}) \}";
+                } else "\{ {j0}; {prefix} {app}({args}) \}";
+                if (Reflect.UNIT_TYPE == fun.getType().getReturnType()) {
+                    result = "\{ {result}; () \}";
                 }
-                return "{prefix} {app}({args})";
+                return result;
             } else {
                 var args = "";
                 var sep = "";
@@ -1974,11 +2026,18 @@ public class IPath {
                 return "function from ({parms}) to {resultType.getName()} \{ {parents[0].getLocalAccess()} \}";
             }
             if (i is StaticInputMemberExpression) {
+                if (i.observable <> null) {
+                    return "\{ {parents[0].getWorldAccess()}; {i.target.toSource(null)} \}";
+                }
                 return i.target.toSource(null);
             }
             if (i.member.m is F3VarMember and i.member.isObserver) {
                 return "\{ {i.target.toSource(null)}.{i.member.toApply()} = {parents[0].getWorldAccess()}; \}";
             } else if (i.target is VarContextExpression) {
+                const vexp = i.target as VarContextExpression;
+                if (vexp.varContext.isShortcut) {
+                    return parents[0].getWorldAccess();
+                }
                 if (needsLower()) {
                     return "{i.target.toSource(null)}.set(i{getDepth()-1})";
                 }
@@ -1990,6 +2049,26 @@ public class IPath {
                     return "{parents[0].getWorldAccess()}; {i.target.toSource(null)}.{i.member.toApply()}";
                 }
             }
+        }
+        if (observer is JoinObserverExpression) {
+            var sep = "";
+            var result = "\{ ";
+            for (p in parents) {
+                result = "{result}{sep}{p.getWorldAccess()}";
+                sep = "; "
+            }
+            result = "{result} \}";
+            return result;
+        }
+        if (observer is JoinExpression) {
+            var sep = "";
+            var result = "\{ ";
+            for (p in parents) {
+                result = "{result}{sep}{p.getWorldAccess()}";
+                sep = "; "
+            }
+            result = "{result} \}";
+            return result;
         }
         if (true) throw new java.lang.RuntimeException("unhandled case: {observer}");
         return "";
@@ -2074,15 +2153,28 @@ class IContext {
             for (p in j.source.inputs) {
                 insert getIPath(p) into result.parents;
             }
+        } else if (ob is JoinExpression) {
+            const j = ob as JoinExpression;
+            for (k in j.inputs) {
+                const p = getIPath(k);
+                println("JOIN {indexof k} {k} => {p}");
+                insert p into result.parents;
+            }
         } else if (b is ObserverExpression) {
             const obs = b as ObserverExpression;
             insert getIPath(obs) into result.parents;
+        } else if (b is JoinObservableExpression) {
+            const j = b as JoinObservableExpression;
+            for (k in j.source.inputs) {
+                insert getIPath(k) into result .parents;
+            }
         }
         if (result.parents == []) {
             var id = pathCount++;
             pathCount += result.getContainingObservableDepth();
             result.id = id;
         }
+        println("GET IPATH {ob} => {result.parents.size()}");
         return result;
     }
 }
@@ -2248,6 +2340,11 @@ public class Function is MemberExpression {
     override public function toSource from (context is IContext) to String {
          ""
     }
+
+    override function getTerminals to Expression[] {
+        const terms = output.getTerminals();
+        if (terms == []) then inputs else terms;
+    }
 }
 
 public class Parameter is ObserverExpression {
@@ -2301,7 +2398,7 @@ public class Parameter is ObserverExpression {
         "Parameter {i} {getName()} of {target} with observable: {observable}"
     }
     override function getTerminals to Expression[] {
-        target.output.getTerminals();
+        target.getTerminals()
     }
 }
 
@@ -2659,7 +2756,7 @@ class FormatText extends FunctionView {
                                             foreach (j in idents) Reflect.OBJECT_TYPE], 
                                            Reflect.STRING_TYPE,
                                            yes);
-        (this.fun as FormatTextFunction).body = bodyBuff.toString();
+        (this.fun as FormatTextFunction).body = "\"{bodyBuff.toString()}\"";
         const newArgCount = idents.size() + 1;
         const newInputs is Parameter[] = 
         [
@@ -3264,6 +3361,10 @@ public class OutputMemberExpression is MemberExpression, ObservableExpression {
     override public function toEnglish to String {
 	source.toEnglish();
     }
+    override function getTerminals to Expression[] 
+    {
+        if (observers == []) then [] else foreach (ob in observers) ob.getTerminals();
+    }
 }
 
 class ObjectOutputView is OutputView {
@@ -3609,7 +3710,7 @@ public class GetVarView is OutputView {
 class OutputPort is LinkedOutputView {
     public var width is Number;
     public function getOutputType to F3Type { resultType }
-    public var target is ForkView;
+    public var target is ExpressionView;
     override var transform = bind translate(pos);
     override bound function getLinkPos to Point3 
     { 
@@ -3645,7 +3746,8 @@ class OutputPort is LinkedOutputView {
 }
 
 class SourcePort is LinkedInputView {
-    public var target is ForkView;
+    override var transform = bind translate(pos);
+    public var target is ExpressionView;
     public var width is Number;
     bound var src is LinkedOutputView = links[0].source;
     bound var sourceExpression = src.expression;
@@ -3855,6 +3957,200 @@ public class ForkView is ExpressionView {
         return n;
     } 
 }
+
+// UNIT^n -> UNIT
+class JoinExpression is ObserverExpression {
+    public var inputCount is Integer = 2;
+    public bound var inputs = foreach (i in [0..<inputCount]) JoinObserverExpression { target: this };
+    public const output = JoinObservableExpression { source: this };
+    override function getType { Reflect.UNIT_TYPE }
+    override bound function getName to String { "ignore" }
+    override function getTerminals to Expression[] {
+        const terms = output.getTerminals();
+        if terms == [] then [this] else terms;
+    }
+}
+
+class JoinObserverExpression is ObserverExpression {
+    public var target is JoinExpression;
+    override function getType { Reflect.UNIT_TYPE }
+    override bound function getName to String { "ignore" }
+    override function getTerminals to Expression[] {
+        target.getTerminals();
+    }
+};
+
+class JoinObservableExpression is ObservableExpression {
+    public var source is JoinExpression;
+    override function getType { Reflect.UNIT_TYPE }
+    override bound function getName to String { "ignore" }
+};
+
+public class JoinView is ExpressionView {
+    override var transform = bind translate(pos);
+    const join = this;
+    override var selectable = true;
+    public var sourceCount is Integer = 2;
+    public const joinExp = JoinExpression {inputCount: bind sourceCount}
+    override var expression = bind joinExp;
+    readonly var sourcePorts is SourcePort[] = bind foreach (exp in joinExp.inputs) SourcePort {
+        target: this;
+        width: bind width;
+        canvas: bind canvas;
+        expression: bind exp;
+        override public function assignLinkIds to () {
+            join.assignLinkIds()
+        }
+    };
+
+    public function assignLinkIds to () 
+    {
+        var n = 0;
+        for (i in sourcePorts.reverse()) {
+            for (j in i.links) {
+                j.targetLinkId = n++;
+            }
+        }
+    }
+    override function unlink to ()
+    {
+        for (sourcePort in sourcePorts) sourcePort.unlink();
+        targetPort.unlink();
+    }
+
+    bound var targetPort is LinkedOutputView = OutputPort {
+        override public function assignLinkIds to () {
+            join.assignLinkIds()
+        }
+        expression: bind joinExp.output;
+        target: this;
+        transform: translate(4, 0, 0);
+        canvas: bind canvas;
+        width: bind width
+        override function getInputLinks to LinkView[] 
+        {
+            foreach (j in sourcePorts) j.links;
+        }
+    }
+
+    var width is Number = 3;
+    var h = 0.0;
+    bound var height is Number = h+(sourceCount) * cellHeight;
+    override function update to ()
+   {
+        super.update();
+        var y = height/2 - cellHeight/2;
+        const x = -4;
+        for (j in sourcePorts) {
+            j.pos = new Point3(x, y, 0);
+            y -= cellHeight;
+        }
+    }
+    var isResizing is Boolean;
+    var outputCount = 0;
+    function startResize from (e is MouseEvent) to ()
+    {
+        isResizing = true;
+    }
+    function resize from (e is MouseEvent) to ()
+    {
+        const d = (e.picked.dragPoint1-e.picked.dragPoint0);
+        h -= e.drag.y*2;
+    }
+    function finishResize from (e is MouseEvent) to ()
+    {
+        isResizing = false;
+        sourceCount = Math.max(Math.max(Math.round(height / cellHeight) as Integer, outputCount), 2);
+        h = 0;
+        canvas.saveCode();
+    }
+    function resizer to Node {
+        Rectangle {
+            fillPaint: ColorPaint(Color.color(.9, .9, .9, 1));
+            height: 2;
+            width: bind width+2;
+            cursor: Cursor.SouthResize;
+            onMouseDown: startResize;
+            onMouseDrag: resize;
+            onMouseUp: finishResize;
+        }
+    }
+    override var internalContent = Group {
+        content:
+        [Rectangle 
+        {
+            width: bind width*2;
+            height: bind height;
+            fillPaint: ColorPaint(Color.color(.2, .2, .2));
+            var dragging = false;
+            override function onMouseMove from (e is MouseEvent) to ()
+            {
+            }
+            override function onMouseDown from (e is MouseEvent) to ()
+            {
+                if (e.shiftKey) {
+                    join.selected = true;
+                } else if (e.ctrlKey) {
+                    join.selected = not join.selected;
+                } else {
+                    canvas.setSelection([join]);
+                }
+                //println("targetPorts={targetPorts}");
+                dragging = true;//e.location.y >= height/2-2;
+            }
+            override function onMouseDrag from (e is MouseEvent) to ()
+            {
+                if (dragging) {
+                    pos += (canvas.toLocal * e.picked.dragPoint1 - canvas.toLocal * e.picked.dragPoint0);
+                }
+            }
+        },
+        Group { content: bind sourcePorts },
+        Group {
+            content: bind targetPort;
+        }
+        Group {
+            content: Rectangle 
+           {
+               visible: bind join.selected
+               pickable: false;
+               width: bind width*2;
+               height: bind height;
+               stroke: bind Stroke {
+                   scale: 1.0 / canvas.zoomx;
+                   width: 2;
+               }
+               strokePaint: SelectionPaint;
+           }
+        }/*,
+        TransformNode {
+           ty: bind -height/2;
+           content: bind resizer();
+        }*/]
+    };
+
+
+    override function serialize to JoinNode {
+        const n = JoinNode {
+            id: "{id}";
+            x: pos.x;
+            y: pos.y;
+        }
+        canvas.serializationMap.put(this, n);
+        n.inputs = foreach (sourcePort in sourcePorts) TargetNode {
+            targetId: "{id}", links: foreach (link in sourcePort.links) "{link.id}";
+        };
+        if (targetPort.links.size() > 0) {
+            const link = targetPort.links[0];
+            n.output = SourceNode {
+                sourceId: "{id}"
+                links: ["{link.id}"];
+            }
+        }
+        return n;
+    } 
+}
+
 
 public class BranchView is ExpressionView {
     override var transform = bind translate(pos);
@@ -4893,14 +5189,13 @@ public class MemberTreecell is Treeview.Treecell
     public var canvas is Canvas;
     const self = this;
     public var active is Boolean;
-
+    
     public var parentCell is MemberTreecell;
 
     override function toString to String
     {
         "MemberTreecell {bounds} canvas={canvas}, tv={tv} fg={fg} bg={bg} visible={visible}";
     }
-
     var parentLink is LinkView;
 
     function link from () to ()
@@ -4933,12 +5228,31 @@ public class MemberTreecell is Treeview.Treecell
         }
         p.unlink();
     }
+    var linkBounds is Bounds;
+    override function update to () {
+        super.update();
+        linkBounds = getLinkBoundsImpl(active, canvas.toLocal, boundsInScene);
+    }
+
+    function getLinkBoundsImpl from (active is Boolean,
+                                     toLocal is Mat4,
+                                     boundsInScene is Bounds) to Bounds
+    {
+        //println("getLinkBounds {tn.label}, active={active}, boundsInScene={boundsInScene}, parent={parentCell}");
+        if (not active) then parentCell.getLinkBounds() else {
+                toLocal * boundsInScene;
+            }
+    }
 
     bound function getLinkBounds to Bounds 
     {
+        linkBounds;
+        //getLinkBoundsImpl(active, canvas.toLocal, boundsInScene);
+        /*
         if (not active) then parentCell.getLinkBounds() else {
-                self.canvas.toLocal * self.boundsInScene;
+                canvas.toLocal * boundsInScene;
             }
+        */
     }
 
     public var showSelection is Boolean;
@@ -5128,8 +5442,7 @@ class GetTreeview is AbstractNode {
     public bound function getTreeHeight to Number { treeHeight }
     const self = this;
     const cellMap is java.util.Map of (MemberTreenode, MemberTreecell) =        
-	new LRUMap of (MemberTreenode, MemberTreecell)(128);
-
+	new java.util.HashMap of (MemberTreenode, MemberTreecell);
     public function getCell from (tn is MemberTreenode) to MemberTreecell {
         if (tn == null) return null;
 	var r = cellMap.get(tn);
@@ -5174,26 +5487,17 @@ class GetTreeview is AbstractNode {
 
         override function update to ()
         {
+            super.update();
             var cells is java.util.List of MemberTreecell = cellsArray;
             var linkCount = 0;
             cells.clear();
-            /*
-            const rootCell = getCell(treeModel.root as MemberTreenode);
-            if (linkToContainer == null and exprView <> null and rootCell <> null) {
-                linkToContainer = LinkView {}
-                linkToContainer.source = exprView;
-                linkToContainer.target = rootCell.linkedView;
-                linkToContainer.link();
-            }
-            */
-            for (cell in cellMap.values()) {
-                if (cell.parentCell == null) {
-                    cell.active = true;
-                } else {
-                    cell.active = false;
-                }
-                cells.add(cell);
-            }
+            treeModel.root.foldLeft((), 
+                                    function from (_ is (), n is Treenode) to () 
+                                    {
+                                        const cell = getCell(n as MemberTreenode);
+                                        cell.active = false;
+                                        cells.add(cell);
+                                    });
             java.util.Collections.sort(cells, java.util.Comparator of MemberTreecell {
                     override function compare from (x is MemberTreecell, y is MemberTreecell) to Integer 
                     {
@@ -5206,7 +5510,7 @@ class GetTreeview is AbstractNode {
                 }
             }
             cells.clear();
-            for (row in rows) {
+            for (row in tv.rows) {
                 const cell = cellMap.get(row);
                 cell.active = true;
             }
@@ -5526,6 +5830,9 @@ class MemberListview is Listview of Member {
             } else if (m == FORK) {
                 const fork = canvas.createFork(targetPosition);
                 k(fork.sourcePort);
+            } else if (m == JOIN) {
+                const join = canvas.createJoin(targetPosition);
+                k(join.sourcePorts[0]);
             } else if (m == BRANCH) {
                 const fork = canvas.createBranch(targetPosition);
                 k(fork.sourcePort);
@@ -5723,6 +6030,9 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
             } else if (m == FORK) {
                 const fork = canvas.createFork(targetPosition);
                 k(fork.sourcePort);
+            } else if (m == JOIN) {
+                const join = canvas.createJoin(targetPosition);
+                k(join.sourcePorts[0]);
             } else if (m == BRANCH) {
                 const fork = canvas.createBranch(targetPosition);
                 k(fork.sourcePort);
@@ -5947,6 +6257,8 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         var r is ExpressionView;
         if (m == FORK) {
             r = createFork(toLocal * where.scenePoint);
+        } else if (m == JOIN) {
+            r = createJoin(toLocal * where.scenePoint);
         } else {
             r = createMemberView(toLocal * where.scenePoint, m, 0, true);
         }
@@ -5969,6 +6281,15 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
 
     function createFork from (pt is Point3) to ForkView {
         const r = ForkView {
+            canvas: this;
+        }
+        insert r into views;
+        r.pos = new Point3(pt.x, pt.y, pt.z);
+        return r;
+    }
+
+    function createJoin from (pt is Point3) to JoinView {
+        const r = JoinView {
             canvas: this;
         }
         insert r into views;
@@ -6439,13 +6760,33 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
     const targetArrow is TransformNode = TransformNode {
 	px: 3.5
 	content: bind makeArrow(ARROW_COLOR);
+    };
+    /*
+    function implementAbstractClass from (c is F3ClassType) to ()
+    {
+        var members = introspect(c);
+        members = 
+            foreach (m in members) {
+            if (m is FunctionMember) {
+                var funMember = m as FunctionMember;
+                [if (funMember.isStatic()) 
+                        then null else 
+                            typeToMember(funMember.getDeclaringClass(), "this"),
+                                foreach (i in [0..<funMember.getType().minArgs()]) typeToMember(funMember.getType().getArgumentType(i), funMember.argName(i))];
+            } else [m];
+        }
+        bound var classFun = ObjectExpression {
+            hasStaticAccess: no;
+            inputMembers: members
+            outputMembers: 
+            [
+            
+        };
+        
     }
-
-    public var inputs is Context.ClosureVarContext[];
-    public var outputs is Context.ClosureVarContext[];
+    */
 
     public var event is Member;
-
     public var subject is Context.ClosureVarContext;
     public var eventContext is Context.MemberContext;
     public var varContext is Context.ClosureVarContext;
@@ -6500,6 +6841,30 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         //ty: bind (height / 2 - cy) - 20;
         content: bind initialExprView;  
     };
+
+    public var methodTarget is Context.MethodContext;
+
+    function buildMethodExp from (method is Context.MethodContext) to ObjectExpression 
+    {
+        ObjectExpression {
+            hasStaticAccess: no;
+            outputMembers: bind foreach (v in method.inputs) typeToMember(v.varType.t, v.variableName);
+            inputMembers: bind typeToMember(method.returnType.t, "result");
+            override function getType to F3Type {
+                method.methodType;
+            }
+            override bound function getName to String {
+                method.methodName;
+            }
+        }
+    }
+
+    bound var methodView is ObjectView = if (methodTarget == null) then null else ObjectView {
+            canvas: this;
+            override bound function getLabel to String { methodTarget.methodName }
+            objectExpr: bind buildMethodExp(methodTarget);
+        }
+
 
     public readonly var initialExprView is GetVarView = bind makeGetter(event);
     public readonly var terminalExprView is SetterView = bind makeSetter(subject);
@@ -7106,7 +7471,8 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
                content: localSpace = Group {
                    transform: bind selectionTransform;
 	           content: 
-                   [Group { content: bind initialView }, Group {content: bind terminalView}, Group { content: bind views },
+                   [Group { content: bind initialView }, Group {content: bind terminalView}, 
+                    Group { content: bind methodView}, Group { content: bind views },
                    MeshNode {
                        id: "lines"
                        pickable: false;
@@ -7685,6 +8051,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         var ret = " \} return obsvbs$;";
         var sep = "";
         for (term in terms) {
+            println("considering term: {term.getClass()}: {term}");
             var t = term;
             if (t is Result) {
                 t = (t as Result).observers[0];
@@ -7906,6 +8273,44 @@ public class ForkNode is ExprNode {
         return v;
     }
 }
+
+public class JoinNode is ExprNode {
+    public var inputs is TargetNode[];
+    public var output is SourceNode;
+    public override function createView from (canvas is Canvas) to JoinView {
+        const v = JoinView {
+            canvas: canvas;
+            pathFactory: canvas.pathFactory;
+            layoutEngine: canvas.layoutEngine;
+            imageLoader: canvas.imageLoader;
+            effectLoader: canvas.effectLoader;
+        }
+        v.sourceCount = inputs.size();
+        {
+            for (input in inputs) {
+                var n = input;
+                const p1 = v.sourcePorts[indexof input];
+                if (n.links.size() > 0) {
+                    for (link in n.links) {
+                        const lnk = canvas.getLink(link);
+                        lnk.target = p1;
+                    }
+                } 
+            }
+        }
+        var p = output;
+        if (p.links.size() > 0) {
+            for (link in p.links) {
+                const lnk = canvas.getLink(link);
+                lnk.source = v.targetPort;
+            }
+        }
+        v.pos = new Point3(x, y, 0);
+        insert v into canvas.views;
+        return v;
+    }
+}
+
 
 public class BranchNode is ExprNode {
     public var input is TargetNode;
@@ -8292,6 +8697,7 @@ public class Editor is ResizableNode, Focuser {
     public var targetTimeNode is ResourceTimeNode = bind getAsTimeNode(targetObject);
     function getAsNode from (obj is Object) to ResourceNode { if (obj is ResourceNode) then obj as ResourceNode else null }
     function getAsTimeNode from (obj is Object) to ResourceTimeNode { if (obj is ResourceTimeNode) then obj as ResourceTimeNode else null }
+    public var methodTarget is Context.MethodContext;
     public var eventContext is Context.MemberContext;
     public var varContext is Context.ClosureVarContext;
     public var event is Member = bind eventContext.member;
@@ -8321,7 +8727,9 @@ public class Editor is ResizableNode, Focuser {
         return result;
     }
 
-    var canvas is Canvas = bind getCanvas(targetObject, getTargetPath(eventContext), targetObject.programs, eventContext, varContext);
+    var canvas is Canvas = bind getCanvas(targetObject, getTargetPath(eventContext), 
+                                          targetObject.programs, 
+                                          methodTarget, eventContext, varContext);
 
     override var internalContent = bind sp;
 
@@ -8340,6 +8748,7 @@ public class Editor is ResizableNode, Focuser {
         from (target is ResourceTarget, 
               targetPath is String,
               programs is Program[],
+              methodTarget is Context.MethodContext,
               eventContext0 is Context.MemberContext, 
               varContext is Context.ClosureVarContext) 
         to Canvas
@@ -8347,29 +8756,13 @@ public class Editor is ResizableNode, Focuser {
         if (target == null) return null;
 	var prog is Program;
         println("TARGET: {target}, programs={target.programs.size()}, targetPath={targetPath}");
-        /*
-	for (x in programs) {
-            println("PROGRAM {x.event.m}, event={eventContext.member.m}, targetPath={x.targetPath}");
-            println("PROGRAM {java.lang.System.identityHashCode(x.event.m)}, event={java.lang.System.identityHashCode(eventContext.member.m)}");
-	    if (x.event == eventContext.member and x.evalContext.varContext == varContext and x.targetPath == targetPath) { // hack
-                println("FOUND IT");
-		prog = x;
-                break;
-	    } else {
-                if (x.targetPath == targetPath and x.event == eventContext.member and varContext <> null and x.evalContext.varContext == null) {
-                    parentProg = x;
-                }
-                println("NO MATCH");
-            }
-	}
-        */
-        prog = if (varContext <> null) then varContext.program else eventContext0.program;
+        prog = if (methodTarget <> null) then methodTarget.program else if (varContext <> null) then varContext.program else eventContext0.program;
         var eventContext = if (prog == null) then eventContext0 else prog.evalContext.eventContext;
         var parentProg = if (varContext <> null) then eventContext.program else null;
         const event = eventContext.event.member;
         const found = prog == null;
 	if (prog == null) {
-            println("CREATING PROGRAM IN CANVAS: {event}");
+            println("CREATING PROGRAM IN CANVAS: {event}, {methodTarget}, {varContext}");
             if (parentProg == null and varContext <> null) {
                 parentProg = Program { 
                     parent: parentProg;
@@ -8405,7 +8798,9 @@ public class Editor is ResizableNode, Focuser {
                 }
             };
 	    insert prog into target.programs;
-            if (varContext <> null) {
+            if (methodTarget <> null) {
+                methodTarget.program = prog;
+            } else if (varContext <> null) {
                 varContext.program = prog;
             } else {
                 eventContext.program = prog;
@@ -8427,6 +8822,7 @@ public class Editor is ResizableNode, Focuser {
                 width: width;
                 height: height;
 		targetNode: target,
+                methodTarget: methodTarget;
 		event: event;
                 subject: varContext;
                 eventContext: eventContext;

@@ -16,7 +16,7 @@ public class CreateVar is ResizableNode, Focuser {
     public var isShortcut is Boolean;
     public var assetModel is AssetTree.AssetModel;
     bound var font is Font = layoutEngine.createFont(Names.DEFAULT_FONT);
-    bound var cellHeight = font.height();
+    public readonly var cellHeight = bind font.height();
     bound var labelWidth is Number = Math.max(font.width("Name:"), font.width("Type:"))+2;
     bound var fieldOffset is Number = labelWidth + 1;
     bound var fieldWidth is Number = width - 40 - labelWidth;
@@ -137,6 +137,7 @@ public class CreateVar is ResizableNode, Focuser {
     public function selectType from (t is AssetTree.TypeAsset) to ()
     {
         selectedType = t;
+        typeArgs = if (t.t is F3ClassType) then (t.t as F3ClassType).getTypeParameters() else null;
         hideChooser();
         chooseType.searchField.setText(t.name);
         checkButtons();
@@ -201,8 +202,10 @@ public class CreateVar is ResizableNode, Focuser {
         chooseType.resize(fieldWidth, 200);
     }
 
+    public readonly var typeArgs is F3Type[];
+
     override var internalContent = Group {
-        content:
+        content: bind
         [Rectangle {
             height: bind height;
             width: bind width;
@@ -218,7 +221,7 @@ public class CreateVar is ResizableNode, Focuser {
             content:             
             bind [typeLabel, 
                  TransformNode {
-                    tx: bind fieldOffset/2-1;
+                    tx: bind fieldOffset/2-2;
                     content: bind chooseType.searchField;
                  }, 
                  TransformNode {
@@ -227,8 +230,55 @@ public class CreateVar is ResizableNode, Focuser {
                      content: arrow;
                  }]
         },
+        foreach (i in [0..<typeArgs.size()]) {
+            TransformNode {
+                var chooseTypeTransform1 is Mat4 = Mat4.<<1>>;
+                var chooseType1 = ChooseType {
+                    width: bind fieldWidth-16;
+                    height: 200;
+                    //onLoseFocus: hideChooser;
+                    transform: bind chooseTypeTransform1;
+                    treeModel: bind assetModel;
+                    visible: false;
+                    chooseMembers: false;
+                    //onSelectType: bind selectType;
+                    //onEscape: hideChooser;
+                };
+                var tv = bind typeArgs[i];
+                var typeLabel1 is Text.Label = Text.Label {
+                    text: bind tv.getTypeVariable();
+                    font: bind font;
+                    height: bind cellHeight;
+                    width: bind labelWidth;
+                    foreground: bind labelFg;
+                    background: null;
+                    transform: bind translate(-width/2+labelWidth-2, 0);
+                    rightJustified: true;
+                }
+                var arrow1 is Polygon = Polygon {
+                    transform: rotate(-90, Vec3.Z_AXIS);
+                    points: [-3.5, -4.5, -3.5, 4.5, 3.5, 0];
+                    fillPaint: textFg;
+                    override function onMouseDown from (e is MouseEvent) to ()
+                    {
+                    }
+                }
+                ty: bind -(i+1)*cellHeight+cellHeight/2 - 1;
+                content:             
+                bind [typeLabel1, 
+                      TransformNode {
+                        tx: bind fieldOffset/2-2+8;
+                        content: bind chooseType1.searchField;
+                    }, 
+                    TransformNode {
+                        tx: bind (fieldWidth + fieldOffset)/2  - 7;
+                        ty: -3.5;
+                        content: arrow1;
+                    }]
+            }
+        },
         TransformNode {
-            ty: bind -1.5*cellHeight -9 - 1;
+            ty: bind typeArgs.size() * -cellHeight -1.5*cellHeight -9 - 1;
             content:
             bind [cancelButton, applyButton]
         }]

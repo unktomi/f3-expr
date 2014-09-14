@@ -1,12 +1,26 @@
 package expr;
 import f3.reflect.*;
 import com.google.common.reflect.TypeToken;
-public const jdk_paranamer = 
-    new com.thoughtworks.paranamer.JavadocParanamer(new java.net.URL("http://docs.oracle.com/javase/6/docs/api/"));
 
-public const paranamer = 
-       new com.thoughtworks.paranamer.CachingParanamer(
-       new com.thoughtworks.paranamer.AdaptiveParanamer(jdk_paranamer, new com.thoughtworks.paranamer.BytecodeReadingParanamer()));
+var jdk_paranamer is com.thoughtworks.paranamer.JavadocParanamer;
+var paranamer is com.thoughtworks.paranamer.CachingParanamer;
+
+function getParanamer to com.thoughtworks.paranamer.Paranamer {
+    if (paranamer == null) {
+        try {
+            if (jdk_paranamer == null) {
+                jdk_paranamer = 
+                    new com.thoughtworks.paranamer.JavadocParanamer(new java.net.URL("http://docs.oracle.com/javase/6/docs/api/"));
+            }
+            paranamer = 
+                new com.thoughtworks.paranamer.CachingParanamer(
+                                                                new com.thoughtworks.paranamer.AdaptiveParanamer(jdk_paranamer, new com.thoughtworks.paranamer.BytecodeReadingParanamer()));
+        } catch (e is java.lang.Exception) {
+            e.printStackTrace();
+        }
+    }
+    return paranamer;
+}
 
 public const ctx = F3Local.getContext();
 
@@ -48,7 +62,7 @@ public function getParameterNames from (fun is F3FunctionMember) to String[]
     if (fun is F3Local.MethodFunctionMember) {
         const j = fun as F3Local.MethodFunctionMember;
         try {
-            return paranamer.lookupParameterNames(j.getUnderlying());
+            return getParanamer().lookupParameterNames(j.getUnderlying());
         } catch (e is java.lang.Exception) {
             e.printStackTrace();
         }
