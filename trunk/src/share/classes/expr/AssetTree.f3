@@ -30,6 +30,16 @@ public class GroupAsset is SpatialAsset {
     }
 }
 
+public class ListviewAsset is SpatialAsset {
+    protected var count = 1;
+    override var name is String = "List";
+    public function getListview to ResourceListview of ? {
+        ResourceListview of Object {
+            url: "node://List {count++}";
+        }
+    }
+}
+
 public class MaAsset is Asset {
     public const model is Ma.Model;
     override var url = bind model.url;
@@ -665,6 +675,15 @@ public class AssetModel is Treemodel {
         movieLoader: bind movieLoader;
     };
     
+    const listviewAsset = ListviewAsset {
+        pathFactory: bind pathFactory;
+        layoutEngine: bind layoutEngine;
+        imageLoader: bind imageLoader;
+        effectLoader: bind effectLoader;
+        soundLoader: bind soundLoader; 
+        movieLoader: bind movieLoader;
+    };
+    
     public const blendLayerAsset = BlendLayerAsset {};
     public const transitionLayerAsset = TransitionLayerAsset{};
     public const timeLayerAsset = TimeLayerAsset {};
@@ -676,7 +695,7 @@ public class AssetModel is Treemodel {
 
     const spatial = AssetGroup { 
         name: "Spatial", 
-        content: [groupAsset, Scene2DAsset {}, textFieldAsset, textOutputAsset];
+        content: [groupAsset, listviewAsset, Scene2DAsset {}, textFieldAsset, textOutputAsset];
     } 
 
     override var root = AssetTreenode {

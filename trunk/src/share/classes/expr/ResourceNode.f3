@@ -62,6 +62,7 @@ class Input {
 }
 
 public class ResourceNode is TransformNode, ResourceTarget, NodeAPI, Inspectable {
+    public bound function instance to ResourceNode { null }
     public const webBrowserFactory is AbstractWebBrowserFactory = the AbstractWebBrowserFactory;
     public const pathFactory is Shape2D.Path2DFactory = the Shape2D.Path2DFactory;
     public const layoutEngine is Text.LayoutEngine = the Text.LayoutEngine;
@@ -429,6 +430,7 @@ public class SoundResourceNode is ResourceNode {
     override function createChannels from (parent is ChannelBoxGroup) to (Channel of Number)[] { 
         [createSoundChannels(parent), super.createChannels(parent)];
     }
+
 
 }
 

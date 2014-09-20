@@ -3,6 +3,39 @@ import java.lang.Math;
 import f3.util.*;
 import f3.media.scene.*;
 import f3.media.scene.Shape2D.*;
+import Resources.*;
+
+class Instance {
+    public var src is ResourceLabel;
+    public var target is ResourceLabel = bind ResourceLabel {
+        webBrowserFactory: bind src.webBrowserFactory;
+        pathFactory: bind src.pathFactory;
+        layoutEngine: bind src.layoutEngine;
+        effectLoader: bind src.effectLoader;
+        soundLoader: bind src.soundLoader;
+        movieLoader: bind src.movieLoader;
+        imageLoader: bind src.imageLoader;
+        tx: bind src.tx;
+        ty: bind src.ty;
+        id: bind src.id;
+        url: bind src.url;
+        fontSize: bind src.fontSize;
+        fontFamily: bind src.fontFamily;
+        fontStyle: bind src.fontStyle;
+        fontWeight: bind src.fontWeight;
+        foreground: bind src.foreground;
+        background: bind src.background;
+        width: bind src.width;
+        text: bind src.text;
+    };
+}
+
+function createInstance from (src is ResourceLabel) to Instance {
+    Instance {
+        src: src;
+    }
+}
+
 
 public class ResourceLabel is AbstractResourceText {
 
@@ -15,6 +48,7 @@ public class ResourceLabel is AbstractResourceText {
     }
 
     const impl is Text.Label = Text.Label {
+        layoutEngine: bind layoutEngine;
         foreground: bind ColorPaint(foreground);
         background: bind ColorPaint(background);
         text: bind text;
@@ -22,6 +56,66 @@ public class ResourceLabel is AbstractResourceText {
         width: bind if width < 0 then Math.max(minimumWidth, font.width(text)) else width;
     };
     override var content = bind [impl];
+
+
+    public override bound function instance to ResourceNode {
+        createInstance(this).target;
+    }
+
+
+    public override function instance from (id is String,
+                                            lookupVar is function from String to Object,
+                                            lookupSpatial is function from String to Node,
+                                            lookupTemporal is function from String to TimeNode) to Node 
+    {
+        const n = this;
+        const f = this;
+        const i = TextOutputResource {
+                url: f.url;
+                id: f.id;
+                displayName: f.displayName;
+                fontFamily: f.fontFamily.selection;
+                fontWeight: f.fontWeight.selection;
+                fontStyle: f.fontStyle.selection;
+                fontSize: f.fontSize.selection;
+                foreground: formatColor(f.foreground);
+                background: formatColor(f.background);
+                width: f.width;
+                text: f.text;
+                tx: n.tx;
+                ty: n.ty;
+                tz: n.tz;
+                sx: n.sx;
+                sy: n.sy;
+                sz: n.sz;
+                rx: n.rx;
+                ry: n.ry;
+                rz: n.rz;
+                px: n.px;
+                py: n.py;
+                pz: n.pz;
+                //    programs: progs;
+                //                animation: anims;
+                //            colliderResource: colliderResource;
+        };
+        const r = i as TextOutputResource;
+        const tf = ResourceLabel {
+            layoutEngine: bind layoutEngine;
+            id: r.id;
+            url: r.url;
+            displayName: i.displayName;
+            fontSize: new FontSizeSelection(r.fontSize);
+            fontFamily: new FontFamilySelection(r.fontFamily);
+            fontStyle: new FontStyleSelection(r.fontStyle);
+            fontWeight: new FontWeightSelection(r.fontWeight);
+            foreground: parseColor(r.foreground);
+            background: parseColor(r.background);
+            width: r.width;
+        };
+        tf.setText(r.text);
+        println("instanced: {tf}");
+        return tf;
+    }
 
 }
 

@@ -99,7 +99,7 @@ public class SpriteResource is SpatialResource {
     public var duration is Duration;
 }
 
-function formatColor from (c is Color) to Integer
+public function formatColor from (c is Color) to Integer
 {
     const r = (c.red * 255 + 0.5) as Integer;
     const g = (c.green * 255 + 0.5) as Integer;
@@ -112,7 +112,7 @@ function formatColor from (c is Color) to Integer
     return value;
 }
 
-function parseColor from (argb is Integer) to Color
+public function parseColor from (argb is Integer) to Color
 {
     const a = Bits.bitAnd(Bits.shiftRight(argb, 24), 0xff);
     const r = Bits.bitAnd(Bits.shiftRight(argb, 16), 0xff);
