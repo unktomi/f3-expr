@@ -1,0 +1,79 @@
+package expr;
+import f3.media.scene.*;
+import f3.media.input.*;
+import f3.util.Observer.*;
+import f3.util.Observable.*;
+import f3.util.*;
+import f3.math.*;
+import expr.undo.*;
+import expr.prog.Program;
+import expr.InspectedElement.*;
+import f3.lang.*;
+import Listview.Listmodel;
+
+class Value of a {
+    public var value is a;
+}
+
+public class ListCell of a {
+    public const index is Integer;
+    public const value is a;
+}
+
+public class ResourceListview of a is ResourceNode {
+
+    public readonly var cellContent is ResourceNode[];
+
+    public function addContent from (rn is ResourceNode) to ()
+    {
+        insert rn into cellContent;
+    }
+
+    public function deleteContent from (rn is ResourceNode) to ()
+    {
+        delete rn from cellContent;
+    }
+
+    public function observeCell to Observable of ListCell
+    {
+        cellSubject;
+    }
+
+    public var width is Number = 200;
+    public var height is Number = 100;
+    public var cellHeight is Number = 16;
+
+    const cellSubject = Subject of ListCell {};
+
+    public var getSize is function from () to Integer;
+    public var getValue is function from Integer to a;
+
+    const self = this;
+
+    const listModel is Listmodel of Value of a = Listmodel of Value of a {
+        var values = [Value of a {}, Value of a {}];
+        override var size is Integer = bind values.size();
+        override function getValue from (i is Integer) to Value of a { values[i] }
+    }
+
+    const visual is Listview of Value of a = Listview of Value of a {
+        width: bind width;
+        height: bind height;
+        cellHeight: bind cellHeight;
+        model: bind listModel;
+        override function render from (i is Integer, value is Value of a) to Node
+        {
+            if (i == 0) {
+                Group {
+                    content: bind cellContent;
+                }
+            } else {
+                Group {
+                    content: bind foreach (x in cellContent) x.instance();
+                }
+            }
+        }
+    };
+
+    override var content = bind visual;
+}

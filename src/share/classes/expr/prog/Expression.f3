@@ -84,7 +84,46 @@ function serializeType from (t is F3Type) to String
     }
     return t.getName();
 }
+/*
+// converts t to legal java class argument or return type
+public function serializePType from (t is F3Type) to String
+{
+    if (t is F3FunctionType) {
+        const ft = t as F3FunctionType;
+        const n = ft.minArgs();
+        const retType = serializePType(ft.getReturnType());
+        const targs = "of ({retType}";
+        for (i in [0..<n]) {
+            targs = ",{serializePType(ft.getArgumentType(i))}";
+        }
+        targs = "{targs})";
+        return "org.f3.functions.Function{n} {targs}";
+    }
+    if (t is F3ClassType) {
+        const ct = (t as F3ClassType);
+        const parms = ct.getTypeParameters();
+        if (parms.size() > 0) {
+            const targs = "of (";
+            for (p in parms) {
+                targs = ",{serializePType(p)}";
+            }
+            targs = "{targs})";
+            return "{t.getName()} {targs}";
+        }
+    }
+    return t.getName();
+}
 
+// converts t to legal java class argument or return type
+public function parseSignature from (t is String) to F3Type
+{
+    const j = t.indexOf(" of (");
+    const base = if (j > 0) then t.substring(0, j) else t;
+    const baseType = Reflect.getType(base);
+    if (j > 0) {
+    }
+}
+*/
 class Seq of a {
     var content is (..a)[];
     bound function concat from (x is Seq of a) to Seq of a {

@@ -475,13 +475,20 @@ public function run from (args is String[]) to ()
 
     const browser = if TheWebBrowserFactory == null then null else WebBrowser {}
     
-    function addResource from (rn is ResourceNode, pt is Point3) to ()
+    function addResource from (rn is ResourceNode, pt0 is Point3) to ()
     {
+        var pt = pt0;
         println("ADDING {rn} to {currentResource} th.scenes={transformHierarchy.scenes}, th.selectedScene={transformHierarchy.selectedScene}");
         var groupContext is Context.GroupContext = contextModel.selectedMemberContext;
+        var target = transformHierarchy.selectedNode;
+        var isRelative = false;
         if (transformHierarchy.selectedNode is GroupResourceNode) {
             (transformHierarchy.selectedNode as GroupResourceNode).addContent(rn);
             groupContext = mainContext.resolveNodeContext(transformHierarchy.selectedNode as ResourceNode);
+        } else if (transformHierarchy.selectedNode is ResourceListview of ?) {
+            (transformHierarchy.selectedNode as ResourceListview of ?).addContent(rn);
+            groupContext = mainContext.resolveNodeContext(transformHierarchy.selectedNode as ResourceNode);
+            isRelative = true;
         } else {
             insert rn into currentResource.resources;
         } 
@@ -515,6 +522,9 @@ public function run from (args is String[]) to ()
         transformHierarchy.selectNode(rn);
         println("added asset to context { contextModel.selectedGroupContext } => {contextModel.selectedGroupContext.content}");
         if (currentScene.camera is Camera2D) {
+            if (isRelative) {
+                pt = target.toSceneTransform.inverse() * pt;
+            }
             rn.tx = pt.x;
             rn.ty = pt.y;
         }
@@ -2220,6 +2230,14 @@ public function run from (args is String[]) to ()
                                                      MasterUndoable.commit();
                                                  }
                                              }
+                                             if (asset is AssetTree.ListviewAsset) {
+                                                 const picked = getUnderMouseInEditor();
+                                                 if (picked == []) {
+                                                     const f = (asset as AssetTree.ListviewAsset).getListview();
+                                                     addResource(f, currentScene.mousePosition);
+                                                     MasterUndoable.commit();
+                                                 }
+                                             }
                                              if (asset is AssetTree.SceneAsset) {
                                                  const picked = getUnderMouseInEditor();
                                                  if (picked == []) {
@@ -2920,6 +2938,8 @@ Tabview.Tab {
 	    const rn = n as ResourceNode;
             if (rn.parent is GroupResourceNode) {
                 (rn.parent as GroupResourceNode).deleteContent(rn);
+            } else if (rn.parent is ResourceListview of ?) {
+                (rn.parent as ResourceListview of ?).deleteContent(rn);
             } else {
                 delete n as ResourceNode from currentResource.resources;
                 if (rn.temporal <> null) {

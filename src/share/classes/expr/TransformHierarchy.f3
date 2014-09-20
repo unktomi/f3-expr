@@ -19,6 +19,11 @@ bound function makeTreeNode from (parent is Treeview.Treenode, n is Node) to Tre
             parent: parent;
             n: n;
         }
+    } else if (n is ResourceListview of ?) {
+        ListviewTreenode {
+            parent: parent;
+            n: n;
+        }
     } else {
         Treenode {
             parent: parent;
@@ -46,6 +51,12 @@ public class Treenode is Treeview.Treenode {
 	super.open();
 	println("open {n} => {children.size()}");
     }
+}
+
+public class ListviewTreenode is Treenode {
+    override var canOpen = bind (n as ResourceListview of ?).cellContent.size() > 0;
+    override var label = bind (n as ResourceListview of ?).url;
+    override var children = bind foreach (r in (n as ResourceListview of ?).cellContent) Treenode { n: r }
 }
 
 public class WebBrowserTreenode is Treenode {
