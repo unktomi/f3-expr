@@ -8,6 +8,7 @@ import f3.math.*;
 import expr.undo.*;
 import expr.prog.Program;
 import expr.InspectedElement.*;
+import f3.media.svg.SVG;
 import f3.lang.*;
 
 public function colorPtr from (p is Ref of Color, i is Integer) to Ref of Number
@@ -62,7 +63,7 @@ class Input {
 }
 
 public class ResourceNode is TransformNode, ResourceTarget, NodeAPI, Inspectable {
-    public bound function instance to ResourceNode { null }
+    public bound function instance to Node { null }
     public const webBrowserFactory is AbstractWebBrowserFactory = the AbstractWebBrowserFactory;
     public const pathFactory is Shape2D.Path2DFactory = the Shape2D.Path2DFactory;
     public const layoutEngine is Text.LayoutEngine = the Text.LayoutEngine;
@@ -341,6 +342,29 @@ public class MaResourceNode is ResourceNode {
     public const model is Ma.Model;
     override var url = bind model.url;
     override var content = bind [events, model.getSpatialRoot()];
+}
+
+public class SVGResourceNode is ResourceNode {
+    public const svg is SVG;
+    override var url = bind svg.url;
+    override var content = bind [svg.root];
+    override bound function instance to Node
+    {
+        SVGResourceNode {
+            tx: tx;
+            ty: ty;
+            tz: tz;
+            sx: sx;
+            sy: sy;
+            sz: sz;
+            rx: rx;
+            ry: ry;
+            rz: rz;
+            svg: SVG {
+                url: url;
+            }
+        }
+    }
 }
 
 public class F3AssimpResourceNode is ResourceNode {

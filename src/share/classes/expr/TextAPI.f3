@@ -1,7 +1,10 @@
 package expr;
 import f3.math.*;
 import f3.media.scene.*;
+import f3.media.scene.Shape2D.*;
 
 public interface TextAPI {
     public function setText from (text is String) to ();
+    public function setForeground from (paint is Paint) to ();
+    public function setBackground from (paint is Paint) to ();
 }

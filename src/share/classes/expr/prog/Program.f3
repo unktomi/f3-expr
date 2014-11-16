@@ -151,7 +151,7 @@ public class EvalContext {
 
     function lookupSpatialDebug from (name is String) to Node {
         const r = lookupSpatial(name);
-        //println("lookup spatial {name} => {r}");
+        //        println("lookup spatial {name} => {r}");
         return r;
     }
 

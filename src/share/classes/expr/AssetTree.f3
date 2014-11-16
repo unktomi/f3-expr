@@ -34,8 +34,11 @@ public class ListviewAsset is SpatialAsset {
     protected var count = 1;
     override var name is String = "List";
     public function getListview to ResourceListview of ? {
+        var idNum = count++;
         ResourceListview of Object {
-            url: "node://List {count++}";
+            override var url = bind "list://{id}";
+            id: "List {idNum}";
+            displayName: "List {idNum}";
         }
     }
 }

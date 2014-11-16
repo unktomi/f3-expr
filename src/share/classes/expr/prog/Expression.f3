@@ -27,6 +27,29 @@ import expr.AssetTree.sort;
 const QUOT = "\"";
 const BACK = "\\";
 
+function getSourceType from (t is F3Type) to String
+{
+    if (t is F3ClassType) {
+        const x = t as F3ClassType;
+        const targs is F3Type[] = x.getTypeParameters();
+        if (targs.size() > 0) {
+            var s = "{x.getName()} of (";
+            var sep = "";
+            for (j in targs) {
+                s = "{s}{sep}{getSourceType(j)}";
+                sep = ", ";
+            }
+            s = "{s})";
+            return s;
+        }
+    }
+    if (t.isTypeVariable()) {
+        return "java.lang.Object";
+    }
+    return t.getName();
+}
+
+
 function toSourceCode from (str is String) to String
 {
     var strBuff = new java.lang.StringBuffer();
@@ -1053,6 +1076,14 @@ public class Member {
             isStatic: m.isStatic();
         }
     }
+    public function isEvent to Boolean 
+    {
+        m is F3FunctionMember and {
+            const fun = m as F3FunctionMember;
+            const ft = fun.getType();
+            ft.minArgs() == 0 and OBSERVABLE_TYPE.isAssignableFrom(ft.getReturnType());
+        }
+    }
     public const rt is F3Type;
     public const m is F3Member; 
     public const t is F3Type;
@@ -1121,6 +1152,9 @@ public class Member {
 }
 
 public class FunctionMember is Member {
+    override function isEvent to Boolean {
+        ft.minArgs() == 0 and OBSERVABLE_TYPE.isAssignableFrom(ft.getReturnType())
+    }
     public var isInfix is Boolean;
     public var ft is F3FunctionType = bind (m as F3FunctionMember).getType();
     override public function serialize to MemberNode 
@@ -8074,7 +8108,7 @@ public class Canvas is ResizableNode, Focusable, KeyboardInputHandler, Scrollabl
         const mem = e as MemberExpression;
 	var itype = if mem.member.m.isStatic() then OBJECT_TYPE else mem.member.m.getDeclaringClass();
         if (itype == null) itype = OBJECT_TYPE;
-	var result = "var _ = function from (debugger is f3.util.ObservableDebugger, i$ is Object, getVar is function from String to Object, getNode is function from String to f3.media.scene.Node, getClip is function from String to f3.media.scene.TimeNode, $register is function from (Object) to ()) to (f3.util.Observable of ?)[] \{ var i0 = i$ as {itype.getName()};  var obsvbs$ is f3.util.Observable[]; \{ ";
+	var result = "var _ = function from (debugger is f3.util.ObservableDebugger, i$ is Object, getVar is function from String to Object, getNode is function from String to f3.media.scene.Node, getClip is function from String to f3.media.scene.TimeNode, $register is function from (Object) to ()) to (f3.util.Observable of ?)[] \{ var i0 = i$ as {getSourceType(itype)};  var obsvbs$ is f3.util.Observable[]; \{ ";
         if (terms == []) {
             var rs = foreach (x in eventContext.content) {
                 if (x is Context.ResourceNodeContext) {
