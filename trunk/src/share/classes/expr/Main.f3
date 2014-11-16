@@ -504,6 +504,11 @@ public function run from (args is String[]) to ()
                     parent: groupContext;
                     resource: rn;
                 }
+            } else if (rn is ResourceListview) {
+                ctx = Context.ResourceListviewContext { 
+                    parent: groupContext;
+                    resource: rn;
+                }
             } else {
                 ctx = Context.ResourceNodeContext { 
                     parent: groupContext;
@@ -741,9 +746,8 @@ public function run from (args is String[]) to ()
                 monitorForChanges: yes;
 		url: url;
 	    }
-	    const rn = ResourceNode {
-		url: url;
-		content: bind svg.root;
+	    const rn = SVGResourceNode {
+                svg: svg;
 	    }	
 	    addResource(rn, pt);
 	} else if (loweredUrl.endsWith(".png") or 
@@ -2936,10 +2940,14 @@ Tabview.Tab {
     function deleteResource from (n is Node) to () {
 	if (n is ResourceNode) {
 	    const rn = n as ResourceNode;
-            if (rn.parent is GroupResourceNode) {
-                (rn.parent as GroupResourceNode).deleteContent(rn);
-            } else if (rn.parent is ResourceListview of ?) {
-                (rn.parent as ResourceListview of ?).deleteContent(rn);
+            var p = rn.parent;
+            while (not (p is ResourceNode)) {
+                p = p.parent;
+            }
+            if (p is GroupResourceNode) {
+                (p as GroupResourceNode).deleteContent(rn);
+            } else if (p is ResourceListview of ?) {
+                (p as ResourceListview of ?).deleteContent(rn);
             } else {
                 delete n as ResourceNode from currentResource.resources;
                 if (rn.temporal <> null) {

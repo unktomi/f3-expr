@@ -156,8 +156,20 @@ public class NumericSliderField is SliderField {
         return false;
     }
 }
-
-public class ColorInspector extends AbstractNode {
+/*
+public class TypeInspector is AbstractNode {
+    const chooseType = ChooseType {
+        onLoseFocus: hideChooser;
+        transform: bind chooseTypeTransform;
+        treeModel: bind assetModel;
+        visible: false;
+        chooseMembers: false;
+        onSelectType: bind selectType;
+        onEscape: hideChooser;
+    };
+}
+*/
+public class ColorInspector is AbstractNode {
     public var editable is Boolean = true;
     public var i is InspectedColor;
     public var height is Number = 15;

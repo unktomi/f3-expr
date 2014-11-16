@@ -10,14 +10,17 @@ import expr.prog.Program;
 import expr.InspectedElement.*;
 import f3.lang.*;
 import Listview.Listmodel;
-
-class Value of a {
-    public var value is a;
-}
+import Reflect.*;
+import f3.reflect.*;
+import java.lang.Math;
+import f3.media.scene.Shape2D.*;
 
 public class ListCell of a {
-    public const index is Integer;
-    public const value is a;
+    public var index is Integer;
+    public var value is a;
+    public var foreground is Paint;
+    public var background is Paint;
+    public var cellHeight is Number;
 }
 
 public class ResourceListview of a is ResourceNode {
@@ -34,7 +37,7 @@ public class ResourceListview of a is ResourceNode {
         delete rn from cellContent;
     }
 
-    public function observeCell to Observable of ListCell
+    public function renderCell to Observable of ListCell of a
     {
         cellSubject;
     }
@@ -42,27 +45,91 @@ public class ResourceListview of a is ResourceNode {
     public var width is Number = 200;
     public var height is Number = 100;
     public var cellHeight is Number = 16;
+    public var dataSize is Integer = 5;
+    public const listGroup = InspectionGroup {
+        displayName: "list";
+        targets: 
+        [InspectedNumberValue {
+            displayName: "width";
+            target: &width;
+        },
+        InspectedNumberValue {
+            displayName: "height";
+            target: &height;
+        },
+        InspectedNumberValue {
+            displayName: "Cell Height";
+            target: &cellHeight;
+        }
+        InspectedIntegerValue {
+            displayName: "Data Size";
+            target: &dataSize;
+        }]
+    };
+      
+    public var foreground is Color = new Color(.2, .2, .2, 1);
+    public var background is Color = 
+	Color.color(.6, .6, .6, 1);
+    public var selectedBackground is Color = 
+	Color.color(.4, .4, .4, 1);
+    public var focusedAndSelectedForeground is Color = 
+	Color.color(.9, .9, .9, 1);
+    public var selectedForeground = Color.color(.77, .77, .77, 1);
 
-    const cellSubject = Subject of ListCell {};
+    const cellSubject = Subject of ListCell of a {};
+    public var dataType is F3Type = OBJECT_TYPE;
+    public var dataSource is a[];
 
-    public var getSize is function from () to Integer;
-    public var getValue is function from Integer to a;
+    const listSelf = this;
 
-    const self = this;
+    public var getData is function from () to a[];
 
-    const listModel is Listmodel of Value of a = Listmodel of Value of a {
-        var values = [Value of a {}, Value of a {}];
+    bound var values = foreach (i in [0..<Math.max(dataSize, dataSource.size())]) ListCell of a { value: bind dataSource[i] }
+
+    const listModel is Listmodel of ListCell of a = Listmodel of ListCell of a {
         override var size is Integer = bind values.size();
-        override function getValue from (i is Integer) to Value of a { values[i] }
+        override function getValue from (i is Integer) to ListCell of a { values[i] }
+    };
+
+    override function lookup from (id is String) to Node
+    {
+        const r = currentCell.lookup(id);
+        //        println("lookup {id}, currentCell={currentCell} r={r}");
+        if (r == null) {
+            return super.lookup(id);
+        }
+        return r;
     }
 
-    const visual is Listview of Value of a = Listview of Value of a {
+    var currentCell is Node;
+
+    override function update to ()
+    {
+        for (i in [0..<listModel.size]) {
+            const value = listModel.getValue(i);
+            value.index = i;
+            currentCell = visual.elements[i].view;
+            value.foreground = if (visual.isSelected(i)) then visual.selectionForeground else visual.foreground;
+            value.background = if (visual.isSelected(i)) then visual.selectionBackground else visual.background;
+            value.cellHeight = cellHeight;
+            cellSubject.onNext(value);
+        }
+        super.update();
+    }
+        
+
+    const visual is Listview of ListCell of a = Listview of ListCell of a {
         width: bind width;
         height: bind height;
         cellHeight: bind cellHeight;
         model: bind listModel;
-        override function render from (i is Integer, value is Value of a) to Node
+        foreground: bind ColorPaint(foreground);
+        background: bind ColorPaint(background);
+        selectionBackground: bind ColorPaint(selectedBackground);
+        override var selectionForeground = bind ColorPaint(if (focused) then listSelf.focusedAndSelectedForeground else listSelf.selectedForeground);
+        override function render from (i is Integer, value is ListCell of a) to Node
         {
+
             if (i == 0) {
                 Group {
                     content: bind cellContent;

@@ -1,6 +1,7 @@
 package expr;
 import f3.util.*;
 import f3.media.scene.*;
+import f3.media.scene.Shape2D.*;
 import expr.undo.*;
 
 public const FONT_WEIGHT_TYPE = Reflect.getType("expr.AbstractResourceText.FontWeightSelection");
@@ -40,6 +41,16 @@ public abstract class AbstractResourceText is ResourceNode, TextAPI, ResourceLea
 
     public var font = bind layoutEngine.createFont("font-size:{fontSize.selection};font-family:{fontFamily.selection};font-weight:{fontWeight.selection};font-style:{fontStyle.selection};text-decoration:{fontTextDecoration.selection}");
 
+
+    public function setForeground from (p is Paint) to () 
+    {
+        foreground = (p as ColorPaint).color;
+    }
+
+    public function setBackground from (p is Paint) to () 
+    {
+        background = (p as ColorPaint).color;
+    }
 
     postinit {
         undoList.addTarget("fontSize", &fontSize);

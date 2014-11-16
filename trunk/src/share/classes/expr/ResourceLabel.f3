@@ -7,26 +7,26 @@ import Resources.*;
 
 class Instance {
     public var src is ResourceLabel;
-    public var target is ResourceLabel = bind ResourceLabel {
+    public var target is ResourceLabel = ResourceLabel {
         webBrowserFactory: bind src.webBrowserFactory;
-        pathFactory: bind src.pathFactory;
-        layoutEngine: bind src.layoutEngine;
-        effectLoader: bind src.effectLoader;
-        soundLoader: bind src.soundLoader;
-        movieLoader: bind src.movieLoader;
-        imageLoader: bind src.imageLoader;
-        tx: bind src.tx;
-        ty: bind src.ty;
-        id: bind src.id;
-        url: bind src.url;
-        fontSize: bind src.fontSize;
-        fontFamily: bind src.fontFamily;
-        fontStyle: bind src.fontStyle;
-        fontWeight: bind src.fontWeight;
-        foreground: bind src.foreground;
-        background: bind src.background;
-        width: bind src.width;
-        text: bind src.text;
+        pathFactory:  bind src.pathFactory;
+        layoutEngine:  bind src.layoutEngine;
+        effectLoader:  bind src.effectLoader;
+        soundLoader:  bind src.soundLoader;
+        movieLoader:  bind src.movieLoader;
+        imageLoader:  bind src.imageLoader;
+        tx: src.tx;
+        ty: src.ty;
+        id: src.id;
+        url: src.url;
+        fontSize: src.fontSize;
+        fontFamily: src.fontFamily;
+        fontStyle: src.fontStyle;
+        fontWeight: src.fontWeight;
+        foreground: src.foreground;
+        background: src.background;
+        width: src.width;
+        text: src.text;
     };
 }
 
@@ -35,7 +35,6 @@ function createInstance from (src is ResourceLabel) to Instance {
         src: src;
     }
 }
-
 
 public class ResourceLabel is AbstractResourceText {
 
@@ -58,7 +57,7 @@ public class ResourceLabel is AbstractResourceText {
     override var content = bind [impl];
 
 
-    public override bound function instance to ResourceNode {
+    public override bound function instance to Node {
         createInstance(this).target;
     }
 
@@ -68,6 +67,7 @@ public class ResourceLabel is AbstractResourceText {
                                             lookupSpatial is function from String to Node,
                                             lookupTemporal is function from String to TimeNode) to Node 
     {
+        /*
         const n = this;
         const f = this;
         const i = TextOutputResource {
@@ -115,6 +115,8 @@ public class ResourceLabel is AbstractResourceText {
         tf.setText(r.text);
         println("instanced: {tf}");
         return tf;
+        */
+        null
     }
 
 }
