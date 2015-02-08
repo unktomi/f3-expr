@@ -441,11 +441,12 @@ function formatEnglishName from (name is String, id is String, html is Boolean) 
 
 function formatEnglishName from (name is String, id is String, html is Boolean, asOp is Boolean) to String 
 {
-    const n = Names.formatName(name);
+    const n = if name.length() > 0 and Character.isDigit(name.charAt(0)) then name else Names.formatName(name);
     const isOp = asOp and operatorMap.containsKey(n);
     const m = if isOp then operatorMap.get(n) else n;
     if (html) {
         const t = m.toLowerCase(); 
+        println("to lower {m} => {t}");
         if (m.startsWith("Get ") and not m.endsWith(" of")) {
             if (id == "") {
                 "<i>{t}</i> of";
@@ -4830,9 +4831,10 @@ public class ParameterView is InputView {
             override function onChange from (n is Number) to () 
             {
                 super.onChange(n);
+                println("ON CHANGE {n}");
                 parameter.constantValue = n;
-                canvas.dumpSrc();
                 MasterUndoable.commit();
+                canvas.dumpSrc();
             }
         };
         return f;
