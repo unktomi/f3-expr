@@ -26,6 +26,7 @@
       <fileset dir="../form-follows-function/f3_assimp/build/" includes="*.jar"/>
       <fileset dir="../form-follows-function/f3_assimp/lib/" includes="jassimp.jar"/>
       <fileset dir="../form-follows-function/dist/lib/shared" includes="*.jar"/>
+      <fileset dir="../form-follows-function//lib" includes="jsr166.jar"/>
       <fileset  erroronmissingdir="false" dir="../form-follows-function/f3_awesomium_jogl/build/" includes="*.jar"/>
       <fileset  erroronmissingdir="false" dir="../form-follows-function/f3_awesomium_jogl/lib/" includes="js.jar"/>
     </copy>
