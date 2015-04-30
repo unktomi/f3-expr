@@ -681,6 +681,7 @@ public class ContextTreemodel is Treemodel {
 
     public function toTreeNode from (c is Context) to ContextTreenode 
     {
+        if (c == null) return null;
         if (c == rootContext) return root as ContextTreenode;
         var result is ContextTreenode;
         const pn = toTreeNode(c.parent);

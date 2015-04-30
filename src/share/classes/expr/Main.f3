@@ -109,9 +109,11 @@ public class EditorState {
     public var playheadFrame is Integer = 0;
     public var frameRate is Integer = 24;
     public var recent is String[];
+    public var eventSelection is String;
 }
 
-function saveEditorState from (scene is Scene, player is Timeline, trax is Trax, recent is String[]) to () 
+function saveEditorState from (scene is Scene, player is Timeline, trax is Trax, 
+                               recent is String[], eventSelection is String) to () 
 {
     var internalWindows is InternalWindowState[];
     const f is function from ((), Node) to () 
@@ -141,13 +143,14 @@ function saveEditorState from (scene is Scene, player is Timeline, trax is Trax,
 //            playheadFrame: trax.currentFrame as Integer;
             frameRate: trax.frameRate as Integer;
             recent: recent;
+            eventSelection: eventSelection;
         });
     w.flush();
     w.close();
     file.renameTo(new java.io.File(".expr.editorstate"));
 }
 
-function loadEditorState from (stage is JoglStage, scene is Scene, player is Timeline, trax is Trax) to String[] 
+function loadEditorState from (stage is JoglStage, scene is Scene, player is Timeline, trax is Trax, selectEvent is function from String to ()) to String[] 
 {
     const file = new java.io.File(".expr.editorstate");
     if (file.exists()) {
@@ -184,6 +187,9 @@ function loadEditorState from (stage is JoglStage, scene is Scene, player is Tim
             } catch (e is java.lang.Exception) {
                 e.printStackTrace();
             }
+        }
+        if (s.eventSelection <> "") {
+            selectEvent(s.eventSelection);
         }
         return result;
     }
@@ -1033,12 +1039,14 @@ public function run from (args is String[]) to ()
         if (mainScene.currentResource.url <> "") {
             savePoint = MasterUndoable.now;
             updateRecent(mainScene.currentResource.url);
+            const tn = contextTree.selectedTreenode as Context.ContextTreenode;
             Resources.save(mainScene.currentResource.url,
                            mainContext.programs,
                            mainScene,
                            mainScene.currentResource,
                            currentAnimResource,
-                           currentScenes[x | x <> mainScene]);
+                           currentScenes[x | x <> mainScene],
+                           tn.context.fullName());
             return true;
         }
         return false;
@@ -1617,6 +1625,10 @@ public function run from (args is String[]) to ()
         println("SET ANIM RESOURCES bounds={mainTimeLayer.bounds}");
         transformHierarchy.selectScene(mainScene);
         for (p in allPrograms) p.evaluate();
+        const selectedCtx = mainContext.resolve(sceneRes.eventSelection);
+        if (selectedCtx <> null) {
+            contextTree.select(contextModel.toTreeNode(selectedCtx));
+        }
 	MasterUndoable.reset();
 	MasterUndoable.commit();
 	savePoint = MasterUndoable.now;
@@ -1696,10 +1708,15 @@ public function run from (args is String[]) to ()
             override function update {
                 const now = java.lang.System.currentTimeMillis();
                 if (lastTime == 0) {
-                    recentList = loadEditorState(joglStage(), this, player, trax);
+                    recentList = loadEditorState(joglStage(), this, player, trax, function from (path is String) to () {
+                            const ctx = mainContext.resolve(path);
+                            const tn = contextModel.toTreeNode(ctx);
+                            contextTree.select(tn);
+                        });
                     lastTime = now;
                 } else if (now - lastTime > 2000) {
-                    saveEditorState(this, player, trax, recentList);
+                    const tn = contextTree.selectedTreenode as Context.ContextTreenode;
+                    saveEditorState(this, player, trax, recentList, tn.context.fullName());
                     if (savePoint <> MasterUndoable.now) {
                         doSave();
                     }
@@ -2762,7 +2779,8 @@ Tabview.Tab {
             if (not saveChangesIfNecessary()) {
                 return false;
             }
-            saveEditorState(editorScene, player, trax, recentList);
+            const tn = contextTree.selectedTreenode as Context.ContextTreenode;
+            saveEditorState(editorScene, player, trax, recentList, tn.context.fullName());
             return true;
         }
         title: bind "{formatURL(mainScene.currentResource.url)} {if (savePoint <> MasterUndoable.now) then " (Unsaved)" else ""}";

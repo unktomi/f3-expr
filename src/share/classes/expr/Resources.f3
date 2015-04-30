@@ -441,6 +441,7 @@ public class SceneResource is Resource {
     public var spatialResources is SpatialResource[];
     public var temporalResources is TemporalResource[];
     public var layers is SceneLayer[];
+    public var eventSelection is String;
 }
 
 public class ProgramResource is Resource {
@@ -551,7 +552,8 @@ public function save
 	  mainScene is Scene,
 	  spatial is ResourceGroup,
 	  temporal is ResourceTimeGroup,
-          scenes is ResourceScene[])
+          scenes is ResourceScene[],
+          eventSelection is String)
     to ()
 
 {
@@ -561,6 +563,7 @@ public function save
 	const file = new java.io.File(url.substring(5));
         const builder = ResourceBuilder {};
 	const sceneRes = SceneResource {
+            eventSelection: eventSelection;
             url: url;
 	    width: scene.width;
 	    height: scene.height;
